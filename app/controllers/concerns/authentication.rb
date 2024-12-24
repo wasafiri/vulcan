@@ -29,21 +29,21 @@ module Authentication
   # Redirects unauthenticated users to the sign-in page with an alert message
   def authenticate_user!
     unless current_user
-      redirect_to sign_in_path, alert: 'Please log in first'
+      redirect_to sign_in_path, alert: "Please log in first" if !current_page?(sign_in_path)
     end
   end
 
   # Restricts access to admin users only
   def require_admin!
     unless current_user.admin?
-      redirect_to root_path, alert: 'Unauthorized access'
+      redirect_to root_path, alert: "Unauthorized access"
     end
   end
 
   # Restricts access to evaluator users only
   def require_evaluator!
     unless current_user.evaluator?
-      redirect_to root_path, alert: 'Unauthorized access'
+      redirect_to root_path, alert: "Unauthorized access"
     end
   end
 end
