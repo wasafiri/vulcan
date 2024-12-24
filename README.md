@@ -1,6 +1,6 @@
 # Vulcan: Maryland Accessible Telecommunications CRM
 
-Vulcan is a Ruby on Rails application that manages the Maryland Accessible Telecommunications (MAT) program. 
+Vulcan is a Ruby on Rails application that facilitates Maryland Accessible Telecommunications (MAT) workflows. 
 
 ## Features
 
