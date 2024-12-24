@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>Maryland Accessible Telecommunications Program</title>
+   <%= csrf_meta_tags %>
+   <%= csp_meta_tag %>
+
+   <!-- Tailwind CSS -->
+   <%= stylesheet_link_tag "application", media: "all", "data-turbo-track": "reload" %>
+   
+   <style>
+     /* Custom focus outline for better visibility */
+     a:focus, button:focus {
+       outline: 2px solid #4a90e2;
+       outline-offset: 2px;
+     }
+   </style>
+ </head>
+ 
+ <body class="font-sans antialiased bg-gray-50">
+   <!-- Navigation Bar -->
+   <header>
+     <nav role="navigation" aria-label="Main Navigation" class="bg-white shadow">
+       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+         <div class="flex justify-between h-16">
+           <!-- Logo and Primary Navigation -->
+           <div class="flex">
+             <!-- Logo -->
+             <div class="flex-shrink-0 flex items-center">
+               <%= link_to root_path, class: "flex items-center" do %>
+                 <img src="<%= asset_path('TAM_color.png') %>" alt="Logo for TAM" class="h-8 w-auto">
+               <% end %>
+             </div>
+             
+             <!-- Primary Navigation Links -->
+             <div class="hidden md:flex items-center space-x-4 ml-10">
+               <ul class="flex space-x-4">
+                 <li>
+                   <%= link_to 'Help', help_path, class: "py-5 px-3 text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" %>
+                 </li>
+                 <li>
+                   <%= link_to 'How It Works', how_it_works_path, class: "py-5 px-3 text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" %>
+                 </li>
+                 <li>
+                   <%= link_to 'Eligibility', eligibility_path, class: "py-5 px-3 text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" %>
+                 </li>
+                 <li>
+                   <%= link_to 'Contact', contact_path, class: "py-5 px-3 text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" %>
+                 </li>
+               </ul>
+             </div>
+           </div>
+           
+           <!-- Secondary Navigation (Authentication Links) -->
+           <div class="hidden md:flex items-center space-x-4">
+             <% if current_user %>
+               <span class="py-5 px-3 text-gray-700">Hello, <%= current_user.first_name %>!</span>
+               <%= link_to 'Dashboard', dashboard_path_for(current_user), class: "py-2 px-3 bg-indigo-600 text-white rounded hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" %>
+               <%= button_to 'Sign Out', sign_out_path, method: :delete, class: "py-2 px-3 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500", form_class: "inline" %>
+             <% else %>
+               <%= link_to 'Sign In', sign_in_path, class: "py-2 px-3 bg-indigo-600 text-white rounded hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" %>
+               <%= link_to 'Sign Up', sign_up_path, class: "py-2 px-3 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500" %>
+             <% end %>
+           </div>
+         </div>
+       </div>
+     </nav>
+   </header>
+
+  <!-- Hero Section -->
+  <section class="bg-white">
+    <div class="max-w-7xl mx-auto px-4 py-16 flex flex-col-reverse lg:flex-row items-center gap-8"> <!-- Added gap-8 for spacing -->
+      <div class="w-full lg:w-1/2">
+        <h1 class="text-4xl font-bold text-gray-800">Communicate freely, without dependence.</h1>
+        <p class="mt-4 text-gray-600">
+          Using the phone isn't easy for everyone. The Maryland Accessible Telecommunications Program provides accessible telecommunications equipment to help you make calls on your own. Whether you need specialized phones or hearing devices, we support your independence.
+        </p>
+        <% if current_user&.constituent? %>
+          <% if current_user.active_application? %>
+            <div class="mt-6">
+              <%= link_to 'View/Edit Application', constituent_application_path(current_user.active_application), class: "inline-block bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500", aria_label: "View or edit your current application" %>
+            </div>
+          <% else %>
+            <div class="mt-6">
+              <%= link_to 'Apply Now', new_constituent_application_path, class: "inline-block bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500", aria_label: "Begin your application for telecommunications equipment" %>
+            </div>
+          <% end %>
+        <% end %>
+      </div>
+      <div class="w-full lg:w-1/2 flex items-center justify-center">
+        <img src="<%= asset_path('mat_vulcan.png') %>" alt="Image of the god Vulcan" class="rounded-md w-2/3" />
+      </div>
+    </div>
+  </section> 
+
+     <!-- Features/Services Section -->
+     <section class="bg-gray-50 py-12">
+       <div class="max-w-7xl mx-auto px-4">
+         <h2 class="text-3xl font-semibold text-center text-gray-800">Our Services</h2>
+         <p class="mt-4 text-center text-gray-600">
+           Learn more about how the Maryland Accessible Telecommunications program can support you.
+         </p>
+       </div>
+     </section>
+
+     <!-- Call to Action Section -->
+     <% if !current_user || current_user&.constituent? %>
+       <section class="bg-indigo-600">
+         <div class="max-w-7xl mx-auto px-4 py-12 flex flex-col md:flex-row items-center justify-between">
+           <div class="text-center md:text-left">
+             <h2 class="text-3xl font-semibold text-white">Ready to Get Started?</h2>
+             <p class="mt-2 text-white">
+               Apply now to access the accessible telecommunications equipment you need.
+             </p>
+             <%= link_to 'Apply Now', new_application_path, class: "mt-4 inline-block bg-white text-indigo-600 px-6 py-3 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-white", aria_label: "Begin your application for telecommunications equipment" %>
+           </div>
+         </div>
+       </section>
+     <% end %>
+   </main>
+ </body>
+</html>

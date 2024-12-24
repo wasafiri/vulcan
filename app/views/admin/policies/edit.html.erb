@@ -1,0 +1,24 @@
+<h1>Edit Policies</h1>
+
+<%= form_with url: admin_policies_path, method: :patch do |form| %>
+  <table>
+    <thead>
+      <tr>
+        <th>Policy</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @policies.each do |policy| %>
+        <tr>
+          <td><%= policy.key.humanize %></td>
+          <td>
+            <%= hidden_field_tag "policies[#{policy.id}][id]", policy.id %>
+            <%= number_field_tag "policies[#{policy.id}][value]", policy.value %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+  <%= submit_tag 'Update Policies' %>
+<% end %>

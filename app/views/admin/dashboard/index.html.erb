@@ -1,0 +1,13 @@
+<h1>Admin Dashboard</h1>
+
+<div class="stats">
+  <div>Total Constituents: <%= @constituents_count %></div>
+  <div>Open Applications: <%= @open_applications_count %></div>
+  <div>Today's Appointments: <%= @appointments_today %></div>
+</div>
+
+<div class="links">
+  <%= link_to "Constituents Dashboard", admin_constituents_dashboard_index_path %>
+  <%= link_to "Applications Dashboard", admin_applications_dashboard_index_path %>
+  <%= link_to "Appointments Dashboard", admin_appointments_dashboard_index_path %>
+</div>

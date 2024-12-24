@@ -1,0 +1,100 @@
+<!-- app/views/registrations/new.html.erb -->
+<div class="min-h-screen flex items-center justify-center bg-gray-100">
+  <div class="bg-white p-8 rounded shadow-md w-full max-w-lg">
+    <h2 class="text-2xl font-semibold mb-6 text-center">Create Account</h2>
+
+    <% if flash[:alert] %>
+      <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <span><%= flash[:alert] %></span>
+      </div>
+    <% end %>
+
+    <%= form_with model: @user, url: sign_up_path, local: true, class: "space-y-6" do |form| %>
+      <div>
+        <%= form.label :first_name, "First Name", class: "block text-gray-700" %>
+        <%= form.text_field :first_name, 
+              class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500", 
+              required: true, 
+              autofocus: true %>
+      </div>
+
+      <div>
+        <%= form.label :middle_initial, "Middle Initial (Optional)", class: "block text-gray-700" %>
+        <%= form.text_field :middle_initial, 
+              class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500", 
+              maxlength: 1 %>
+      </div>
+
+      <div>
+        <%= form.label :last_name, "Last Name", class: "block text-gray-700" %>
+        <%= form.text_field :last_name, 
+              class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500", 
+              required: true %>
+      </div>
+
+      <div>
+        <%= form.label :email, "Email Address", class: "block text-gray-700" %>
+        <%= form.email_field :email, 
+              class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500", 
+              required: true %>
+      </div>
+
+      <div>
+        <%= form.label :password, "Password", class: "block text-gray-700" %>
+        <%= form.password_field :password, 
+              class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500", 
+              required: true, 
+              minlength: 6 %>
+      </div>
+
+      <div>
+        <%= form.label :password_confirmation, "Confirm Password", class: "block text-gray-700" %>
+        <%= form.password_field :password_confirmation, 
+              class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500", 
+              required: true, 
+              minlength: 6 %>
+      </div>
+
+      <div>
+        <%= form.label :phone, "Phone Number", class: "block text-gray-700" %>
+        <%= form.telephone_field :phone, 
+              class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500", 
+              required: true %>
+      </div>
+
+      <div>
+        <%= form.label :date_of_birth, "Date of Birth", class: "block text-gray-700" %>
+        <%= form.date_field :date_of_birth, 
+              class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500", 
+              required: true %>
+      </div>
+
+      <div>
+        <%= form.label :timezone, "Timezone", class: "block text-gray-700" %>
+        <%= form.select :timezone, ActiveSupport::TimeZone.all.map(&:name), 
+              { prompt: "Select Timezone" }, 
+              class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500", 
+              required: true %>
+      </div>
+
+      <div>
+        <%= form.label :locale, "Language Preference", class: "block text-gray-700" %>
+        <%= form.select :locale, [['English', 'en'], ['Spanish', 'es'], ['French', 'fr'], ['Other', 'other']], 
+              { prompt: "Select Language" }, 
+              class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500", 
+              required: true %>
+      </div>
+
+      <!-- Add any additional fields as necessary -->
+
+      <div class="flex items-center justify-between">
+        <%= form.submit "Sign Up", class: "w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" %>
+      </div>
+    <% end %>
+
+    <p class="mt-4 text-center text-gray-600">
+      Already have an account? 
+      <a href="<%= sign_in_path %>" class="text-indigo-600 hover:text-indigo-500">Sign In</a>
+    </p>
+  </div>
+</div>
