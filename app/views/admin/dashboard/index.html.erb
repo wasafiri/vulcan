@@ -1,13 +1,90 @@
-<h1>Admin Dashboard</h1>
+<main class="container mx-auto px-4 py-8" role="main">
+  <!-- Stats Cards Section -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <!-- YTD Constituents -->
+    <div class="bg-white rounded-lg shadow p-6">
+      <h3 class="text-lg font-medium text-gray-900">Constituents YTD</h3>
+      <p class="text-3xl font-bold text-indigo-600"><%= @ytd_constituents_count %></p>
+      <p class="text-sm text-gray-500">Since July 1st, <%= @current_fiscal_year %></p>
+    </div>
 
-<div class="stats">
-  <div>Total Constituents: <%= @constituents_count %></div>
-  <div>Open Applications: <%= @open_applications_count %></div>
-  <div>Today's Appointments: <%= @appointments_today %></div>
-</div>
+    <!-- Active Applications -->
+    <div class="bg-white rounded-lg shadow p-6">
+      <h3 class="text-lg font-medium text-gray-900">Active Applications</h3>
+      <p class="text-3xl font-bold text-indigo-600"><%= @open_applications_count %></p>
+    </div>
 
-<div class="links">
-  <%= link_to "Constituents Dashboard", admin_constituents_dashboard_index_path %>
-  <%= link_to "Applications Dashboard", admin_applications_dashboard_index_path %>
-  <%= link_to "Appointments Dashboard", admin_appointments_dashboard_index_path %>
-</div>
+    <!-- Awaiting Equipment/Services -->
+    <div class="bg-white rounded-lg shadow p-6">
+      <h3 class="text-lg font-medium text-gray-900">Awaiting Equipment or Services</h3>
+      <p class="text-3xl font-bold text-indigo-600"><%= @pending_services_count %></p>
+    </div>
+
+    <!-- Empty Card -->
+    <div class="bg-white rounded-lg shadow p-6">
+      <h3 class="text-lg font-medium text-gray-900">Coming Soon</h3>
+    </div>
+  </div>
+
+  <!-- Tabs Section -->
+  <nav class="flex border-b border-gray-200 mb-6">
+    <% tabs = ['Incomplete Applications', 'Need Evaluation', 'Need Training', 'Equipment'] %>
+    <% tabs.each_with_index do |tab, index| %>
+      <%= link_to tab, 
+          admin_root_path(tab: tab.parameterize),
+          class: "w-1/4 py-4 px-1 text-center border-b-2 #{params[:tab]&.parameterize == tab.parameterize ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}",
+          role: "tab",
+          aria: { selected: params[:tab]&.parameterize == tab.parameterize } %>
+    <% end %>
+  </nav>
+
+  <!-- Content Section -->
+  <% if @applications.present? %>
+    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead>
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          <% @applications.each do |application| %>
+            <tr>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <%= application.created_at.strftime("%m/%d/%Y") %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <%= application.user.full_name %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <%= application.user.phone %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <%= application.user.email %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span class="<%= application_status_color(application.status) %> px-2 py-1 rounded-full text-xs">
+                  <%= application.status.titleize %>
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <%= link_to "View Application", admin_application_path(application), class: "text-indigo-600 hover:text-indigo-900" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <div class="bg-white rounded-lg shadow p-6 text-center">
+      <p class="text-gray-500">No records found</p>
+    </div>
+  <% end %>
+
+  <%= paginate @records if @records.present? %>
+</main>

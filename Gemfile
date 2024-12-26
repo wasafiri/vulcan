@@ -19,6 +19,9 @@ gem "cssbundling-rails"
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]
 gem "jbuilder"
 
+# pagination capability
+gem "pagy"
+
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 gem "bcrypt", "~> 3.1.7"
 
@@ -51,6 +54,9 @@ group :development, :test do
 
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
+
+  gem "minitest-rails", "~> 8.0.0"
+  gem "factory_bot_rails"
 end
 
 group :development do
@@ -65,16 +71,10 @@ group :test do
 end
 
 # gems for authentication
-gem 'authentication-zero'
+gem "authentication-zero"
 
 # gem for hosting images & getting ocr functionality
-gem 'aws-sdk-s3'
+gem "aws-sdk-s3"
 
 # gem for sending out emails
-gem 'ElasticEmail' 
-
-# gems for testing
-group :development, :test do
-  gem "minitest-rails", "~> 8.0.0"
-  gem "factory_bot_rails"
-end
+gem "ElasticEmail"

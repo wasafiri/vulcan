@@ -3,6 +3,8 @@ class ApplicationController < ActionController::Base
 
   before_action :set_current_attributes
 
+  include Pagy::Backend
+
   include Authentication
 
   private
