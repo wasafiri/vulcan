@@ -1,0 +1,27 @@
+<table class="min-w-full divide-y divide-gray-200">
+  <thead>
+    <tr>
+      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+    </tr>
+  </thead>
+  <tbody class="divide-y divide-gray-200">
+    <% @records.each do |application| %>
+      <tr>
+        <td class="px-6 py-4"><%= application.created_at.strftime("%m/%d/%Y") %></td>
+        <td class="px-6 py-4"><%= application.user.full_name %></td>
+        <td class="px-6 py-4"><%= application.user.phone %></td>
+        <td class="px-6 py-4"><%= application.user.email %></td>
+        <td class="px-6 py-4">
+          <%= button_to "Assign Trainer",
+              assign_trainer_admin_application_path(application),
+              method: :patch,
+              class: "text-indigo-600 hover:text-indigo-900" %>
+        </td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>

@@ -1,0 +1,23 @@
+<table class="min-w-full divide-y divide-gray-200">
+  <thead>
+    <tr>
+      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bid Number</th>
+      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Responses</th>
+      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+    </tr>
+  </thead>
+  <tbody class="divide-y divide-gray-200">
+    <% @records.each do |bid| %>
+      <tr>
+        <td class="px-6 py-4"><%= bid.number %></td>
+        <td class="px-6 py-4"><%= bid.created_at.strftime("%m/%d/%Y") %></td>
+        <td class="px-6 py-4"><%= bid.responses_received? ? "Yes" : "No" %></td>
+        <td class="px-6 py-4">
+          <%= link_to "View Bid", admin_bid_path(bid), 
+              class: "text-indigo-600 hover:text-indigo-900" %>
+        </td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>

@@ -28,9 +28,13 @@ module Authentication
 
   # Redirects unauthenticated users to the sign-in page with an alert message
   def authenticate_user!
-    unless current_user
-      redirect_to sign_in_path, alert: "Please log in first" if !current_page?(sign_in_path)
-    end
+    return if current_user
+    store_location
+    redirect_to sign_in_path, alert: "Please sign in to continue"
+  end
+
+  def store_location
+    session[:return_to] = request.fullpath if request.get?
   end
 
   # Restricts access to admin users only

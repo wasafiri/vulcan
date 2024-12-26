@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2024_12_24_022540) do
+ActiveRecord::Schema[8.0].define(version: 2024_12_26_175533) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -61,6 +61,9 @@ ActiveRecord::Schema[8.0].define(version: 2024_12_24_022540) do
     t.text "notes"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "status", default: 0
+    t.bigint "application_id", null: false
+    t.index ["application_id"], name: "index_evaluations_on_application_id"
     t.index ["constituent_id"], name: "index_evaluations_on_constituent_id"
     t.index ["evaluator_id"], name: "index_evaluations_on_evaluator_id"
   end
@@ -179,6 +182,7 @@ ActiveRecord::Schema[8.0].define(version: 2024_12_24_022540) do
   add_foreign_key "applications", "users", column: "medical_provider_id"
   add_foreign_key "appointments", "users"
   add_foreign_key "appointments", "users", column: "evaluator_id"
+  add_foreign_key "evaluations", "applications"
   add_foreign_key "evaluations", "users", column: "constituent_id"
   add_foreign_key "evaluations", "users", column: "evaluator_id"
   add_foreign_key "events", "users"
