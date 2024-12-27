@@ -1,16 +1,15 @@
 class User < ApplicationRecord
-
   has_secure_password
 
   # associations
   has_many :sessions, dependent: :destroy
-  has_many :received_notifications, class_name: 'Notification', foreign_key: :recipient_id, dependent: :destroy
+  has_many :received_notifications, class_name: "Notification", foreign_key: :recipient_id, dependent: :destroy
 
   validates :email, presence: true, uniqueness: true
   validates :first_name, :last_name, presence: true
 
   def full_name
-    "\#{first_name} \#{last_name}"
+    [ first_name, last_name ].compact.join(" ")
   end
 
   def track_sign_in!(ip)
