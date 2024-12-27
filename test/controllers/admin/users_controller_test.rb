@@ -1,23 +1,33 @@
 require "test_helper"
 
-describe Admin::UsersController do
-  it "gets index" do
-    get admin_users_index_url
-    must_respond_with :success
-  end
+class Admin::ReportsControllerTest < ActionDispatch::IntegrationTest
+ setup do
+   @admin = users(:admin)
+   sign_in_as(@admin)
+ end
 
-  it "gets show" do
-    get admin_users_show_url
-    must_respond_with :success
-  end
+ test "should get index" do
+   get admin_reports_path
+   assert_response :success
+ end
 
-  it "gets edit" do
-    get admin_users_edit_url
-    must_respond_with :success
-  end
+ test "should get show" do
+   get admin_report_path(@report)
+   assert_response :success
+ end
 
-  it "gets update" do
-    get admin_users_update_url
-    must_respond_with :success
-  end
+ test "should get equipment distribution" do
+   get equipment_distribution_admin_reports_path
+   assert_response :success
+ end
+
+ test "should get evaluation metrics" do
+   get evaluation_metrics_admin_reports_path
+   assert_response :success
+ end
+
+ test "should get vendor performance" do
+   get vendor_performance_admin_reports_path
+   assert_response :success
+ end
 end

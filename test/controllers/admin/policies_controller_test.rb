@@ -1,13 +1,19 @@
 require "test_helper"
 
-describe Admin::PoliciesController do
-  it "gets edit" do
-    get admin_policies_edit_url
-    must_respond_with :success
-  end
+class Admin::PoliciesControllerTest < ActionDispatch::IntegrationTest
+ setup do
+   @admin = users(:admin)
+   sign_in_as(@admin)
+   @policy = policies(:one)
+ end
 
-  it "gets update" do
-    get admin_policies_update_url
-    must_respond_with :success
-  end
+ test "should get edit" do
+   get edit_admin_policies_path
+   assert_response :success
+ end
+
+ test "should update policy" do
+   patch admin_policies_path, params: { policies: { @policy.id => { value: 5 } } }
+   assert_redirected_to edit_admin_policies_path
+ end
 end

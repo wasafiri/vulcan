@@ -1,8 +1,13 @@
 require "test_helper"
 
-describe Admin::DashboardController do
-  it "gets index" do
-    get admin_dashboard_index_url
-    must_respond_with :success
-  end
+class Admin::DashboardControllerTest < ActionDispatch::IntegrationTest
+ setup do
+   @admin = users(:admin) # Add fixture/factory
+   sign_in_as(@admin)
+ end
+
+ test "should get index" do
+   get admin_root_path
+   assert_response :success
+ end
 end
