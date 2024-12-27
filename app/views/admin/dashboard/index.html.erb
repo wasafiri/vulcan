@@ -86,5 +86,5 @@
     </div>
   <% end %>
 
-  <%= paginate @records if @records.present? %>
+  <%== pagy_nav(@pagy) if @pagy.pages > 1 %>
 </main>

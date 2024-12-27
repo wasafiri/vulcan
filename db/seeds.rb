@@ -20,7 +20,7 @@ unless Rails.env.production?
     email: 'evaluator@example.com',
     first_name: 'Primary',
     last_name: 'Evaluator',
-    availability_schedule: { monday: ['9:00', '17:00'] },
+    availability_schedule: { monday: [ '9:00', '17:00' ] },
     status: :active,
     password: 'SecurePass123!'
   )
@@ -88,6 +88,16 @@ unless Rails.env.production?
   policies.each do |key, value|
     Policy.find_or_create_by!(key: key) do |policy|
       policy.value = value
+    end
+  end
+
+  unless Rails.env.production?
+    10.times do
+      constituent = FactoryBot.create(:constituent)
+      FactoryBot.create(:application,
+      user: constituent,
+      income_verified_by: admin
+      )
     end
   end
 

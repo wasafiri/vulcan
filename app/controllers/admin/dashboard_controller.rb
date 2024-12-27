@@ -1,5 +1,6 @@
 class Admin::DashboardController < ApplicationController
   before_action :require_admin!
+  include Pagy::Backend
 
   def index
     @current_fiscal_year = fiscal_year
@@ -10,15 +11,16 @@ class Admin::DashboardController < ApplicationController
     @pagy, @records = pagy(
       case params[:tab]
       when "need_evaluation"
-        Application.where(status: :approved).includes(:user)
+        Application.approved.needs_evaluation.includes(:user)
       when "need_training"
-        Application.where(status: :approved).includes(:user)
+        Application.approved.needs_training.includes(:user)
       when "equipment"
         Bid.pending_response
       else
-        Application.where(status: :in_progress).includes(:user)
-      end
-    )
+        Application.in_progress.includes(:user)
+      end,
+      items: 20
+     )
 
     @applications = @records unless params[:tab] == "equipment"
   end
