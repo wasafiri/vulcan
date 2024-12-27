@@ -7,15 +7,15 @@
                  method: :get,
                  class: "flex gap-4",
                  role: "search",
-                 aria-label: "Filter applications by status" do %>
+                 aria: { label: "Filter applications by status" } do %>
       <%= select_tag :status,
           options_for_select(Application.statuses.keys.map { |s| [s.titleize, s] }, params[:status]),
           prompt: "Filter by Status",
           class: "rounded border p-2",
-          aria_label: "Select status filter" %>
+          aria: { label: "Select status filter" } %>
       <%= submit_tag "Filter",
           class: "bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 focus:ring-2",
-          aria_label: "Apply status filter" %>
+          aria: { label: "Apply status filter" } %>
     <% end %>
   </section>
 
@@ -54,7 +54,7 @@
                 <%= link_to "View",
                     admin_applications_dashboard_path(application),
                     class: "text-blue-600 hover:text-blue-800 focus:ring-2 focus:ring-blue-500 rounded px-2 py-1",
-                    aria_label: "View application #{application.id}" %>
+                    aria: { label: "View application #{application.id}" } %>
               </td>
             </tr>
           <% end %>
