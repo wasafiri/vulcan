@@ -42,6 +42,7 @@ Rails.application.routes.draw do
     resources :constituents_dashboard, only: [ :index, :show ]
     resources :applications_dashboard, only: [ :index, :show ]
     resources :appointments_dashboard, only: [ :index, :show ]
+
     resource :policies, only: [ :edit, :update ]
 
     resources :users do
@@ -57,6 +58,7 @@ Rails.application.routes.draw do
         post :remind_to_complete
         post :assign_evaluator
       end
+
       collection do
         get :evaluators
         get :vendors
@@ -85,6 +87,7 @@ Rails.application.routes.draw do
         post :archive
         post :unarchive
       end
+
       collection do
         get :inventory_report
       end
@@ -97,7 +100,7 @@ Rails.application.routes.draw do
         get :vendor_performance
       end
     end
-   end
+  end
 
   namespace :evaluator do
     resource :dashboard, only: [ :show ]
@@ -106,6 +109,7 @@ Rails.application.routes.draw do
         post :submit_report
         post :request_additional_info
       end
+
       collection do
         get :pending
         get :completed
@@ -117,8 +121,8 @@ Rails.application.routes.draw do
     resource :dashboard, only: [ :show ]
   end
 
-  # for constituent routes
-  namespace :constituent do
+  # For constituent routes
+  namespace :constituent_dashboard do
     # Dashboard
     resource :dashboard, only: [ :show ]
 
