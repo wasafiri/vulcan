@@ -1,7 +1,7 @@
 class Constituent::ApplicationsController < ApplicationController
   before_action :authenticate_user!
   before_action :require_constituent!
-  before_action :set_application, only: [ :show ]
+  before_action :set_application, only: [ :show, :edit, :update ]
 
   def show
   end
