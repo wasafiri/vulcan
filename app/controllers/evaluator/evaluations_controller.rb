@@ -3,7 +3,7 @@ module Evaluator
     # Ensure the user is an evaluator before accessing any actions
     before_action :require_evaluator!
     # Set the evaluation instance for specific actions
-    before_action :set_evaluation, only: [:show, :edit, :update, :submit_report, :request_additional_info, :pending, :completed]
+    before_action :set_evaluation, only: [ :show, :edit, :update, :submit_report, :request_additional_info, :pending, :completed ]
 
     # GET /evaluator/evaluations
     def index
@@ -24,7 +24,7 @@ module Evaluator
     def create
       @evaluation = current_user.evaluations.build(evaluation_params)
       if @evaluation.save
-        redirect_to evaluator_evaluation_path(@evaluation), notice: 'Evaluation was successfully created.'
+        redirect_to evaluator_evaluation_path(@evaluation), notice: "Evaluation was successfully created."
       else
         render :new
       end
@@ -38,7 +38,7 @@ module Evaluator
     # PATCH/PUT /evaluator/evaluations/:id
     def update
       if @evaluation.update(evaluation_params)
-        redirect_to evaluator_evaluation_path(@evaluation), notice: 'Evaluation was successfully updated.'
+        redirect_to evaluator_evaluation_path(@evaluation), notice: "Evaluation was successfully updated."
       else
         render :edit
       end
@@ -47,16 +47,16 @@ module Evaluator
     # POST /evaluator/evaluations/:id/submit_report
     def submit_report
       if @evaluation.update(report_submitted: true)
-        redirect_to evaluator_evaluation_path(@evaluation), notice: 'Report submitted successfully.'
+        redirect_to evaluator_evaluation_path(@evaluation), notice: "Report submitted successfully."
       else
-        redirect_back fallback_location: evaluator_evaluations_path, alert: 'Failed to submit report.'
+        redirect_back fallback_location: evaluator_evaluations_path, alert: "Failed to submit report."
       end
     end
 
     # POST /evaluator/evaluations/:id/request_additional_info
     def request_additional_info
       @evaluation.request_additional_info!
-      redirect_to evaluator_evaluation_path(@evaluation), notice: 'Requested additional information.'
+      redirect_to evaluator_evaluation_path(@evaluation), notice: "Requested additional information."
     end
 
     # GET /evaluator/evaluations/pending

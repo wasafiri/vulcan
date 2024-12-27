@@ -1,4 +1,5 @@
 class Admin::ApplicationsController < ApplicationController
+  before_action :set_application, only: [ :show, :edit, :update ]
   def index
   end
 
@@ -27,5 +28,11 @@ class Admin::ApplicationsController < ApplicationController
   end
 
   def request_documents
+  end
+
+  private
+
+  def set_application
+    @application = Application.find(params[:id])
   end
 end
