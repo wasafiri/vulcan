@@ -68,7 +68,7 @@
                 <%= application.user.email %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span class="<%= application_status_color(application.status) %> px-2 py-1 rounded-full text-xs">
+                <span class="<%= application_status_badge(application.status) %> px-2 py-1 rounded-full text-xs">
                   <%= application.status.titleize %>
                 </span>
               </td>
