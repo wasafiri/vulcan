@@ -1,17 +1,16 @@
-# app/controllers/constituent/dashboard_controller.rb
-module Constituent
+module ConstituentDashboard
   class DashboardController < ApplicationController
     before_action :authenticate_user!
     before_action :require_constituent!
 
     def show
       @upcoming_appointments_count = current_user.appointments
-                                               .where("scheduled_for > ?", Time.current)
-                                               .count
+                                                   .where("scheduled_for > ?", Time.current)
+                                                   .count
 
       @devices_count = current_user.applications
-                                 .where(status: :approved)
-                                 .count
+                                   .where(status: :approved)
+                                   .count
 
       @recent_activities = recent_activities
     end
