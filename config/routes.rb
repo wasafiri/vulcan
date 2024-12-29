@@ -121,8 +121,7 @@ Rails.application.routes.draw do
     resource :dashboard, only: [ :show ]
   end
 
-  # For constituent routes
-  namespace :constituent_dashboard do
+  namespace :constituent do
     # Dashboard
     resource :dashboard, only: [ :show ]
 
