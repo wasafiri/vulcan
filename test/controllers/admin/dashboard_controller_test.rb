@@ -1,6 +1,6 @@
 require "test_helper"
 
-class Admin::DashboardControllerTest < ActionDispatch::IntegrationTest
+class Admin::DashboardsControllerTest < ActionDispatch::IntegrationTest
  setup do
    @admin = users(:admin) # Add fixture/factory
    sign_in_as(@admin)
