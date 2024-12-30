@@ -1,0 +1,135 @@
+<main class="container mx-auto px-4 py-8" role="main">
+ <header class="mb-6">
+   <h1 class="text-3xl font-bold text-gray-900">Edit Application</h1>
+ </header>
+
+ <%= form_with(model: [:constituent, @application], local: true, class: "space-y-8") do |f| %>
+   <div class="bg-white shadow sm:rounded-lg" aria-labelledby="application_form_heading">
+     <h2 id="application_form_heading" class="sr-only">Application Details Form</h2>
+
+     <% if @application.errors.any? %>
+       <div class="bg-red-50 p-4 rounded-t-lg" role="alert" aria-labelledby="error_messages">
+         <h3 id="error_messages" class="text-red-800 font-medium">
+           <%= pluralize(@application.errors.count, "error") %> prohibited this application from being saved:
+         </h3>
+         <ul class="mt-2 list-disc list-inside text-sm text-red-700">
+           <% @application.errors.full_messages.each do |msg| %>
+             <li><%= msg %></li>
+           <% end %>
+         </ul>
+       </div>
+     <% end %>
+
+     <div class="p-6 space-y-6">
+       <!-- Application Type -->
+       <div>
+         <%= f.label :application_type, class: "block text-sm font-medium text-gray-700" %>
+         <div class="mt-1">
+           <%= f.select :application_type,
+               Application.application_types.keys.map { |type| [type.titleize, type] },
+               {},
+               class: "mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md",
+               "aria-describedby": "application_type_help" %>
+         </div>
+         <p class="mt-2 text-sm text-gray-500" id="application_type_help">
+           Select the type of application you're submitting
+         </p>
+       </div>
+
+       <!-- Household Information Section -->
+       <fieldset class="space-y-6">
+         <legend class="text-lg font-medium text-gray-900">Household Information</legend>
+         
+         <div>
+           <%= f.label :household_size, class: "block text-sm font-medium text-gray-700" %>
+           <div class="mt-1">
+             <%= f.number_field :household_size,
+                 min: 1,
+                 class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md",
+                 "aria-describedby": "household_size_help" %>
+           </div>
+           <p class="mt-2 text-sm text-gray-500" id="household_size_help">
+             Total number of people living in your household
+           </p>
+         </div>
+
+         <div>
+           <%= f.label :annual_income, class: "block text-sm font-medium text-gray-700" %>
+           <div class="mt-1 relative rounded-md shadow-sm">
+             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+               <span class="text-gray-500 sm:text-sm">$</span>
+             </div>
+             <%= f.number_field :annual_income,
+                 step: "0.01",
+                 class: "pl-7 focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md",
+                 "aria-describedby": "annual_income_help" %>
+           </div>
+           <p class="mt-2 text-sm text-gray-500" id="annual_income_help">
+             Total yearly household income before taxes
+           </p>
+         </div>
+       </fieldset>
+
+       <!-- Documentation Section -->
+       <fieldset class="space-y-6">
+         <legend class="text-lg font-medium text-gray-900">Supporting Documentation</legend>
+
+         <div>
+           <%= f.label :income_details, class: "block text-sm font-medium text-gray-700" %>
+           <div class="mt-1">
+             <%= f.text_area :income_details,
+                 rows: 4,
+                 class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border border-gray-300 rounded-md",
+                 "aria-describedby": "income_details_help" %>
+           </div>
+           <p class="mt-2 text-sm text-gray-500" id="income_details_help">
+             Describe your sources of income and any relevant documentation
+           </p>
+         </div>
+
+         <div>
+           <%= f.label :residency_details, class: "block text-sm font-medium text-gray-700" %>
+           <div class="mt-1">
+             <%= f.text_area :residency_details,
+                 rows: 4,
+                 class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border border-gray-300 rounded-md",
+                 "aria-describedby": "residency_details_help" %>
+           </div>
+           <p class="mt-2 text-sm text-gray-500" id="residency_details_help">
+             Describe your Maryland residency status and documentation
+           </p>
+         </div>
+       </fieldset>
+
+       <!-- Medical Provider Section -->
+       <div>
+         <%= f.label :medical_provider_id, "Medical Provider", class: "block text-sm font-medium text-gray-700" %>
+         <div class="mt-1">
+           <%= f.collection_select :medical_provider_id,
+               MedicalProvider.all,
+               :id,
+               :full_name,
+               {},
+               class: "mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md",
+               "aria-describedby": "medical_provider_help" %>
+         </div>
+         <p class="mt-2 text-sm text-gray-500" id="medical_provider_help">
+           Select your primary medical provider
+         </p>
+       </div>
+     </div>
+
+     <!-- Form Actions -->
+     <div class="px-6 py-4 bg-gray-50 flex items-center justify-end space-x-3 rounded-b-lg">
+       <%= link_to "Cancel",
+           constituent_application_path(@application),
+           class: "inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+           role: "button" %>
+           
+       <%= f.submit "Update Application",
+           class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+           "aria-label": "Save application changes" %>
+     </div>
+   </div>
+ <% end %>
+</main>

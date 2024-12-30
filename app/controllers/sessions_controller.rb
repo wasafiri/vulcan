@@ -10,28 +10,43 @@ class SessionsController < ApplicationController
   def new
   end
 
-  def create
-    user = User.find_by(email: params[:email])
+# app/controllers/sessions_controller.rb
+def create
+  user = User.find_by(email: params[:email])
 
-    if user&.authenticate(params[:password])
-      @session = user.sessions.new
-      @session.user_agent = request.user_agent
-      @session.ip_address = request.remote_ip
+  if user&.authenticate(params[:password])
+    @session = user.sessions.new
+    @session.user_agent = request.user_agent
+    @session.ip_address = request.remote_ip
 
-      if @session.save
-        cookies.signed.permanent[:session_token] = { value: @session.session_token, httponly: true }
+    if @session.save
+      cookies.signed.permanent[:session_token] = { value: @session.session_token, httponly: true }
+      user.track_sign_in!(request.remote_ip)
 
-        # Track sign-in
-        user.track_sign_in!(request.remote_ip)
-
-        redirect_to root_path, notice: "Signed in successfully"
+      # Redirect based on user type
+      redirect_path = case user
+      when Admin
+          admin_root_path
+      when Constituent
+          constituent_dashboard_path
+      when Evaluator
+          evaluator_dashboard_path
+      when Vendor
+          vendor_dashboard_path
       else
-        redirect_to sign_in_path(email_hint: params[:email]), alert: "Unable to create session. Please try again."
+          root_path
       end
+
+      redirect_to redirect_path, notice: "Signed in successfully"
     else
-      redirect_to sign_in_path(email_hint: params[:email]), alert: "That email or password is incorrect."
+      redirect_to sign_in_path(email_hint: params[:email]),
+        alert: "Unable to create session. Please try again."
     end
+  else
+    redirect_to sign_in_path(email_hint: params[:email]),
+      alert: "That email or password is incorrect."
   end
+end
 
   def destroy
     session = current_user.sessions.find_by(session_token: cookies.signed[:session_token])
