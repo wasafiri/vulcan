@@ -16,7 +16,7 @@
             <% if @application = current_user.active_application %>
               <div class="mt-4 flex items-center">
                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                  <%= application_status_color(@application.status) %>">
+                  <%= application_status_badge(@application.status) %>">
                   <%= @application.status.titleize %>
                 </span>
                 <span class="ml-4 text-sm text-gray-600">
