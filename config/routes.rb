@@ -13,25 +13,18 @@ Rails.application.routes.draw do
 
   # Authentication routes
   get "sign_in", to: "sessions#new"
-  get "login", to: "sessions#new"
   post "sign_in", to: "sessions#create"
   delete "sign_out", to: "sessions#destroy"
   get "sessions", to: "sessions#index"
-  delete "sessions/:id", to: "sessions#destroy", as: :session
 
   # Registration routes
   get "sign_up", to: "registrations#new"
   post "sign_up", to: "registrations#create"
-  resource :password, only: [ :edit, :update ]
+  resource :password, only: [ :new, :create, :edit, :update ]
+  resource :profile, only: [ :edit, :update ], controller: "users"
 
   # Regular application routes for constituents
   resources :applications, only: [ :new, :create, :show, :edit, :update ]
-
-  namespace :identity do
-    resource :email, only: [ :edit, :update ]
-    resource :email_verification, only: [ :edit, :create ]
-    resource :password_reset, only: [ :new, :edit, :create, :update ]
-  end
 
   # Health check
   get "up", to: "rails/health#show", as: :rails_health_check
