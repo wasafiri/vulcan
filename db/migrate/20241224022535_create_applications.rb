@@ -10,7 +10,7 @@ class CreateApplications < ActiveRecord::Migration[8.0]
       t.decimal :annual_income
       t.integer :income_verification_status
       t.datetime :income_verified_at
-      t.references :income_verified_by, null: false, foreign_key: { to_table: :users }
+      t.references :income_verified_by, foreign_key: { to_table: :users }
       t.text :income_details
       t.text :residency_details
       t.string :current_step

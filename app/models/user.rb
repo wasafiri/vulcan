@@ -46,4 +46,18 @@ class User < ApplicationRecord
   def medical_provider?
     is_a?(MedicalProvider)
   end
+
+  def generate_password_reset_token!
+    update(
+      reset_password_token: SecureRandom.urlsafe_base64,
+      reset_password_sent_at: Time.current
+    )
+  end
+
+  def clear_reset_password_token!
+    update(
+      reset_password_token: nil,
+      reset_password_sent_at: nil
+    )
+  end
 end

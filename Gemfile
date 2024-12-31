@@ -56,6 +56,7 @@ group :development, :test do
   gem "rubocop-rails-omakase", require: false
 
   gem "minitest-rails", "~> 8.0.0"
+  gem "database_cleaner-active_record"
   gem "factory_bot_rails"
 end
 
