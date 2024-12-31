@@ -1,16 +1,30 @@
-<!-- app/views/layouts/application.html.erb -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>Maryland Accessible Telecommunications program</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maryland Accessible Telecommunications Program</title>
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
+    <!-- Tailwind CSS -->
     <%= stylesheet_link_tag "application", media: "all", "data-turbo-track": "reload" %>
+    
+    <style>
+      /* Custom focus outline for better visibility */
+      a:focus, button:focus {
+        outline: 2px solid #4a90e2;
+        outline-offset: 2px;
+      }
+    </style>
   </head>
-
-  <body class="bg-gray-100">
-    <%= render 'layouts/flash' %>
-    <%= yield %>
+  
+  <body class="font-sans antialiased bg-gray-50">
+    <%= render "shared/header" %>
+    <%= render "layouts/flash" %>
+    
+    <main>
+      <%= yield %>
+    </main>
   </body>
 </html>

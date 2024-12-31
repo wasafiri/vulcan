@@ -18,56 +18,6 @@
      }
    </style>
  </head>
- 
- <body class="font-sans antialiased bg-gray-50">
-   <!-- Navigation Bar -->
-   <header>
-     <nav role="navigation" aria-label="Main Navigation" class="bg-white shadow">
-       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-         <div class="flex justify-between h-16">
-           <!-- Logo and Primary Navigation -->
-           <div class="flex">
-             <!-- Logo -->
-             <div class="flex-shrink-0 flex items-center">
-               <%= link_to root_path, class: "flex items-center" do %>
-                 <img src="<%= asset_path('TAM_color.png') %>" alt="Logo for TAM" class="h-8 w-auto">
-               <% end %>
-             </div>
-             
-             <!-- Primary Navigation Links -->
-             <div class="hidden md:flex items-center space-x-4 ml-10">
-               <ul class="flex space-x-4">
-                 <li>
-                   <%= link_to 'Help', help_path, class: "py-5 px-3 text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" %>
-                 </li>
-                 <li>
-                   <%= link_to 'How It Works', how_it_works_path, class: "py-5 px-3 text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" %>
-                 </li>
-                 <li>
-                   <%= link_to 'Eligibility', eligibility_path, class: "py-5 px-3 text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" %>
-                 </li>
-                 <li>
-                   <%= link_to 'Contact', contact_path, class: "py-5 px-3 text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" %>
-                 </li>
-               </ul>
-             </div>
-           </div>
-           
-           <!-- Secondary Navigation (Authentication Links) -->
-           <div class="hidden md:flex items-center space-x-4">
-             <% if current_user %>
-               <span class="py-5 px-3 text-gray-700">Hello, <%= current_user.first_name %>!</span>
-               <%= link_to 'Dashboard', constituent_dashboard_path, class: "py-2 px-3 bg-indigo-600 text-white rounded hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" %>
-               <%= button_to 'Sign Out', sign_out_path, method: :delete, class: "py-2 px-3 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500", form_class: "inline" %>
-             <% else %>
-               <%= link_to 'Sign In', sign_in_path, class: "py-2 px-3 bg-indigo-600 text-white rounded hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" %>
-               <%= link_to 'Sign Up', sign_up_path, class: "py-2 px-3 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500" %>
-             <% end %>
-           </div>
-         </div>
-       </div>
-     </nav>
-   </header>
 
   <!-- Hero Section -->
   <section class="bg-white">
