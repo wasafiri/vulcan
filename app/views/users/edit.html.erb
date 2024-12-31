@@ -1,0 +1,46 @@
+<div class="max-w-2xl mx-auto p-6">
+  <h1 class="text-2xl font-bold mb-6">Edit Profile</h1>
+
+  <%= form_with(model: @user, url: profile_path, method: :patch, class: "space-y-6") do |f| %>
+    <% if @user.errors.any? %>
+      <div class="bg-red-50 p-4 rounded mb-6">
+        <h2 class="text-red-700 font-medium">
+          <%= pluralize(@user.errors.count, "error") %> prohibited this profile from being saved:
+        </h2>
+        <ul class="list-disc list-inside text-red-700">
+          <% @user.errors.full_messages.each do |message| %>
+            <li><%= message %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <div>
+      <%= f.label :first_name, class: "block text-sm font-medium text-gray-700" %>
+      <%= f.text_field :first_name, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" %>
+    </div>
+
+    <div>
+      <%= f.label :last_name, class: "block text-sm font-medium text-gray-700" %>
+      <%= f.text_field :last_name, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" %>
+    </div>
+
+    <div>
+      <%= f.label :email, class: "block text-sm font-medium text-gray-700" %>
+      <%= f.email_field :email, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" %>
+    </div>
+
+    <div class="flex justify-end space-x-4">
+      <%= link_to "Cancel", after_update_path(current_user), class: "px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+      <%= f.submit "Update Profile", class: "px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+    </div>
+  <% end %>
+
+  <div class="mt-8 pt-6 border-t border-gray-200">
+    <h2 class="text-lg font-medium text-gray-900">Password Settings</h2>
+    <p class="mt-1 text-sm text-gray-500">Want to update your password?</p>
+    <div class="mt-4">
+      <%= link_to "Change Password", edit_password_path, class: "inline-flex items-center px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500" %>
+    </div>
+  </div>
+</div>
