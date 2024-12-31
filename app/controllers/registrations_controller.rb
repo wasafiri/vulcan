@@ -10,23 +10,26 @@ class RegistrationsController < ApplicationController
     @user = User.new
   end
 
-  # POST /sign_up
   def create
     @user = User.new(registration_params)
+    @user.type = "Constituent"
+
     if @user.save
-      # Create a session for the user
       @session = @user.sessions.create!(
         user_agent: request.user_agent,
         ip_address: request.remote_ip
       )
       cookies.signed[:session_token] = { value: @session.session_token, httponly: true, permanent: true }
-      user.track_sign_in!(request.remote_ip)
+      @user.track_sign_in!(request.remote_ip)
       redirect_to root_path, notice: "Account created successfully. Welcome!"
     else
-      flash.now[:alert] = "There was a problem creating your account."
-      render :new
+      puts "Validation errors: #{@user.errors.full_messages}"  # Add this debug line
+      flash.now[:alert] = @user.errors.full_messages.join(", ")  # Show errors to user
+      render :new, status: :unprocessable_entity
     end
   end
+
+  private
 
   # GET /edit_registration
   def edit
@@ -63,7 +66,6 @@ class RegistrationsController < ApplicationController
     end
   end
 
-  # Only allow a list of trusted parameters through.
   def registration_params
     params.require(:user).permit(
       :email,
@@ -71,10 +73,11 @@ class RegistrationsController < ApplicationController
       :password_confirmation,
       :first_name,
       :last_name,
+      :middle_initial,
+      :date_of_birth,
       :phone,
       :timezone,
-      :locale,
-      # Add other permitted parameters here
+      :locale
     )
   end
 end

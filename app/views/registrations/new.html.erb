@@ -70,14 +70,6 @@
       </div>
 
       <div>
-        <%= form.label :timezone, "Timezone", class: "block text-gray-700" %>
-        <%= form.select :timezone, ActiveSupport::TimeZone.all.map(&:name), 
-              { prompt: "Select Timezone" }, 
-              class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500", 
-              required: true %>
-      </div>
-
-      <div>
         <%= form.label :locale, "Language Preference", class: "block text-gray-700" %>
         <%= form.select :locale, [['English', 'en'], ['Spanish', 'es'], ['French', 'fr'], ['Other', 'other']], 
               { prompt: "Select Language" }, 
