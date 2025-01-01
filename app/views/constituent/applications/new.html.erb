@@ -1,0 +1,166 @@
+<%# app/views/constituent/applications/new.html.erb %>
+<div class="min-h-screen flex items-center justify-center bg-gray-100 py-12">
+  <div class="bg-white p-8 rounded shadow-md w-full max-w-2xl">
+    <h2 class="text-2xl font-semibold mb-6 text-center">New Application</h2>
+
+    <% if flash[:alert] %>
+      <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <span><%= flash[:alert] %></span>
+      </div>
+    <% end %>
+
+    <%= form_with(model: [:constituent, @application], local: true, class: "space-y-6") do |form| %>
+      <% if @application.errors.any? %>
+        <div class="bg-red-50 p-4 rounded mb-6">
+          <h2 class="text-red-700 font-medium">
+            <%= pluralize(@application.errors.count, "error") %> prohibited this application from being saved:
+          </h2>
+          <ul class="list-disc list-inside text-red-700">
+            <% @application.errors.full_messages.each do |msg| %>
+              <li><%= msg %></li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+
+      <%# Guardian Information %>
+      <div class="space-y-4 p-4 bg-gray-50 rounded">
+        <div class="flex items-start">
+          <%= form.check_box :is_guardian, 
+              class: "mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" %>
+          <%= form.label :is_guardian, "I am applying on behalf of someone under 18", 
+              class: "ml-2 block text-sm text-gray-700" %>
+        </div>
+
+        <div class="guardian-fields" data-controller="guardian">
+          <div>
+            <%= form.label :guardian_relationship, "Relationship to Applicant", 
+                class: "block text-sm font-medium text-gray-700" %>
+            <%= form.select :guardian_relationship, 
+                options_for_select(['Parent', 'Legal Guardian']), 
+                { include_blank: 'Select Relationship' }, 
+                class: "mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md" %>
+          </div>
+        </div>
+      </div>
+
+      <%# Disability Self-Certification %>
+      <div class="space-y-4 p-4 bg-gray-50 rounded">
+        <h3 class="text-lg font-medium text-gray-900">Disability Information</h3>
+        
+        <div class="flex items-start">
+          <%= form.check_box :self_certify_disability, 
+              class: "mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" %>
+          <%= form.label :self_certify_disability, 
+              "I certify that I have a disability that affects my ability to access telecommunications services", 
+              class: "ml-2 block text-sm text-gray-700" %>
+        </div>
+
+        <div class="space-y-2">
+          <p class="text-sm text-gray-700 font-medium">Select all that apply:</p>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex items-center">
+              <%= form.check_box :hearing_disability, 
+                  class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" %>
+              <%= form.label :hearing_disability, "Hearing", class: "ml-2 text-sm text-gray-700" %>
+            </div>
+
+            <div class="flex items-center">
+              <%= form.check_box :vision_disability, 
+                  class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" %>
+              <%= form.label :vision_disability, "Vision", class: "ml-2 text-sm text-gray-700" %>
+            </div>
+
+            <div class="flex items-center">
+              <%= form.check_box :speech_disability, 
+                  class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" %>
+              <%= form.label :speech_disability, "Speech", class: "ml-2 text-sm text-gray-700" %>
+            </div>
+
+            <div class="flex items-center">
+              <%= form.check_box :mobility_disability, 
+                  class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" %>
+              <%= form.label :mobility_disability, "Mobility", class: "ml-2 text-sm text-gray-700" %>
+            </div>
+
+            <div class="flex items-center">
+              <%= form.check_box :cognition_disability, 
+                  class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" %>
+              <%= form.label :cognition_disability, "Cognition", class: "ml-2 text-sm text-gray-700" %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <%# Medical Professional Information %>
+      <div class="space-y-4 p-4 bg-gray-50 rounded">
+        <h3 class="text-lg font-medium text-gray-900">Medical Professional Information</h3>
+        
+        <%= fields_for :medical_professional do |mp| %>
+          <div>
+            <%= mp.label :name, "Name", class: "block text-sm font-medium text-gray-700" %>
+            <%= mp.text_field :name, 
+                class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" %>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <%= mp.label :phone, "Phone", class: "block text-sm font-medium text-gray-700" %>
+              <%= mp.telephone_field :phone, 
+                  class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" %>
+            </div>
+
+            <div>
+              <%= mp.label :fax, "Fax", class: "block text-sm font-medium text-gray-700" %>
+              <%= mp.telephone_field :fax, 
+                  class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" %>
+            </div>
+          </div>
+
+          <div>
+            <%= mp.label :email, "Email", class: "block text-sm font-medium text-gray-700" %>
+            <%= mp.email_field :email, 
+                class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" %>
+          </div>
+        <% end %>
+      </div>
+
+      <%# Document Upload Section %>
+      <div class="space-y-4 p-4 bg-gray-50 rounded">
+        <h3 class="text-lg font-medium text-gray-900">Required Documentation</h3>
+
+        <div>
+          <%= form.label :residency_proof, "Proof of Residency", class: "block text-sm font-medium text-gray-700" %>
+          <p class="text-xs text-gray-500 mb-2">Upload driver's license, state ID, or identification card</p>
+          <%= form.file_field :residency_proof, 
+              class: "block w-full text-sm text-gray-500
+                     file:mr-4 file:py-2 file:px-4
+                     file:rounded-md file:border-0
+                     file:text-sm file:font-semibold
+                     file:bg-indigo-50 file:text-indigo-700
+                     hover:file:bg-indigo-100" %>
+        </div>
+
+        <div>
+          <%= form.label :income_proof, "Income Verification", class: "block text-sm font-medium text-gray-700" %>
+          <p class="text-xs text-gray-500 mb-2">Upload SSI/SSDI documentation, recent pay stubs, or tax forms</p>
+          <%= form.file_field :income_proof, 
+              class: "block w-full text-sm text-gray-500
+                     file:mr-4 file:py-2 file:px-4
+                     file:rounded-md file:border-0
+                     file:text-sm file:font-semibold
+                     file:bg-indigo-50 file:text-indigo-700
+                     hover:file:bg-indigo-100" %>
+        </div>
+      </div>
+
+      <div class="flex justify-end space-x-4">
+        <%= link_to "Cancel", constituent_dashboard_path, 
+            class: "px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+        <%= form.submit "Submit Application", 
+            class: "px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+      </div>
+    <% end %>
+  </div>
+</div>
