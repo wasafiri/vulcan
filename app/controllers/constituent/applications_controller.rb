@@ -11,6 +11,7 @@ class Constituent::ApplicationsController < ApplicationController
     @application = current_user.applications.new(application_params)
     @application.application_date = Time.current
     @application.status = :in_progress
+    @application.submission_method = :online
 
     ActiveRecord::Base.transaction do
       if current_user.update(disability_params) && @application.save
@@ -48,7 +49,10 @@ class Constituent::ApplicationsController < ApplicationController
       :annual_income,
       :residency_details,
       :self_certify_disability,
-      :medical_provider_id
+      :medical_provider_name,
+      :medical_provider_phone,
+      :medical_provider_fax,
+      :medical_provider_email
     )
   end
 
