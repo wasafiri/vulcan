@@ -5,7 +5,7 @@
      <div class="flex justify-between items-center">
        <h1 class="text-2xl font-bold">Application #<%= @application.id %></h1>
        <div>
-         <span class="<%= application_status_color(@application.status) %> px-3 py-1 rounded-full text-sm font-medium">
+         <span class="<%= application_status_badge(@application.status) %> px-3 py-1 rounded-full text-sm font-medium">
            <%= @application.status.titleize %>
          </span>
        </div>

@@ -10,9 +10,37 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_01_02_025403) do
+ActiveRecord::Schema[8.0].define(version: 2025_01_02_212748) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "active_storage_attachments", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "record_type", null: false
+    t.bigint "record_id", null: false
+    t.bigint "blob_id", null: false
+    t.datetime "created_at", null: false
+    t.index ["blob_id"], name: "index_active_storage_attachments_on_blob_id"
+    t.index ["record_type", "record_id", "name", "blob_id"], name: "index_active_storage_attachments_uniqueness", unique: true
+  end
+
+  create_table "active_storage_blobs", force: :cascade do |t|
+    t.string "key", null: false
+    t.string "filename", null: false
+    t.string "content_type"
+    t.text "metadata"
+    t.string "service_name", null: false
+    t.bigint "byte_size", null: false
+    t.string "checksum"
+    t.datetime "created_at", null: false
+    t.index ["key"], name: "index_active_storage_blobs_on_key", unique: true
+  end
+
+  create_table "active_storage_variant_records", force: :cascade do |t|
+    t.bigint "blob_id", null: false
+    t.string "variation_digest", null: false
+    t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  end
 
   create_table "applications", force: :cascade do |t|
     t.bigint "user_id", null: false
@@ -35,10 +63,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_02_025403) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "self_certify_disability", default: false
-    t.string "medical_provider_name"
-    t.string "medical_provider_phone"
-    t.string "medical_provider_fax"
-    t.string "medical_provider_email"
     t.boolean "maryland_resident"
     t.boolean "draft", default: true
     t.boolean "terms_accepted"
@@ -86,16 +110,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_02_025403) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["user_id"], name: "index_events_on_user_id"
-  end
-
-  create_table "medical_providers", force: :cascade do |t|
-    t.string "name"
-    t.string "phone"
-    t.string "fax"
-    t.string "email"
-    t.text "address"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
   end
 
   create_table "notifications", force: :cascade do |t|
@@ -195,6 +209,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_02_025403) do
     t.boolean "is_guardian", default: false
     t.string "guardian_relationship"
     t.bigint "guardian_id"
+    t.string "fax"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["evaluator_id"], name: "index_users_on_evaluator_id"
     t.index ["guardian_id"], name: "index_users_on_guardian_id"
@@ -205,9 +220,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_02_025403) do
     t.index ["type"], name: "index_users_on_type"
   end
 
+  add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "applications", "users"
   add_foreign_key "applications", "users", column: "income_verified_by_id"
-  add_foreign_key "applications", "users", column: "medical_provider_id"
   add_foreign_key "appointments", "users"
   add_foreign_key "appointments", "users", column: "evaluator_id"
   add_foreign_key "evaluations", "applications"

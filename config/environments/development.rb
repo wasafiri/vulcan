@@ -1,6 +1,8 @@
 Rails.application.configure do
   config.eager_load = false
 
+  config.active_storage.service = :local
+
   # Only the non-default and required settings
   config.action_mailer.delivery_method = :smtp
   config.action_mailer.raise_delivery_errors = true
