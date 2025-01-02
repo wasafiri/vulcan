@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2024_12_26_175533) do
+ActiveRecord::Schema[8.0].define(version: 2025_01_02_025403) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -24,16 +24,26 @@ ActiveRecord::Schema[8.0].define(version: 2024_12_26_175533) do
     t.decimal "annual_income"
     t.integer "income_verification_status"
     t.datetime "income_verified_at"
-    t.bigint "income_verified_by_id", null: false
+    t.bigint "income_verified_by_id"
     t.text "income_details"
     t.text "residency_details"
     t.string "current_step"
     t.datetime "received_at"
     t.datetime "last_activity_at"
     t.integer "review_count"
-    t.bigint "medical_provider_id", null: false
+    t.bigint "medical_provider_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "self_certify_disability", default: false
+    t.string "medical_provider_name"
+    t.string "medical_provider_phone"
+    t.string "medical_provider_fax"
+    t.string "medical_provider_email"
+    t.boolean "maryland_resident"
+    t.boolean "draft", default: true
+    t.boolean "terms_accepted"
+    t.boolean "information_verified"
+    t.boolean "medical_release_authorized"
     t.index ["income_verified_by_id"], name: "index_applications_on_income_verified_by_id"
     t.index ["medical_provider_id"], name: "index_applications_on_medical_provider_id"
     t.index ["user_id"], name: "index_applications_on_user_id"
@@ -76,6 +86,16 @@ ActiveRecord::Schema[8.0].define(version: 2024_12_26_175533) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["user_id"], name: "index_events_on_user_id"
+  end
+
+  create_table "medical_providers", force: :cascade do |t|
+    t.string "name"
+    t.string "phone"
+    t.string "fax"
+    t.string "email"
+    t.text "address"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "notifications", force: :cascade do |t|
@@ -169,11 +189,19 @@ ActiveRecord::Schema[8.0].define(version: 2024_12_26_175533) do
     t.bigint "evaluator_id"
     t.bigint "recipient_id"
     t.bigint "medical_provider_id"
+    t.boolean "email_verified"
+    t.string "reset_password_token"
+    t.datetime "reset_password_sent_at"
+    t.boolean "is_guardian", default: false
+    t.string "guardian_relationship"
+    t.bigint "guardian_id"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["evaluator_id"], name: "index_users_on_evaluator_id"
+    t.index ["guardian_id"], name: "index_users_on_guardian_id"
     t.index ["income_verified_by_id"], name: "index_users_on_income_verified_by_id"
     t.index ["medical_provider_id"], name: "index_users_on_medical_provider_id"
     t.index ["recipient_id"], name: "index_users_on_recipient_id"
+    t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
     t.index ["type"], name: "index_users_on_type"
   end
 
@@ -191,6 +219,7 @@ ActiveRecord::Schema[8.0].define(version: 2024_12_26_175533) do
   add_foreign_key "products", "users"
   add_foreign_key "sessions", "users"
   add_foreign_key "users", "users", column: "evaluator_id"
+  add_foreign_key "users", "users", column: "guardian_id"
   add_foreign_key "users", "users", column: "income_verified_by_id"
   add_foreign_key "users", "users", column: "medical_provider_id"
   add_foreign_key "users", "users", column: "recipient_id"

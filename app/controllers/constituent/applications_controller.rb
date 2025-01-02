@@ -1,21 +1,47 @@
 class Constituent::ApplicationsController < ApplicationController
   before_action :authenticate_user!
   before_action :require_constituent!
-  before_action :set_application, only: [ :show, :edit, :update ]
+  before_action :set_application, only: [ :show, :edit, :update, :verify, :submit ]
+  before_action :ensure_editable, only: [ :edit, :update ]
 
   def new
     @application = current_user.applications.new
   end
 
   def create
-    @application = current_user.applications.new(application_params)
-    @application.application_date = Time.current
-    @application.status = :in_progress
-    @application.submission_method = :online
-
     ActiveRecord::Base.transaction do
-      if current_user.update(disability_params) && @application.save
-        redirect_to constituent_application_path(@application), notice: "Application submitted successfully."
+      # Add error handling for required fields
+      if params.dig(:medical_provider, :name).blank?
+        @application = current_user.applications.new
+        @application.errors.add(:base, "Medical provider information is required")
+        return render :new, status: :unprocessable_entity
+      end
+
+      user_attrs = {
+        is_guardian: ActiveModel::Type::Boolean.new.cast(params.dig(:application, :is_guardian)),
+        guardian_relationship: params.dig(:application, :guardian_relationship),
+        hearing_disability: ActiveModel::Type::Boolean.new.cast(params.dig(:application, :hearing_disability)),
+        vision_disability: ActiveModel::Type::Boolean.new.cast(params.dig(:application, :vision_disability)),
+        speech_disability: ActiveModel::Type::Boolean.new.cast(params.dig(:application, :speech_disability)),
+        mobility_disability: ActiveModel::Type::Boolean.new.cast(params.dig(:application, :mobility_disability)),
+        cognition_disability: ActiveModel::Type::Boolean.new.cast(params.dig(:application, :cognition_disability))
+      }.compact
+
+      @application = current_user.applications.new(
+        application_date: Time.current,
+        status: :in_progress,
+        submission_method: :online,
+        draft: true,
+        maryland_resident: ActiveModel::Type::Boolean.new.cast(params.dig(:application, :maryland_resident)),
+        self_certify_disability: ActiveModel::Type::Boolean.new.cast(params.dig(:application, :self_certify_disability)),
+        medical_provider_name: params.dig(:medical_provider, :name),
+        medical_provider_phone: params.dig(:medical_provider, :phone),
+        medical_provider_fax: params.dig(:medical_provider, :fax),
+        medical_provider_email: params.dig(:medical_provider, :email)
+      )
+
+      if current_user.update(user_attrs) && @application.save
+        redirect_to constituent_application_path(@application), notice: "Application saved as draft."
       else
         @application.errors.merge!(current_user.errors)
         render :new, status: :unprocessable_entity
@@ -30,10 +56,59 @@ class Constituent::ApplicationsController < ApplicationController
   end
 
   def update
-    if @application.update(application_params)
-      redirect_to constituent_application_path(@application), notice: "Application updated successfully."
+    ActiveRecord::Base.transaction do
+      # Add error handling for required fields
+      if params.dig(:medical_provider, :name).blank?
+        @application.errors.add(:base, "Medical provider information is required")
+        return render :edit, status: :unprocessable_entity
+      end
+
+      user_attrs = {
+        is_guardian: ActiveModel::Type::Boolean.new.cast(params.dig(:application, :is_guardian)),
+        guardian_relationship: params.dig(:application, :guardian_relationship),
+        hearing_disability: ActiveModel::Type::Boolean.new.cast(params.dig(:application, :hearing_disability)),
+        vision_disability: ActiveModel::Type::Boolean.new.cast(params.dig(:application, :vision_disability)),
+        speech_disability: ActiveModel::Type::Boolean.new.cast(params.dig(:application, :speech_disability)),
+        mobility_disability: ActiveModel::Type::Boolean.new.cast(params.dig(:application, :mobility_disability)),
+        cognition_disability: ActiveModel::Type::Boolean.new.cast(params.dig(:application, :cognition_disability))
+      }.compact
+
+      application_attrs = {
+        maryland_resident: ActiveModel::Type::Boolean.new.cast(params.dig(:application, :maryland_resident)),
+        self_certify_disability: ActiveModel::Type::Boolean.new.cast(params.dig(:application, :self_certify_disability)),
+        medical_provider_name: params.dig(:medical_provider, :name),
+        medical_provider_phone: params.dig(:medical_provider, :phone),
+        medical_provider_fax: params.dig(:medical_provider, :fax),
+        medical_provider_email: params.dig(:medical_provider, :email)
+      }
+
+      if params[:submit_for_verification]
+        if current_user.update(user_attrs) && @application.update(application_attrs)
+          redirect_to verify_constituent_application_path(@application)
+        else
+          @application.errors.merge!(current_user.errors)
+          render :edit, status: :unprocessable_entity
+        end
+      else
+        # Regular draft save
+        if @application.update(application_attrs)
+          redirect_to constituent_application_path(@application), notice: "Application saved as draft."
+        else
+          render :edit, status: :unprocessable_entity
+        end
+      end
+    end
+  end
+
+  def verify
+    redirect_to constituent_application_path(@application) unless @application.draft?
+  end
+
+  def submit
+    if @application.update(verification_params.merge(draft: false))
+      redirect_to constituent_application_path(@application), notice: "Application submitted successfully!"
     else
-      render :edit, status: :unprocessable_entity
+      render :verify, status: :unprocessable_entity
     end
   end
 
@@ -43,30 +118,18 @@ class Constituent::ApplicationsController < ApplicationController
     @application = current_user.applications.find(params[:id])
   end
 
-  def application_params
-    params.require(:application).permit(
-      :household_size,
-      :annual_income,
-      :residency_details,
-      :self_certify_disability,
-      :medical_provider_name,
-      :medical_provider_phone,
-      :medical_provider_fax,
-      :medical_provider_email
-    )
+  def ensure_editable
+    unless @application.draft?
+      redirect_to constituent_application_path(@application),
+                  alert: "This application has already been submitted and cannot be edited."
+    end
   end
 
-  def disability_params
+  def verification_params
     params.require(:application).permit(
-      :is_guardian,
-      :guardian_relationship,
-      :residency_proof,
-      :income_proof,
-      :hearing_disability,
-      :vision_disability,
-      :speech_disability,
-      :mobility_disability,
-      :cognition_disability
+      :terms_accepted,
+      :information_verified,
+      :medical_release_authorized
     )
   end
 
