@@ -4,8 +4,10 @@ class User < ApplicationRecord
   # associations
   has_many :sessions, dependent: :destroy
   has_many :received_notifications, class_name: "Notification", foreign_key: :recipient_id, dependent: :destroy
+  has_many :applications, foreign_key: :user_id
 
-  validates :email, presence: true, uniqueness: true
+  validates :email, presence: true, uniqueness: true, format: { with: URI::MailTo::EMAIL_REGEXP }
+
   validates :first_name, :last_name, presence: true
 
   def full_name

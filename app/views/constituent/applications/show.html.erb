@@ -23,13 +23,13 @@
 
     <div class="mb-4">
       <h2 class="text-xl font-semibold mb-2">Medical Provider Information</h2>
-      <% if @application.medical_provider_name.present? %>
-        <p><strong>Name:</strong> <%= @application.medical_provider_name %></p>
-        <p><strong>Phone:</strong> <%= @application.medical_provider_phone %></p>
-        <% if @application.medical_provider_fax.present? %>
-          <p><strong>Fax:</strong> <%= @application.medical_provider_fax %></p>
+      <% if @application.medical_provider.present? %>
+        <p><strong>Name:</strong> <%= @application.medical_provider.first_name %></p>
+        <p><strong>Phone:</strong> <%= @application.medical_provider.phone %></p>
+        <% if @application.medical_provider.fax.present? %>
+          <p><strong>Fax:</strong> <%= @application.medical_provider.fax %></p>
         <% end %>
-        <p><strong>Email:</strong> <%= @application.medical_provider_email %></p>
+        <p><strong>Email:</strong> <%= @application.medical_provider.email %></p>
       <% else %>
         <p>No medical provider information provided</p>
       <% end %>

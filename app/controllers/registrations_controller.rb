@@ -23,8 +23,6 @@ class RegistrationsController < ApplicationController
       @user.track_sign_in!(request.remote_ip)
       redirect_to root_path, notice: "Account created successfully. Welcome!"
     else
-      puts "Validation errors: #{@user.errors.full_messages}"  # Add this debug line
-      flash.now[:alert] = @user.errors.full_messages.join(", ")  # Show errors to user
       render :new, status: :unprocessable_entity
     end
   end

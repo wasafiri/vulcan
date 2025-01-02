@@ -54,21 +54,6 @@
          </p>
        </div>
      </section>
-
-     <!-- Call to Action Section -->
-     <% if !current_user || current_user&.constituent? %>
-       <section class="bg-indigo-600">
-         <div class="max-w-7xl mx-auto px-4 py-12 flex flex-col md:flex-row items-center justify-between">
-           <div class="text-center md:text-left">
-             <h2 class="text-3xl font-semibold text-white">Ready to Get Started?</h2>
-             <p class="mt-2 text-white">
-               Apply now to access the accessible telecommunications equipment you need.
-             </p>
-             <%= link_to 'Apply Now', new_application_path, class: "mt-4 inline-block bg-white text-indigo-600 px-6 py-3 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-white", aria_label: "Begin your application for telecommunications equipment" %>
-           </div>
-         </div>
-       </section>
-     <% end %>
    </main>
  </body>
 </html>

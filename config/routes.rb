@@ -23,9 +23,6 @@ Rails.application.routes.draw do
   resource :password, only: [ :new, :create, :edit, :update ]
   resource :profile, only: [ :edit, :update ], controller: "users"
 
-  # Regular application routes for constituents
-  resources :applications, only: [ :new, :create, :show, :edit, :update ]
-
   # Health check
   get "up", to: "rails/health#show", as: :rails_health_check
 
@@ -56,22 +53,6 @@ Rails.application.routes.draw do
         get :evaluators
         get :vendors
         get :constituents
-      end
-    end
-
-    resources :applications do
-      member do
-        patch :verify_income
-        patch :request_documents
-        patch :approve
-        patch :reject
-      end
-
-      collection do
-        get :search
-        get :filter
-        patch :batch_approve
-        patch :batch_reject
       end
     end
 
@@ -121,8 +102,10 @@ Rails.application.routes.draw do
     # Applications
     resources :applications, only: [ :index, :show, :new, :create, :edit, :update ] do
       member do
-        patch :upload_documents  # For adding documentation
-        post :request_review     # Request review after adding docs
+        patch :upload_documents
+        post :request_review
+        get :verify
+        patch :submit
       end
     end
 

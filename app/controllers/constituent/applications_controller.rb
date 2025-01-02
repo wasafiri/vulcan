@@ -6,6 +6,11 @@ class Constituent::ApplicationsController < ApplicationController
 
   def new
     @application = current_user.applications.new
+    @application.build_medical_provider
+  end
+
+  def index
+    @applications = current_user.applications
   end
 
   def create
@@ -40,6 +45,10 @@ class Constituent::ApplicationsController < ApplicationController
         medical_provider_email: params.dig(:medical_provider, :email)
       )
 
+      # **Assign Uploaded Files Using `attach`**
+      @application.residency_proof.attach(params[:application][:residency_proof]) if params[:application][:residency_proof].present?
+      @application.income_proof.attach(params[:application][:income_proof]) if params[:application][:income_proof].present?
+
       if current_user.update(user_attrs) && @application.save
         redirect_to constituent_application_path(@application), notice: "Application saved as draft."
       else
@@ -53,6 +62,7 @@ class Constituent::ApplicationsController < ApplicationController
   end
 
   def edit
+    @application.build_medical_provider unless @application.medical_provider.present?
   end
 
   def update
@@ -81,6 +91,10 @@ class Constituent::ApplicationsController < ApplicationController
         medical_provider_fax: params.dig(:medical_provider, :fax),
         medical_provider_email: params.dig(:medical_provider, :email)
       }
+
+      # **Assign Uploaded Files Using `attach`**
+      @application.residency_proof.attach(params[:application][:residency_proof]) if params[:application][:residency_proof].present?
+      @application.income_proof.attach(params[:application][:income_proof]) if params[:application][:income_proof].present?
 
       if params[:submit_for_verification]
         if current_user.update(user_attrs) && @application.update(application_attrs)
