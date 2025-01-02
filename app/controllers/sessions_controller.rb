@@ -6,6 +6,10 @@ class SessionsController < ApplicationController
     @sessions = current_user.sessions.order(created_at: :desc)
   end
 
+  def new
+    redirect_to after_sign_in_path if current_user
+  end
+
   def create
     user = User.find_by(email: params[:email])
 
@@ -57,5 +61,15 @@ class SessionsController < ApplicationController
 
   def set_session
     @session = Session.find_by(session_token: cookies.signed[:session_token])
+  end
+
+  def after_sign_in_path
+    case current_user
+    when Admin then admin_root_path
+    when Constituent then constituent_dashboard_path
+    when Evaluator then evaluator_dashboard_path
+    when Vendor then vendor_dashboard_path
+    else root_path
+    end
   end
 end
