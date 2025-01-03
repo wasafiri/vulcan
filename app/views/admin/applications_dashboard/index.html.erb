@@ -39,7 +39,7 @@
               <td class="px-6 py-4"><%= application.id %></td>
               <td class="px-6 py-4"><%= application.user.full_name %></td>
               <td class="px-6 py-4">
-                <span class="<%= application_status_color(application.status) %> px-2 py-1 rounded-full text-xs"
+                <span class="<%= application_status_badge(application.status) %> px-2 py-1 rounded-full text-xs"
                       role="status">
                   <%= application.status.titleize %>
                 </span>

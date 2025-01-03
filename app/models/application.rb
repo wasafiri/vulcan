@@ -70,6 +70,10 @@ class Application < ApplicationRecord
   delegate :full_name, to: :medical_provider, prefix: true, allow_nil: true
   delegate :phone, :fax, :email, to: :medical_provider, prefix: true, allow_nil: true
 
+  def medical_provider_name
+    medical_provider&.full_name
+  end
+
   private
 
   # Sets the default status to :in_progress if not already set
