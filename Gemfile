@@ -78,4 +78,4 @@ gem "authentication-zero"
 gem "aws-sdk-s3"
 
 # gem for sending out emails
-gem "ElasticEmail"
+gem "postmark-rails", "~> 0.22.1"
