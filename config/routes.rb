@@ -52,6 +52,7 @@ Rails.application.routes.draw do
         post :reset_password
         post :remind_to_complete
         post :assign_evaluator
+        patch :update_role
       end
 
       collection do
@@ -80,6 +81,7 @@ Rails.application.routes.draw do
       end
     end
   end
+
 
   namespace :evaluators do
     resource :dashboard, only: [ :show ]
