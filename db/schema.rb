@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_01_02_212748) do
+ActiveRecord::Schema[8.0].define(version: 2025_01_03_193402) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -134,6 +134,17 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_02_212748) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "policy_changes", force: :cascade do |t|
+    t.bigint "policy_id", null: false
+    t.bigint "user_id", null: false
+    t.integer "previous_value"
+    t.integer "new_value"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["policy_id"], name: "index_policy_changes_on_policy_id"
+    t.index ["user_id"], name: "index_policy_changes_on_user_id"
+  end
+
   create_table "products", force: :cascade do |t|
     t.string "name"
     t.text "description"
@@ -232,6 +243,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_02_212748) do
   add_foreign_key "events", "users"
   add_foreign_key "notifications", "users", column: "actor_id"
   add_foreign_key "notifications", "users", column: "recipient_id"
+  add_foreign_key "policy_changes", "policies"
+  add_foreign_key "policy_changes", "users"
   add_foreign_key "products", "users"
   add_foreign_key "sessions", "users"
   add_foreign_key "users", "users", column: "evaluator_id"

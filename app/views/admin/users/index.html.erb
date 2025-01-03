@@ -1,2 +1,109 @@
-<h1>Admin::Users#index</h1>
-<p>Find me in app/views/admin/users/index.html.erb</p>
+<main class="container mx-auto px-4 py-8" role="main" aria-labelledby="manage-users-title">
+  <div class="bg-white rounded-lg shadow">
+    <div class="p-6 border-b border-gray-200">
+      <div class="flex justify-between items-center">
+        <h1 id="manage-users-title" class="text-2xl font-semibold text-gray-900">
+          Manage Users
+        </h1>
+        
+        <%# Add any action buttons here if needed %>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200" role="grid">
+        <caption class="sr-only">List of system users and their roles</caption>
+        
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" 
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                role="columnheader">
+              Name
+            </th>
+            <th scope="col" 
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                role="columnheader">
+              Email
+            </th>
+            <th scope="col" 
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                role="columnheader">
+              Role
+            </th>
+            <th scope="col" 
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                role="columnheader">
+              <span class="sr-only">Actions</span>
+            </th>
+          </tr>
+        </thead>
+
+        <tbody class="bg-white divide-y divide-gray-200">
+          <% @users.each do |user| %>
+            <tr class="hover:bg-gray-50">
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-medium text-gray-900">
+                  <%= user.full_name %>
+                </div>
+              </td>
+
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm text-gray-500">
+                  <%= mail_to user.email, class: "hover:text-indigo-600" %>
+                </div>
+              </td>
+
+              <td class="px-6 py-4 whitespace-nowrap">
+                <% if user == current_user %>
+                  <span class="text-sm text-gray-500">
+                    <%= user.role_type %>
+                  </span>
+                <% else %>
+                  <div class="relative" data-controller="role-select">
+                    <%= label_tag "role_#{user.id}", 
+                        "Role for #{user.full_name}", 
+                        class: "sr-only" %>
+                    <%= select_tag "role_#{user.id}",
+                        options_for_select(%w[Admin Evaluator Constituent Vendor], 
+                                         selected: user.role_type),
+                        data: { 
+                          user_id: user.id,
+                          action: "change->role-select#roleChanged"
+                        },
+                        class: "block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md",
+                        aria: { 
+                          label: "Select role for #{user.full_name}",
+                          controls: "update-button-#{user.id}"
+                        } %>
+                  </div>
+                <% end %>
+              </td>
+
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <% unless user == current_user %>
+                  <button type="button"
+                          id="update-button-<%= user.id %>"
+                          data-user-id="<%= user.id %>"
+                          data-action="role-select#updateRole"
+                          class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                          aria-label="Update role for <%= user.full_name %>"
+                          disabled>
+                    Update Role
+                  </button>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <%# Feedback Messages %>
+  <div id="role-update-feedback" 
+       class="fixed bottom-4 right-4 max-w-sm w-full bg-white rounded-lg shadow-lg p-4 hidden"
+       role="alert"
+       aria-live="polite">
+  </div>
+</main>

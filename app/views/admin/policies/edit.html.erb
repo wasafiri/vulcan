@@ -1,24 +1,215 @@
-<h1>Edit Policies</h1>
+<main class="container mx-auto px-4 py-8" role="main" aria-labelledby="edit-policies-title">
+  <div class="bg-white rounded-lg shadow">
+    <div class="p-6 border-b border-gray-200">
+      <h1 id="edit-policies-title" class="text-2xl font-semibold text-gray-900">
+        Edit System Policies
+      </h1>
+    </div>
 
-<%= form_with url: admin_policies_path, method: :patch do |form| %>
-  <table>
-    <thead>
-      <tr>
-        <th>Policy</th>
-        <th>Value</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% @policies.each do |policy| %>
-        <tr>
-          <td><%= policy.key.humanize %></td>
-          <td>
-            <%= hidden_field_tag "policies[#{policy.id}][id]", policy.id %>
-            <%= number_field_tag "policies[#{policy.id}][value]", policy.value %>
-          </td>
-        </tr>
+    <%= form_with url: admin_policies_path, method: :patch do |form| %>
+      <% if flash[:notice] %>
+        <div class="p-4 bg-green-50 border-l-4 border-green-400" role="alert">
+          <p class="text-green-700"><%= flash[:notice] %></p>
+        </div>
       <% end %>
-    </tbody>
-  </table>
-  <%= submit_tag "Update Policies" %>
-<% end %>
+
+      <!-- FPL Section -->
+      <div class="p-6">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Federal Poverty Level (FPL) Settings</h2>
+        
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+          <p class="text-sm text-yellow-700">
+            These values should be updated annually when new Federal Poverty Level guidelines are released, 
+            typically in January or February.
+          </p>
+        </div>
+
+        <!-- FPL Modifier -->
+        <div class="mb-6">
+          <% modifier_policy = @policies.find_by(key: 'fpl_modifier_percentage') %>
+          <% if modifier_policy %>
+            <div class="flex items-center space-x-4">
+              <%= hidden_field_tag "policies[#{modifier_policy.id}][id]", modifier_policy.id %>
+              <label for="policies_<%= modifier_policy.id %>_value" class="block text-sm font-medium text-gray-700">
+                FPL Modifier Percentage
+              </label>
+              <div class="relative rounded-md shadow-sm w-32">
+                <%= number_field_tag "policies[#{modifier_policy.id}][value]",
+                    modifier_policy.value,
+                    class: "block w-full pl-3 pr-8 py-2 rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+                    required: true,
+                    min: 100,
+                    step: 100 %>
+                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <span class="text-gray-500 sm:text-sm">%</span>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+
+        <!-- FPL Table -->
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Household Size
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Base FPL Amount
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Calculated Threshold (<%= modifier_policy&.value %>%)
+                </th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <% (1..8).each do |size| %>
+                <% policy = @policies.find_by(key: "fpl_#{size}_person") %>
+                <% if policy %>
+                  <tr>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <%= size %> <%= 'Person'.pluralize(size) %>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <%= hidden_field_tag "policies[#{policy.id}][id]", policy.id %>
+                      <div class="relative rounded-md shadow-sm w-48">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <span class="text-gray-500 sm:text-sm">$</span>
+                        </div>
+                        <%= number_field_tag "policies[#{policy.id}][value]",
+                            policy.value,
+                            class: "block w-full pl-7 py-2 rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+                            required: true,
+                            min: 0 %>
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <%= number_to_currency(policy.value * modifier_policy.value / 100) %>
+                    </td>
+                  </tr>
+                <% end %>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Other Policies Section -->
+      <div class="p-6">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Other System Policies</h2>
+        
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Policy Name
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Value
+                </th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <% @policies.reject { |p| p.key.start_with?('fpl_') }.each do |policy| %>
+                <tr>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <%= policy.key.humanize %>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <%= hidden_field_tag "policies[#{policy.id}][id]", policy.id %>
+                    <%= number_field_tag "policies[#{policy.id}][value]",
+                        policy.value,
+                        class: "block w-32 rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+                        required: true,
+                        min: 0 %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Policy Change History Section -->
+      <div class="p-6 border-t border-gray-200">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Recent Policy Changes</h2>
+        
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Date
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Policy
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Changed By
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Previous Value
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  New Value
+                </th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <% @recent_changes.each do |change| %>
+                <tr>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <%= change.created_at.strftime("%B %d, %Y %I:%M %p") %>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm font-medium text-gray-900">
+                      <%= change.policy.key.titleize %>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-900">
+                      <%= change.user.full_name %>
+                    </div>
+                    <div class="text-xs text-gray-500">
+                      <%= change.user.email %>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <%= format_policy_value(change.policy.key, change.previous_value) %>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <%= format_policy_value(change.policy.key, change.new_value) %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+
+          <% if @recent_changes.empty? %>
+            <p class="text-sm text-gray-500 text-center py-4">No recent policy changes</p>
+          <% end %>
+        </div>
+
+        <div class="mt-4 text-right">
+          <%= link_to changes_admin_policies_path,
+              class: "text-sm text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
+            View Full Change History
+            <span aria-hidden="true"> &rarr;</span>
+          <% end %>
+        </div>
+      </div>
+
+      <div class="px-6 py-4 bg-gray-50 flex justify-end space-x-3">
+        <%= link_to "Cancel",
+            admin_root_path,
+            class: "px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+            
+        <%= form.submit "Update Policies",
+            class: "px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+      </div>
+    <% end %>
+  </div>
+</main>

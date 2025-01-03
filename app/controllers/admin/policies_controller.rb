@@ -3,6 +3,10 @@ class Admin::PoliciesController < ApplicationController
   before_action :set_policies, only: [ :edit, :update ]
 
   def edit
+    @policies = Policy.all
+    @recent_changes = PolicyChange.includes(:policy, :user)
+                                .order(created_at: :desc)
+                                .limit(10)
   end
 
   def update
@@ -11,10 +15,17 @@ class Admin::PoliciesController < ApplicationController
         policy = Policy.find(policy_params[:id])
         policy.update!(value: policy_params[:value])
       end
+      redirect_to edit_admin_policies_path, notice: "Policies updated successfully."
     end
-    redirect_to edit_admin_policies_path, notice: "Policies updated successfully."
-  rescue ActiveRecord::RecordInvalid
-    redirect_to edit_admin_policies_path, alert: "Failed to update policies."
+  rescue ActiveRecord::RecordInvalid => e
+    redirect_to edit_admin_policies_path, alert: "Failed to update policies: #{e.message}"
+  end
+
+  def changes
+    @policy_changes = PolicyChange.includes(:policy, :user)
+                                .order(created_at: :desc)
+                                .page(params[:page])
+                                .per(25)
   end
 
   private

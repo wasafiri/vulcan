@@ -38,7 +38,11 @@ Rails.application.routes.draw do
     end
     resources :appointments_dashboard, only: [ :index, :show ]
 
-    resource :policies, only: [ :edit, :update ]
+    resource :policies, only: [ :edit, :update ] do
+      collection do
+        get :changes
+      end
+    end
 
     resources :users do
       member do
