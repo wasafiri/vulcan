@@ -81,7 +81,7 @@ Rails.application.routes.draw do
     end
   end
 
-  namespace :evaluator do
+  namespace :evaluators do
     resource :dashboard, only: [ :show ]
     resources :evaluations do
       member do
