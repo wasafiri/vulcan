@@ -1,4 +1,5 @@
 class Admin::PoliciesController < ApplicationController
+  include Pagy::Backend
   before_action :require_admin!
   before_action :set_policies, only: [ :edit, :update ]
 
@@ -13,6 +14,7 @@ class Admin::PoliciesController < ApplicationController
     Policy.transaction do
       params[:policies].each do |id, policy_params|
         policy = Policy.find(policy_params[:id])
+        policy.updated_by = current_user
         policy.update!(value: policy_params[:value])
       end
       redirect_to edit_admin_policies_path, notice: "Policies updated successfully."
@@ -22,10 +24,10 @@ class Admin::PoliciesController < ApplicationController
   end
 
   def changes
-    @policy_changes = PolicyChange.includes(:policy, :user)
-                                .order(created_at: :desc)
-                                .page(params[:page])
-                                .per(25)
+    @pagy, @policy_changes = pagy(
+      PolicyChange.includes(:policy, :user).order(created_at: :desc),
+      items: 25
+    )
   end
 
   private
