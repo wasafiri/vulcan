@@ -12,10 +12,10 @@ module MatVulcan
 
     # Factory_bot configuration
     config.generators do |g|
-      g.factory_bot dir: 'test/factories'
+      g.factory_bot dir: "test/factories"
       g.factory_bot suffix: false
       g.test_framework :minitest
-      g.fixture_replacement :factory_bot, dir: 'test/factories'
+      g.fixture_replacement :factory_bot, dir: "test/factories"
     end
   end
 end

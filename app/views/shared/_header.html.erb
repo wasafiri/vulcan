@@ -7,7 +7,7 @@
           <%= link_to root_path, 
               class: "focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md", 
               aria: { label: "Return to homepage" } do %>
-            <img src="<%= asset_path('TAM_color.png') %>" 
+            <img src="<%= asset_path("TAM_color.png") %>" 
                  alt="TAM Logo" 
                  class="h-8 w-auto"
                  aria-hidden="true">
@@ -43,10 +43,10 @@
           <nav aria-label="Primary Navigation">
             <ul class="flex space-x-4" role="menubar">
               <% navigation_links = [
-                ['Help', help_path],
-                ['How It Works', how_it_works_path],
-                ['Eligibility', eligibility_path],
-                ['Contact', contact_path]
+                ["Help", help_path],
+                ["How It Works", how_it_works_path],
+                ["Eligibility", eligibility_path],
+                ["Contact", contact_path]
               ] %>
               
               <% navigation_links.each do |text, path| %>
@@ -86,10 +86,10 @@
                 <% end %>
               </div>
             <% else %>
-              <%= link_to 'Sign In',
+              <%= link_to "Sign In",
                   sign_in_path,
                   class: "px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
-              <%= link_to 'Sign Up',
+              <%= link_to "Sign Up",
                   sign_up_path,
                   class: "px-4 py-2 rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" %>
             <% end %>
@@ -121,7 +121,7 @@
             <p class="text-base font-medium text-gray-800">
               Hello, <%= current_user.first_name %>
             </p>
-            <%= link_to 'Dashboard',
+            <%= link_to "Dashboard",
                 (case current_user
                 when Admin then admin_root_path
                 when Constituent then constituent_dashboard_path
@@ -130,7 +130,7 @@
                 end),
                 class: "mt-2 block w-full text-left px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md",
                 role: "menuitem" %>
-            <%= button_to 'Sign Out',
+            <%= button_to "Sign Out",
                 sign_out_path,
                 method: :delete,
                 class: "mt-1 block w-full text-left px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md",
@@ -138,11 +138,11 @@
           </div>
         <% else %>
           <div class="px-4 space-y-1">
-            <%= link_to 'Sign In',
+            <%= link_to "Sign In",
                 sign_in_path,
                 class: "block w-full px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md",
                 role: "menuitem" %>
-            <%= link_to 'Sign Up',
+            <%= link_to "Sign Up",
                 sign_up_path,
                 class: "block w-full px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md",
                 role: "menuitem" %>

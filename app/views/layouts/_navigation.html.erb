@@ -5,18 +5,18 @@
       <!-- Logo -->
       <div class="flex-shrink-0 flex items-center">
         <%= link_to root_path, class: "flex items-center" do %>
-          <img src="<%= asset_path('TAM_color.png') %>" alt="Logo for TAM" class="h-8 w-auto">
+          <img src="<%= asset_path("TAM_color.png") %>" alt="Logo for TAM" class="h-8 w-auto">
         <% end %>
       </div>
 
       <!-- Primary Navigation -->
       <div class="hidden md:flex items-center space-x-4 ml-10">
-        <%= render 'layouts/nav_links' %>
+        <%= render "layouts/nav_links" %>
       </div>
 
       <!-- Auth Links -->
       <div class="hidden md:flex items-center space-x-4">
-        <%= render 'layouts/auth_links' %>
+        <%= render "layouts/auth_links" %>
       </div>
     </div>
   </div>
