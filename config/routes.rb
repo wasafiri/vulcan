@@ -30,7 +30,12 @@ Rails.application.routes.draw do
     root to: "dashboard#index"
 
     resources :constituents_dashboard, only: [ :index, :show ]
-    resources :applications_dashboard, only: [ :index, :show ]
+    resources :applications_dashboard, only: [ :index, :show ] do
+      member do
+        patch :approve
+        patch :reject
+      end
+    end
     resources :appointments_dashboard, only: [ :index, :show ]
 
     resource :policies, only: [ :edit, :update ]

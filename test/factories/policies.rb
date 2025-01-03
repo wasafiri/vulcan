@@ -4,12 +4,12 @@ FactoryBot.define do
     value { 3 }
 
     trait :max_training_sessions do
-      key { 'max_training_sessions' }
+      key { "max_training_sessions" }
       value { 3 }
     end
 
     trait :waiting_period_years do
-      key { 'waiting_period_years' }
+      key { "waiting_period_years" }
       value { 3 }
     end
   end
