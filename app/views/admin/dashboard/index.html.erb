@@ -20,23 +20,20 @@
       <p class="text-3xl font-bold text-indigo-600"><%= @pending_services_count %></p>
     </div>
 
-    <!-- Empty Card -->
+    <!-- User Management -->
     <div class="bg-white rounded-lg shadow p-6">
-      <h3 class="text-lg font-medium text-gray-900">Coming Soon</h3>
+      <h3 class="text-lg font-medium text-gray-900">User Management</h3>
+      <p class="text-3xl font-bold text-indigo-600"><%= @total_users_count %></p>
+      <%= link_to admin_users_path,
+          class: "mt-2 inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+          aria: { label: "Manage system users" } do %>
+        Manage Users
+        <svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+      <% end %>
     </div>
   </div>
-
-  <!-- Tabs Section -->
-  <nav class="flex border-b border-gray-200 mb-6">
-    <% tabs = ["Incomplete Applications", "Need Evaluation", "Need Training", "Equipment"] %>
-    <% tabs.each_with_index do |tab, index| %>
-      <%= link_to tab, 
-          admin_root_path(tab: tab.parameterize),
-          class: "w-1/4 py-4 px-1 text-center border-b-2 #{params[:tab]&.parameterize == tab.parameterize ? "border-indigo-500 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}",
-          role: "tab",
-          aria: { selected: params[:tab]&.parameterize == tab.parameterize } %>
-    <% end %>
-  </nav>
 
   <!-- Content Section -->
   <% if @applications.present? %>

@@ -49,6 +49,18 @@ class User < ApplicationRecord
     is_a?(MedicalProvider)
   end
 
+  def role_type
+    self.type
+  end
+
+  def prevent_self_role_update(current_user, new_role)
+    if self == current_user
+      errors.add(:base, "You cannot change your own role.")
+      return false
+    end
+    true
+  end
+
   def generate_password_reset_token!
     update(
       reset_password_token: SecureRandom.urlsafe_base64,
