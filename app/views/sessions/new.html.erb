@@ -23,7 +23,7 @@
        <%= form.email_field :email,
            id: "email-input",
            class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-           value: params[:email_hint] || '',
+           value: params[:email_hint] || "",
            required: true,
            autocomplete: "email",
            aria: {
@@ -35,7 +35,7 @@
        <p class="text-xs text-gray-500" id="email-hint">Enter the email address associated with your account</p>
        <% if @errors&.include?(:email) %>
          <p id="email-error" class="mt-1 text-sm text-red-600">
-           <%= @errors[:email].join(', ') %>
+           <%= @errors[:email].join(", ") %>
          </p>
        <% end %>
      </div>
@@ -88,7 +88,7 @@
        </div>
        <% if @errors&.include?(:password) %>
          <p id="password-error" class="mt-1 text-sm text-red-600">
-           <%= @errors[:password].join(', ') %>
+           <%= @errors[:password].join(", ") %>
          </p>
        <% end %>
      </div>

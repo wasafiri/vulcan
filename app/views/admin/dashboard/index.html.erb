@@ -28,11 +28,11 @@
 
   <!-- Tabs Section -->
   <nav class="flex border-b border-gray-200 mb-6">
-    <% tabs = ['Incomplete Applications', 'Need Evaluation', 'Need Training', 'Equipment'] %>
+    <% tabs = ["Incomplete Applications", "Need Evaluation", "Need Training", "Equipment"] %>
     <% tabs.each_with_index do |tab, index| %>
       <%= link_to tab, 
           admin_root_path(tab: tab.parameterize),
-          class: "w-1/4 py-4 px-1 text-center border-b-2 #{params[:tab]&.parameterize == tab.parameterize ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}",
+          class: "w-1/4 py-4 px-1 text-center border-b-2 #{params[:tab]&.parameterize == tab.parameterize ? "border-indigo-500 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}",
           role: "tab",
           aria: { selected: params[:tab]&.parameterize == tab.parameterize } %>
     <% end %>

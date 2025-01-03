@@ -99,8 +99,8 @@
             <%= form.label :guardian_relationship, "Relationship to Applicant",
                 class: "block text-sm font-medium text-gray-700" %>
             <%= form.select :guardian_relationship,
-                options_for_select(['Parent', 'Legal Guardian']),
-                { include_blank: 'Select Relationship' },
+                options_for_select(["Parent", "Legal Guardian"]),
+                { include_blank: "Select Relationship" },
                 { class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500",
                   "aria-describedby": "relationship-hint" } %>
             <p id="relationship-hint" class="mt-1 text-sm text-gray-500">Select your relationship to the applicant if you are applying on behalf of a minor</p>
@@ -146,7 +146,7 @@
         </section>
 
         <!-- Medical Provider Information -->
-        <%= render 'medical_provider_form', form: form %>
+        <%= render "medical_provider_form", form: form %>
 
         <!-- Document Upload Section -->
         <section aria-labelledby="documents-section-title" class="space-y-4 p-4 bg-gray-50 rounded">

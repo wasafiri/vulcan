@@ -4,20 +4,20 @@
     
     <div class="mb-4">
       <h2 class="text-xl font-semibold mb-2">Application Details</h2>
-      <p><strong>Application Type:</strong> <%= @application.application_type&.titleize || 'Not specified' %></p>
-      <p><strong>Submission Method:</strong> <%= @application.submission_method&.titleize || 'Not specified' %></p>
-      <p><strong>Status:</strong> <%= @application.status&.titleize || 'Not specified' %></p>
-      <p><strong>Application Date:</strong> <%= @application.application_date&.strftime("%B %d, %Y") || 'Not specified' %></p>
-      <p><strong>Household Size:</strong> <%= @application.household_size || 'Not specified' %></p>
+      <p><strong>Application Type:</strong> <%= @application.application_type&.titleize || "Not specified" %></p>
+      <p><strong>Submission Method:</strong> <%= @application.submission_method&.titleize || "Not specified" %></p>
+      <p><strong>Status:</strong> <%= @application.status&.titleize || "Not specified" %></p>
+      <p><strong>Application Date:</strong> <%= @application.application_date&.strftime("%B %d, %Y") || "Not specified" %></p>
+      <p><strong>Household Size:</strong> <%= @application.household_size || "Not specified" %></p>
       <p><strong>Annual Income:</strong> <%= number_to_currency(@application.annual_income) if @application.annual_income %></p>
-      <p><strong>Income Verification Status:</strong> <%= @application.income_verification_status&.titleize || 'Not specified' %></p>
-      <p><strong>Income Verified At:</strong> <%= @application.income_verified_at&.strftime("%B %d, %Y") || 'Not verified' %></p>
-      <p><strong>Income Verified By:</strong> <%= @application.income_verified_by&.full_name || 'Not verified' %></p>
-      <p><strong>Income Details:</strong> <%= @application.income_details.presence || 'None provided' %></p>
-      <p><strong>Residency Details:</strong> <%= @application.residency_details.presence || 'None provided' %></p>
-      <p><strong>Current Step:</strong> <%= @application.current_step&.titleize || 'Not specified' %></p>
-      <p><strong>Received At:</strong> <%= @application.received_at&.strftime("%B %d, %Y") || 'Not specified' %></p>
-      <p><strong>Last Activity At:</strong> <%= @application.last_activity_at&.strftime("%B %d, %Y") || 'Not specified' %></p>
+      <p><strong>Income Verification Status:</strong> <%= @application.income_verification_status&.titleize || "Not specified" %></p>
+      <p><strong>Income Verified At:</strong> <%= @application.income_verified_at&.strftime("%B %d, %Y") || "Not verified" %></p>
+      <p><strong>Income Verified By:</strong> <%= @application.income_verified_by&.full_name || "Not verified" %></p>
+      <p><strong>Income Details:</strong> <%= @application.income_details.presence || "None provided" %></p>
+      <p><strong>Residency Details:</strong> <%= @application.residency_details.presence || "None provided" %></p>
+      <p><strong>Current Step:</strong> <%= @application.current_step&.titleize || "Not specified" %></p>
+      <p><strong>Received At:</strong> <%= @application.received_at&.strftime("%B %d, %Y") || "Not specified" %></p>
+      <p><strong>Last Activity At:</strong> <%= @application.last_activity_at&.strftime("%B %d, %Y") || "Not specified" %></p>
       <p><strong>Review Count:</strong> <%= @application.review_count || 0 %></p>
     </div>
 
@@ -37,8 +37,8 @@
 
     <div class="mb-4">
       <h2 class="text-xl font-semibold mb-2">Actions</h2>
-      <%= link_to 'Edit Application', edit_constituent_application_path(@application), class: "bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600" %>
-      <%= link_to 'Back to Dashboard', constituent_dashboard_path, class: "bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 ml-2" %>
+      <%= link_to "Edit Application", edit_constituent_application_path(@application), class: "bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600" %>
+      <%= link_to "Back to Dashboard", constituent_dashboard_path, class: "bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 ml-2" %>
     </div>
   </div>
 </main>

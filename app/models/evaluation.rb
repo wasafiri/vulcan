@@ -1,6 +1,7 @@
 class Evaluation < ApplicationRecord
   belongs_to :evaluator, class_name: "Evaluator"
   belongs_to :constituent, class_name: "Constituent"
+  belongs_to :application
 
   has_many :notifications, as: :notifiable, dependent: :destroy
 

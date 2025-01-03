@@ -1,4 +1,8 @@
 class PagesController < ApplicationController
+  skip_before_action :authenticate_user!, only: [
+    :help, :how_it_works, :eligibility, :apply, :contact
+  ]
+
   def help
   end
 
