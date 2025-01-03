@@ -1,0 +1,166 @@
+<main class="container mx-auto px-4 py-8" role="main" aria-labelledby="application-title">
+  <div class="bg-white rounded-lg shadow p-6">
+    <div class="border-b border-gray-200 pb-4 mb-6 flex justify-between items-center">
+      <h1 id="application-title" class="text-2xl font-semibold text-gray-900">
+        Application #<%= @application.id %> Details
+      </h1>
+      
+      <div class="flex space-x-4">
+        <%= link_to admin_applications_dashboard_index_path, 
+            class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+            aria: { label: "Return to applications list" } do %>
+          <span>Back to List</span>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Application Status Section %>
+    <div class="mb-6 p-4 rounded-md <%= status_background_color(@application.status) %>">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-medium">Current Status: <%= @application.status&.titleize || "Not Set" %></h2>
+          <p class="text-sm mt-1">Last Updated: <%= @application.updated_at.strftime("%B %d, %Y at %I:%M %p") %></p>
+        </div>
+        
+        <div class="flex space-x-2">
+          <% if @application.status != 'approved' %>
+            <%= button_to approve_admin_applications_dashboard_path(@application),
+                method: :patch,
+                class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500",
+                aria: { label: "Approve this application" },
+                data: { confirm: "Are you sure you want to approve this application?" } do %>
+            Approve
+            <% end %>
+
+            <%= button_to reject_admin_applications_dashboard_path(@application),
+                method: :patch,
+                class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500",
+                aria: { label: "Reject this application" },
+                data: { confirm: "Are you sure you want to reject this application?" } do %>
+            Reject
+            <% end %>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <%# Applicant Information %>
+    <section class="mb-8" aria-labelledby="applicant-info-title">
+      <h2 id="applicant-info-title" class="text-lg font-medium text-gray-900 mb-4">Applicant Information</h2>
+      <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-gray-50 px-4 py-3 rounded-md">
+          <dt class="text-sm font-medium text-gray-500">Full Name</dt>
+          <dd class="mt-1 text-sm text-gray-900"><%= @application.user.full_name %></dd>
+        </div>
+
+        <div class="bg-gray-50 px-4 py-3 rounded-md">
+          <dt class="text-sm font-medium text-gray-500">Email</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <%= mail_to @application.user.email, class: "text-indigo-600 hover:text-indigo-500" %>
+          </dd>
+        </div>
+
+        <div class="bg-gray-50 px-4 py-3 rounded-md">
+          <dt class="text-sm font-medium text-gray-500">Phone</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <%= @application.user.phone || "Not provided" %>
+          </dd>
+        </div>
+
+        <div class="bg-gray-50 px-4 py-3 rounded-md">
+          <dt class="text-sm font-medium text-gray-500">Address</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <%= @application.user.physical_address_1 %><br>
+            <% if @application.user.physical_address_2.present? %>
+              <%= @application.user.physical_address_2 %><br>
+            <% end %>
+            <%= "#{@application.user.city}, #{@application.user.state} #{@application.user.zip_code}" %>
+          </dd>
+        </div>
+      </dl>
+    </section>
+
+    <%# Application Details %>
+    <section class="mb-8" aria-labelledby="application-details-title">
+      <h2 id="application-details-title" class="text-lg font-medium text-gray-900 mb-4">Application Details</h2>
+      <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-gray-50 px-4 py-3 rounded-md">
+          <dt class="text-sm font-medium text-gray-500">Application Type</dt>
+          <dd class="mt-1 text-sm text-gray-900"><%= @application.application_type&.titleize || "Not specified" %></dd>
+        </div>
+
+        <div class="bg-gray-50 px-4 py-3 rounded-md">
+          <dt class="text-sm font-medium text-gray-500">Submission Method</dt>
+          <dd class="mt-1 text-sm text-gray-900"><%= @application.submission_method&.titleize || "Online" %></dd>
+        </div>
+
+        <div class="bg-gray-50 px-4 py-3 rounded-md">
+          <dt class="text-sm font-medium text-gray-500">Application Date</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <%= @application.application_date&.strftime("%B %d, %Y") || "Not recorded" %>
+          </dd>
+        </div>
+
+        <div class="bg-gray-50 px-4 py-3 rounded-md">
+          <dt class="text-sm font-medium text-gray-500">Last Activity</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <%= @application.last_activity_at&.strftime("%B %d, %Y at %I:%M %p") || "No activity recorded" %>
+          </dd>
+        </div>
+      </dl>
+    </section>
+
+    <%# Financial Information %>
+    <section class="mb-8" aria-labelledby="financial-info-title">
+      <h2 id="financial-info-title" class="text-lg font-medium text-gray-900 mb-4">Financial Information</h2>
+      <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-gray-50 px-4 py-3 rounded-md">
+          <dt class="text-sm font-medium text-gray-500">Household Size</dt>
+          <dd class="mt-1 text-sm text-gray-900"><%= @application.household_size || "Not specified" %></dd>
+        </div>
+
+        <div class="bg-gray-50 px-4 py-3 rounded-md">
+          <dt class="text-sm font-medium text-gray-500">Annual Income</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <%= number_to_currency(@application.annual_income) if @application.annual_income %>
+          </dd>
+        </div>
+
+        <div class="bg-gray-50 px-4 py-3 rounded-md">
+          <dt class="text-sm font-medium text-gray-500">Income Verification Status</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <%= @application.income_verification_status&.titleize || "Pending" %>
+          </dd>
+        </div>
+
+        <div class="bg-gray-50 px-4 py-3 rounded-md">
+          <dt class="text-sm font-medium text-gray-500">Income Details</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <%= @application.income_details.presence || "No additional details provided" %>
+          </dd>
+        </div>
+      </dl>
+    </section>
+
+    <%# Medical Provider Information %>
+    <section class="mb-8" aria-labelledby="medical-info-title">
+      <h2 id="medical-info-title" class="text-lg font-medium text-gray-900 mb-4">Medical Provider Information</h2>
+      <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-gray-50 px-4 py-3 rounded-md">
+          <dt class="text-sm font-medium text-gray-500">Provider Name</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <%= @application.medical_provider_name || "Not provided" %>
+          </dd>
+        </div>
+
+        <div class="bg-gray-50 px-4 py-3 rounded-md">
+          <dt class="text-sm font-medium text-gray-500">Provider Contact</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            Phone: <%= @application.medical_provider_phone || "Not provided" %><br>
+            Email: <%= @application.medical_provider_email || "Not provided" %>
+          </dd>
+        </div>
+      </dl>
+    </section>
+  </div>
+</main>

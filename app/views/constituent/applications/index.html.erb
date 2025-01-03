@@ -1,0 +1,37 @@
+<!-- app/views/constituent/applications/index.html.erb -->
+<h1>Your Applications</h1>
+
+<% if @applications.any? %>
+  <table>
+    <thead>
+      <tr>
+        <th>Application Date</th>
+        <th>Status</th>
+        <th>Submission Method</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @applications.each do |application| %>
+        <tr>
+          <td><%= application.application_date.strftime("%B %d, %Y") %></td>
+          <td><%= application.status.capitalize %></td>
+          <td><%= application.submission_method.capitalize %></td>
+          <td>
+            <%= link_to "View", constituent_application_path(application) %> |
+            <% if application.draft? %>
+              <%= link_to "Edit", edit_constituent_application_path(application) %>
+            <% else %>
+              <!-- No edit link for submitted applications -->
+              N/A
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% else %>
+  <p>You have not submitted any applications yet.</p>
+<% end %>
+
+<%= link_to "New Application", new_constituent_application_path %>

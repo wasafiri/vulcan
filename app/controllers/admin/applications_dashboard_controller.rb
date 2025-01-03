@@ -8,6 +8,16 @@ class Admin::ApplicationsDashboardController < ApplicationController
   end
 
   def show
-    @application = Application.find(params[:id])
+    @application = Application.includes(:user).find(params[:id])
+  end
+
+  def approve
+    @application.update!(status: :approved)
+    redirect_to admin_applications_dashboard_path(@application), notice: "Application approved successfully."
+  end
+
+  def reject
+    @application.update!(status: :rejected)
+    redirect_to admin_applications_dashboard_path(@application), alert: "Application rejected."
   end
 end
