@@ -74,6 +74,10 @@ class Application < ApplicationRecord
     medical_provider&.full_name
   end
 
+  def medical_provider_present?
+    medical_provider.present?
+  end
+
   private
 
   # Sets the default status to :in_progress if not already set
@@ -128,10 +132,5 @@ class Application < ApplicationRecord
     if income_proof.attached? && income_proof.byte_size > max_size
       errors.add(:income_proof, "is too large. Maximum size allowed is 5MB.")
     end
-  end
-
-  # Checks if a medical provider is associated with the application
-  def medical_provider_present?
-    medical_provider.present?
   end
 end
