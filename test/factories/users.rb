@@ -5,25 +5,27 @@ FactoryBot.define do
 
   factory :user do
     email
-    password { 'password123' }
-    first_name { 'Test' }
-    last_name { 'User' }
-    phone { '555-555-5555' }
+    password { "password123" }
+    first_name { "Test" }
+    last_name { "User" }
+    phone { "555-555-5555" }
     date_of_birth { 30.years.ago }
-    timezone { 'Eastern Time (US & Canada)' }
-    locale { 'en' }
+    timezone { "Eastern Time (US & Canada)" }
+    locale { "en" }
+    email_verified { true }
+    verified { true }
 
     # Define all user type factories as children of :user
-    factory :admin, class: 'Admin' do
-      type { 'Admin' }
-      first_name { 'Admin' }
+    factory :admin, class: "Admin" do
+      type { "Admin" }
+      first_name { "Admin" }
     end
 
-    factory :evaluator, class: 'Evaluator' do
-      type { 'Evaluator' }
-      first_name { 'Test' }
-      last_name { 'Evaluator' }
-      availability_schedule { { monday: ['9:00', '17:00'] } }
+    factory :evaluator, class: "Evaluator" do
+      type { "Evaluator" }
+      first_name { "Test" }
+      last_name { "Evaluator" }
+      availability_schedule { { monday: [ "9:00", "17:00" ] } }
       status { :active }
 
       trait :inactive do
@@ -35,14 +37,14 @@ FactoryBot.define do
       end
     end
 
-    factory :constituent, class: 'Constituent' do
-      type { 'Constituent' }
-      income_proof { 'Uploaded' }
-      residency_proof { 'Uploaded' }
-      physical_address_1 { '123 Main St' }
-      city { 'Baltimore' }
-      state { 'MD' }
-      zip_code { '21201' }
+    factory :constituent, class: "Constituent" do
+      type { "Constituent" }
+      income_proof { "Uploaded" }
+      residency_proof { "Uploaded" }
+      physical_address_1 { "123 Main St" }
+      city { "Baltimore" }
+      state { "MD" }
+      zip_code { "21201" }
 
       trait :with_disabilities do
         hearing_disability { true }
@@ -55,8 +57,8 @@ FactoryBot.define do
       end
     end
 
-    factory :vendor, class: 'Vendor' do
-      type { 'Vendor' }
+    factory :vendor, class: "Vendor" do
+      type { "Vendor" }
       status { :approved }
 
       trait :pending do
@@ -68,10 +70,10 @@ FactoryBot.define do
       end
     end
 
-    factory :medical_provider, class: 'MedicalProvider' do
-      type { 'MedicalProvider' }
-      first_name { 'Medical' }
-      last_name { 'Provider' }
+    factory :medical_provider, class: "MedicalProvider" do
+      type { "MedicalProvider" }
+      first_name { "Medical" }
+      last_name { "Provider" }
     end
   end
 end
