@@ -81,6 +81,15 @@ unless Rails.env.production?
 
   # Create policies using find_or_create_by! to ensure idempotency
   {
+    "fpl_modifier_percentage" => 400,
+    "fpl_1_person" => 15060,
+    "fpl_2_person" => 20440,
+    "fpl_3_person" => 25820,
+    "fpl_4_person" => 31200,
+    "fpl_5_person" => 36580,
+    "fpl_6_person" => 41960,
+    "fpl_7_person" => 47340,
+    "fpl_8_person" => 52720,
     "max_training_sessions" => 3,
     "waiting_period_years" => 3
   }.each do |key, value|
