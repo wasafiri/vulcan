@@ -4,7 +4,7 @@ class Application < ApplicationRecord
   belongs_to :income_verified_by, class_name: "User", foreign_key: :income_verified_by_id, optional: true
   belongs_to :medical_provider, class_name: "MedicalProvider", foreign_key: :medical_provider_id, optional: true
 
-  has_many :evaluations
+  has_one :evaluation
   has_many :notifications, as: :notifiable, dependent: :destroy
   accepts_nested_attributes_for :medical_provider, allow_destroy: false, reject_if: :all_blank
 

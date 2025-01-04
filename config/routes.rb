@@ -34,6 +34,7 @@ Rails.application.routes.draw do
       member do
         patch :approve
         patch :reject
+        post :assign_evaluator
       end
     end
     resources :appointments_dashboard, only: [ :index, :show ]
