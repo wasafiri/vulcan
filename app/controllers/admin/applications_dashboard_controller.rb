@@ -1,6 +1,6 @@
 class Admin::ApplicationsDashboardController < ApplicationController
   before_action :require_admin!
-  before_action :set_application, only: [ :show, :approve, :reject ]
+  before_action :set_application, only: [ :show, :approve, :reject, :assign_evaluator ]
 
   def index
     @applications = Application.includes(:user)
@@ -21,9 +21,38 @@ class Admin::ApplicationsDashboardController < ApplicationController
     redirect_to admin_applications_dashboard_path(@application), alert: "Application rejected."
   end
 
+  def assign_evaluator
+    evaluator = Evaluator.find(params[:evaluator_id])
+
+    ActiveRecord::Base.transaction do
+      # Create new evaluation
+      evaluation = Evaluation.create!(
+        evaluator: evaluator,
+        constituent: @application.user,
+        application: @application,
+        status: :pending,
+        evaluation_type: determine_evaluation_type(@application.user),
+        evaluation_date: Date.current
+      )
+
+      # Send email notification
+      EvaluatorMailer.with(
+        evaluation: evaluation,
+        constituent: @application.user
+      ).new_evaluation_assigned.deliver_later
+    end
+
+    redirect_to admin_applications_dashboard_path(@application),
+                notice: "Evaluator successfully assigned"
+  end
+
   private
 
   def set_application
-    @application = Application.includes(:user).find(params[:id])
+    @application = Application.includes(:user, :evaluation).find(params[:id])
+  end
+
+  def determine_evaluation_type(constituent)
+    constituent.evaluations.exists? ? :follow_up : :initial
   end
 end

@@ -44,6 +44,22 @@
       </div>
     </div>
 
+    <% if @application.approved? && !@application.evaluation.present? %>
+      <div class="mt-6 p-4 bg-gray-50 rounded-md shadow">
+        <h3 class="text-lg font-medium mb-4">Assign Evaluator</h3>
+        <div class="flex flex-wrap gap-3">
+          <% Evaluator.active.each do |evaluator| %>
+            <%= button_to assign_evaluator_admin_applications_dashboard_path(@application, evaluator_id: evaluator.id),
+                method: :post,
+                class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                data: { confirm: "Are you sure you want to assign #{evaluator.full_name} to this application?" } do %>
+              Assign <%= evaluator.full_name %>
+            <% end %>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
     <%# Applicant Information %>
     <section class="mb-8" aria-labelledby="applicant-info-title">
       <h2 id="applicant-info-title" class="text-lg font-medium text-gray-900 mb-4">Applicant Information</h2>
