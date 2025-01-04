@@ -6,7 +6,9 @@ class EvaluatorMailer < ApplicationMailer
 
     mail(
       to: @evaluator.email,
-      subject: "New Evaluation Assigned - #{@constituent.full_name}"
+      subject: "New Evaluation Assigned - #{@constituent.full_name}",
+      track_opens: true,
+      message_stream: "notifications"
     )
   end
 end
