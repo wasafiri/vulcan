@@ -10,6 +10,11 @@ module MatVulcan
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.0
 
+    config.action_mailer.delivery_method = :postmark
+    config.action_mailer.postmark_settings = {
+      api_token: Rails.application.credentials.postmark_api_token
+    }
+
     # Factory_bot configuration
     config.generators do |g|
       g.factory_bot dir: "test/factories"

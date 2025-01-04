@@ -1,0 +1,26 @@
+Hi <%= @evaluator.full_name %>,
+
+You have been assigned a new evaluation for constituent <%= @constituent.full_name %>.
+
+Constituent Details:
+- Name: <%= @constituent.full_name %>
+- Address: <%= @constituent.physical_address_1 %>
+<% if @constituent.physical_address_2.present? %>          <%= @constituent.physical_address_2 %><% end %>
+          <%= "#{@constituent.city}, #{@constituent.state} #{@constituent.zip_code}" %>
+- Phone: <%= @constituent.phone %>
+- Email: <%= @constituent.email %>
+
+Disabilities:
+<% if @constituent.hearing_disability %>- Hearing<% end %>
+<% if @constituent.vision_disability %>- Vision<% end %>
+<% if @constituent.speech_disability %>- Speech<% end %>
+<% if @constituent.mobility_disability %>- Mobility<% end %>
+<% if @constituent.cognition_disability %>- Cognition<% end %>
+
+You can view and update the evaluation here:
+<%= evaluator_evaluation_url(@evaluation) %>
+
+Please begin the evaluation process by contacting the constituent to schedule an assessment.
+
+Best regards,
+The Admin Team

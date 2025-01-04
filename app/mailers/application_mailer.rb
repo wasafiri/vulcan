@@ -1,7 +1,7 @@
 class ApplicationMailer < ActionMailer::Base
   default(
-    from: ENV.fetch("ELASTIC_EMAIL_FROM"),
-    reply_to: ENV.fetch("ELASTIC_EMAIL_REPLY_TO")
+    from: "info@mdmat.org",
+    reply_to: "info@mdmat.org"
   )
 
   layout "mailer"
