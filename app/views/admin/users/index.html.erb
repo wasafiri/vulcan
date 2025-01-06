@@ -27,7 +27,7 @@
         </thead>
 
         <tbody class="bg-white divide-y divide-gray-200">
-          <% @users.each do |user| %>
+          <% @users.reject(&:medical_provider?).each do |user| %>
             <tr class="hover:bg-gray-50">
               <td class="px-6 py-4">
                 <div class="space-y-1">
@@ -76,7 +76,10 @@
                         Primary Role
                       </label>
                       <%= select_tag "role_#{user.id}",
-                          options_for_select(%w[Admin Evaluator Constituent Vendor Trainer], selected: user.role_type),
+                          options_for_select(
+                            %w[Admin Evaluator Constituent Vendor Trainer],
+                            selected: user.role_type
+                          ),
                           data: { 
                             role_select_target: "select",
                             action: "change->role-select#roleChanged"
