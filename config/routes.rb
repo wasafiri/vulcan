@@ -58,6 +58,7 @@ Rails.application.routes.draw do
         post :remind_to_complete
         post :assign_evaluator
         patch :update_role
+        patch :update_capabilities
       end
 
       collection do

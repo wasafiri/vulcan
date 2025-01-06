@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_01_04_214518) do
+ActiveRecord::Schema[8.0].define(version: 2025_01_05_033017) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -158,6 +158,15 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_04_214518) do
     t.index ["user_id"], name: "index_products_on_user_id"
   end
 
+  create_table "role_capabilities", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "capability", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id", "capability"], name: "index_role_capabilities_on_user_id_and_capability", unique: true
+    t.index ["user_id"], name: "index_role_capabilities_on_user_id"
+  end
+
   create_table "sessions", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.string "user_agent"
@@ -251,6 +260,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_04_214518) do
   add_foreign_key "policy_changes", "policies"
   add_foreign_key "policy_changes", "users"
   add_foreign_key "products", "users"
+  add_foreign_key "role_capabilities", "users"
   add_foreign_key "sessions", "users"
   add_foreign_key "users", "users", column: "evaluator_id"
   add_foreign_key "users", "users", column: "guardian_id"
