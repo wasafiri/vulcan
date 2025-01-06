@@ -36,23 +36,29 @@ Vulcan is a Ruby on Rails application that facilitates Maryland Accessible Telec
 
 ## Current Implementation Status
 
-- ✅ Authentication system (using authentication-zero)
+- ✅ Authentication system (using [authentication-zero](https://github.com/DiegoSalazar/rails-authentication-zero))
 - ✅ Basic CRUD operations
 - ✅ Core views and layouts
 - ✅ Admin dashboard (basic implementation)
 - ✅ Test data seeding
-- ✅ User role management (Admin, Evaluator, Constituent, Vendor, Medical Provider)
+- ✅ User role management (Admin, Evaluator, Constituent, Vendor, Trainer, **Medical Provider** – though Medical Provider is now effectively hidden from the main user management UI)
+- ✅ Role-capabilities system with Stimulus controllers for toggling capabilities
+- ⏳ Postmark API integration for sending emails (migrated from ElasticEmail)
+- ⏳ Enhanced vendor equipment management (partial)
 
 ## Technical Stack
 
-- Ruby 3.3
-- Rails 8.0
-- PostgreSQL
-- Tailwind CSS
-- Propshaft Asset Pipeline
-- Solid Queue (for background jobs)
-- ElasticEmail for email delivery
-- AWS S3 for file storage and OCR functionality
+- **Ruby** 3.3
+- **Rails** 8.0
+- **PostgreSQL**
+- **Tailwind CSS**
+- **Propshaft Asset Pipeline**
+- **Solid Queue** (for background jobs)
+- **Postmark** (for email delivery)
+- **AWS S3** (planned for file storage and OCR functionality)
+
+> **Note**: We **previously** planned on using ElasticEmail; we have now moved to **Postmark** for email.  
+> We also decided **not** to use Pundit for authorization.
 
 ## Prerequisites
 
@@ -63,7 +69,7 @@ Vulcan is a Ruby on Rails application that facilitates Maryland Accessible Telec
 
 ## Setup
 
-1. Clone the repository:
+1. **Clone the repository**:
    ```bash
    git clone https://github.com/yourusername/vulcan.git
    cd vulcan
@@ -129,15 +135,17 @@ This project is licensed under the MIT License - see the LICENSE.md file for det
 
 ## TODO
 
-- [ ] Complete API integration for ElasticEmail
+- [X] Complete API integration for Postmarkapp
+- [X] Add admin page to change user role and assign role capabilities
 - [ ] Configure email templates
 - [ ] Enhance admin dashboard views
 - [ ] Enhance constituent dashboard view
-- [ ] Implement Pundit for authorization to go along with authentication-zero for authentication
 - [ ] Add comprehensive application flow for constituents
 - [ ] Implement application upload and OCR processing via AWS
-- [ ] Add vendor equipment management dashboard
+- [ ] Add page to add/remove devices supported by the program and/or available for new applicants to be assigned
 - [ ] Implement reporting system
+- [ ] Implement flow to reject document, send request for updated submission, display updated submission in admin dashboard
+- [ ] Obtain alpha testing feedback
 
 ## Acknowledgments
 
