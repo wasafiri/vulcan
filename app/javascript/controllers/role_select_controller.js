@@ -2,73 +2,154 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["select", "button", "feedback"]
+  static targets = ["select", "feedback", "capability"]
+  static values = {
+    userId: String
+  }
 
   connect() {
-    this.originalRole = this.selectTarget.value
-    this.buttonTarget.disabled = true
+    console.log("RoleSelect Controller connected", {
+      element: this.element,
+      userId: this.userIdValue,
+      hasSelectTarget: this.hasSelectTarget,
+      hasCapabilityTargets: this.hasCapabilityTargets,
+      targetsFound: {
+        select: this.selectTarget,
+        capabilities: this.capabilityTargets,
+        feedback: this.feedbackTarget
+      }
+    })
   }
 
-  roleChanged() {
-    this.buttonTarget.disabled = this.selectTarget.value === this.originalRole
+  roleChanged(event) {
+    console.log("Role changed triggered", {
+      userId: this.userIdValue,
+      newRole: event.target.value,
+      element: event.target,
+      currentTarget: event.currentTarget
+    })
+
+    const data = {
+      role: event.target.value
+    }
+
+    console.log("Sending role update with data:", data)
+    this.saveChanges('role', data)
   }
 
-  async updateRole(event) {
-    const userId = event.currentTarget.dataset.userId
-    const role = this.selectTarget.value
-    const button = event.currentTarget
-    
+  toggleCapability(event) {
+    console.log("Capability toggle triggered", {
+      userId: this.userIdValue,
+      capability: event.target.dataset.capability,
+      checked: event.target.checked,
+      element: event.target,
+      currentTarget: event.currentTarget
+    })
+
+    const data = {
+      capability: event.target.dataset.capability,
+      enabled: event.target.checked
+    }
+
+    console.log("Sending capability update with data:", data)
+    this.saveChanges('capability', data)
+  }
+
+  async saveChanges(changeType, data) {
+    console.log("Starting saveChanges", {
+      type: changeType,
+      userId: this.userIdValue,
+      data: data,
+      currentState: {
+        selectValue: this.selectTarget?.value,
+        capabilities: this.capabilityTargets ? [...this.capabilityTargets].map(cb => ({
+          name: cb.dataset.capability,
+          checked: cb.checked
+        })) : []
+      }
+    })
+
+    const url = `/admin/users/${this.userIdValue}/${changeType === 'role' ? 'update_role' : 'update_capabilities'}`
+    console.log("Making request to:", url)
+
     try {
-      button.disabled = true
-      button.innerHTML = 'Updating...'
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
+      console.log("CSRF Token found:", !!csrfToken)
 
-      const response = await fetch(`/admin/users/${userId}/update_role`, {
+      const response = await fetch(url, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+          'X-CSRF-Token': csrfToken
         },
-        body: JSON.stringify({ role })
+        body: JSON.stringify(data)
       })
 
-      const data = await response.json()
+      console.log("Response received", {
+        status: response.status,
+        ok: response.ok,
+        statusText: response.statusText
+      })
 
       if (!response.ok) {
-        throw new Error(data.message || 'An unexpected error occurred')
+        const errorText = await response.text()
+        console.error("Server returned error", {
+          status: response.status,
+          text: errorText
+        })
+        throw new Error(errorText || `Server returned ${response.status}`)
       }
 
-      this.showFeedback(data.message, 'success')
-      this.originalRole = role
+      const responseData = await response.json()
+      console.log("Response data:", responseData)
+
+      this.showFeedback(responseData.message, 'success')
     } catch (error) {
-      this.showFeedback(error.message, 'error')
-    } finally {
-      button.disabled = false
-      button.innerHTML = 'Update Role'
+      console.error("Save failed", {
+        error: error,
+        message: error.message,
+        stack: error.stack
+      })
+
+      // (A) Revert the checkbox if it was a capability toggle that failed
+      if (changeType === 'capability') {
+        const toggledCapability = data.capability
+        const toggledCheckbox = this.capabilityTargets.find(cb => cb.dataset.capability === toggledCapability)
+        if (toggledCheckbox) {
+          // Reverse to the old checked state
+          toggledCheckbox.checked = !data.enabled
+        }
+      }
+
+        this.showFeedback(error.message, 'error')
     }
   }
 
   showFeedback(message, type) {
+    console.log("Showing feedback", {
+      message: message,
+      type: type,
+      feedbackTarget: this.feedbackTarget
+    })
+
     const feedback = this.feedbackTarget
+    const isSuccess = type === 'success'
+
     feedback.classList.remove('hidden')
-    feedback.classList.add(type === 'success' ? 'bg-green-50' : 'bg-red-50')
     feedback.innerHTML = `
-      <div class="flex items-center p-4">
-        <div class="flex-shrink-0">
-          ${type === 'success' 
-            ? '<svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>'
-            : '<svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>'
-          }
-        </div>
-        <div class="ml-3">
-          <p class="text-sm font-medium ${type === 'success' ? 'text-green-800' : 'text-red-800'}">
-            ${message}
-          </p>
-        </div>
+      <div class="flex items-center p-2 ${isSuccess ? 'bg-green-50' : 'bg-red-50'} rounded">
+        <p class="text-sm ${isSuccess ? 'text-green-700' : 'text-red-700'}">${message}</p>
       </div>
     `
 
+    console.log("Feedback element updated", {
+      visible: !feedback.classList.contains('hidden'),
+      content: feedback.innerHTML
+    })
+
     setTimeout(() => {
       feedback.classList.add('hidden')
+      console.log("Feedback hidden")
     }, 3000)
   }
 }
