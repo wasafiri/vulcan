@@ -139,25 +139,25 @@
        <% end %>
      </div>
 
-     <div class="space-y-1">
-       <%= form.label :phone, "Phone Number", class: "block text-sm font-medium text-gray-700" %>
-       <%= form.telephone_field :phone, 
-           class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-           required: true,
-           pattern: "[0-9]{10}",
-           placeholder: "Format: 1234567890",
-           aria: {
-             required: "true",
-             invalid: @user.errors[:phone].any?,
-             errormessage: "phone-error"
-           } %>
-       <p class="text-xs text-gray-500">10-digit number only</p>
-       <% if @user.errors[:phone].any? %>
-         <p id="phone-error" class="mt-1 text-sm text-red-600">
-           <%= @user.errors[:phone].join(", ") %>
-         </p>
-       <% end %>
-     </div>
+      <div class="space-y-1">
+        <%= form.label :phone, "Phone Number", class: "block text-sm font-medium text-gray-700" %>
+        <%= form.telephone_field :phone, 
+            class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+            required: true,
+            pattern: "[0-9]{3}-?[0-9]{3}-?[0-9]{4}",
+            placeholder: "Format: 202-555-5555 or 2025555555",
+            aria: {
+              required: "true",
+              invalid: @user.errors[:phone].any?,
+              errormessage: "phone-error"
+            } %>
+        <p class="text-xs text-gray-500">10-digit number, with or without dashes</p>
+        <% if @user.errors[:phone].any? %>
+          <p id="phone-error" class="mt-1 text-sm text-red-600">
+            <%= @user.errors[:phone].join(", ") %>
+          </p>
+        <% end %>
+      </div>
 
      <div class="space-y-1">
        <%= form.label :date_of_birth, "Date of Birth", class: "block text-sm font-medium text-gray-700" %>

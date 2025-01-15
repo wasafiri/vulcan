@@ -1,114 +1,180 @@
 class Application < ApplicationRecord
+  include ApplicationStatusManagement
+  include NotificationDelivery
+
   # Associations
   belongs_to :user, class_name: "Constituent", foreign_key: :user_id
   belongs_to :income_verified_by, class_name: "User", foreign_key: :income_verified_by_id, optional: true
-  belongs_to :medical_provider, class_name: "MedicalProvider", foreign_key: :medical_provider_id, optional: true
+  has_many :training_sessions, class_name: "TrainingSession"
+  has_many :trainers, through: :training_sessions
 
   has_one :evaluation
   has_many :notifications, as: :notifiable, dependent: :destroy
-  accepts_nested_attributes_for :medical_provider, allow_destroy: false, reject_if: :all_blank
 
   # Active Storage attachments
   has_one_attached :residency_proof
   has_one_attached :income_proof
 
-  # Enums
-  enum :status, {
-    in_progress: 0,
+  def status
+    value = read_attribute(:status)
+    return value if value.nil?  # Don't default to 0, just return nil if it's nil
+
+    # Convert string to integer if needed
+    value = self.class.statuses[value.to_sym] if value.is_a?(String)
+
+    # Return the symbol key for the integer value
+    self.class.statuses.key(value.to_i)
+  end
+
+  def status=(value)
+    case value
+    when Symbol
+      write_attribute(:status, self.class.statuses[value])
+    when String
+      write_attribute(:status, self.class.statuses[value.to_sym])
+    when Integer
+      write_attribute(:status, value) if self.class.statuses.values.include?(value)
+    end
+  end
+
+  # Enums for proof statuses
+  enum :income_proof_status, {
+    not_reviewed: 0,
     approved: 1,
-    rejected: 2,
-    needs_information: 3,
-    reminder_sent: 4,
-    awaiting_documents: 5
-  }
+    rejected: 2
+  }, prefix: :income_proof_status
 
-  enum :application_type, {
-    new_application: 0,
-    renewal: 1
-  }
+  enum :residency_proof_status, {
+    not_reviewed: 0,
+    approved: 1,
+    rejected: 2
+  }, prefix: :residency_proof_status
 
-  enum :submission_method, {
-    online: 0,
-    in_person: 1
-  }
+  # Helper methods for proof status checks
+  def rejected_income_proof?
+    income_proof_status_rejected?
+  end
 
-  enum :income_verification_status, {
-    pending: 0,
-    verified: 1,
-    failed: 2
-  }
+  def rejected_residency_proof?
+    residency_proof_status_rejected?
+  end
 
   # Validations
   validates :user, :application_date, :status, presence: true
-  validates :household_size, numericality: { greater_than: 0 }, allow_nil: true
-  validates :annual_income, numericality: { greater_than: 0 }, allow_nil: true
-
-  # Conditional presence validations
-  validates :residency_proof, :income_proof, presence: true, unless: :draft?
-
-  validates :maryland_resident, acceptance: { accept: true, message: "You must be a Maryland resident to apply" }
-  validates :terms_accepted, :information_verified, :medical_release_authorized, acceptance: { accept: true }, if: :submitted?
-
-  # Custom validations
   validate :waiting_period_completed, on: :create
   validate :correct_proof_mime_type
   validate :proof_size_within_limit
 
+  # Conditional presence validations
+  validates :residency_proof, :income_proof, presence: true, unless: :draft?
+  validates :maryland_resident, inclusion: { in: [ true ], message: "You must be a Maryland resident to apply" }
+  validates :terms_accepted, :information_verified, :medical_release_authorized, acceptance: { accept: true }, if: :submitted?
+  validates :medical_provider_name, :medical_provider_phone, :medical_provider_email, presence: true, unless: :draft?
+  validates :household_size, presence: true
+  validates :annual_income, presence: true
+  validates :self_certify_disability, inclusion: { in: [ true, false ] }
+  validates :guardian_relationship, presence: true, if: :is_guardian?
+
   # Scopes
-  scope :pending_verification, -> { where(income_verification_status: :pending) }
   scope :needs_review, -> { where(status: :needs_information) }
   scope :active, -> { where(status: [ :in_progress, :needs_information, :reminder_sent, :awaiting_documents ]) }
   scope :incomplete, -> { where(status: :in_progress) }
   scope :complete, -> { where(status: :approved) }
   scope :needs_evaluation, -> { where(status: :approved) }
   scope :needs_training, -> { where(status: :approved) }
+  scope :submitted, -> { where.not(status: :draft) }
+  scope :draft, -> { where(status: "draft") }
 
-  # Callbacks
-  before_validation :set_default_status, on: :create
+  # Updated Scopes to Match Enum Definitions
+  scope :needs_income_review, -> { where(income_proof_status: :not_reviewed) }
+  scope :needs_residency_review, -> { where(residency_proof_status: :not_reviewed) }
+  scope :rejected_income_proofs, -> { where(income_proof_status: :rejected) }
+  scope :rejected_residency_proofs, -> { where(residency_proof_status: :rejected) }
 
-  # Delegations for cleaner view access
-  delegate :full_name, to: :medical_provider, prefix: true, allow_nil: true
-  delegate :phone, :fax, :email, to: :medical_provider, prefix: true, allow_nil: true
+  # For proof review
+  has_many :proof_reviews, dependent: :destroy
+  after_update :schedule_admin_notifications, if: :needs_proof_review?
 
-  def medical_provider_name
-    medical_provider&.full_name
+  def annual_income=(value)
+    # Remove commas and convert to decimal
+    cleaned_value = value.to_s.gsub(/,/, "").to_f
+    super(cleaned_value)
   end
 
-  def medical_provider_present?
-    medical_provider.present?
+  def purge_proofs(admin_user)
+    raise ArgumentError, "Admin user required" unless admin_user&.admin?
+
+    ActiveRecord::Base.transaction do
+      income_proof.purge if income_proof.attached?
+      residency_proof.purge if residency_proof.attached?
+
+      update_columns(
+        income_proof_status: :not_reviewed,
+        residency_proof_status: :not_reviewed,
+        last_proof_submitted_at: nil,
+        needs_review_since: nil
+      )
+
+      proof_reviews.create!(
+        admin: admin_user,
+        proof_type: "system",
+        status: "purged",
+        reviewed_at: Time.current,
+        submission_method: "system"
+      )
+
+      create_system_notification!(
+        recipient: user,
+        actor: admin_user,
+        action: "proofs_purged"
+      )
+    end
+  rescue => e
+    Rails.logger.error "Failed to purge proofs for application #{id}: #{e.message}"
+    false
+  end
+
+  def valid?(*)
+    result = super
+    Rails.logger.debug "Validation result: #{result}"
+    Rails.logger.debug "Validation errors: #{errors.full_messages}" unless result
+    result
   end
 
   private
 
-  # Sets the default status to :in_progress if not already set
-  def set_default_status
-    self.status ||= :in_progress
+  def schedule_admin_notifications
+    NotifyAdminsJob.perform_later(self)
   end
 
-  # Determines if the application has been submitted (not a draft)
   def submitted?
-    !draft
+    !draft?
   end
 
-  # Marks the application as submitted by setting draft to false
   def submit!
-    update(draft: false)
+    update(status: :in_progress)  # Change from draft to in_progress status
   end
 
-  # Validates that the user has completed the required waiting period before submitting a new application
   def waiting_period_completed
     return unless user
+    return if new_record? # Add this line - skip check for new applications
 
-    last_application = user.applications.order(application_date: :desc).where.not(id: id).first
-    if last_application
-      waiting_period = Policy.get("waiting_period_years") || 3
-      if last_application.application_date > waiting_period.years.ago
-        errors.add(:base, "You must wait #{waiting_period} years before submitting a new application.")
-      end
+    Rails.logger.debug "Checking waiting period for user #{user.id}"
+    last_application = user.applications.where.not(id: id).order(application_date: :desc).first
+
+    Rails.logger.debug "Last application found: #{last_application.inspect}"
+    return unless last_application
+
+    waiting_period = Policy.get("waiting_period_years") || 3
+    Rails.logger.debug "Waiting period: #{waiting_period} years"
+
+    if last_application.application_date > waiting_period.years.ago
+      Rails.logger.debug "Last application date: #{last_application.application_date}"
+      Rails.logger.debug "Required wait until: #{waiting_period.years.ago}"
+      errors.add(:base, "You must wait #{waiting_period} years before submitting a new application.")
     end
   end
 
-  # Validates that attached proofs have correct MIME types
   def correct_proof_mime_type
     allowed_types = [ "application/pdf", "image/jpeg", "image/png", "image/tiff", "image/bmp" ]
 
@@ -121,7 +187,6 @@ class Application < ApplicationRecord
     end
   end
 
-  # Validates that attached proofs do not exceed the size limit
   def proof_size_within_limit
     max_size = 5.megabytes
 
@@ -132,5 +197,56 @@ class Application < ApplicationRecord
     if income_proof.attached? && income_proof.byte_size > max_size
       errors.add(:income_proof, "is too large. Maximum size allowed is 5MB.")
     end
+  end
+
+  def needs_proof_review?
+    saved_change_to_needs_review_since? && needs_review_since.present?
+  end
+
+  def notify_admins_of_new_proofs
+    notifications = User.where(type: "Admin").map do |admin|
+      {
+        recipient: admin,
+        actor: user,
+        action: "proof_submitted",
+        notifiable: self,
+        metadata: { proof_types: pending_proof_types }
+      }
+    end
+    Notification.insert_all!(notifications)
+  end
+
+  def pending_proof_types
+    types = []
+    types << "income" if income_proof_status_not_reviewed?
+    types << "residency" if residency_proof_status_not_reviewed?
+    types
+  end
+
+  def track_proof_purge
+    ProofSubmissionAudit.create!(
+      application: self,
+      user: Current.user,
+      action: "purged",
+      metadata: { reason: "cleanup" }
+    )
+  end
+
+  def create_system_notification!(recipient:, actor:, action:)
+    Notification.create!(
+      recipient: recipient,
+      actor: actor,
+      action: action,
+      notifiable: self,
+      metadata: {
+        application_id: id,
+        timestamp: Time.current.iso8601
+      }
+    )
+  end
+
+  def is_guardian?
+    # Assuming there's a boolean column or method in the User or Application model
+    user&.is_guardian == true
   end
 end

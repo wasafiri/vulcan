@@ -21,102 +21,164 @@
      <% end %>
 
      <div class="p-6 space-y-6">
-       <!-- Application Type -->
+       <!-- Application Status Display -->
        <div>
-         <%= f.label :application_type, class: "block text-sm font-medium text-gray-700" %>
+         <label class="block text-sm font-medium text-gray-700">Application Status</label>
          <div class="mt-1">
-           <%= f.select :application_type,
-               Application.application_types.keys.map { |type| [type.titleize, type] },
-               {},
-               class: "mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md",
-               "aria-describedby": "application_type_help" %>
+           <span class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-gray-100 text-gray-800">
+             <%= @application.status.titleize %>
+           </span>
          </div>
-         <p class="mt-2 text-sm text-gray-500" id="application_type_help">
-           Select the type of application you're submitting
+         <p class="mt-2 text-sm text-gray-500">
+           Current status of your application
          </p>
        </div>
 
-       <!-- Household Information Section -->
-       <fieldset class="space-y-6">
-         <legend class="text-lg font-medium text-gray-900">Household Information</legend>
+       <!-- Residency Verification Section -->
+       <div class="space-y-4 p-4 bg-gray-50 rounded">
+         <h2 class="text-lg font-medium text-gray-900">Residency Verification</h2>
          
-         <div>
-           <%= f.label :household_size, class: "block text-sm font-medium text-gray-700" %>
-           <div class="mt-1">
-             <%= f.number_field :household_size,
-                 min: 1,
-                 class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md",
-                 "aria-describedby": "household_size_help" %>
-           </div>
-           <p class="mt-2 text-sm text-gray-500" id="household_size_help">
-             Total number of people living in your household
-           </p>
+         <div class="flex items-start">
+           <%= f.check_box :maryland_resident,
+               class: "mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
+               required: true,
+               "aria-required": "true" %>
+           <%= f.label :maryland_resident, "I certify that I am a resident of Maryland",
+               class: "ml-2 block text-sm text-gray-700" %>
          </div>
-
-         <div>
-           <%= f.label :annual_income, class: "block text-sm font-medium text-gray-700" %>
-           <div class="mt-1 relative rounded-md shadow-sm">
-             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-               <span class="text-gray-500 sm:text-sm">$</span>
-             </div>
-             <%= f.number_field :annual_income,
-                 step: "0.01",
-                 class: "pl-7 focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md",
-                 "aria-describedby": "annual_income_help" %>
-           </div>
-           <p class="mt-2 text-sm text-gray-500" id="annual_income_help">
-             Total yearly household income before taxes
-           </p>
-         </div>
-       </fieldset>
-
-       <!-- Documentation Section -->
-       <fieldset class="space-y-6">
-         <legend class="text-lg font-medium text-gray-900">Supporting Documentation</legend>
-
-         <div>
-           <%= f.label :income_details, class: "block text-sm font-medium text-gray-700" %>
-           <div class="mt-1">
-             <%= f.text_area :income_details,
-                 rows: 4,
-                 class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border border-gray-300 rounded-md",
-                 "aria-describedby": "income_details_help" %>
-           </div>
-           <p class="mt-2 text-sm text-gray-500" id="income_details_help">
-             Describe your sources of income and any relevant documentation
-           </p>
-         </div>
-
-         <div>
-           <%= f.label :residency_details, class: "block text-sm font-medium text-gray-700" %>
-           <div class="mt-1">
-             <%= f.text_area :residency_details,
-                 rows: 4,
-                 class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border border-gray-300 rounded-md",
-                 "aria-describedby": "residency_details_help" %>
-           </div>
-           <p class="mt-2 text-sm text-gray-500" id="residency_details_help">
-             Describe your Maryland residency status and documentation
-           </p>
-         </div>
-       </fieldset>
-
-       <!-- Medical Provider Section -->
-       <div>
-         <%= f.label :medical_provider_id, "Medical Provider", class: "block text-sm font-medium text-gray-700" %>
-         <div class="mt-1">
-           <%= f.collection_select :medical_provider_id,
-               MedicalProvider.all,
-               :id,
-               :full_name,
-               {},
-               class: "mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md",
-               "aria-describedby": "medical_provider_help" %>
-         </div>
-         <p class="mt-2 text-sm text-gray-500" id="medical_provider_help">
-           Select your primary medical provider
-         </p>
        </div>
+
+      <!-- Household Information Section -->
+      <fieldset class="space-y-6">
+        <legend class="text-lg font-medium text-gray-900">Household Information</legend>
+        
+        <div>
+          <%= f.label :household_size, "Household Size", class: "block text-sm font-medium text-gray-700" %>
+          <div class="mt-1">
+            <%= f.number_field :household_size,
+                min: 1,
+                class: "focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md",
+                "aria-describedby": "household_size_help",
+                required: true %>
+          </div>
+          <p class="mt-2 text-sm text-gray-500" id="household_size_help">
+            Total number of people living in your household
+          </p>
+        </div>
+
+        <div>
+          <%= f.label :annual_income, "Annual Income", class: "block text-sm font-medium text-gray-700" %>
+          <div class="mt-1 relative rounded-md shadow-sm">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <span class="text-gray-500 sm:text-sm">$</span>
+            </div>
+            <%= f.number_field :annual_income,
+                step: "0.01",
+                class: "pl-7 focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md",
+                "aria-describedby": "annual_income_help",
+                required: true %>
+          </div>
+          <p class="mt-2 text-sm text-gray-500" id="annual_income_help">
+            Total yearly household income before taxes
+          </p>
+        </div>
+      </fieldset>
+
+       <!-- Guardian Information Section -->
+       <section aria-labelledby="guardian-section-title" class="space-y-4 p-4 bg-gray-50 rounded">
+         <h2 id="guardian-section-title" class="text-lg font-medium text-gray-900">Guardian Information</h2>
+         
+         <div class="flex items-start">
+           <%= f.check_box :is_guardian,
+               class: "mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
+               "aria-describedby": "guardian-description" %>
+           <%= f.label :is_guardian, "I am applying on behalf of someone under 18",
+               class: "ml-2 block text-sm text-gray-700" %>
+         </div>
+         <p id="guardian-description" class="text-sm text-gray-600">Check this box if you are a parent or legal guardian applying on behalf of a minor</p>
+
+         <div class="guardian-fields" data-controller="guardian">
+           <%= f.label :guardian_relationship, "Relationship to Applicant",
+               class: "block text-sm font-medium text-gray-700" %>
+           <%= f.select :guardian_relationship,
+               options_for_select(["Parent", "Legal Guardian"]),
+               { include_blank: "Select Relationship" },
+               { class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500",
+                 "aria-describedby": "relationship-hint" } %>
+           <p id="relationship-hint" class="mt-1 text-sm text-gray-500">Select your relationship to the applicant if you are applying on behalf of a minor</p>
+         </div>
+       </section>
+
+       <!-- Disability Section -->
+       <section aria-labelledby="disability-section-title" class="space-y-4 p-4 bg-gray-50 rounded">
+         <h2 id="disability-section-title" class="text-lg font-medium text-gray-900">Disability Information</h2>
+         
+         <div class="flex items-start">
+           <%= f.check_box :self_certify_disability,
+               class: "mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
+               "aria-describedby": "disability-certification-description" %>
+           <%= f.label :self_certify_disability,
+               "I certify that I have a disability that affects my ability to access telecommunications services",
+               class: "ml-2 block text-sm text-gray-700" %>
+         </div>
+         <p id="disability-certification-description" class="text-sm text-gray-600">
+           If you have a disability, please self-certify by checking the box above.
+         </p>
+
+         <fieldset class="space-y-2">
+           <legend class="text-sm text-gray-700 font-medium">Select all disabilities that apply:</legend>
+           
+           <div class="grid sm:grid-cols-2 gap-4">
+             <% disabilities = [:hearing, :vision, :speech, :mobility, :cognition] %>
+             <% disabilities.each do |disability| %>
+               <div class="flex items-center">
+                 <%= f.check_box "#{disability}_disability",
+                     class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
+                     "aria-describedby": "#{disability}-description" %>
+                 <%= f.label "#{disability}_disability", disability.to_s.titleize,
+                     class: "ml-2 text-sm text-gray-700" %>
+               </div>
+               <span id="<%= disability %>-description" class="sr-only">
+                 Check if you have a <%= disability %> disability
+               </span>
+             <% end %>
+           </div>
+         </fieldset>
+       </section>
+
+       <!-- Medical Provider Information -->
+       <%= render "medical_provider_form", form: f %>
+
+       <!-- Document Upload Section -->
+       <section aria-labelledby="documents-section-title" class="space-y-4 p-4 bg-gray-50 rounded">
+         <h2 id="documents-section-title" class="text-lg font-medium text-gray-900">Required Documentation</h2>
+
+         <div class="space-y-4">
+           <div>
+             <%= f.label :residency_proof, "Proof of Residency",
+                 class: "block text-sm font-medium text-gray-700" %>
+             <p id="residency-hint" class="text-xs text-gray-500 mb-2">
+               Upload driver's license, state ID, or identification card
+             </p>
+             <%= f.file_field :residency_proof,
+                 class: "block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100",
+                 "aria-describedby": "residency-hint",
+                 accept: ".pdf,.jpg,.jpeg,.png" %>
+           </div>
+
+           <div>
+             <%= f.label :income_proof, "Income Verification",
+                 class: "block text-sm font-medium text-gray-700" %>
+             <p id="income-hint" class="text-xs text-gray-500 mb-2">
+               Upload SSI/SSDI documentation, recent pay stubs, or tax forms
+             </p>
+             <%= f.file_field :income_proof,
+                 class: "block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100",
+                 "aria-describedby": "income-hint",
+                 accept: ".pdf,.jpg,.jpeg,.png" %>
+           </div>
+         </div>
+       </section>
      </div>
 
      <!-- Form Actions -->
@@ -126,9 +188,15 @@
            class: "inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
            role: "button" %>
            
-       <%= f.submit "Update Application",
+       <%= f.submit "Save Application",
+           name: "save_draft",
            class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-           "aria-label": "Save application changes" %>
+           "aria-label": "Save application draft" %>
+
+       <%= f.submit "Submit Application", 
+           name: "submit_application",
+           class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500",
+           "aria-label": "Submit final application" %>
      </div>
    </div>
  <% end %>

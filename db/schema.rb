@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_01_05_033017) do
+ActiveRecord::Schema[8.0].define(version: 2025_01_14_164603) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -59,17 +59,30 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_05_033017) do
     t.datetime "received_at"
     t.datetime "last_activity_at"
     t.integer "review_count"
-    t.bigint "medical_provider_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "self_certify_disability", default: false
     t.boolean "maryland_resident"
-    t.boolean "draft", default: true
     t.boolean "terms_accepted"
     t.boolean "information_verified"
     t.boolean "medical_release_authorized"
+    t.integer "income_proof_status", default: 0, null: false
+    t.integer "residency_proof_status", default: 0, null: false
+    t.string "medical_provider_name"
+    t.string "medical_provider_phone"
+    t.string "medical_provider_fax"
+    t.string "medical_provider_email"
+    t.integer "total_rejections", default: 0, null: false
+    t.datetime "last_proof_submitted_at"
+    t.datetime "needs_review_since"
+    t.bigint "trainer_id"
     t.index ["income_verified_by_id"], name: "index_applications_on_income_verified_by_id"
-    t.index ["medical_provider_id"], name: "index_applications_on_medical_provider_id"
+    t.index ["last_proof_submitted_at"], name: "index_applications_on_last_proof_submitted_at"
+    t.index ["medical_provider_email", "status"], name: "index_applications_on_medical_provider_email_and_status"
+    t.index ["needs_review_since"], name: "index_applications_on_needs_review_since"
+    t.index ["status", "needs_review_since"], name: "index_applications_on_status_and_needs_review_since"
+    t.index ["total_rejections"], name: "index_applications_on_total_rejections"
+    t.index ["trainer_id"], name: "index_applications_on_trainer_id"
     t.index ["user_id"], name: "index_applications_on_user_id"
   end
 
@@ -84,6 +97,18 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_05_033017) do
     t.datetime "updated_at", null: false
     t.index ["evaluator_id"], name: "index_appointments_on_evaluator_id"
     t.index ["user_id"], name: "index_appointments_on_user_id"
+  end
+
+  create_table "email_templates", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "subject"
+    t.text "body"
+    t.text "variables", default: [], array: true
+    t.bigint "updated_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_email_templates_on_name", unique: true
+    t.index ["updated_by_id"], name: "index_email_templates_on_updated_by_id"
   end
 
   create_table "evaluations", force: :cascade do |t|
@@ -158,6 +183,23 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_05_033017) do
     t.index ["user_id"], name: "index_products_on_user_id"
   end
 
+  create_table "proof_reviews", force: :cascade do |t|
+    t.bigint "application_id", null: false
+    t.bigint "admin_id", null: false
+    t.string "proof_type", null: false
+    t.string "status", null: false
+    t.text "rejection_reason"
+    t.string "submission_method"
+    t.datetime "reviewed_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["admin_id", "created_at"], name: "index_proof_reviews_on_admin_id_and_created_at"
+    t.index ["admin_id"], name: "index_proof_reviews_on_admin_id"
+    t.index ["application_id", "proof_type", "created_at"], name: "idx_on_application_id_proof_type_created_at_4b8ffa7c5f"
+    t.index ["application_id"], name: "index_proof_reviews_on_application_id"
+    t.index ["status"], name: "index_proof_reviews_on_status"
+  end
+
   create_table "role_capabilities", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.string "capability", null: false
@@ -182,6 +224,19 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_05_033017) do
   create_table "solid_queue_tables", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+  end
+
+  create_table "training_sessions", force: :cascade do |t|
+    t.bigint "application_id", null: false
+    t.bigint "trainer_id", null: false
+    t.datetime "scheduled_for"
+    t.datetime "completed_at"
+    t.integer "status", default: 0
+    t.text "notes"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["application_id"], name: "index_training_sessions_on_application_id"
+    t.index ["trainer_id"], name: "index_training_sessions_on_trainer_id"
   end
 
   create_table "users", force: :cascade do |t|
@@ -222,8 +277,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_05_033017) do
     t.boolean "speech_disability", default: false
     t.boolean "mobility_disability", default: false
     t.boolean "cognition_disability", default: false
-    t.string "income_proof"
-    t.string "residency_proof"
     t.bigint "income_verified_by_id"
     t.bigint "evaluator_id"
     t.bigint "recipient_id"
@@ -249,8 +302,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_05_033017) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "applications", "users"
   add_foreign_key "applications", "users", column: "income_verified_by_id"
+  add_foreign_key "applications", "users", column: "trainer_id"
   add_foreign_key "appointments", "users"
   add_foreign_key "appointments", "users", column: "evaluator_id"
+  add_foreign_key "email_templates", "users", column: "updated_by_id"
   add_foreign_key "evaluations", "applications"
   add_foreign_key "evaluations", "users", column: "constituent_id"
   add_foreign_key "evaluations", "users", column: "evaluator_id"
@@ -260,8 +315,12 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_05_033017) do
   add_foreign_key "policy_changes", "policies"
   add_foreign_key "policy_changes", "users"
   add_foreign_key "products", "users"
+  add_foreign_key "proof_reviews", "applications"
+  add_foreign_key "proof_reviews", "users", column: "admin_id"
   add_foreign_key "role_capabilities", "users"
   add_foreign_key "sessions", "users"
+  add_foreign_key "training_sessions", "applications"
+  add_foreign_key "training_sessions", "users", column: "trainer_id"
   add_foreign_key "users", "users", column: "evaluator_id"
   add_foreign_key "users", "users", column: "guardian_id"
   add_foreign_key "users", "users", column: "income_verified_by_id"

@@ -1,2 +1,90 @@
-<h1>Admin::Applications#index</h1>
-<p>Find me in app/views/admin/applications/index.html.erb</p>
+<%# app/views/admin/applications/index.html.erb %>
+<main class="container mx-auto px-4 py-8">
+  <div class="max-w-7xl mx-auto">
+    <h1 class="text-3xl font-bold mb-6">Unapproved Applications</h1>
+
+    <%# Sorting and Filtering Controls %>
+    <div class="flex justify-between mb-4">
+      <div>
+        <%= link_to "Sort by Status", admin_applications_path(sort: 'status', direction: params[:direction] == 'asc' ? 'desc' : 'asc'), class: "text-indigo-600 hover:text-indigo-900 mr-4" %>
+        <%= link_to "Sort by Date", admin_applications_path(sort: 'application_date', direction: params[:direction] == 'asc' ? 'desc' : 'asc'), class: "text-indigo-600 hover:text-indigo-900" %>
+      </div>
+
+      <div>
+        <%= link_to "Proofs Needing Review", admin_applications_path(filter: "proofs_needing_review"), class: "text-indigo-600 hover:text-indigo-900 mr-4" %>
+        <%= link_to "Rejected Proofs", admin_applications_path(filter: "proofs_rejected"), class: "text-indigo-600 hover:text-indigo-900 mr-4" %>
+        <%= link_to "Awaiting Medical Response", admin_applications_path(filter: "awaiting_medical_response"), class: "text-indigo-600 hover:text-indigo-900" %>
+      </div>
+    </div>
+
+    <%# Applications Table %>
+    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead>
+          <tr>
+            <%# Table Headers with Sorting Links %>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <%= link_to "Date", admin_applications_path(sort: 'application_date', direction: params[:direction] == 'asc' ? 'desc' : 'asc') %>
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <%= link_to "Name", admin_applications_path(sort: 'user.last_name', direction: params[:direction] == 'asc' ? 'desc' : 'asc') %>
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <%= link_to "Status", admin_applications_path(sort: 'status', direction: params[:direction] == 'asc' ? 'desc' : 'asc') %>
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Attachments</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Medical Response</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          <% @applications.each do |application| %>
+            <tr>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <%= application.application_date.strftime("%m/%d/%Y") %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <%= application.user.full_name %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <%= application.user.phone %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <%= application.user.email %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span class="<%= application_status_badge(application.status) %> px-2 py-1 rounded-full text-xs">
+                  <%= application.status.titleize %>
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <%# Indicators for Proof Statuses %>
+                <% if application.income_proof.attached? || application.residency_proof.attached? %>
+                  <%= content_tag :span, "Income: #{application.income_proof_status.titleize}", class: "text-sm #{proof_status_class(application.income_proof_status)} mr-2" %>
+                  <%= content_tag :span, "Residency: #{application.residency_proof_status.titleize}", class: "text-sm #{proof_status_class(application.residency_proof_status)}" %>
+                <% else %>
+                  <span class="text-sm text-gray-500">No Proofs</span>
+                <% end %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <% if application.status == 'awaiting_documents' %>
+                  <span class="text-sm text-yellow-500">Awaiting Response</span>
+                <% else %>
+                  <span class="text-sm text-green-500">Responded</span>
+                <% end %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <%= link_to "View Application", admin_application_path(application), class: "text-indigo-600 hover:text-indigo-900" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+
+    <%# Pagination (Assuming Pagy is set up) %>
+    <%== pagy_nav(@pagy) if @pagy.pages > 1 %>
+  </div>
+</main>

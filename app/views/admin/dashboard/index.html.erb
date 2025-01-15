@@ -8,16 +8,56 @@
       <p class="text-sm text-gray-500">Since July 1st, <%= @current_fiscal_year %></p>
     </div>
 
-    <!-- Active Applications -->
+    <!-- Active Applications Card -->
     <div class="bg-white rounded-lg shadow p-6">
-      <h3 class="text-lg font-medium text-gray-900">Active Applications</h3>
+      <h3 class="text-lg font-medium text-gray-900">In Progress Applications</h3>
       <p class="text-3xl font-bold text-indigo-600"><%= @open_applications_count %></p>
+      <p class="text-sm text-gray-500">Active but unapproved</p>
+      <div class="mt-2 space-y-2">
+        <% if params[:filter] == 'in_progress' %>
+          <%= link_to admin_root_path,
+              class: "block inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
+            View All Applications
+            <svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          <% end %>
+        <% else %>
+          <%= link_to admin_root_path(filter: 'in_progress'),
+              class: "block inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
+            View Only In Progress
+            <svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          <% end %>
+        <% end %>
+      </div>
     </div>
 
-    <!-- Awaiting Equipment/Services -->
+    <!-- Approved Card -->
     <div class="bg-white rounded-lg shadow p-6">
-      <h3 class="text-lg font-medium text-gray-900">Awaiting Equipment or Services</h3>
+      <h3 class="text-lg font-medium text-gray-900">Approved</h3>
       <p class="text-3xl font-bold text-indigo-600"><%= @pending_services_count %></p>
+      <p class="text-sm text-gray-500">Approved and awaiting services</p>
+      <div class="mt-2 space-y-2">
+        <% if params[:filter] == 'approved' %>
+          <%= link_to admin_root_path,
+              class: "block inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
+            View All Applications
+            <svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          <% end %>
+        <% else %>
+          <%= link_to admin_root_path(filter: 'approved'),
+              class: "block inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
+            View Only Approved
+            <svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          <% end %>
+        <% end %>
+      </div>
     </div>
 
     <!-- Administration -->
@@ -46,51 +86,103 @@
     </div>
   </div>
 
+  <!-- Filter Controls -->
+  <div class="flex justify-between mb-4">
+    <div class="flex space-x-4">
+      <%= link_to admin_root_path(sort: 'status', direction: params[:direction] == 'asc' ? 'desc' : 'asc'),
+          class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+          aria: { label: "Sort applications by status" } do %>
+        <span>Sort by Status</span>
+      <% end %>
+
+      <%= link_to admin_root_path(sort: 'application_date', direction: params[:direction] == 'asc' ? 'desc' : 'asc'),
+          class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+          aria: { label: "Sort applications by date" } do %>
+        <span>Sort by Date</span>
+      <% end %>
+    </div>
+
+    <div class="flex space-x-4">
+      <% if params[:filter].present? %>
+        <%= link_to admin_root_path,
+            class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+            aria: { label: "View all applications" } do %>
+          <span>View All Applications</span>
+        <% end %>
+      <% end %>
+
+      <%= link_to admin_root_path(filter: "proofs_needing_review"),
+          class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 #{params[:filter] == 'proofs_needing_review' ? 'bg-gray-50' : ''}",
+          aria: { label: "Show applications needing proof review" } do %>
+        <span>Proofs Needing Review</span>
+      <% end %>
+
+      <%= link_to admin_root_path(filter: "awaiting_medical_response"),
+          class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 #{params[:filter] == 'awaiting_medical_response' ? 'bg-gray-50' : ''}",
+          aria: { label: "Show applications awaiting medical response" } do %>
+        <span>Awaiting Medical Response</span>
+      <% end %>
+    </div>
+  </div>
+
   <!-- Content Section -->
   <% if @applications.present? %>
     <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead>
-          <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          <% @applications.each do |application| %>
+      <div class="bg-gray-100 p-4 mb-4">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead>
             <tr>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <%= application.created_at.strftime("%m/%d/%Y") %>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <%= application.user.full_name %>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <%= application.user.phone %>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <%= application.user.email %>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span class="<%= application_status_badge(application.status) %> px-2 py-1 rounded-full text-xs">
-                  <%= application.status.titleize %>
-                </span>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <%= link_to "View Application", admin_applications_dashboard_path(application), class: "text-indigo-600 hover:text-indigo-900" %>
-              </td>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact Info</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Attachments</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
             </tr>
-          <% end %>
-        </tbody>
-      </table>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <% @applications.each do |application| %>
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <%= application.created_at.strftime("%m/%d/%Y") %>
+                </td>
+                <td class="px-6 py-4 whitespace-normal">
+                  <%= application.user.full_name %>
+                </td>
+                <td class="px-6 py-4 whitespace-normal">
+                  <div><%= application.user.phone %></div>
+                  <div class="text-gray-500 text-sm"><%= application.user.email %></div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span class="<%= application_status_badge(application.status) %> px-2 py-1 rounded-full text-xs">
+                    <%= application.status.titleize %>
+                  </span>
+                </td>
+                <td class="px-6 py-4 whitespace-normal">
+                  <% if application.income_proof.attached? || application.residency_proof.attached? %>
+                    <div class="flex flex-col space-y-1">
+                      <%= content_tag :span, "Income: #{application.income_proof_status.titleize}", 
+                          class: "text-sm #{proof_status_class(application.income_proof_status)}" %>
+                      <%= content_tag :span, "Residency: #{application.residency_proof_status.titleize}", 
+                          class: "text-sm #{proof_status_class(application.residency_proof_status)}" %>
+                    </div>
+                  <% else %>
+                    <span class="text-sm text-gray-500">No Proofs</span>
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  <%= link_to "View Application", admin_applications_dashboard_path(application), 
+                      class: "text-indigo-600 hover:text-indigo-900" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
     </div>
   <% else %>
     <div class="bg-white rounded-lg shadow p-6 text-center">
-      <p class="text-gray-500">No records found</p>
+      <p class="text-gray-500">No applications found</p>
     </div>
   <% end %>
 

@@ -1,0 +1,18 @@
+# app/views/medical_provider_mailer/request_certification.html.erb
+<h1>Disability Certification Request</h1>
+
+<p>Dear Healthcare Provider,</p>
+
+<p>We are requesting disability certification for your patient, <%= @constituent.full_name %>.</p>
+
+<p>Please complete and return the attached certification form.</p>
+
+<p>Patient Information:</p>
+<ul>
+  <li>Name: <%= @constituent.full_name %></li>
+  <li>Date of Birth: <%= @constituent.date_of_birth %></li>
+</ul>
+
+<p>Thank you for your assistance.</p>
+
+<p>MDMAT Team</p>

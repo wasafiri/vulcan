@@ -1,123 +1,173 @@
+<%# app/views/admin/applications/show.html.erb %>
 <main class="container mx-auto px-4 py-8">
- <div class="max-w-7xl mx-auto">
-   <!-- Application Header -->
-   <header class="mb-8">
-     <div class="flex justify-between items-center">
-       <h1 class="text-2xl font-bold">Application #<%= @application.id %></h1>
-       <div>
-         <span class="<%= application_status_badge(@application.status) %> px-3 py-1 rounded-full text-sm font-medium">
-           <%= @application.status.titleize %>
-         </span>
-       </div>
-     </div>
-   </header>
+  <div class="max-w-7xl mx-auto">
+    <!-- Application Header -->
+    <header class="mb-8">
+      <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold">Application #<%= @application.id %></h1>
+        <div>
+          <span class="<%= application_status_badge(@application.status) %> px-3 py-1 rounded-full text-sm font-medium">
+            <%= @application.status.titleize %>
+          </span>
+        </div>
+      </div>
+    </header>
 
-   <!-- Main Content Grid -->
-   <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-     <!-- Applicant Details -->
-     <section class="lg:col-span-2 bg-white shadow rounded-lg p-6" aria-labelledby="applicant-details">
-       <h2 id="applicant-details" class="text-lg font-medium mb-4">Applicant Details</h2>
-       <dl class="grid grid-cols-2 gap-4">
-         <div>
-           <dt class="text-sm font-medium text-gray-500">Full Name</dt>
-           <dd class="mt-1"><%= @application.user.full_name %></dd>
-         </div>
-         <div>
-           <dt class="text-sm font-medium text-gray-500">Phone</dt>
-           <dd class="mt-1"><%= @application.user.phone %></dd>
-         </div>
-         <div>
-           <dt class="text-sm font-medium text-gray-500">Email</dt>
-           <dd class="mt-1"><%= @application.user.email %></dd>
-         </div>
-         <div>
-           <dt class="text-sm font-medium text-gray-500">Date of Birth</dt>
-           <dd class="mt-1"><%= @application.user.date_of_birth.strftime("%B %d, %Y") %></dd>
-         </div>
-       </dl>
-     </section>
+    <!-- Main Content Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <!-- Applicant Details -->
+      <section class="lg:col-span-2 bg-white shadow rounded-lg p-6" aria-labelledby="applicant-details">
+        <h2 id="applicant-details" class="text-lg font-medium mb-4">Applicant Details</h2>
+        <dl class="grid grid-cols-2 gap-4">
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Full Name</dt>
+            <dd class="mt-1"><%= @application.user.full_name %></dd>
+          </div>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Phone</dt>
+            <dd class="mt-1"><%= @application.user.phone %></dd>
+          </div>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Email</dt>
+            <dd class="mt-1"><%= @application.user.email %></dd>
+          </div>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Date of Birth</dt>
+            <dd class="mt-1"><%= @application.user.date_of_birth.strftime("%B %d, %Y") %></dd>
+          </div>
+        </dl>
+      </section>
 
-     <!-- Application Status -->
-     <aside class="bg-white shadow rounded-lg p-6" aria-labelledby="application-status">
-       <h2 id="application-status" class="text-lg font-medium mb-4">Application Status</h2>
-       <dl>
-         <div class="mb-4">
-           <dt class="text-sm font-medium text-gray-500">Submitted On</dt>
-           <dd class="mt-1"><%= @application.application_date.strftime("%B %d, %Y") %></dd>
-         </div>
-         <div class="mb-4">
-           <dt class="text-sm font-medium text-gray-500">Last Updated</dt>
-           <dd class="mt-1"><%= @application.last_activity_at.strftime("%B %d, %Y") %></dd>
-         </div>
-         <div class="mb-4">
-           <dt class="text-sm font-medium text-gray-500">Income Verification</dt>
-           <dd class="mt-1"><%= @application.income_verification_status.titleize %></dd>
-         </div>
-       </dl>
+      <!-- Application Status and Actions -->
+      <aside class="bg-white shadow rounded-lg p-6" aria-labelledby="application-status">
+        <h2 id="application-status" class="text-lg font-medium mb-4">Application Status</h2>
+        <dl>
+          <div class="mb-4">
+            <dt class="text-sm font-medium text-gray-500">Submitted On</dt>
+            <dd class="mt-1"><%= @application.application_date.strftime("%B %d, %Y") %></dd>
+          </div>
+          <div class="mb-4">
+            <dt class="text-sm font-medium text-gray-500">Last Updated</dt>
+            <%= @application.last_activity_at.present? ? @application.last_activity_at.strftime("%B %d, %Y") : "Not specified" %>
+          </div>
+        </dl>
 
-       <!-- Admin Actions -->
-       <div class="mt-6 space-y-3">
-         <%= button_to "Verify Income", 
-             verify_income_admin_application_path(@application),
-             method: :patch,
-             class: "w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700",
-             data: { confirm: "Are you sure?" },
-             role: "button",
-             disabled: @application.income_verification_status == "verified" %>
-             
-         <%= button_to "Request Documents",
-             request_documents_admin_application_path(@application),
-             method: :patch, 
-             class: "w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700",
-             role: "button" %>
+      <!-- Admin Actions -->
+      <div class="mt-6 space-y-3">
+        <%= button_to verify_income_admin_application_path(@application),
+            method: :patch,
+            class: "w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700",
+            data: { confirm: "Are you sure?" },
+            role: "button",
+            disabled: @application.income_proof_status == "approved" do %>
+          Verify Income
+        <% end %>
+                
+        <%= button_to request_documents_admin_application_path(@application),
+            method: :patch, 
+            class: "w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700",
+            role: "button" do %>
+          Request Documents
+        <% end %>
 
-         <% if @application.status == "in_progress" %>
-           <%= button_to "Approve Application",
-               approve_admin_application_path(@application),
-               method: :patch,
-               class: "w-full bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700",
-               role: "button" %>
-         <% end %>
-       </div>
-     </aside>
-   </div>
+        <% if @application.status == :in_progress %>
+          <%= button_to approve_admin_applications_dashboard_path(@application),
+              method: :patch,
+              class: "w-full bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700",
+              role: "button" do %>
+            Approve Application
+          <% end %>
+        <% end %>
+      </div>
 
-   <!-- Additional Details Section -->
-   <section class="mt-8 bg-white shadow rounded-lg p-6" aria-labelledby="additional-details">
-     <h2 id="additional-details" class="text-lg font-medium mb-4">Additional Details</h2>
-     
-     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-       <div>
-         <h3 class="text-sm font-medium text-gray-500 mb-2">Income Details</h3>
-         <p class="text-gray-700"><%= @application.income_details %></p>
-       </div>
-       
-       <div>
-         <h3 class="text-sm font-medium text-gray-500 mb-2">Residency Details</h3>
-         <p class="text-gray-700"><%= @application.residency_details %></p>
-       </div>
-     </div>
+    <!-- Additional Details Section -->
+    <section class="mt-8 bg-white shadow rounded-lg p-6" aria-labelledby="additional-details">
+      <h2 id="additional-details" class="text-lg font-medium mb-4">Additional Details</h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <h3 class="text-sm font-medium text-gray-500 mb-2">Income Details</h3>
+          <p class="text-gray-700"><%= @application.income_details %></p>
+        </div>
+        
+        <div>
+          <h3 class="text-sm font-medium text-gray-500 mb-2">Residency Details</h3>
+          <p class="text-gray-700"><%= @application.residency_details %></p>
+        </div>
+      </div>
 
-     <div class="mt-6">
-       <h3 class="text-sm font-medium text-gray-500 mb-2">Disability Information</h3>
-       <ul class="list-disc pl-5 space-y-1">
-         <% if @application.user.hearing_disability %>
-           <li>Hearing Disability</li>
-         <% end %>
-         <% if @application.user.vision_disability %>
-           <li>Vision Disability</li>
-         <% end %>
-         <% if @application.user.speech_disability %>
-           <li>Speech Disability</li>
-         <% end %>
-         <% if @application.user.mobility_disability %>
-           <li>Mobility Disability</li>
-         <% end %>
-         <% if @application.user.cognition_disability %>
-           <li>Cognition Disability</li>
-         <% end %>
-       </ul>
-     </div>
-   </section>
- </div>
+      <div class="mt-6">
+        <h3 class="text-sm font-medium text-gray-500 mb-2">Disability Information</h3>
+        <ul class="list-disc pl-5 space-y-1">
+          <% if @application.user.hearing_disability %>
+            <li>Hearing Disability</li>
+          <% end %>
+          <% if @application.user.vision_disability %>
+            <li>Vision Disability</li>
+          <% end %>
+          <% if @application.user.speech_disability %>
+            <li>Speech Disability</li>
+          <% end %>
+          <% if @application.user.mobility_disability %>
+            <li>Mobility Disability</li>
+          <% end %>
+          <% if @application.user.cognition_disability %>
+            <li>Cognition Disability</li>
+          <% end %>
+        </ul>
+      </div>
+
+      <%# Proof Review Section %>
+      <div class="mt-8">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Proofs Review</h2>
+        <div class="space-y-4">
+          <%# Proof of Income Attachment %>
+          <div>
+            <h3 class="text-md font-semibold">Proof of Income</h3>
+            <% if @application.income_proof.attached? %>
+              <%= link_to "View Proof of Income", url_for(@application.income_proof), target: "_blank", class: "text-indigo-600 hover:text-indigo-900 mr-4" %>
+              <span class="<%= proof_status_badge(@application.income_proof_status) %> px-2 py-1 rounded-full text-xs">
+                <%= @application.income_proof_status.titleize %>
+              </span>
+              <%# Accept/Reject Buttons if not yet reviewed %>
+              <% if @application.income_proof_status == 'not_reviewed' %>
+                <%= button_to "Approve Income Proof", update_proof_status_admin_application_path(@application, proof_type: 'income', status: 'approved'), method: :patch, class: "bg-green-500 text-white px-3 py-1 rounded ml-2", data: { confirm: "Approve this proof?" } %>
+                <%= button_to "Reject Income Proof", update_proof_status_admin_application_path(@application, proof_type: 'income', status: 'rejected'), method: :patch, class: "bg-red-500 text-white px-3 py-1 rounded ml-2", data: { confirm: "Reject this proof?" } %>
+              <% end %>
+            <% else %>
+              <span class="text-gray-500">No Proof of Income Submitted</span>
+            <% end %>
+          </div>
+
+          <%# Proof of Residency Attachment %>
+          <div>
+            <h3 class="text-md font-semibold">Proof of Residency</h3>
+            <% if @application.residency_proof.attached? %>
+              <%= link_to "View Proof of Residency", url_for(@application.residency_proof), target: "_blank", class: "text-indigo-600 hover:text-indigo-900 mr-4" %>
+              <span class="<%= proof_status_badge(@application.residency_proof_status) %> px-2 py-1 rounded-full text-xs">
+                <%= @application.residency_proof_status.titleize %>
+              </span>
+              <%# Accept/Reject Buttons if not yet reviewed %>
+              <% if @application.residency_proof_status == 'not_reviewed' %>
+                <%= button_to "Approve Residency Proof", update_proof_status_admin_application_path(@application, proof_type: 'residency', status: 'approved'), method: :patch, class: "bg-green-500 text-white px-3 py-1 rounded ml-2", data: { confirm: "Approve this proof?" } %>
+                <%= button_to "Reject Residency Proof", update_proof_status_admin_application_path(@application, proof_type: 'residency', status: 'rejected'), method: :patch, class: "bg-red-500 text-white px-3 py-1 rounded ml-2", data: { confirm: "Reject this proof?" } %>
+              <% end %>
+            <% else %>
+              <span class="text-gray-500">No Proof of Residency Submitted</span>
+            <% end %>
+          </div>
+        </div>
+      </div>
+
+      <%# Medical Provider Response Section %>
+      <div class="mt-8">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Medical Provider Response</h2>
+        <% if @application.status == 'awaiting_documents' %>
+          <span class="text-yellow-500">Awaiting response from medical provider.</span>
+        <% else %>
+          <span class="text-green-500">Medical provider has responded.</span>
+        <% end %>
+      </div>
+    </section>
+  </div>
 </main>

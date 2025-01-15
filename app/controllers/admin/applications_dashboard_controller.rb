@@ -13,7 +13,7 @@ class Admin::ApplicationsDashboardController < ApplicationController
 
   def approve
     @application.update!(status: :approved)
-    redirect_to admin_applications_dashboard_path(@application), notice: "Application approved successfully."
+    redirect_to admin_applications_dashboard_path(@application), notice: "Application approved."
   end
 
   def reject
@@ -43,7 +43,32 @@ class Admin::ApplicationsDashboardController < ApplicationController
     end
 
     redirect_to admin_applications_dashboard_path(@application),
-                notice: "Evaluator successfully assigned"
+      notice: "Evaluator successfully assigned"
+  end
+
+  def schedule_training
+    trainer = User.find(params[:trainer_id])
+    training_session = @application.training_sessions.new(
+      trainer: trainer,
+      scheduled_for: params[:scheduled_for],
+      status: :scheduled
+    )
+
+    if training_session.save
+      redirect_to admin_applications_dashboard_path(@application),
+        notice: "Training session scheduled with #{trainer.full_name}"
+    else
+      redirect_to admin_applications_dashboard_path(@application),
+        alert: "Failed to schedule training session"
+    end
+  end
+
+  def complete_training
+    training_session = @application.training_sessions.find(params[:training_session_id])
+    training_session.update(status: :completed, completed_at: Time.current)
+
+    redirect_to admin_applications_dashboard_path(@application),
+                notice: "Training session marked as completed"
   end
 
   private

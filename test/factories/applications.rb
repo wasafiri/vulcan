@@ -1,39 +1,125 @@
 FactoryBot.define do
   factory :application do
-    association :user, factory: :constituent
-    association :medical_provider, factory: :medical_provider
-    application_type { :new_application }
-    submission_method { :online }
-    status { :in_progress }
-    application_date { 2.days.ago }
-    household_size { 3 }
-    annual_income { 45000 }
-    income_verification_status { :pending }
-    income_details { "Social Security Income and part-time employment" }
-    residency_details { "Maryland resident for 15 years" }
-    current_step { "income_verification" }
-    received_at { 2.days.ago }
-    last_activity_at { 1.day.ago }
-    review_count { 0 }
+    # Required associations
+    association :user, factory: [ :constituent, :with_disabilities ], strategy: :create
 
-    trait :in_prgress do
-      status { :in_progress }
+    # Base status fields with default values
+    status { :in_progress }
+    income_proof_status { :not_reviewed }  # Add default value
+    residency_proof_status { :not_reviewed }  # Add default value
+
+    # Other required fields
+    application_date { Time.current }
+    maryland_resident { true }
+    self_certify_disability { true }
+    medical_provider_name { generate(:medical_provider_name) }
+    medical_provider_phone { generate(:medical_provider_phone) }
+    medical_provider_fax { generate(:medical_provider_fax) }
+    medical_provider_email { generate(:medical_provider_email) }
+
+    after(:build) do |application|
+      # Create and attach proofs
+      fixture_dir = Rails.root.join("test", "fixtures", "files")
+      FileUtils.mkdir_p(fixture_dir)
+      [ "income_proof.pdf", "residency_proof.pdf" ].each do |filename|
+        file_path = fixture_dir.join(filename)
+        unless File.exist?(file_path)
+          File.write(file_path, "test content for #{filename}")
+        end
+        proof_type = filename.sub(".pdf", "").to_sym
+        application.public_send(proof_type).attach(
+          io: File.open(file_path),
+          filename: filename,
+          content_type: "application/pdf"
+        )
+      end
     end
 
-    trait :approved do
-      status { :approved }
-      income_verification_status { :verified }
+    trait :completed do
+      status { :approved }  # Use symbol instead of integer
+      income_proof_status { :approved }
+      residency_proof_status { :approved }
+      terms_accepted { true }
+      information_verified { true }
+      medical_release_authorized { true }
       income_verified_at { Time.current }
-      current_step { "completed" }
+      last_activity_at { Time.current }
       association :income_verified_by, factory: :admin
     end
 
-    trait :needs_information do
-      status { :needs_information }
-      income_verification_status { :failed }
-      income_details { "Need additional documentation" }
-      residency_details { "Need proof of Maryland residency" }
-      current_step { "documentation_required" }
+    trait :rejected do
+      status { :rejected }  # Use symbol instead of integer
+      income_proof_status { :rejected }
+      residency_proof_status { :rejected }
+      terms_accepted { true }
+      information_verified { true }
+      medical_release_authorized { true }
+      total_rejections { 1 }
+      needs_review_since { Time.current }
+      last_activity_at { Time.current }
+    end
+
+    trait :archived do
+      status { :archived }  # Use symbol instead of integer
+      income_proof_status { :approved }
+      residency_proof_status { :approved }
+      terms_accepted { true }
+      information_verified { true }
+      medical_release_authorized { true }
+      application_date { 8.years.ago }
+      last_activity_at { 8.years.ago }
+    end
+
+    trait :in_progress_with_rejected_proofs do
+      status { :in_progress }
+      income_proof_status { :rejected }
+      residency_proof_status { :rejected }
+      needs_review_since { Time.current }
+      last_activity_at { Time.current }
+
+      after(:build) do |application|
+        fixture_dir = Rails.root.join("test", "fixtures", "files")
+        FileUtils.mkdir_p(fixture_dir)
+        [ "income_proof_rejected.pdf", "residency_proof_rejected.pdf" ].each do |filename|
+          file_path = fixture_dir.join(filename)
+          unless File.exist?(file_path)
+            File.write(file_path, "test content for #{filename}")
+          end
+          proof_type = filename.sub("_rejected.pdf", "").to_sym
+          application.public_send(proof_type).attach(
+            io: File.open(file_path),
+            filename: filename,
+            content_type: "application/pdf"
+          )
+        end
+      end
+    end
+
+    trait :in_progress_with_approved_proofs do
+      status { :in_progress }
+      income_proof_status { :approved }
+      residency_proof_status { :approved }
+      last_activity_at { Time.current }
+
+      after(:build) do |application|
+        fixture_dir = Rails.root.join("test", "fixtures", "files")
+        FileUtils.mkdir_p(fixture_dir)
+        files = {
+          "approved_income_proof.pdf" => :income_proof,
+          "placeholder_residency_proof.pdf" => :residency_proof
+        }
+        files.each do |filename, proof_type|
+          file_path = fixture_dir.join(filename)
+          unless File.exist?(file_path)
+            File.write(file_path, "test content for #{filename}")
+          end
+          application.public_send(proof_type).attach(
+            io: File.open(file_path),
+            filename: filename,
+            content_type: "application/pdf"
+          )
+        end
+      end
     end
   end
 end

@@ -1,143 +1,115 @@
+<%# app/views/sessions/new.html.erb %>
 <div class="min-h-screen flex items-center justify-center bg-gray-100 px-4 py-12">
- <div class="bg-white p-6 sm:p-8 rounded-lg shadow-md w-full max-w-md" role="main">
-   <h1 class="text-2xl font-semibold mb-6 text-center text-gray-900" id="signin-heading">Sign In</h1>
+  <div class="bg-white p-6 sm:p-8 rounded-lg shadow-md w-full max-w-md" role="main">
+    <h1 class="text-2xl font-semibold mb-6 text-center text-gray-900" id="signin-heading">Sign In</h1>
 
-   <% if flash[:alert] %>
-     <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6" 
-          role="alert"
-          aria-atomic="true">
-       <span><%= flash[:alert] %></span>
-     </div>
-   <% end %>
+    <% if flash[:alert] %>
+      <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6" 
+           role="alert"
+           aria-atomic="true">
+        <span><%= flash[:alert] %></span>
+      </div>
+    <% end %>
 
-   <%= form_with url: sign_in_path, 
-                 local: true, 
-                 class: "space-y-6",
-                 aria: { labelledby: "signin-heading" },
-                 data: { controller: "visibility" } do |form| %>
-     
-     <div class="space-y-1">
-       <%= form.label :email, "Email Address", 
-           class: "block text-sm font-medium text-gray-700",
-           for: "email-input" %>
-       <%= form.email_field :email,
-           id: "email-input",
-           class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-           value: params[:email_hint] || "",
-           required: true,
-           autocomplete: "email",
-           aria: {
-             required: "true",
-             invalid: @errors&.include?(:email),
-             errormessage: "email-error",
-             describedby: "email-hint email-error"
-           } %>
-       <p class="text-xs text-gray-500" id="email-hint">Enter the email address associated with your account</p>
-       <% if @errors&.include?(:email) %>
-         <p id="email-error" class="mt-1 text-sm text-red-600">
-           <%= @errors[:email].join(", ") %>
-         </p>
-       <% end %>
-     </div>
+    <%= form_with url: sign_in_path, 
+                  local: true, 
+                  class: "space-y-6",
+                  aria: { labelledby: "signin-heading" },
+                  data: { controller: "visibility" } do |form| %>
+      
+      <div class="space-y-1">
+        <%= form.label :email, "Email Address", 
+            class: "block text-sm font-medium text-gray-700",
+            for: "email-input" %>
+        <%= form.email_field :email,
+            id: "email-input",
+            class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+            value: params[:email_hint] || "",
+            required: true,
+            autocomplete: "email",
+            aria: {
+              required: "true",
+              invalid: @errors&.include?(:email),
+              errormessage: "email-error",
+              describedby: "email-hint email-error"
+            } %>
+        <p class="text-xs text-gray-500" id="email-hint">Enter the email address associated with your account</p>
+        <% if @errors&.include?(:email) %>
+          <p id="email-error" class="mt-1 text-sm text-red-600">
+            <%= @errors[:email].join(", ") %>
+          </p>
+        <% end %>
+      </div>
 
-     <div class="space-y-1">
-       <%= form.label :password, "Password",
-           class: "block text-sm font-medium text-gray-700",
-           for: "password-input" %>
-       <div class="relative">
-         <%= form.password_field :password,
-             id: "password-input",
-             class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-             required: true,
-             autocomplete: "current-password",
-             data: { visibility_target: "field" },
-             aria: {
-               required: "true",
-               invalid: @errors&.include?(:password),
-               errormessage: "password-error",
-               describedby: "password-hint password-error password-visibility-status"
-             } %>
-         <button type="button"
-                 data-action="visibility#togglePassword" 
-                 class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                 aria-label="Toggle password visibility"
-                 aria-pressed="false">
-           <svg class="h-5 w-5" 
-                data-visibility-target="icon" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-                aria-hidden="true">
-             <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-             <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-           </svg>
-         </button>
-         <div aria-live="polite" 
-              class="sr-only" 
-              id="password-visibility-status"
-              data-visibility-target="status">
-           Password is hidden
-         </div>
-       </div>
-       <div class="flex items-center justify-between mt-2">
-         <p class="text-xs text-gray-500" id="password-hint">Enter your password</p>
-         <%= link_to "Forgot password?", 
-             edit_password_path, 
-             class: "text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded",
-             aria: { label: "Reset your password" } %>
-       </div>
-       <% if @errors&.include?(:password) %>
-         <p id="password-error" class="mt-1 text-sm text-red-600">
-           <%= @errors[:password].join(", ") %>
-         </p>
-       <% end %>
-     </div>
+      <div class="space-y-1">
+        <%= form.label :password, "Password",
+            class: "block text-sm font-medium text-gray-700",
+            for: "password-input" %>
+        <div class="relative">
+          <%= form.password_field :password,
+              id: "password-input",
+              class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+              required: true,
+              autocomplete: "current-password",
+              data: { visibility_target: "field" },
+              aria: {
+                required: "true",
+                invalid: @errors&.include?(:password),
+                errormessage: "password-error",
+                describedby: "password-hint password-error password-visibility-status"
+              } %>
+          <button type="button"
+                  data-action="visibility#togglePassword" 
+                  class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  aria-label="Toggle password visibility"
+                  aria-pressed="false">
+            <svg class="h-5 w-5" 
+                 data-visibility-target="icon" 
+                 fill="none" 
+                 viewBox="0 0 24 24" 
+                 stroke="currentColor"
+                 aria-hidden="true">
+              <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          </button>
+          <div aria-live="polite" 
+               class="sr-only" 
+               id="password-visibility-status"
+               data-visibility-target="status">
+            Password is hidden
+          </div>
+        </div>
+        <div class="flex items-center justify-between mt-2">
+          <p class="text-xs text-gray-500" id="password-hint">Enter your password</p>
+          <%= link_to "Forgot password?", 
+              edit_password_path, 
+              class: "text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded",
+              aria: { label: "Reset your password" } %>
+        </div>
+        <% if @errors&.include?(:password) %>
+          <p id="password-error" class="mt-1 text-sm text-red-600">
+            <%= @errors[:password].join(", ") %>
+          </p>
+        <% end %>
+      </div>
 
-     <%= form.submit "Sign In", 
-         class: "w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-         data: { 
-           disable_with: "Signing in...",
-           "aria-busy": "true" 
-         },
-         aria: { label: "Sign in to your account" } %>
+      <%= form.submit "Sign In", 
+          class: "w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+          data: { 
+            disable_with: "Signing in...",
+            "aria-busy": "true" 
+          },
+          aria: { label: "Sign in to your account" } %>
 
-     <div class="text-center" role="contentinfo">
-       <p class="text-sm text-gray-600">
-         Don't have an account?
-         <%= link_to "Sign Up", 
-             sign_up_path, 
-             class: "ml-1 font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded" %>
-       </p>
-     </div>
-   <% end %>
- </div>
+      <div class="text-center" role="contentinfo">
+        <p class="text-sm text-gray-600">
+          Don't have an account?
+          <%= link_to "Sign Up", 
+              sign_up_path, 
+              class: "ml-1 font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded" %>
+        </p>
+      </div>
+    <% end %>
+  </div>
 </div>
-
-<%# Stimulus controller for password visibility %>
-<%= javascript_tag do %>
- import { Controller } from "@hotwired/stimulus"
-
- export default class extends Controller {
-   static targets = ["field", "icon", "status"]
-
-   togglePassword() {
-     const field = this.fieldTarget
-     const isVisible = field.type === "text"
-     
-     // Toggle password visibility
-     field.type = isVisible ? "password" : "text"
-     
-     // Update aria-pressed state
-     this.element.setAttribute("aria-pressed", !isVisible)
-     
-     // Update status for screen readers
-     this.statusTarget.textContent = `Password is ${isVisible ? 'hidden' : 'visible'}`
-     
-     // Update icon
-     const showPath = "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-     const hidePath = "M13.359 11.238C13.42 11.869 13.42 12.131 13.359 12.762M10.641 11.238C10.58 11.869 10.58 12.131 10.641 12.762M3 8L15 8M9 15L15 15"
-     
-     this.iconTarget.querySelector("path").setAttribute("d", isVisible ? showPath : hidePath)
-   }
- }
-<% end %>
