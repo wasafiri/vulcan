@@ -75,16 +75,16 @@ class Admin::ScannedProofsController < ApplicationController
 
   def attach_proof
     case params[:proof_type]
-    when 'income'
+    when "income"
       @application.income_proof.attach(params[:file])
       proof_type = :income_proof_status
-    when 'residency'
+    when "residency"
       @application.residency_proof.attach(params[:file])
       proof_type = :residency_proof_status
     else
       raise ArgumentError, "Invalid proof type"
     end
-  
+
     @application.update!(
       proof_type => :not_reviewed,
       needs_review_since: Time.current,
