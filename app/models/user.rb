@@ -4,16 +4,18 @@ class User < ApplicationRecord
   # Associations
   has_many :sessions, dependent: :destroy
   has_many :received_notifications,
-           class_name: "Notification",
-           foreign_key: :recipient_id,
-           dependent: :destroy
+    class_name: "Notification",
+    foreign_key: :recipient_id,
+    dependent: :destroy
   has_many :applications, foreign_key: :user_id
   has_many :role_capabilities, dependent: :destroy
+  has_many :devices, dependent: :destroy
+  has_many :activities, dependent: :destroy
 
   # Validations
   validates :email, presence: true,
-                   uniqueness: true,
-                   format: { with: URI::MailTo::EMAIL_REGEXP }
+    uniqueness: true,
+    format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :first_name, :last_name, presence: true
 
   # Scopes
@@ -84,7 +86,7 @@ class User < ApplicationRecord
   end
 
   # Role check methods using STI
-  %w[admin constituent evaluator vendor trainer medical_provider].each do |role|
+  %w[admin constituent evaluator vendor trainer ].each do |role|
     define_method "#{role}?" do
       is_a?(role.classify.constantize)
     end
@@ -177,5 +179,17 @@ class User < ApplicationRecord
     @available_capabilities = nil
     @inherent_capabilities = nil
     @loaded_capabilities = nil
+  end
+
+  def active_application
+    applications.where.not(status: "draft").order(created_at: :desc).first
+  end
+
+  def is_guardian=(value)
+    super(ActiveModel::Type::Boolean.new.cast(value))
+  end
+
+  def guardian_relationship=(value)
+    super(value)
   end
 end

@@ -13,19 +13,4 @@ class ApplicationStatus
       notifiable: @application
     )
   end
-
-  def verify_income!(actor: nil)
-    @application.update(
-      income_verification_status: :verified,
-      income_verified_at: Time.current,
-      income_verified_by: actor
-    )
-    Notification.create!(
-      recipient: @application.user,
-      actor: actor,
-      action: "income_verified",
-      metadata: {},
-      notifiable: @application
-    )
-  end
 end

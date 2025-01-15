@@ -5,7 +5,7 @@ class Evaluation < ApplicationRecord
 
   has_many :notifications, as: :notifiable, dependent: :destroy
 
-  enum :evaluation_type, { initial: 0, follow_up: 1, special: 2 }
+  enum :evaluation_type, { initial: 0, renewal: 1, special: 2 }
   enum :status, { pending: 0, completed: 1 }
 
   validates :evaluation_date, presence: true

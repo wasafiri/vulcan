@@ -4,25 +4,31 @@ class Admin::DashboardController < ApplicationController
 
   def index
     @current_fiscal_year = fiscal_year
+    @total_users_count = User.count
     @ytd_constituents_count = Application.where("created_at >= ?", fiscal_year_start).count
-    @open_applications_count = Application.where(status: :in_progress).count
+    @open_applications_count = Application.active.count
     @pending_services_count = Application.where(status: :approved).count
 
-    @pagy, @records = pagy(
-      case params[:tab]
-      when "need_evaluation"
-        Application.approved.needs_evaluation.includes(:user)
-      when "need_training"
-        Application.approved.needs_training.includes(:user)
-      when "equipment"
-        Bid.pending_response
-      else
-        Application.in_progress.includes(:user)
-      end,
-      items: 20
-     )
+    # Get base scope with includes
+    scope = Application.includes(:user, :income_proof_attachment, :residency_proof_attachment)
+      .where.not(status: [ :rejected, :archived ])
 
-    @applications = @records unless params[:tab] == "equipment"
+    # Apply filters
+    scope = case params[:filter]
+    when "in_progress"
+      scope.where(status: :in_progress)
+    when "approved"
+      scope.where(status: :approved)
+    when "proofs_needing_review"
+      scope.where(income_proof_status: 0)
+           .or(scope.where(residency_proof_status: 0))
+    when "awaiting_medical_response"
+      scope.where(status: :awaiting_documents)
+    else
+      scope
+    end
+
+    @pagy, @applications = pagy(scope, items: 20)
   end
 
   private

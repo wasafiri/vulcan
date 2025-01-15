@@ -11,33 +11,56 @@ Rails.application.routes.draw do
   get "apply", to: "pages#apply", as: :apply
   get "contact", to: "pages#contact", as: :contact
 
-  # Authentication routes
+  # Authentication
   get "sign_in", to: "sessions#new"
   post "sign_in", to: "sessions#create"
   delete "sign_out", to: "sessions#destroy"
   get "sessions", to: "sessions#index"
 
-  # Registration routes
+  # Registration
   get "sign_up", to: "registrations#new"
   post "sign_up", to: "registrations#create"
   resource :password, only: [ :new, :create, :edit, :update ]
   resource :profile, only: [ :edit, :update ], controller: "users"
-
-  # Health check
   get "up", to: "rails/health#show", as: :rails_health_check
 
   namespace :admin do
     root to: "dashboard#index"
 
-    resources :constituents_dashboard, only: [ :index, :show ]
-    resources :applications_dashboard, only: [ :index, :show ] do
+    resources :applications do
+      member do
+        patch :verify_income
+        patch :request_documents
+        get :review_proof
+        patch :update_proof_status
+      end
+
+      collection do
+        post :batch_approve
+        post :batch_reject
+        get :search
+        get :filter
+      end
+    end
+
+    resources :applications_dashboard do
       member do
         patch :approve
         patch :reject
         post :assign_evaluator
+        post :schedule_training
+        patch :complete_training
+        patch :cancel_training
       end
     end
+
+    resources :constituents_dashboard, only: [ :index, :show ]
     resources :appointments_dashboard, only: [ :index, :show ]
+
+    resources :proof_reviews, only: [ :index, :show, :new, :create ]
+    resources :proofs, only: [ :new, :create ] do
+      post :resubmit, on: :collection
+    end
 
     resource :policies, only: [ :edit, :update ] do
       collection do
@@ -88,7 +111,6 @@ Rails.application.routes.draw do
     end
   end
 
-
   namespace :evaluators do
     resource :dashboard, only: [ :show ]
     resources :evaluations do
@@ -109,11 +131,8 @@ Rails.application.routes.draw do
   end
 
   namespace :constituent do
-    # Dashboard
     resource :dashboard, only: [ :show ]
-
-    # Applications
-    resources :applications, only: [ :index, :show, :new, :create, :edit, :update ] do
+    resources :applications do
       member do
         patch :upload_documents
         post :request_review
@@ -121,17 +140,13 @@ Rails.application.routes.draw do
         patch :submit
       end
     end
-
-    # Appointments
     resources :appointments, only: [ :index, :show ]
-
-    # Evaluations (read-only access for constituents)
     resources :evaluations, only: [ :index, :show ]
-
-    # Devices (products assigned to constituent)
     resources :devices, only: [ :index, :show ]
-
-    # Medical certification status
     resource :medical_certification, only: [ :show ]
+  end
+
+  namespace :webhooks do
+    resources :email_events, only: [ :create ]
   end
 end

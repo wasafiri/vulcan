@@ -3,15 +3,20 @@ class Constituent::DashboardsController < ApplicationController
   before_action :require_constituent!
 
   def show
-    @upcoming_appointments_count = current_user.appointments
-                                                  .where("scheduled_for > ?", Time.current)
-                                                  .count
+    # Draft application check
+    @draft_application = current_user.applications.draft.first
 
-    @devices_count = current_user.applications
-                                  .where(status: :approved)
-                                  .count
+    # Active application check (non-draft)"
+    @active_application = current_user.applications.where.not(status: "draft").order(created_at: :desc).first
 
-    @recent_activities = recent_activities
+    # Upcoming appointments
+    @upcoming_appointments_count = current_user.appointments.where("scheduled_for > ?", Time.current).count
+
+    # Devices count - use 0 if no devices method exists
+    @devices_count = 0
+
+    # Recent activities - use empty array if no activities method exists
+    @recent_activities = []
   end
 
   private

@@ -6,7 +6,7 @@
       </h1>
       
       <div class="flex space-x-4">
-        <%= link_to admin_applications_dashboard_index_path, 
+        <%= link_to admin_root_path, 
             class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
             aria: { label: "Return to applications list" } do %>
           <span>Back to List</span>
@@ -29,7 +29,7 @@
                 class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500",
                 aria: { label: "Approve this application" },
                 data: { confirm: "Are you sure you want to approve this application?" } do %>
-            Approve
+              Approve
             <% end %>
 
             <%= button_to reject_admin_applications_dashboard_path(@application),
@@ -37,30 +37,118 @@
                 class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500",
                 aria: { label: "Reject this application" },
                 data: { confirm: "Are you sure you want to reject this application?" } do %>
-            Reject
+              Reject
             <% end %>
           <% end %>
         </div>
       </div>
     </div>
 
-    <% if @application.approved? && !@application.evaluation.present? %>
-      <div class="mt-6 p-4 bg-gray-50 rounded-md shadow">
-        <h3 class="text-lg font-medium mb-4">Assign Evaluator</h3>
-        <div class="flex flex-wrap gap-3">
-          <% Evaluator.active.each do |evaluator| %>
-            <%= button_to assign_evaluator_admin_applications_dashboard_path(@application, evaluator_id: evaluator.id),
-                method: :post,
-                class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                data: { confirm: "Are you sure you want to assign #{evaluator.full_name} to this application?" } do %>
-              Assign <%= evaluator.full_name %>
-            <% end %>
+    <%# Evaluation and Training Status Section %>
+    <% if @application.approved? %>
+      <section class="mb-8" aria-labelledby="evaluation-status-title">
+        <h2 id="evaluation-status-title" class="text-lg font-medium text-gray-900 mb-4">Evaluation and Training Status</h2>
+        
+        <%# Evaluation Status %>
+        <div class="bg-gray-50 px-4 py-3 rounded-md mb-4">
+          <% if @application.evaluation.present? %>
+            <div class="mb-4">
+              <h3 class="text-sm font-medium text-gray-500">Current Evaluator</h3>
+              <div class="mt-2 flex items-center justify-between">
+                <div>
+                  <span class="text-sm text-gray-900"><%= @application.evaluation.evaluator.full_name %></span>
+                  <span class="ml-2 px-2 py-1 text-xs rounded-full <%= evaluation_status_badge(@application.evaluation.status) %>">
+                    <%= @application.evaluation.status.titleize %>
+                  </span>
+                </div>
+                <% if @application.evaluation.evaluation_date %>
+                  <span class="text-sm text-gray-500">
+                    Scheduled for: <%= @application.evaluation.evaluation_date.strftime("%B %d, %Y") %>
+                  </span>
+                <% end %>
+              </div>
+            </div>
+          <% else %>
+            <div>
+              <h3 class="text-sm font-medium text-gray-500 mb-2">Assign Evaluator</h3>
+              <div class="flex flex-wrap gap-3">
+                <% Evaluator.active.each do |evaluator| %>
+                  <%= button_to assign_evaluator_admin_applications_dashboard_path(@application, evaluator_id: evaluator.id),
+                      method: :post,
+                      class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                      data: { confirm: "Are you sure you want to assign #{evaluator.full_name} as evaluator?" } do %>
+                    Assign <%= evaluator.full_name %>
+                  <% end %>
+                <% end %>
+              </div>
+            </div>
           <% end %>
         </div>
-      </div>
+
+        <%# Training Sessions - Only show if evaluation is completed %>
+        <% if @application.evaluation&.completed? %>
+          <div class="bg-gray-50 px-4 py-3 rounded-md">
+            <h3 class="text-sm font-medium text-gray-500 mb-4">Training Sessions</h3>
+
+            <%# Existing Training Sessions %>
+            <% if @application.training_sessions.any? %>
+              <div class="space-y-3 mb-4">
+                <% @application.training_sessions.order(scheduled_for: :desc).each do |session| %>
+                  <div class="bg-white p-3 rounded shadow-sm">
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center space-x-4">
+                        <div>
+                          <p class="text-sm font-medium text-gray-900"><%= session.trainer.full_name %></p>
+                          <p class="text-xs text-gray-500">
+                            Scheduled for: <%= session.scheduled_for&.strftime("%B %d, %Y at %I:%M %p") %>
+                          </p>
+                        </div>
+                        <span class="px-2 py-1 text-xs rounded-full <%= training_session_status_badge(session.status) %>">
+                          <%= session.status.titleize %>
+                        </span>
+                      </div>
+                      
+                      <% if session.scheduled? %>
+                        <div class="flex space-x-2">
+                          <%= button_to complete_training_admin_applications_dashboard_path(@application, training_session_id: session.id),
+                              method: :patch,
+                              class: "inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-xs font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" do %>
+                            Complete
+                          <% end %>
+                        </div>
+                      <% end %>
+                    </div>
+                    <% if session.notes.present? %>
+                      <p class="mt-2 text-sm text-gray-600"><%= session.notes %></p>
+                    <% end %>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+
+            <%# Schedule New Training Session %>
+            <div class="mt-4">
+              <h4 class="text-sm font-medium text-gray-500 mb-2">Schedule New Training Session</h4>
+              <div class="flex flex-wrap gap-3">
+                <% Trainer.active.each do |trainer| %>
+                  <%= form_tag schedule_training_admin_applications_dashboard_path(@application), method: :post, class: "flex items-center space-x-2" do %>
+                    <%= hidden_field_tag :trainer_id, trainer.id %>
+                    <%= date_field_tag :scheduled_for, nil, 
+                        class: "rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50",
+                        required: true %>
+                    <%= submit_tag "Schedule with #{trainer.full_name}",
+                        class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                        data: { confirm: "Schedule training session with #{trainer.full_name}?" } %>
+                  <% end %>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      </section>
     <% end %>
 
-    <%# Applicant Information %>
+<%# Applicant Information %>
     <section class="mb-8" aria-labelledby="applicant-info-title">
       <h2 id="applicant-info-title" class="text-lg font-medium text-gray-900 mb-4">Applicant Information</h2>
       <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -145,7 +233,7 @@
         <div class="bg-gray-50 px-4 py-3 rounded-md">
           <dt class="text-sm font-medium text-gray-500">Income Verification Status</dt>
           <dd class="mt-1 text-sm text-gray-900">
-            <%= @application.income_verification_status&.titleize || "Pending" %>
+            <%= @application.income_proof_status&.titleize || "Pending" %>
           </dd>
         </div>
 
@@ -177,6 +265,97 @@
           </dd>
         </div>
       </dl>
+    </section>
+
+    <%# Proofs Review Section %>
+    <section class="mb-8" aria-labelledby="proofs-review-title">
+      <h2 id="proofs-review-title" class="text-lg font-medium text-gray-900 mb-4">Proofs Review</h2>
+      <div class="space-y-4">
+        <%# Income Proof Attachment %>
+        <div class="bg-gray-50 px-4 py-3 rounded-md">
+          <h3 class="text-sm font-medium text-gray-500">Proof of Income</h3>
+          <% if @application.income_proof.attached? %>
+            <%= link_to "View Proof of Income", url_for(@application.income_proof), target: "_blank", class: "text-indigo-600 hover:text-indigo-500 mr-4" %>
+            <span class="<%= proof_status_badge(@application.income_proof_status) %> px-2 py-1 rounded-full text-xs">
+              <%= @application.income_proof_status&.titleize || "Not Reviewed" %>
+            </span>
+            <% if @application.income_proof_status_not_reviewed? %>
+              <div class="mt-2 flex space-x-2">
+                <%= button_to update_proof_status_admin_application_path(@application, proof_type: 'income', status: 'approved'),
+                    method: :patch,
+                    class: "inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500",
+                    data: { confirm: "Are you sure you want to approve the Proof of Income?" } do %>
+                  Approve
+                <% end %>
+
+                <%= button_to update_proof_status_admin_application_path(@application, proof_type: 'income', status: 'rejected'),
+                    method: :patch,
+                    class: "inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500",
+                    data: { confirm: "Are you sure you want to reject the Proof of Income?" } do %>
+                  Reject
+                <% end %>
+              </div>
+            <% end %>
+          <% else %>
+            <span class="text-gray-500">No Proof of Income Submitted</span>
+          <% end %>
+        </div>
+
+        <%# Residency Proof Attachment %>
+        <div class="bg-gray-50 px-4 py-3 rounded-md">
+          <h3 class="text-sm font-medium text-gray-500">Proof of Residency</h3>
+          <% if @application.residency_proof.attached? %>
+            <%= link_to "View Proof of Residency", url_for(@application.residency_proof), target: "_blank", class: "text-indigo-600 hover:text-indigo-500 mr-4" %>
+            <span class="<%= proof_status_badge(@application.residency_proof_status) %> px-2 py-1 rounded-full text-xs">
+              <%= @application.residency_proof_status&.titleize || "Not Reviewed" %>
+            </span>
+            <% if @application.residency_proof_status_not_reviewed? %>
+              <div class="mt-2 flex space-x-2">
+                <%= button_to update_proof_status_admin_application_path(@application, proof_type: 'residency', status: 'approved'),
+                    method: :patch,
+                    class: "inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500",
+                    data: { confirm: "Are you sure you want to approve the Proof of Residency?" } do %>
+                  Approve
+                <% end %>
+
+                <%= button_to update_proof_status_admin_application_path(@application, proof_type: 'residency', status: 'rejected'),
+                    method: :patch,
+                    class: "inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500",
+                    data: { confirm: "Are you sure you want to reject the Proof of Residency?" } do %>
+                  Reject
+                <% end %>
+              </div>
+            <% end %>
+          <% else %>
+            <span class="text-gray-500">No Proof of Residency Submitted</span>
+          <% end %>
+        </div>
+      </div>
+    </section>
+
+    <%# Disability Information %>
+    <section class="mb-8" aria-labelledby="disability-info-title">
+      <h2 id="disability-info-title" class="text-lg font-medium text-gray-900 mb-4">Disability Information</h2>
+      <ul class="list-disc pl-5 space-y-1 text-gray-900">
+        <% if @application.user.hearing_disability %>
+          <li>Hearing Disability</li>
+        <% end %>
+        <% if @application.user.vision_disability %>
+          <li>Vision Disability</li>
+        <% end %>
+        <% if @application.user.speech_disability %>
+          <li>Speech Disability</li>
+        <% end %>
+        <% if @application.user.mobility_disability %>
+          <li>Mobility Disability</li>
+        <% end %>
+        <% if @application.user.cognition_disability %>
+          <li>Cognition Disability</li>
+        <% end %>
+        <% unless @application.user.hearing_disability || @application.user.vision_disability || @application.user.speech_disability || @application.user.mobility_disability || @application.user.cognition_disability %>
+          <li>No Disabilities Reported</li>
+        <% end %>
+      </ul>
     </section>
   </div>
 </main>

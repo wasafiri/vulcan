@@ -1,0 +1,21 @@
+<%# app/views/constituent/proofs/new.html.erb %>
+<div class="container mx-auto px-4 py-8">
+  <h1 class="text-xl font-bold mb-4">Resubmit <%= @proof_type.titleize %> Proof</h1>
+
+  <%= form_with(url: resubmit_constituent_application_proofs_path(@application), 
+               method: :post, 
+               multipart: true) do |f| %>
+    
+    <div class="mb-4">
+      <%= f.label "#{@proof_type}_proof", "Select File", 
+          class: "block text-sm font-medium text-gray-700" %>
+      <%= f.file_field "#{@proof_type}_proof", 
+          class: "mt-1 block w-full" %>
+    </div>
+
+    <div class="mt-4">
+      <%= f.submit "Submit", 
+          class: "px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" %>
+    </div>
+  <% end %>
+</div>

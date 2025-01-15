@@ -1,112 +1,289 @@
+# db/seeds.rb
+require 'factory_bot_rails'
+
 unless Rails.env.production?
-  # Clear existing data
   begin
-    Policy.destroy_all
-    Application.destroy_all
-    User.destroy_all
-  rescue => e
-    Rails.logger.warn "Error during cleanup: #{e.message}"
-  end
+    ActiveRecord::Base.transaction do
+      # Clear existing data
+      puts "\nClearing existing data..."
+      [
+        Evaluation, ProofReview, Appointment, Notification, RoleCapability,
+        PolicyChange, EmailTemplate, Product, Event, Policy, Application, User
+      ].each do |model|
+        puts "  Clearing #{model.name} records..."
+        model.in_batches.destroy_all
+      end
 
-  # Create users
-  Admin.create!(
-    email: "admin@example.com",
-    first_name: "System",
-    last_name: "Administrator",
-    password: "SecurePass123"
-  )
+      base_date = Time.current
 
-  Evaluator.create!(
-    email: "evaluator@example.com",
-    first_name: "Primary",
-    last_name: "Evaluator",
-    availability_schedule: { monday: [ "9:00", "17:00" ] },
-    status: :active,
-    password: "SecurePass123!"
-  )
+      # Create admin first since other records will reference it
+      puts "\nCreating admin user..."
+      admin = FactoryBot.create(:admin, {
+        email: "admin@example.com",
+        first_name: "System",
+        last_name: "Administrator",
+        password: "SecurePass123"
+      })
+      raise "Failed to create admin" unless admin.persisted?
+      raise "Admin ID not generated" unless admin.id.present?
 
-  constituent = Constituent.create!(
-    email: "constituent@example.com",
-    first_name: "Test",
-    last_name: "User",
-    phone: "555-555-5555",
-    date_of_birth: 30.years.ago,
-    timezone: "Eastern Time (US & Canada)",
-    locale: "en",
-    income_proof: "Uploaded",
-    residency_proof: "Uploaded",
-    physical_address_1: "123 Main St",
-    city: "Baltimore",
-    state: "MD",
-    zip_code: "21201",
-    hearing_disability: true,
-    vision_disability: true,
-    speech_disability: true,
-    home_internet_service: true,
-    password: "SecurePass123!"
-  )
+      # Create evaluators
+      puts "\nCreating evaluators..."
+      evaluators = 3.times.map do |i|
+        evaluator = FactoryBot.create(:evaluator, {
+          email: "evaluator#{i + 1}@example.com",
+          first_name: "Evaluator#{i + 1}",
+          last_name: "LastName#{i + 1}",
+          availability_schedule: { monday: [ "9:00", "17:00" ], tuesday: [ "10:00", "16:00" ] },
+          status: :active,
+          password: "SecurePass123!"
+        })
+        raise "Failed to create evaluator #{i + 1}" unless evaluator.persisted?
+        raise "Evaluator #{i + 1} ID not generated" unless evaluator.id.present?
+        evaluator
+      end
+      raise "No evaluators were created" if evaluators.empty?
 
-  Vendor.create!(
-    email: "vendor@example.com",
-    first_name: "Equipment",
-    last_name: "Provider",
-    status: :approved,
-    password: "SecurePass123!"
-  )
+      # Create primary constituent
+      puts "\nCreating primary constituent..."
+      constituent = FactoryBot.create(:constituent, :with_disabilities, {
+        email: "constituent@example.com",
+        first_name: "Test",
+        last_name: "User",
+        phone: "555-555-5555",
+        date_of_birth: base_date - 25.years,
+        timezone: "Eastern Time (US & Canada)",
+        locale: "en",
+        physical_address_1: "123 Main St",
+        city: "Baltimore",
+        state: "MD",
+        zip_code: "21201",
+        home_internet_service: true,
+        password: "SecurePass123!"
+      })
+      raise "Failed to create primary constituent" unless constituent.persisted?
+      raise "Constituent ID not generated" unless constituent.id.present?
+      raise "Constituent disabilities not set" unless constituent.hearing_disability ||
+        constituent.vision_disability ||
+        constituent.speech_disability ||
+        constituent.mobility_disability ||
+        constituent.cognition_disability
 
-  medical_provider = MedicalProvider.create!(
-    email: "medical_provider@example.com",
-    first_name: "Doctor",
-    last_name: "Smith",
-    password: "SecurePass123!"
-  )
+      # Create vendor
+      puts "\nCreating vendor..."
+      vendor = FactoryBot.create(:vendor, {
+        email: "vendor@example.com",
+        first_name: "Equipment",
+        last_name: "Provider",
+        status: :approved,
+        password: "SecurePass123!"
+      })
+      raise "Failed to create vendor" unless vendor.persisted?
+      raise "Vendor ID not generated" unless vendor.id.present?
 
-  Application.create!(
-    user: constituent,
-    income_verified_by: Admin.first, # Use the first admin created
-    medical_provider: medical_provider,
-    application_type: :new_application,
-    submission_method: :online,
-    status: :needs_information,
-    application_date: 1.day.ago,
-    received_at: 1.day.ago,
-    last_activity_at: 1.day.ago,
-    household_size: 3,
-    annual_income: 45_000,
-    income_verification_status: :failed,
-    income_details: "Need additional documentation",
-    residency_details: "Need proof of Maryland residency",
-    current_step: "documentation_required"
-  )
+      # Create policies
+      puts "\nCreating policies..."
+      policies = {
+        "fpl_modifier_percentage" => 400,
+        "fpl_1_person" => 15_060,
+        "fpl_2_person" => 20_440,
+        "fpl_3_person" => 25_820,
+        "fpl_4_person" => 31_200,
+        "fpl_5_person" => 36_580,
+        "fpl_6_person" => 41_960,
+        "fpl_7_person" => 47_340,
+        "fpl_8_person" => 52_720,
+        "max_training_sessions" => 3,
+        "waiting_period_years" => 3
+      }
 
-  # Create policies using find_or_create_by! to ensure idempotency
-  {
-    "fpl_modifier_percentage" => 400,
-    "fpl_1_person" => 15060,
-    "fpl_2_person" => 20440,
-    "fpl_3_person" => 25820,
-    "fpl_4_person" => 31200,
-    "fpl_5_person" => 36580,
-    "fpl_6_person" => 41960,
-    "fpl_7_person" => 47340,
-    "fpl_8_person" => 52720,
-    "max_training_sessions" => 3,
-    "waiting_period_years" => 3
-  }.each do |key, value|
-    Policy.find_or_create_by!(key: key) do |policy|
-      policy.value = value
+      policies.each do |key, value|
+        policy = Policy.find_or_create_by!(key: key) do |p|
+          p.value = value
+        end
+        raise "Failed to create policy #{key}" unless policy.persisted?
+        raise "Policy #{key} ID not generated" unless policy.id.present?
+        raise "Policy #{key} has wrong value" unless policy.value == value
+      end
+
+      # Verify required records exist
+      raise "Missing required admin user" unless admin&.id
+      raise "Missing required constituent" unless constituent&.id
+      raise "No evaluators available" if evaluators.empty?
+
+      # Create applications with approved status
+      puts "\nCreating applications with approved status..."
+      10.times do |i|
+        print "  Creating approved application #{i + 1}... "
+
+        # Create constituent first
+        new_constituent = FactoryBot.create(:constituent, :with_disabilities, {
+          email: "constituent_approved_#{i + 1}@example.com",
+          first_name: "Constituent_Approved#{i + 1}",
+          last_name: "User#{i + 1}"
+        })
+        raise "Failed to create constituent for approved application #{i + 1}" unless new_constituent.persisted?
+
+        # Create approved application
+        application = FactoryBot.create(:application, :completed, {
+          user: new_constituent,
+          income_verified_by: admin,
+          application_date: base_date - 4.years,
+          terms_accepted: true,
+          information_verified: true,
+          medical_release_authorized: true
+        })
+        raise "Failed to create approved application #{i + 1}" unless application.persisted?
+        raise "Proof files not attached for application #{i + 1}" unless
+          application.income_proof.attached? && application.residency_proof.attached?
+
+        # Select a random evaluator
+        evaluator = evaluators.sample
+
+        # Create evaluation
+        evaluation = FactoryBot.create(:evaluation, {
+          evaluator: evaluator,
+          constituent: new_constituent,
+          application: application,
+          evaluation_date: base_date - 3.years,
+          evaluation_type: :initial,
+          report_submitted: true,
+          notes: "Initial evaluation completed.",
+          status: :completed
+        })
+        raise "Failed to create evaluation for approved application #{i + 1}" unless evaluation.persisted?
+
+        puts "done"
+      end
+
+      # Create applications with rejected status
+      puts "\nCreating applications with rejected status..."
+      5.times do |i|
+        print "  Creating rejected application #{i + 1}... "
+
+        application = FactoryBot.create(:application, :rejected, {
+          user: constituent,
+          income_verified_by: admin,
+          application_date: base_date - 4.years,
+          terms_accepted: true,
+          information_verified: true,
+          medical_release_authorized: true
+        })
+        raise "Failed to create rejected application #{i + 1}" unless application.persisted?
+        raise "Proof files not attached for rejected application #{i + 1}" unless
+          application.income_proof.attached? && application.residency_proof.attached?
+
+        # Select a random evaluator
+        evaluator = evaluators.sample
+
+        evaluation = FactoryBot.create(:evaluation, {
+          evaluator: evaluator,
+          constituent: constituent,
+          application: application,
+          evaluation_date: base_date - 3.years,
+          evaluation_type: :initial,
+          report_submitted: false,
+          notes: "Initial evaluation rejected due to insufficient documentation.",
+          status: :completed
+        })
+        raise "Failed to create evaluation for rejected application #{i + 1}" unless evaluation.persisted?
+
+        puts "done"
+      end
+
+      # Create applications with archived status
+      puts "\nCreating applications with archived status..."
+      10.times do |i|
+        print "  Creating archived application #{i + 1}... "
+
+        application = FactoryBot.create(:application, :archived, {
+          user: constituent,
+          income_verified_by: admin,
+          application_date: base_date - 8.years,
+          terms_accepted: true,
+          information_verified: true,
+          medical_release_authorized: true
+        })
+        raise "Failed to create archived application #{i + 1}" unless application.persisted?
+        raise "Proof files not attached for archived application #{i + 1}" unless
+          application.income_proof.attached? && application.residency_proof.attached?
+
+        # Select a random evaluator
+        evaluator = evaluators.sample
+
+        evaluation = FactoryBot.create(:evaluation, {
+          evaluator: evaluator,
+          constituent: constituent,
+          application: application,
+          evaluation_date: base_date - 7.years,
+          evaluation_type: :renewal,
+          report_submitted: true,
+          notes: "Renewal evaluation completed.",
+          status: :completed
+        })
+        raise "Failed to create evaluation for archived application #{i + 1}" unless evaluation.persisted?
+
+        puts "done"
+      end
+
+      # Create in-progress applications with rejected proofs
+      puts "\nCreating in-progress applications with rejected proofs..."
+      5.times do |i|
+        print "  Creating in-progress application with rejected proofs #{i + 1}... "
+
+        # Create constituent first, following the exact pattern from approved applications
+        new_constituent = FactoryBot.create(:constituent, :with_disabilities, {
+          email: "constituent_rejected_proofs_#{i + 1}@example.com",
+          first_name: "Constituent_RejectedProofs#{i + 1}",
+          last_name: "User#{i + 1}"
+        })
+        raise "Failed to create constituent for rejected proofs application #{i + 1}" unless new_constituent.persisted?
+
+        # Create application using the new constituent
+        application = FactoryBot.create(:application, :in_progress_with_rejected_proofs, {
+          user: new_constituent,
+          application_date: base_date - 1.month
+        })
+        raise "Failed to create in-progress application with rejected proofs #{i + 1}" unless application.persisted?
+        raise "Proof files not attached for in-progress application #{i + 1}" unless
+          application.income_proof.attached? && application.residency_proof.attached?
+
+        puts "done"
+      end
+
+      # Create in-progress applications with approved proofs
+      puts "\nCreating in-progress applications with approved proofs..."
+      5.times do |i|
+        print "  Creating in-progress application with approved proofs #{i + 1}... "
+
+        # Create constituent first, following the exact pattern from approved applications
+        new_constituent = FactoryBot.create(:constituent, :with_disabilities, {
+          email: "constituent_approved_proofs_#{i + 1}@example.com",
+          first_name: "Constituent_ApprovedProofs#{i + 1}",
+          last_name: "User#{i + 1}"
+        })
+        raise "Failed to create constituent for approved proofs application #{i + 1}" unless new_constituent.persisted?
+
+        # Create application using the new constituent
+        application = FactoryBot.create(:application, :in_progress_with_approved_proofs, {
+          user: new_constituent,
+          application_date: base_date - 1.month
+        })
+        raise "Failed to create in-progress application with approved proofs #{i + 1}" unless application.persisted?
+        raise "Proof files not attached for in-progress application #{i + 1}" unless
+          application.income_proof.attached? && application.residency_proof.attached?
+
+        puts "done"
+      end
     end
+  rescue StandardError => e
+    puts "\nSeeding failed: #{e.message}"
+    puts "Backtrace:"
+    e.backtrace.first(10).each { |line| puts line }
+    exit 1
+  else
+    puts "\nSeeding completed successfully!" unless Rails.env.production?
   end
-
-  10.times do
-    constituent = FactoryBot.create(:constituent)
-    FactoryBot.create(:application,
-      user: constituent,
-      income_verified_by: Admin.first
-    )
-  end
-
-  puts "Seeding completed!"
 else
   puts "Production environment detected. Seeding skipped to prevent data override."
 end
