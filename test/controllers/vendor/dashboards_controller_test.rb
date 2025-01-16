@@ -1,8 +1,8 @@
 require "test_helper"
 
-describe Vendor::DashboardsController do
-  it "gets show" do
+class Vendor::DashboardsControllerTest < ActionDispatch::IntegrationTest
+  test "gets show" do
     get vendor_dashboard_show_url
-    must_respond_with :success
+    assert_response :success
   end
 end

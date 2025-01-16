@@ -1,8 +1,8 @@
 require "test_helper"
 
-describe Evaluator::DashboardsController do
-  it "gets show" do
+class Evaluator::DashboardsControllerTest < ActionDispatch::IntegrationTest
+  test "gets show" do
     get evaluator_dashboard_show_url
-    must_respond_with :success
+    assert_response :success
   end
 end
