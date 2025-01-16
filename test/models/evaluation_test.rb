@@ -1,7 +1,8 @@
 require "test_helper"
 
-describe Evaluation do
-  # it "does a thing" do
-  #   value(1+1).must_equal 2
+class EvaluationTest < ActiveSupport::TestCase
+  # Uncomment and modify the test method as needed
+  # test "does a thing" do
+  #   assert_equal 2, 1 + 1
   # end
 end
