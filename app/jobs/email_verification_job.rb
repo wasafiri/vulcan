@@ -1,4 +1,3 @@
-# app/jobs/email_verification_job.rb
 class EmailVerificationJob < ApplicationJob
   queue_as :default
 
