@@ -43,8 +43,6 @@ jobs:
           POSTGRES_DB: vulcan_test
         ports:
           - 5432:5432
-        volumes:
-          - /var/run/postgresql:/var/run/postgresql
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -64,12 +62,25 @@ jobs:
           ruby-version: .ruby-version
           bundler-cache: true
 
+      - name: Setup Database
+        env:
+          RAILS_ENV: test
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: vulcan_test
+        run: |
+          bin/rails db:test:prepare
+
       - name: Run tests
         env:
           RAILS_ENV: test
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/vulcan_test
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: vulcan_test
         run: |
-          bin/rails db:test:prepare test test:system
+          bin/rails test test:system
 
       - name: Keep screenshots from failed system tests
         uses: actions/upload-artifact@v4
