@@ -112,7 +112,7 @@ Rails.application.routes.draw do
   end
 
   namespace :evaluators do
-    resource :dashboard, only: [ :show ]
+    resource :dashboard, only: [:show], controller: :dashboards
     resources :evaluations do
       member do
         post :submit_report
