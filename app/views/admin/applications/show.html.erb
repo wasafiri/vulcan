@@ -71,7 +71,7 @@
         <% end %>
 
         <% if @application.status == :in_progress %>
-          <%= button_to approve_admin_applications_dashboard_path(@application),
+          <%= button_to approve_admin_application_path(@application),
               method: :patch,
               class: "w-full bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700",
               role: "button" do %>

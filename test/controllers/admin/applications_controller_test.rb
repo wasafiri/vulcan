@@ -47,11 +47,6 @@ class Admin::ApplicationsControllerTest < ActionDispatch::IntegrationTest
    assert_redirected_to admin_applications_path
  end
 
- test "should verify income" do
-   patch verify_income_admin_application_path(@application)
-   assert_redirected_to admin_application_path(@application)
- end
-
  test "should request documents" do
    patch request_documents_admin_application_path(@application)
    assert_redirected_to admin_application_path(@application)

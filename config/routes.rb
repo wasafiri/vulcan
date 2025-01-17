@@ -28,29 +28,22 @@ Rails.application.routes.draw do
     root to: "dashboard#index"
 
     resources :applications do
-      member do
-        patch :verify_income
-        patch :request_documents
-        get :review_proof
-        patch :update_proof_status
-      end
-
       collection do
         post :batch_approve
         post :batch_reject
-        get :search
-        get :filter
+        get  :search
+        get  :filter
       end
-    end
-
-    resources :applications_dashboard do
+  
       member do
-        patch :approve
-        patch :reject
+        post :request_documents
+        post :review_proof  # if you’re handling via standard POST or GET
+        post :update_proof_status
+        post :approve
+        post :reject
         post :assign_evaluator
         post :schedule_training
-        patch :complete_training
-        patch :cancel_training
+        post :complete_training
       end
     end
 
