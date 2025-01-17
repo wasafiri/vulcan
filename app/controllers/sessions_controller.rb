@@ -1,3 +1,5 @@
+# sessions_controller.rb (Complete Updated File)
+
 class SessionsController < ApplicationController
   skip_before_action :authenticate_user!, only: [ :new, :create ]
   before_action :set_session, only: [ :destroy ]
@@ -29,11 +31,16 @@ class SessionsController < ApplicationController
         user.track_sign_in!(request.remote_ip)
 
         redirect_path = case user
-        when Admin, MedicalProvider then admin_root_path
-        when Constituent then constituent_dashboard_path
-        when Evaluator then evaluator_dashboard_path
-        when Vendor then vendor_dashboard_path
-        else root_path
+        when Admin, MedicalProvider
+          admin_root_path
+        when Constituent
+          constituent_dashboard_path
+        when Evaluator
+          evaluators_dashboard_path
+        when Vendor
+          vendor_dashboard_path
+        else
+          root_path
         end
 
         redirect_to redirect_path, notice: "Signed in successfully"
@@ -65,11 +72,16 @@ class SessionsController < ApplicationController
 
   def after_sign_in_path
     case current_user
-    when Admin then admin_root_path
-    when Constituent then constituent_dashboard_path
-    when Evaluator then evaluator_dashboard_path
-    when Vendor then vendor_dashboard_path
-    else root_path
+    when Admin
+      admin_root_path
+    when Constituent
+      constituent_dashboard_path
+    when Evaluator
+      evaluators_dashboard_path
+    when Vendor
+      vendor_dashboard_path
+    else
+      root_path
     end
   end
 end

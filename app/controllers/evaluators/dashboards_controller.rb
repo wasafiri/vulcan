@@ -1,12 +1,11 @@
+# app/controllers/evaluators/dashboards_controller.rb
 module Evaluators
   class DashboardsController < ApplicationController
     before_action :authenticate_user!
     before_action :require_evaluator!
 
     def show
-      # Fetch evaluator-specific dashboard data
       @evaluations = current_user.evaluations
-      # Add other necessary instance variables
     end
 
     private
