@@ -1,4 +1,3 @@
-# app/jobs/proof_review_reminder_job.rb
 class ProofReviewReminderJob < ApplicationJob
   queue_as :default
 
