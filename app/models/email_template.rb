@@ -1,4 +1,3 @@
-# app/models/email_template.rb
 class EmailTemplate < ApplicationRecord
   belongs_to :updated_by, class_name: "User", optional: true
 

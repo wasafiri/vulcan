@@ -1,4 +1,3 @@
-# app/services/training_session_notifier.rb
 class TrainingSessionNotifier
   attr_reader :training_session
 

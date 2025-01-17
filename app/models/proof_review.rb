@@ -1,4 +1,3 @@
-# app/models/proof_review.rb
 class ProofReview < ApplicationRecord
   # Associations
   belongs_to :application

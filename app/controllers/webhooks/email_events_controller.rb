@@ -1,4 +1,3 @@
-# app/controllers/webhooks/email_events_controller.rb
 module Webhooks
   class EmailEventsController < BaseController
     def create

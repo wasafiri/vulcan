@@ -1,4 +1,3 @@
-# app/views/admin/proof_reviews/_proof_card.html.erb
 <div class="bg-white overflow-hidden shadow rounded-lg">
   <div class="px-4 py-5 sm:p-6">
     <div class="flex items-center justify-between">
@@ -12,9 +11,11 @@
       </div>
       <div>
         <% if proof&.attached? %>
-          <span class="<%= proof_status_badge(status) %> px-2 py-1 rounded-full text-xs">
-            <%= review_status_label(status) %>
-          </span>
+          <%= render "shared/status_badge",
+            type: :proof,
+            status: status,
+            label: review_status_label(status),
+            classes: "px-2 py-1 rounded-full text-xs" %>
         <% else %>
           <span class="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs">
             Not Uploaded
@@ -37,8 +38,10 @@
           <%= link_to new_admin_application_proof_review_path(application, proof_type: proof_type),
               class: "text-sm text-indigo-600 hover:text-indigo-500" do %>
             <svg class="inline-block w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
             </svg>
             Review Proof
           <% end %>

@@ -1,4 +1,3 @@
-# app/models/training_session.rb
 class TrainingSession < ApplicationRecord
   include TrainingStatusManagement
 

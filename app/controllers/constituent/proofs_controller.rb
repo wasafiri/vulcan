@@ -1,4 +1,3 @@
-# app/controllers/constituent/proofs_controller.rb
 class Constituent::ProofsController < ApplicationController
   before_action :authenticate_user!
   before_action :require_constituent!

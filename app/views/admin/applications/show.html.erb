@@ -1,4 +1,3 @@
-<%# app/views/admin/applications/show.html.erb %>
 <main class="container mx-auto px-4 py-8">
   <div class="max-w-7xl mx-auto">
     <!-- Application Header -->
@@ -6,9 +5,12 @@
       <div class="flex justify-between items-center">
         <h1 class="text-2xl font-bold">Application #<%= @application.id %></h1>
         <div>
-          <span class="<%= application_status_badge(@application.status) %> px-3 py-1 rounded-full text-sm font-medium">
-            <%= @application.status.titleize %>
-          </span>
+          <!-- Replace the old span call with the shared partial -->
+          <%= render "shared/status_badge",
+            type: :application,
+            status: @application.status,
+            label: @application.status.titleize,
+            classes: "px-3 py-1 rounded-full text-sm font-medium" %>
         </div>
       </div>
     </header>
@@ -52,44 +54,46 @@
           </div>
         </dl>
 
-      <!-- Admin Actions -->
-      <div class="mt-6 space-y-3">
-        <%= button_to verify_income_admin_application_path(@application),
-            method: :patch,
-            class: "w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700",
-            data: { confirm: "Are you sure?" },
-            role: "button",
-            disabled: @application.income_proof_status == "approved" do %>
-          Verify Income
-        <% end %>
-                
-        <%= button_to request_documents_admin_application_path(@application),
-            method: :patch, 
-            class: "w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700",
-            role: "button" do %>
-          Request Documents
-        <% end %>
-
-        <% if @application.status == :in_progress %>
-          <%= button_to approve_admin_application_path(@application),
+        <!-- Admin Actions -->
+        <div class="mt-6 space-y-3">
+          <%= button_to verify_income_admin_application_path(@application),
               method: :patch,
-              class: "w-full bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700",
-              role: "button" do %>
-            Approve Application
+              class: "w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700",
+              data: { confirm: "Are you sure?" },
+              role: "button",
+              disabled: @application.income_proof_status == "approved" do %>
+            Verify Income
           <% end %>
-        <% end %>
-      </div>
+
+          <%= button_to request_documents_admin_application_path(@application),
+              method: :patch,
+              class: "w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700",
+              role: "button" do %>
+            Request Documents
+          <% end %>
+
+          <% if @application.status == :in_progress %>
+            <%= button_to approve_admin_application_path(@application),
+                method: :patch,
+                class: "w-full bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700",
+                role: "button" do %>
+              Approve Application
+            <% end %>
+          <% end %>
+        </div>
+      </aside>
+    </div>
 
     <!-- Additional Details Section -->
     <section class="mt-8 bg-white shadow rounded-lg p-6" aria-labelledby="additional-details">
       <h2 id="additional-details" class="text-lg font-medium mb-4">Additional Details</h2>
-      
+
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <h3 class="text-sm font-medium text-gray-500 mb-2">Income Details</h3>
           <p class="text-gray-700"><%= @application.income_details %></p>
         </div>
-        
+
         <div>
           <h3 class="text-sm font-medium text-gray-500 mb-2">Residency Details</h3>
           <p class="text-gray-700"><%= @application.residency_details %></p>
@@ -117,40 +121,64 @@
         </ul>
       </div>
 
-      <%# Proof Review Section %>
+      <!-- Proof Review Section -->
       <div class="mt-8">
         <h2 class="text-lg font-medium text-gray-900 mb-4">Proofs Review</h2>
         <div class="space-y-4">
-          <%# Proof of Income Attachment %>
+          <!-- Proof of Income Attachment -->
           <div>
             <h3 class="text-md font-semibold">Proof of Income</h3>
             <% if @application.income_proof.attached? %>
-              <%= link_to "View Proof of Income", url_for(@application.income_proof), target: "_blank", class: "text-indigo-600 hover:text-indigo-900 mr-4" %>
-              <span class="<%= proof_status_badge(@application.income_proof_status) %> px-2 py-1 rounded-full text-xs">
-                <%= @application.income_proof_status.titleize %>
-              </span>
-              <%# Accept/Reject Buttons if not yet reviewed %>
+              <%= link_to "View Proof of Income", url_for(@application.income_proof),
+                  target: "_blank", class: "text-indigo-600 hover:text-indigo-900 mr-4" %>
+              <!-- Use the partial for the proof badge -->
+              <%= render "shared/status_badge",
+                type: :proof,
+                status: @application.income_proof_status,
+                label: @application.income_proof_status.titleize,
+                classes: "px-2 py-1 rounded-full text-xs" %>
+
               <% if @application.income_proof_status == 'not_reviewed' %>
-                <%= button_to "Approve Income Proof", update_proof_status_admin_application_path(@application, proof_type: 'income', status: 'approved'), method: :patch, class: "bg-green-500 text-white px-3 py-1 rounded ml-2", data: { confirm: "Approve this proof?" } %>
-                <%= button_to "Reject Income Proof", update_proof_status_admin_application_path(@application, proof_type: 'income', status: 'rejected'), method: :patch, class: "bg-red-500 text-white px-3 py-1 rounded ml-2", data: { confirm: "Reject this proof?" } %>
+                <%= button_to "Approve Income Proof",
+                    update_proof_status_admin_application_path(@application, proof_type: 'income', status: 'approved'),
+                    method: :patch,
+                    class: "bg-green-500 text-white px-3 py-1 rounded ml-2",
+                    data: { confirm: "Approve this proof?" } %>
+                <%= button_to "Reject Income Proof",
+                    update_proof_status_admin_application_path(@application, proof_type: 'income', status: 'rejected'),
+                    method: :patch,
+                    class: "bg-red-500 text-white px-3 py-1 rounded ml-2",
+                    data: { confirm: "Reject this proof?" } %>
               <% end %>
             <% else %>
               <span class="text-gray-500">No Proof of Income Submitted</span>
             <% end %>
           </div>
 
-          <%# Proof of Residency Attachment %>
+          <!-- Proof of Residency Attachment -->
           <div>
             <h3 class="text-md font-semibold">Proof of Residency</h3>
             <% if @application.residency_proof.attached? %>
-              <%= link_to "View Proof of Residency", url_for(@application.residency_proof), target: "_blank", class: "text-indigo-600 hover:text-indigo-900 mr-4" %>
-              <span class="<%= proof_status_badge(@application.residency_proof_status) %> px-2 py-1 rounded-full text-xs">
-                <%= @application.residency_proof_status.titleize %>
-              </span>
-              <%# Accept/Reject Buttons if not yet reviewed %>
+              <%= link_to "View Proof of Residency", url_for(@application.residency_proof),
+                  target: "_blank", class: "text-indigo-600 hover:text-indigo-900 mr-4" %>
+              <!-- Use the partial for the proof badge -->
+              <%= render "shared/status_badge",
+                type: :proof,
+                status: @application.residency_proof_status,
+                label: @application.residency_proof_status.titleize,
+                classes: "px-2 py-1 rounded-full text-xs" %>
+
               <% if @application.residency_proof_status == 'not_reviewed' %>
-                <%= button_to "Approve Residency Proof", update_proof_status_admin_application_path(@application, proof_type: 'residency', status: 'approved'), method: :patch, class: "bg-green-500 text-white px-3 py-1 rounded ml-2", data: { confirm: "Approve this proof?" } %>
-                <%= button_to "Reject Residency Proof", update_proof_status_admin_application_path(@application, proof_type: 'residency', status: 'rejected'), method: :patch, class: "bg-red-500 text-white px-3 py-1 rounded ml-2", data: { confirm: "Reject this proof?" } %>
+                <%= button_to "Approve Residency Proof",
+                    update_proof_status_admin_application_path(@application, proof_type: 'residency', status: 'approved'),
+                    method: :patch,
+                    class: "bg-green-500 text-white px-3 py-1 rounded ml-2",
+                    data: { confirm: "Approve this proof?" } %>
+                <%= button_to "Reject Residency Proof",
+                    update_proof_status_admin_application_path(@application, proof_type: 'residency', status: 'rejected'),
+                    method: :patch,
+                    class: "bg-red-500 text-white px-3 py-1 rounded ml-2",
+                    data: { confirm: "Reject this proof?" } %>
               <% end %>
             <% else %>
               <span class="text-gray-500">No Proof of Residency Submitted</span>
@@ -159,7 +187,7 @@
         </div>
       </div>
 
-      <%# Medical Provider Response Section %>
+      <!-- Medical Provider Response Section -->
       <div class="mt-8">
         <h2 class="text-lg font-medium text-gray-900 mb-4">Medical Provider Response</h2>
         <% if @application.status == 'awaiting_documents' %>

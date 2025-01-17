@@ -1,4 +1,3 @@
-# app/controllers/webhooks/base_controller.rb
 module Webhooks
   class InvalidPayloadError < StandardError; end
 

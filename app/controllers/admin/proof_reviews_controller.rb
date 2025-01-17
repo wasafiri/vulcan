@@ -1,4 +1,3 @@
-# app/controllers/admin/proof_reviews_controller.rb
 class Admin::ProofReviewsController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin!

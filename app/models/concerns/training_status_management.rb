@@ -1,4 +1,3 @@
-# app/models/concerns/training_status_management.rb
 module TrainingStatusManagement
   extend ActiveSupport::Concern
 

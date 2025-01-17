@@ -14,7 +14,7 @@
       </div>
     </div>
 
-    <%# Application Status Section %>
+    <!-- Application Status Section -->
     <div class="mb-6 p-4 rounded-md <%= status_background_color(@application.status) %>">
       <div class="flex items-center justify-between">
         <div>
@@ -44,12 +44,12 @@
       </div>
     </div>
 
-    <%# Evaluation and Training Status Section %>
+    <!-- Evaluation and Training Status Section -->
     <% if @application.approved? %>
       <section class="mb-8" aria-labelledby="evaluation-status-title">
         <h2 id="evaluation-status-title" class="text-lg font-medium text-gray-900 mb-4">Evaluation and Training Status</h2>
         
-        <%# Evaluation Status %>
+        <!-- Evaluation Status -->
         <div class="bg-gray-50 px-4 py-3 rounded-md mb-4">
           <% if @application.evaluation.present? %>
             <div class="mb-4">
@@ -57,9 +57,12 @@
               <div class="mt-2 flex items-center justify-between">
                 <div>
                   <span class="text-sm text-gray-900"><%= @application.evaluation.evaluator.full_name %></span>
-                  <span class="ml-2 px-2 py-1 text-xs rounded-full <%= evaluation_status_badge(@application.evaluation.status) %>">
-                    <%= @application.evaluation.status.titleize %>
-                  </span>
+                  <!-- Example using partial for evaluation status -->
+                  <%= render "shared/status_badge",
+                    type: :evaluation,
+                    status: @application.evaluation.status,
+                    label: @application.evaluation.status.titleize,
+                    classes: "ml-2 px-2 py-1 text-xs rounded-full" %>
                 </div>
                 <% if @application.evaluation.evaluation_date %>
                   <span class="text-sm text-gray-500">
@@ -85,12 +88,12 @@
           <% end %>
         </div>
 
-        <%# Training Sessions - Only show if evaluation is completed %>
+        <!-- Training Sessions - Only show if evaluation is completed -->
         <% if @application.evaluation&.completed? %>
           <div class="bg-gray-50 px-4 py-3 rounded-md">
             <h3 class="text-sm font-medium text-gray-500 mb-4">Training Sessions</h3>
 
-            <%# Existing Training Sessions %>
+            <!-- Existing Training Sessions -->
             <% if @application.training_sessions.any? %>
               <div class="space-y-3 mb-4">
                 <% @application.training_sessions.order(scheduled_for: :desc).each do |session| %>
@@ -103,9 +106,12 @@
                             Scheduled for: <%= session.scheduled_for&.strftime("%B %d, %Y at %I:%M %p") %>
                           </p>
                         </div>
-                        <span class="px-2 py-1 text-xs rounded-full <%= training_session_status_badge(session.status) %>">
-                          <%= session.status.titleize %>
-                        </span>
+                        <!-- training_session status badge -->
+                        <%= render "shared/status_badge",
+                          type: :training_session,
+                          status: session.status,
+                          label: session.status.titleize,
+                          classes: "px-2 py-1 text-xs rounded-full" %>
                       </div>
                       
                       <% if session.scheduled? %>
@@ -126,7 +132,7 @@
               </div>
             <% end %>
 
-            <%# Schedule New Training Session %>
+            <!-- Schedule New Training Session -->
             <div class="mt-4">
               <h4 class="text-sm font-medium text-gray-500 mb-2">Schedule New Training Session</h4>
               <div class="flex flex-wrap gap-3">
@@ -148,7 +154,7 @@
       </section>
     <% end %>
 
-<%# Applicant Information %>
+    <!-- Applicant Information -->
     <section class="mb-8" aria-labelledby="applicant-info-title">
       <h2 id="applicant-info-title" class="text-lg font-medium text-gray-900 mb-4">Applicant Information</h2>
       <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -184,7 +190,7 @@
       </dl>
     </section>
 
-    <%# Application Details %>
+    <!-- Application Details -->
     <section class="mb-8" aria-labelledby="application-details-title">
       <h2 id="application-details-title" class="text-lg font-medium text-gray-900 mb-4">Application Details</h2>
       <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -214,7 +220,7 @@
       </dl>
     </section>
 
-    <%# Financial Information %>
+    <!-- Financial Information -->
     <section class="mb-8" aria-labelledby="financial-info-title">
       <h2 id="financial-info-title" class="text-lg font-medium text-gray-900 mb-4">Financial Information</h2>
       <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -246,7 +252,7 @@
       </dl>
     </section>
 
-    <%# Medical Provider Information %>
+    <!-- Medical Provider Information -->
     <section class="mb-8" aria-labelledby="medical-info-title">
       <h2 id="medical-info-title" class="text-lg font-medium text-gray-900 mb-4">Medical Provider Information</h2>
       <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -267,18 +273,23 @@
       </dl>
     </section>
 
-    <%# Proofs Review Section %>
+    <!-- Proofs Review Section -->
     <section class="mb-8" aria-labelledby="proofs-review-title">
       <h2 id="proofs-review-title" class="text-lg font-medium text-gray-900 mb-4">Proofs Review</h2>
       <div class="space-y-4">
-        <%# Income Proof Attachment %>
+        <!-- Income Proof Attachment -->
         <div class="bg-gray-50 px-4 py-3 rounded-md">
           <h3 class="text-sm font-medium text-gray-500">Proof of Income</h3>
           <% if @application.income_proof.attached? %>
-            <%= link_to "View Proof of Income", url_for(@application.income_proof), target: "_blank", class: "text-indigo-600 hover:text-indigo-500 mr-4" %>
-            <span class="<%= proof_status_badge(@application.income_proof_status) %> px-2 py-1 rounded-full text-xs">
-              <%= @application.income_proof_status&.titleize || "Not Reviewed" %>
-            </span>
+            <%= link_to "View Proof of Income", url_for(@application.income_proof),
+                target: "_blank", class: "text-indigo-600 hover:text-indigo-500 mr-4" %>
+            <!-- Use the partial for the badge -->
+            <%= render "shared/status_badge",
+              type: :proof,
+              status: @application.income_proof_status,
+              label: @application.income_proof_status&.titleize || "Not Reviewed",
+              classes: "px-2 py-1 rounded-full text-xs" %>
+            
             <% if @application.income_proof_status_not_reviewed? %>
               <div class="mt-2 flex space-x-2">
                 <%= button_to update_proof_status_admin_application_path(@application, proof_type: 'income', status: 'approved'),
@@ -287,7 +298,7 @@
                     data: { confirm: "Are you sure you want to approve the Proof of Income?" } do %>
                   Approve
                 <% end %>
-
+                
                 <%= button_to update_proof_status_admin_application_path(@application, proof_type: 'income', status: 'rejected'),
                     method: :patch,
                     class: "inline-flex items-center px-3 py-1 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500",
@@ -301,14 +312,19 @@
           <% end %>
         </div>
 
-        <%# Residency Proof Attachment %>
+        <!-- Residency Proof Attachment -->
         <div class="bg-gray-50 px-4 py-3 rounded-md">
           <h3 class="text-sm font-medium text-gray-500">Proof of Residency</h3>
           <% if @application.residency_proof.attached? %>
-            <%= link_to "View Proof of Residency", url_for(@application.residency_proof), target: "_blank", class: "text-indigo-600 hover:text-indigo-500 mr-4" %>
-            <span class="<%= proof_status_badge(@application.residency_proof_status) %> px-2 py-1 rounded-full text-xs">
-              <%= @application.residency_proof_status&.titleize || "Not Reviewed" %>
-            </span>
+            <%= link_to "View Proof of Residency", url_for(@application.residency_proof),
+                target: "_blank", class: "text-indigo-600 hover:text-indigo-500 mr-4" %>
+            <!-- Use the partial for the badge -->
+            <%= render "shared/status_badge",
+              type: :proof,
+              status: @application.residency_proof_status,
+              label: @application.residency_proof_status&.titleize || "Not Reviewed",
+              classes: "px-2 py-1 rounded-full text-xs" %>
+
             <% if @application.residency_proof_status_not_reviewed? %>
               <div class="mt-2 flex space-x-2">
                 <%= button_to update_proof_status_admin_application_path(@application, proof_type: 'residency', status: 'approved'),
@@ -333,7 +349,7 @@
       </div>
     </section>
 
-    <%# Disability Information %>
+    <!-- Disability Information -->
     <section class="mb-8" aria-labelledby="disability-info-title">
       <h2 id="disability-info-title" class="text-lg font-medium text-gray-900 mb-4">Disability Information</h2>
       <ul class="list-disc pl-5 space-y-1 text-gray-900">
@@ -352,7 +368,11 @@
         <% if @application.user.cognition_disability %>
           <li>Cognition Disability</li>
         <% end %>
-        <% unless @application.user.hearing_disability || @application.user.vision_disability || @application.user.speech_disability || @application.user.mobility_disability || @application.user.cognition_disability %>
+        <% unless @application.user.hearing_disability ||
+                 @application.user.vision_disability ||
+                 @application.user.speech_disability ||
+                 @application.user.mobility_disability ||
+                 @application.user.cognition_disability %>
           <li>No Disabilities Reported</li>
         <% end %>
       </ul>

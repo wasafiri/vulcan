@@ -1,4 +1,3 @@
-# app/models/proof_submission_audit.rb
 class ProofSubmissionAudit < ApplicationRecord
   belongs_to :application
   belongs_to :user

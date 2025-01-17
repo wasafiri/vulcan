@@ -1,4 +1,3 @@
-# app/mailers/application_notifications_mailer.rb
 class ApplicationNotificationsMailer < ApplicationMailer
   def proof_rejected(application, proof_review)
     @application = application
