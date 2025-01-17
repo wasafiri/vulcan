@@ -28,10 +28,12 @@
             
             <% elsif @active_application = current_user.active_application %>
               <div class="mt-4 flex items-center">
-                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                  <%= application_status_badge(@active_application.status) %>">
-                  <%= @active_application.status.titleize %>
-                </span>
+                <%= render "shared/status_badge",
+                  type: :application,
+                  status: @active_application.status,
+                  label: @active_application.status.titleize,
+                  classes: "px-2 inline-flex text-xs leading-5 font-semibold rounded-full" %>
+                  
                 <span class="ml-4 text-sm text-gray-600">
                   Submitted: <%= @active_application.application_date.strftime("%B %d, %Y") %>
                 </span>

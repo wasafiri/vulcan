@@ -1,4 +1,3 @@
-# app/models/policy.rb
 class Policy < ApplicationRecord
   validates :key, presence: true, uniqueness: true
   validates :value, presence: true, numericality: { only_integer: true }

@@ -1,15 +1,8 @@
-# app/helpers/admin/proof_reviews_helper.rb
 module Admin::ProofReviewsHelper
-  def proof_status_badge(status)
+  def proof_review_label(status)
     case status.to_s
-    when "not_reviewed"
-      "bg-gray-100 text-gray-800"
-    when "approved"
-      "bg-green-100 text-green-800"
-    when "rejected"
-      "bg-red-100 text-red-800"
-    else
-      "bg-gray-100 text-gray-800"
+    when "not_reviewed" then "Needs Review"
+    else status.to_s.humanize
     end
   end
 

@@ -1,4 +1,3 @@
-<%# app/views/admin/applications/index.html.erb %>
 <main class="container mx-auto px-4 py-8">
   <div class="max-w-7xl mx-auto">
     <h1 class="text-3xl font-bold mb-6">Unapproved Applications</h1>
@@ -71,9 +70,11 @@
                 <%= application.user.email %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span class="<%= application_status_badge(application.status) %> px-2 py-1 rounded-full text-xs">
-                  <%= application.status.titleize %>
-                </span>
+                <%= render "shared/status_badge", 
+                  type: :application, 
+                  status: application.status, 
+                  label: application.status.titleize, 
+                  classes: "px-2 py-1 rounded-full text-xs" %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <%# Indicators for Proof Statuses %>

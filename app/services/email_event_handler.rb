@@ -1,4 +1,3 @@
-# app/services/email_event_handler.rb
 class EmailEventHandler
   def initialize(params)
     @params = params

@@ -1,4 +1,3 @@
-# app/services/rate_limit.rb
 class RateLimit
   class ExceededError < StandardError; end
 

@@ -1,4 +1,3 @@
-# app/controllers/evaluators/dashboards_controller.rb
 module Evaluators
   class DashboardsController < ApplicationController
     before_action :authenticate_user!

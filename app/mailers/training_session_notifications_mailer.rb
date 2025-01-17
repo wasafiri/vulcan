@@ -1,4 +1,3 @@
-# app/mailers/training_session_notifications_mailer.rb
 class TrainingSessionNotificationsMailer < ApplicationMailer
   def training_scheduled(training_session)
     @training_session = training_session

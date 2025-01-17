@@ -1,4 +1,3 @@
-# app/models/concerns/notification_delivery.rb
 module NotificationDelivery
   extend ActiveSupport::Concern
 

@@ -1,4 +1,3 @@
-# app/models/concerns/application_status_management.rb
 module ApplicationStatusManagement
   extend ActiveSupport::Concern
 

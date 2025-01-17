@@ -1,4 +1,3 @@
-# app/models/constituent.rb
 class Constituent < User
   # Associations
   has_many :applications, foreign_key: :user_id, dependent: :destroy
