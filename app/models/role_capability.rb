@@ -19,9 +19,9 @@ class RoleCapability < ApplicationRecord
   def redundant_capability?
     case capability
     when "can_evaluate"
-      if user.admin? || user.evaluator?
+      user.admin? || user.evaluator?
     when "can_train"
-      if user.admin? || user.trainer?
+      user.admin? || user.trainer?
     else
       false
     end

@@ -44,4 +44,8 @@ module BadgeHelper
     # e.g., if status == :not_reviewed && type == :proof
     status_label
   end
+
+  def status_badge_component(type, status)
+    render(StatusBadgeComponent.new(type: type, status: status))
+  end
 end

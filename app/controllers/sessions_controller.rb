@@ -1,5 +1,3 @@
-# sessions_controller.rb (Complete Updated File)
-
 class SessionsController < ApplicationController
   skip_before_action :authenticate_user!, only: [ :new, :create ]
   before_action :set_session, only: [ :destroy ]

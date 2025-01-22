@@ -8,19 +8,26 @@ module NotificationDelivery
   def deliver_notifications
     return unless should_deliver_notifications?
 
-    ApplicationNotifier.new(self).deliver_all
-  rescue => e
-    log_delivery_error(e)
-    retry_delivery_later
+    begin
+      if Rails.configuration.use_job_scheduler
+        # New job-based delivery while preserving retry logic
+        NotificationJob.set(retry: 3).perform_later(self)
+      else
+        # Existing robust delivery logic
+        ApplicationNotifier.new(self).deliver_all
+      end
+    rescue => e
+      log_delivery_error(e)
+      retry_delivery_later
+    end
   end
 
   private
 
   def should_deliver_notifications?
-    # Check if status or proof statuses have changed
     status_changed? ||
-    (respond_to?(:income_proof_status_changed?) && income_proof_status_changed?) ||
-    (respond_to?(:residency_proof_status_changed?) && residency_proof_status_changed?)
+      (respond_to?(:income_proof_status_changed?) && income_proof_status_changed?) ||
+      (respond_to?(:residency_proof_status_changed?) && residency_proof_status_changed?)
   end
 
   def log_delivery_error(error)
