@@ -60,7 +60,7 @@ class Admin::ApplicationsController < ApplicationController
   def update
     if @application.update(application_params)
       redirect_to admin_application_path(@application),
-                  notice: "Application updated."
+        notice: "Application updated."
     else
       render :edit, status: :unprocessable_entity
     end
@@ -89,7 +89,7 @@ class Admin::ApplicationsController < ApplicationController
   def request_documents
     @application.update!(status: :awaiting_documents)
     redirect_to admin_application_path(@application),
-                notice: "Documents requested."
+      notice: "Documents requested."
   end
 
   def review_proof
@@ -113,7 +113,7 @@ class Admin::ApplicationsController < ApplicationController
     end
 
     redirect_to admin_application_path(@application),
-                notice: "#{proof_type.capitalize} proof #{new_status} successfully."
+      notice: "#{proof_type.capitalize} proof #{new_status} successfully."
   end
 
   # Approve a single application
@@ -151,7 +151,7 @@ class Admin::ApplicationsController < ApplicationController
     end
 
     redirect_to admin_application_path(@application),
-                notice: "Evaluator successfully assigned"
+      notice: "Evaluator successfully assigned"
   end
 
   # Schedule training session for this application
@@ -165,10 +165,10 @@ class Admin::ApplicationsController < ApplicationController
 
     if training_session.save
       redirect_to admin_application_path(@application),
-                  notice: "Training session scheduled with #{trainer.full_name}"
+        notice: "Training session scheduled with #{trainer.full_name}"
     else
       redirect_to admin_application_path(@application),
-                  alert: "Failed to schedule training session"
+        alert: "Failed to schedule training session"
     end
   end
 
@@ -178,7 +178,24 @@ class Admin::ApplicationsController < ApplicationController
     training_session.update(status: :completed, completed_at: Time.current)
 
     redirect_to admin_application_path(@application),
-                notice: "Training session marked as completed"
+      notice: "Training session marked as completed"
+  end
+
+  def update_certification_status
+    @application = Application.find(params[:id])
+
+    if params[:medical_certification].present?
+      @application.medical_certification.attach(params[:medical_certification])
+    end
+
+    @application.update!(
+      medical_certification_status: params[:status],
+      medical_certification_verified_at: Time.current,
+      medical_certification_verified_by: current_user
+    )
+
+    redirect_to admin_application_path(@application),
+      notice: "Medical certification status updated."
   end
 
   private

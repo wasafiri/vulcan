@@ -152,7 +152,79 @@ class Constituent::ApplicationsController < ApplicationController
     end
   end
 
+  def upload_documents
+    @application = current_user.applications.find(params[:id])
+
+    if params[:documents].present?
+      params[:documents].each do |document_type, file|
+        case document_type
+        when "income_proof"
+          @application.income_proof.attach(file)
+        when "residency_proof"
+          @application.residency_proof.attach(file)
+        end
+      end
+
+      if @application.save
+        redirect_to constituent_application_path(@application),
+          notice: "Documents uploaded successfully."
+      else
+        render :edit, status: :unprocessable_entity
+      end
+    else
+      redirect_to constituent_application_path(@application),
+        alert: "Please select documents to upload."
+    end
+  end
+
+  def request_review
+    @application = current_user.applications.find(params[:id])
+
+    if @application.update(needs_review_since: Time.current)
+      # Notify admins about the review request
+      User.where(type: "Admin").find_each do |admin|
+        Notification.create!(
+          recipient: admin,
+          actor: current_user,
+          action: "review_requested",
+          notifiable: @application
+        )
+      end
+
+      redirect_to constituent_application_path(@application),
+        notice: "Review requested successfully."
+    else
+      redirect_to constituent_application_path(@application),
+        alert: "Unable to request review at this time."
+    end
+  end
+
+  def verify
+    @application = current_user.applications.find(params[:id])
+    render :verify
+  end
+
+  def submit
+    @application = current_user.applications.find(params[:id])
+
+    if @application.update(submission_params.merge(status: :in_progress))
+      ApplicationNotificationsMailer.submission_confirmation(@application).deliver_later
+      redirect_to constituent_application_path(@application),
+        notice: "Application submitted successfully!"
+    else
+      render :verify, status: :unprocessable_entity
+    end
+  end
+
   private
+
+  def submission_params
+    params.require(:application).permit(
+      :terms_accepted,
+      :information_verified,
+      :medical_release_authorized
+    )
+  end
 
   def set_application
     @application = current_user.applications.find(params[:id])
