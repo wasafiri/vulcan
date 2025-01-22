@@ -6,47 +6,15 @@ class Admin::ApplicationsController < ApplicationController
   before_action :set_application, only: [
     :show, :edit, :update,
     :verify_income, :request_documents, :review_proof, :update_proof_status,
-    :approve, :reject, :assign_evaluator, :schedule_training, :complete_training
+    :approve, :reject, :assign_evaluator, :schedule_training, :complete_training,
+    :update_certification_status
   ]
 
   def index
-    # Base query with includes
     scope = Application.includes(:user)
-
-    # Sorting if present
-    if params[:sort].present?
-      sort_column = params[:sort]
-      sort_direction = params[:direction] || "asc"
-      if Application.column_names.include?(sort_column)
-        scope = scope.order("#{sort_column} #{sort_direction}")
-      end
-    else
-      # Default sorting
-      scope = scope.order(application_date: :desc)
-    end
-
-    # Filtering by “filter” param (existing logic)
-    if params[:filter].present?
-      case params[:filter]
-      when "proofs_needing_review"
-        scope = scope.where(
-          "income_proof_status = ? OR residency_proof_status = ?",
-          "not_reviewed", "not_reviewed"
-        )
-      when "proofs_rejected"
-        scope = scope.where(
-          income_proof_status: :rejected,
-          residency_proof_status: :rejected
-        )
-      when "awaiting_medical_response"
-        scope = scope.where(status: :awaiting_documents)
-      end
-    end
-
-    # Additional filter by “status” param (from old Dashboard index)
-    if params[:status].present?
-      scope = scope.where(status: params[:status])
-    end
+                      .filter_by_status(params[:status])
+                      .filter_by_type(params[:filter])
+                      .sorted_by(params[:sort], params[:direction])
 
     @pagy, @applications = pagy(scope, items: 20)
   end
@@ -59,17 +27,14 @@ class Admin::ApplicationsController < ApplicationController
 
   def update
     if @application.update(application_params)
-      redirect_to admin_application_path(@application),
-        notice: "Application updated."
+      redirect_to admin_application_path(@application), notice: "Application updated."
     else
       render :edit, status: :unprocessable_entity
     end
   end
 
   def search
-    @applications = Application.includes(:user)
-      .where("users.last_name ILIKE ?", "%#{params[:q]}%")
-      .references(:users)
+    @applications = Application.search_by_last_name(params[:q])
   end
 
   def filter
@@ -77,19 +42,18 @@ class Admin::ApplicationsController < ApplicationController
   end
 
   def batch_approve
-    Application.where(id: params[:ids]).update_all(status: :approved)
+    Application.batch_update_status(params[:ids], :approved)
     redirect_to admin_applications_path, notice: "Applications approved."
   end
 
   def batch_reject
-    Application.where(id: params[:ids]).update_all(status: :rejected)
+    Application.batch_update_status(params[:ids], :rejected)
     redirect_to admin_applications_path, notice: "Applications rejected."
   end
 
   def request_documents
-    @application.update!(status: :awaiting_documents)
-    redirect_to admin_application_path(@application),
-      notice: "Documents requested."
+    @application.request_documents!
+    redirect_to admin_application_path(@application), notice: "Documents requested."
   end
 
   def review_proof
@@ -99,71 +63,44 @@ class Admin::ApplicationsController < ApplicationController
   end
 
   def update_proof_status
-    proof_type = params[:proof_type]
-    new_status = params[:status]
-
-    case proof_type
-    when "income"
-      @application.update(income_proof_status: new_status)
-    when "residency"
-      @application.update(residency_proof_status: new_status)
+    if @application.update_proof_status!(params[:proof_type], params[:status])
+      redirect_to admin_application_path(@application),
+        notice: "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
     else
       render json: { error: "Invalid proof type" }, status: :unprocessable_entity
-      return
     end
-
-    redirect_to admin_application_path(@application),
-      notice: "#{proof_type.capitalize} proof #{new_status} successfully."
   end
 
-  # Approve a single application
   def approve
-    @application.update!(status: :approved)
+    @application.approve!
     redirect_to admin_application_path(@application), notice: "Application approved."
   end
 
-  # Reject a single application
   def reject
-    @application.update!(status: :rejected)
+    @application.reject!
     redirect_to admin_application_path(@application), alert: "Application rejected."
   end
 
-  # Assign an evaluator to the application
   def assign_evaluator
     evaluator = Evaluator.find(params[:evaluator_id])
 
-    ActiveRecord::Base.transaction do
-      # Create new evaluation
-      evaluation = Evaluation.create!(
-        evaluator: evaluator,
-        constituent: @application.user,
-        application: @application,
-        status: :pending,
-        evaluation_type: determine_evaluation_type(@application.user),
-        evaluation_date: Date.current
-      )
-
-      # Send email notification
-      EvaluatorMailer.with(
-        evaluation: evaluation,
-        constituent: @application.user
-      ).new_evaluation_assigned.deliver_later
+    if @application.assign_evaluator!(evaluator)
+      redirect_to admin_application_path(@application),
+        notice: "Evaluator successfully assigned"
+    else
+      redirect_to admin_application_path(@application),
+        alert: "Failed to assign evaluator"
     end
-
-    redirect_to admin_application_path(@application),
-      notice: "Evaluator successfully assigned"
   end
 
-  # Schedule training session for this application
   def schedule_training
     trainer = User.find(params[:trainer_id])
-    training_session = @application.training_sessions.new(
+    training_session = @application.schedule_training!(
       trainer: trainer,
-      scheduled_for: params[:scheduled_for],
-      status: :scheduled
+      scheduled_for: params[:scheduled_for]
     )
 
-    if training_session.save
+    if training_session.persisted?
       redirect_to admin_application_path(@application),
         notice: "Training session scheduled with #{trainer.full_name}"
     else
@@ -172,30 +109,26 @@ class Admin::ApplicationsController < ApplicationController
     end
   end
 
-  # Mark training session as completed
   def complete_training
     training_session = @application.training_sessions.find(params[:training_session_id])
-    training_session.update(status: :completed, completed_at: Time.current)
+    training_session.complete!
 
     redirect_to admin_application_path(@application),
       notice: "Training session marked as completed"
   end
 
   def update_certification_status
-    @application = Application.find(params[:id])
-
-    if params[:medical_certification].present?
-      @application.medical_certification.attach(params[:medical_certification])
+    if @application.update_certification!(
+        certification: params[:medical_certification],
+        status: params[:status],
+        verified_by: current_user
+      )
+      redirect_to admin_application_path(@application),
+        notice: "Medical certification status updated."
+    else
+      redirect_to admin_application_path(@application),
+        alert: "Failed to update certification status."
     end
-
-    @application.update!(
-      medical_certification_status: params[:status],
-      medical_certification_verified_at: Time.current,
-      medical_certification_verified_by: current_user
-    )
-
-    redirect_to admin_application_path(@application),
-      notice: "Medical certification status updated."
   end
 
   private
@@ -212,9 +145,5 @@ class Admin::ApplicationsController < ApplicationController
     unless current_user&.admin?
       redirect_to root_path, alert: "Not authorized"
     end
-  end
-
-  def determine_evaluation_type(constituent)
-    constituent.evaluations.exists? ? :follow_up : :initial
   end
 end

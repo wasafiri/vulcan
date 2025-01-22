@@ -9,6 +9,12 @@ module Authentication
     helper_method :current_user
   end
 
+  def require_role(role)
+    unless current_user&.send("#{role}?")
+      redirect_to root_path, alert: "Unauthorized access"
+    end
+  end
+
   private
 
   # Retrieves the currently logged-in user based on the session_token stored in signed cookies
