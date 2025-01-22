@@ -154,11 +154,7 @@
                   <div class="text-gray-500 text-sm"><%= application.user.email %></div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                  <%= render "shared/status_badge", 
-                    type: :application, 
-                    status: application.status, 
-                    label: application.status.titleize, 
-                    classes: "px-2 py-1 rounded-full text-xs" %>
+                  <%= application_status_badge(application) %>
                 </td>
                 <td class="px-6 py-4 whitespace-normal">
                   <% if application.income_proof.attached? || application.residency_proof.attached? %>
