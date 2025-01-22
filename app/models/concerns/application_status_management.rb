@@ -62,8 +62,4 @@ module ApplicationStatusManagement
   def request_documents!
     update!(status: :awaiting_documents)
   end
-
-  def self.batch_update_status(ids, status)
-    where(id: ids).update_all(status: status)
-  end
 end

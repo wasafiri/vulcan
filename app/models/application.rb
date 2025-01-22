@@ -1,6 +1,7 @@
 class Application < ApplicationRecord
   include ApplicationStatusManagement
   include NotificationDelivery
+  include ProofManageable
 
   # Associations
   belongs_to :user, class_name: "Constituent", foreign_key: :user_id
@@ -13,8 +14,6 @@ class Application < ApplicationRecord
   has_many :proof_reviews, dependent: :destroy
 
   # Active Storage attachments
-  has_one_attached :residency_proof
-  has_one_attached :income_proof
   has_one_attached :medical_certification
 
   # Enums
@@ -40,7 +39,6 @@ class Application < ApplicationRecord
 
   # Validations
   validates :user, :application_date, :status, presence: true
-  validates :residency_proof, :income_proof, presence: true, unless: :draft?
   validates :maryland_resident, inclusion: { in: [ true ],
     message: "You must be a Maryland resident to apply" }
   validates :terms_accepted, :information_verified, :medical_release_authorized,
@@ -52,11 +50,10 @@ class Application < ApplicationRecord
   validates :guardian_relationship, presence: true, if: :is_guardian?
 
   validate :waiting_period_completed, on: :create
-  validate :correct_proof_mime_type
-  validate :proof_size_within_limit
 
   # Callbacks
   after_update :schedule_admin_notifications, if: :needs_proof_review?
+  after_update :log_status_change, if: :saved_change_to_status?
 
   # Scopes
   scope :search_by_last_name, ->(query) {
@@ -99,13 +96,12 @@ class Application < ApplicationRecord
 
   def self.batch_update_status(ids, status)
     transaction do
-      applications = where(id: ids)
-      applications.each do |application|
-        application.with_lock do
-          unless application.update(status: status)
-            Rails.logger.error "Failed to update application #{application.id}: #{application.errors.full_messages}"
-            raise ActiveRecord::Rollback
-          end
+      where(id: ids).lock("FOR UPDATE SKIP LOCKED").find_each do |application|
+        unless application.update(status: status)
+          Rails.logger.error(
+            "Failed to update application #{application.id}: #{application.errors.full_messages}"
+          )
+          raise ActiveRecord::Rollback
         end
       end
       true
@@ -115,86 +111,23 @@ class Application < ApplicationRecord
     end
   end
 
-  # Proof management methods
-  def rejected_income_proof?
-    income_proof_status_rejected?
-  end
-
-  def rejected_residency_proof?
-    residency_proof_status_rejected?
-  end
-
-  def update_proof_status!(proof_type, new_status)
-    transaction do
-      case proof_type
-      when "income"
-        update!(income_proof_status: new_status)
-      when "residency"
-        update!(residency_proof_status: new_status)
-      else
-        raise ArgumentError, "Invalid proof type: #{proof_type}"
-      end
-    end
-    true
-  rescue ActiveRecord::RecordInvalid, ArgumentError => e
-    Rails.logger.error "Failed to update proof status: #{e.message}"
-    false
-  end
-
-  def purge_proofs(admin_user)
-    raise ArgumentError, "Admin user required" unless admin_user&.admin?
-
-    ActiveRecord::Base.transaction do
-      income_proof.purge if income_proof.attached?
-      residency_proof.purge if residency_proof.attached?
-
-      update_columns(
-        income_proof_status: :not_reviewed,
-        residency_proof_status: :not_reviewed,
-        last_proof_submitted_at: nil,
-        needs_review_since: nil
-      )
-
-      proof_reviews.create!(
-        admin: admin_user,
-        proof_type: "system",
-        status: "purged",
-        reviewed_at: Time.current,
-        submission_method: "system"
-      )
-
-      create_system_notification!(
-        recipient: user,
-        actor: admin_user,
-        action: "proofs_purged"
-      )
-    end
-  rescue => e
-    Rails.logger.error "Failed to purge proofs for application #{id}: #{e.message}"
-    false
-  end
-
   # Evaluator assignment
   def assign_evaluator!(evaluator)
-    transaction do
-      evaluation = nil
-      with_lock do
-        evaluation = evaluations.create!(
-          evaluator: evaluator,
-          constituent: user,
-          status: :pending,
-          evaluation_type: determine_evaluation_type,
-          evaluation_date: Date.current
-        )
-      end
-
+    with_lock do  # with_lock already wraps in a transaction
+      evaluation = evaluations.create!(
+        evaluator: evaluator,
+        constituent: user,
+        status: :pending,
+        evaluation_type: determine_evaluation_type,
+        evaluation_date: Date.current
+      )
+      # Notification queued inside the same transaction
       EvaluatorMailer.with(
         evaluation: evaluation,
         constituent: user
       ).new_evaluation_assigned.deliver_later
-
-      true
     end
+    true
   rescue ActiveRecord::RecordInvalid => e
     Rails.logger.error "Failed to assign evaluator: #{e.message}"
     false
@@ -202,16 +135,14 @@ class Application < ApplicationRecord
 
   # Certification management
   def update_certification!(certification:, status:, verified_by:)
-    transaction do
-      with_lock do
-        medical_certification.attach(certification) if certification.present?
+    with_lock do  # Simpler than nested transaction/lock blocks
+      medical_certification.attach(certification) if certification.present?
 
-        update!(
-          medical_certification_status: status,
-          medical_certification_verified_at: Time.current,
-          medical_certification_verified_by: verified_by
-        )
-      end
+      update!(
+        medical_certification_status: status,
+        medical_certification_verified_at: Time.current,
+        medical_certification_verified_by: verified_by
+      )
       true
     end
   rescue ActiveRecord::RecordInvalid => e
@@ -220,21 +151,34 @@ class Application < ApplicationRecord
   end
 
   def schedule_training!(trainer:, scheduled_for:)
-    transaction do
-      with_lock do
-        training_sessions.create!(
-          trainer: trainer,
-          scheduled_for: scheduled_for,
-          status: :scheduled
-        )
-      end
-    rescue ActiveRecord::RecordInvalid => e
-      Rails.logger.error "Failed to schedule training: #{e.message}"
-      false
+    with_lock do
+      training_sessions.create!(
+        trainer: trainer,
+        scheduled_for: scheduled_for,
+        status: :scheduled
+      )
     end
+    true
+  rescue ActiveRecord::RecordInvalid => e
+    Rails.logger.error "[Application #{id}] Failed to schedule training: #{e.message}"
+    errors.add(:base, e.message)
+    false
   end
 
   private
+
+  def log_status_change
+    Event.create!(
+      user: Current.user,
+      action: "application_status_changed",
+      metadata: {
+        application_id: id,
+        old_status: status_before_last_save,
+        new_status: status,
+        timestamp: Time.current.iso8601
+      }
+    )
+  end
 
   def schedule_admin_notifications
     NotifyAdminsJob.perform_later(self)
@@ -259,44 +203,22 @@ class Application < ApplicationRecord
     end
   end
 
-  def correct_proof_mime_type
-    allowed_types = [ "application/pdf", "image/jpeg", "image/png", "image/tiff", "image/bmp" ]
-
-    if residency_proof.attached? && !allowed_types.include?(residency_proof.content_type)
-      errors.add(:residency_proof, "must be a PDF or an image file (jpg, jpeg, png, tiff, bmp)")
-    end
-
-    if income_proof.attached? && !allowed_types.include?(income_proof.content_type)
-      errors.add(:income_proof, "must be a PDF or an image file (jpg, jpeg, png, tiff, bmp)")
-    end
-  end
-
-  def proof_size_within_limit
-    max_size = 5.megabytes
-
-    if residency_proof.attached? && residency_proof.byte_size > max_size
-      errors.add(:residency_proof, "is too large. Maximum size allowed is 5MB.")
-    end
-
-    if income_proof.attached? && income_proof.byte_size > max_size
-      errors.add(:income_proof, "is too large. Maximum size allowed is 5MB.")
-    end
-  end
-
   def needs_proof_review?
     saved_change_to_needs_review_since? && needs_review_since.present?
   end
 
   def notify_admins_of_new_proofs
-    User.where(type: "Admin").find_each do |admin|
-      Notification.create!(
-        recipient: admin,
-        actor: user,
+    notifications = User.where(type: "Admin").map do |admin|
+      {
+        recipient_id: admin.id,
+        actor_id: user.id,
         action: "proof_submitted",
-        notifiable: self,
+        notifiable_type: self.class.name,
+        notifiable_id: id,
         metadata: { proof_types: pending_proof_types }
-      )
+      }
     end
+    Notification.insert_all!(notifications) # Use bulk insert
   end
 
   def pending_proof_types
