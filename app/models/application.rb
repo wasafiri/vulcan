@@ -14,6 +14,7 @@ class Application < ApplicationRecord
   # Active Storage attachments
   has_one_attached :residency_proof
   has_one_attached :income_proof
+  has_one_attached :medical_certification
 
   def status
     value = read_attribute(:status)
@@ -49,6 +50,14 @@ class Application < ApplicationRecord
     approved: 1,
     rejected: 2
   }, prefix: :residency_proof_status
+
+  enum :medical_certification_status, {
+    not_requested: 0,
+    requested: 1,
+    received: 2,
+    accepted: 3,
+    rejected: 4
+  }
 
   # Helper methods for proof status checks
   def rejected_income_proof?

@@ -34,7 +34,7 @@ Rails.application.routes.draw do
         get  :search
         get  :filter
       end
-  
+
       member do
         post :request_documents
         post :review_proof  # if you’re handling via standard POST or GET
@@ -44,6 +44,7 @@ Rails.application.routes.draw do
         post :assign_evaluator
         post :schedule_training
         post :complete_training
+        patch :update_certification_status
       end
     end
 
@@ -105,7 +106,7 @@ Rails.application.routes.draw do
   end
 
   namespace :evaluators do
-    resource :dashboard, only: [:show], controller: :dashboards
+    resource :dashboard, only: [ :show ], controller: :dashboards
     resources :evaluations do
       member do
         post :submit_report
@@ -136,7 +137,6 @@ Rails.application.routes.draw do
     resources :appointments, only: [ :index, :show ]
     resources :evaluations, only: [ :index, :show ]
     resources :devices, only: [ :index, :show ]
-    resource :medical_certification, only: [ :show ]
   end
 
   namespace :webhooks do
