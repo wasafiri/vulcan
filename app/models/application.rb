@@ -13,9 +13,6 @@ class Application < ApplicationRecord
   has_many :notifications, as: :notifiable, dependent: :destroy
   has_many :proof_reviews, dependent: :destroy
 
-  # Active Storage attachments
-  has_one_attached :medical_certification
-
   # Enums
   enum :income_proof_status, {
     not_reviewed: 0,
@@ -163,6 +160,10 @@ class Application < ApplicationRecord
     Rails.logger.error "[Application #{id}] Failed to schedule training: #{e.message}"
     errors.add(:base, e.message)
     false
+  end
+
+  def latest_evaluation
+    evaluations.order(created_at: :desc).first
   end
 
   private

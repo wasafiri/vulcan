@@ -29,8 +29,8 @@ class SessionsController < ApplicationController
         user.track_sign_in!(request.remote_ip)
 
         redirect_path = case user
-        when Admin, MedicalProvider
-          admin_root_path
+        when Admin
+          admin_applications_path
         when Constituent
           constituent_dashboard_path
         when Evaluator
@@ -71,7 +71,7 @@ class SessionsController < ApplicationController
   def after_sign_in_path
     case current_user
     when Admin
-      admin_root_path
+      admin_applications_path
     when Constituent
       constituent_dashboard_path
     when Evaluator

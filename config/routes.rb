@@ -33,14 +33,15 @@ Rails.application.routes.draw do
         post :batch_reject
         get  :search
         get  :filter
+        get  :dashboard
       end
 
       member do
         post :request_documents
         post :review_proof  # if you’re handling via standard POST or GET
         post :update_proof_status
-        post :approve
-        post :reject
+        patch :approve
+        patch :reject
         post :assign_evaluator
         post :schedule_training
         post :complete_training
@@ -132,6 +133,7 @@ Rails.application.routes.draw do
         post :request_review
         get :verify
         patch :submit
+        post :resubmit_proof
       end
     end
     resources :appointments, only: [ :index, :show ]

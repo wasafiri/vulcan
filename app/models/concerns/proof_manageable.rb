@@ -7,6 +7,8 @@ module ProofManageable
   included do
     has_one_attached :income_proof
     has_one_attached :residency_proof
+    has_one_attached :medical_certification
+    has_many_attached :documents
 
     validate :correct_proof_mime_type
     validate :proof_size_within_limit

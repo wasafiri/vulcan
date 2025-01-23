@@ -68,7 +68,7 @@
                   Hello, <%= current_user.first_name %>
                 </span>
                 <%= link_to (case current_user
-                    when Admin then admin_root_path
+                    when Admin then admin_applications_path
                     when Constituent then constituent_dashboard_path
                     when Evaluator then evaluator_dashboard_path
                     when Vendor then vendor_dashboard_path
@@ -77,21 +77,23 @@
                     aria: { label: "Go to your dashboard" } do %>
                   Dashboard
                 <% end %>
-                <%= button_to sign_out_path,
+                <%= button_to "Sign Out",
+                    sign_out_path,
                     method: :delete,
-                    form: { class: "inline-block" },
-                    class: "px-4 py-2 rounded-md text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500",
-                    aria: { label: "Sign out of your account" } do %>
-                  Sign Out
-                <% end %>
+                    class: "mt-1 block w-full text-left px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md",
+                    aria: { label: "Sign out of your account" } %>
               </div>
             <% else %>
-              <%= link_to "Sign In",
-                  sign_in_path,
-                  class: "px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
-              <%= link_to "Sign Up",
-                  sign_up_path,
-                  class: "px-4 py-2 rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" %>
+              <div class="flex space-x-2">
+                <%= link_to "Sign In",
+                    sign_in_path,
+                    class: "px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                    aria: { label: "Sign in to your account" } %>
+                <%= link_to "Sign Up",
+                    sign_up_path,
+                    class: "px-4 py-2 rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500",
+                    aria: { label: "Sign up for a new account" } %>
+              </div>
             <% end %>
           </div>
         </div>
@@ -123,29 +125,32 @@
             </p>
             <%= link_to "Dashboard",
                 (case current_user
-                when Admin then admin_root_path
+                when Admin then admin_applications_path
                 when Constituent then constituent_dashboard_path
                 when Evaluator then evaluator_dashboard_path
                 when Vendor then vendor_dashboard_path
                 end),
                 class: "mt-2 block w-full text-left px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md",
-                role: "menuitem" %>
+                role: "menuitem",
+                aria: { label: "Go to your dashboard" } %>
             <%= button_to "Sign Out",
                 sign_out_path,
                 method: :delete,
                 class: "mt-1 block w-full text-left px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md",
-                role: "menuitem" %>
+                aria: { label: "Sign out of your account" } %>
           </div>
         <% else %>
           <div class="px-4 space-y-1">
             <%= link_to "Sign In",
                 sign_in_path,
                 class: "block w-full px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md",
-                role: "menuitem" %>
+                role: "menuitem",
+                aria: { label: "Sign in to your account" } %>
             <%= link_to "Sign Up",
                 sign_up_path,
                 class: "block w-full px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md",
-                role: "menuitem" %>
+                role: "menuitem",
+                aria: { label: "Sign up for a new account" } %>
           </div>
         <% end %>
       </div>

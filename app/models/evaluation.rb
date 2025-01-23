@@ -9,6 +9,8 @@ class Evaluation < ApplicationRecord
   enum :status, { pending: 0, completed: 1 }
 
   validates :evaluation_date, presence: true
+  validates :evaluator, presence: true
+  validate :evaluator_must_be_evaluator_type
 
   # Define method used in controller
   def request_additional_info!
@@ -20,5 +22,13 @@ class Evaluation < ApplicationRecord
       metadata: { evaluation_id: id },
       notifiable: self
     )
+  end
+
+  private
+
+  def evaluator_must_be_evaluator_type
+    if evaluator && evaluator.type != "Evaluator"
+      errors.add(:evaluator, "must be an Evaluator")
+    end
   end
 end

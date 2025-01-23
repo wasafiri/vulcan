@@ -7,7 +7,7 @@ class Admin::DashboardsControllerTest < ActionDispatch::IntegrationTest
  end
 
  test "should get index" do
-   get admin_root_path
+   get admin_applications_path
    assert_response :success
  end
 end

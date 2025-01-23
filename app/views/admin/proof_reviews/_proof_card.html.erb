@@ -11,11 +11,7 @@
       </div>
       <div>
         <% if proof&.attached? %>
-          <%= render "shared/status_badge",
-            type: :proof,
-            status: status,
-            label: review_status_label(status),
-            classes: "px-2 py-1 rounded-full text-xs" %>
+          <%= application_status_badge(application) %>
         <% else %>
           <span class="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs">
             Not Uploaded
