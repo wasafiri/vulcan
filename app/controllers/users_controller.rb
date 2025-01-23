@@ -24,7 +24,7 @@ class UsersController < ApplicationController
 
   def after_update_path(user)
     case user
-    when Admin then admin_root_path
+    when Admin then admin_applications_path
     when Constituent then constituent_dashboard_path
     when Evaluator then evaluator_dashboard_path
     when Vendor then vendor_dashboard_path

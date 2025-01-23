@@ -9,6 +9,9 @@ class Constituent < User
   # Scopes
   scope :needs_evaluation, -> { joins(:application).where(applications: { status: :approved }) }
   scope :active, -> { where.not(status: [ :withdrawn, :rejected, :expired ]) }
+  scope :ytd, -> {
+    where("created_at >= ?", Date.new(Date.current.year >= 7 ? Date.current.year : Date.current.year - 1, 7, 1))
+  }
 
   def active_application?
     active_application.present?

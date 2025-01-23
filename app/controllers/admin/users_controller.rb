@@ -78,6 +78,10 @@ class Admin::UsersController < ApplicationController
   def update
   end
 
+  def full_name
+    "#{first_name} #{last_name}"
+  end
+
   private
 
   def update_user_capabilities(user, capabilities)

@@ -3,6 +3,7 @@ class Admin::ApplicationsController < ApplicationController
 
   before_action :authenticate_user!
   before_action :require_admin!
+  before_action :set_current_attributes
   before_action :set_application, only: [
     :show, :edit, :update,
     :verify_income, :request_documents, :review_proof, :update_proof_status,
@@ -11,15 +12,39 @@ class Admin::ApplicationsController < ApplicationController
   ]
 
   def index
-    scope = Application.includes(:user)
-                      .filter_by_status(params[:status])
-                      .filter_by_type(params[:filter])
-                      .sorted_by(params[:sort], params[:direction])
+    @current_fiscal_year = fiscal_year
+    @total_users_count = User.count
+    @ytd_constituents_count = Application.where("created_at >= ?", fiscal_year_start).count
+    @open_applications_count = Application.active.count
+    @pending_services_count = Application.where(status: :approved).count
+
+    # Get base scope with includes
+    scope = Application.includes(:user, :income_proof_attachment, :residency_proof_attachment)
+      .where.not(status: [ :rejected, :archived ])
+
+    # Apply filters
+    scope = case params[:filter]
+    when "in_progress"
+      scope.where(status: :in_progress)
+    when "approved"
+      scope.where(status: :approved)
+    when "proofs_needing_review"
+      scope.where(income_proof_status: 0)
+           .or(scope.where(residency_proof_status: 0))
+    when "awaiting_medical_response"
+      scope.where(status: :awaiting_documents)
+    else
+      scope
+    end
 
     @pagy, @applications = pagy(scope, items: 20)
   end
 
   def show
+    # Eager load attachments to prevent N+1 queries
+    @application.documents.attachments.load
+    @application.income_proof.attachments.load
+    @application.residency_proof.attachments.load
   end
 
   def edit
@@ -72,13 +97,29 @@ class Admin::ApplicationsController < ApplicationController
   end
 
   def approve
-    @application.approve!
-    redirect_to admin_application_path(@application), notice: "Application approved."
+    if @application.approve!
+      flash[:notice] = "Application approved."
+      redirect_to admin_application_path(@application)
+    else
+      flash[:alert] = "Failed to approve Application ##{@application.id}: #{@application.errors.full_messages.to_sentence}"
+      render :show, status: :unprocessable_entity
+    end
+  rescue ActiveRecord::RecordInvalid => e
+    flash[:alert] = "Failed to approve Application ##{@application.id}: #{e.record.errors.full_messages.to_sentence}"
+    render :show, status: :unprocessable_entity
   end
 
   def reject
-    @application.reject!
-    redirect_to admin_application_path(@application), alert: "Application rejected."
+    if @application.reject!
+      flash[:alert] = "Application rejected."
+      redirect_to admin_application_path(@application)
+    else
+      flash[:alert] = "Failed to reject Application ##{@application.id}: #{@application.errors.full_messages.to_sentence}"
+      render :show, status: :unprocessable_entity
+    end
+  rescue ActiveRecord::RecordInvalid => e
+    flash[:alert] = "Failed to reject Application ##{@application.id}: #{e.record.errors.full_messages.to_sentence}"
+    render :show, status: :unprocessable_entity
   end
 
   def assign_evaluator
@@ -94,7 +135,12 @@ class Admin::ApplicationsController < ApplicationController
   end
 
   def schedule_training
-    trainer = User.find(params[:trainer_id])
+    trainer = Trainer.active.find_by(id: params[:trainer_id])
+    unless trainer
+      redirect_to admin_application_path(@application), alert: "Invalid trainer selected."
+      return
+    end
+
     training_session = @application.schedule_training!(
       trainer: trainer,
       scheduled_for: params[:scheduled_for]
@@ -133,6 +179,30 @@ class Admin::ApplicationsController < ApplicationController
 
   private
 
+  def sort_column
+    params[:sort] || "application_date"
+  end
+
+  def sort_direction
+    %w[asc desc].include?(params[:direction]) ? params[:direction] : "desc"
+  end
+
+  def filter_conditions
+    # Define your filter conditions based on params[:filter]
+    case params[:filter]
+    when "in_progress"
+      { status: "in_progress" }
+    when "approved"
+      { status: "approved" }
+    when "proofs_needing_review"
+      { status: "proofs_needing_review" }
+    when "awaiting_medical_response"
+      { status: "awaiting_medical_response" }
+    else
+      {}
+    end
+  end
+
   def set_application
     @application = Application.find(params[:id])
   end
@@ -145,5 +215,21 @@ class Admin::ApplicationsController < ApplicationController
     unless current_user&.admin?
       redirect_to root_path, alert: "Not authorized"
     end
+  end
+
+  private
+
+  def set_current_attributes
+    Current.set(request, current_user)
+  end
+
+  def fiscal_year
+    current_date = Date.current
+    current_date.month >= 7 ? current_date.year : current_date.year - 1
+  end
+
+  def fiscal_year_start
+    year = fiscal_year
+    Date.new(year, 7, 1)
   end
 end

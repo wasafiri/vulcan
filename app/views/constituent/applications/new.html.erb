@@ -60,7 +60,7 @@
           <legend class="text-lg font-medium text-gray-900">Household Information</legend>
           
           <div>
-            <%= form.label :household_size, class: "block text-sm font-medium text-gray-700" %>
+            <%= form.label :household_size, "Household Size", class: "block text-sm font-medium text-gray-700" %>
             <div class="mt-1">
               <%= form.number_field :household_size,
                   min: 1,
@@ -74,7 +74,7 @@
           </div>
 
           <div>
-            <%= form.label :annual_income, class: "block text-sm font-medium text-gray-700" %>
+            <%= form.label :annual_income, "Annual Income", class: "block text-sm font-medium text-gray-700" %>
             <div class="mt-1 relative rounded-md shadow-sm">
               <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <span class="text-gray-500 sm:text-sm">$</span>

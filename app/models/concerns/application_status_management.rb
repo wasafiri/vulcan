@@ -21,16 +21,33 @@ module ApplicationStatusManagement
     scope :filter_by_type, ->(filter_type) {
       case filter_type
       when "proofs_needing_review"
-        where("income_proof_status = ? OR residency_proof_status = ?", "not_reviewed", "not_reviewed")
+        where(
+          "income_proof_status = ? OR residency_proof_status = ?",
+          income_proof_statuses[:not_reviewed],
+          residency_proof_statuses[:not_reviewed]
+        )
       when "proofs_rejected"
-        where(income_proof_status: :rejected, residency_proof_status: :rejected)
+        where(
+          income_proof_status: income_proof_statuses[:rejected],
+          residency_proof_status: residency_proof_statuses[:rejected]
+        )
       when "awaiting_medical_response"
-        where(status: :awaiting_documents)
+        where(status: statuses[:awaiting_documents])
       end
-    }
-    scope :sorted_by, ->(column, direction) {
-      if column.present? && column_names.include?(column)
-        order("#{column} #{direction || 'asc'}")
+     }
+     scope :sorted_by, ->(column, direction) {
+      direction = direction&.downcase == "desc" ? "desc" : "asc"
+
+      if column.present?
+        if column.start_with?("user.")
+          association = "users"
+          column_name = column.split(".").last
+          joins(:user).order("#{association}.#{column_name} #{direction}")
+        elsif column_names.include?(column)
+          order("#{column} #{direction}")
+        else
+          order(application_date: :desc)
+        end
       else
         order(application_date: :desc)
       end
