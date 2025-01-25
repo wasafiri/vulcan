@@ -12,6 +12,9 @@ class User < ApplicationRecord
   has_many :devices, dependent: :destroy
   has_many :activities, dependent: :destroy
 
+  has_and_belongs_to_many :products,
+    join_table: "products_users"
+
   # Validations
   validates :email, presence: true,
     uniqueness: true,

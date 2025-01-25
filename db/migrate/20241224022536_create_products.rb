@@ -4,7 +4,6 @@ class CreateProducts < ActiveRecord::Migration[8.0]
       t.string :name
       t.text :description
       t.decimal :price
-      t.integer :quantity
       t.string :device_type
       t.datetime :archived_at
       t.references :user, null: false, foreign_key: true

@@ -108,17 +108,19 @@ class Application < ApplicationRecord
     end
   end
 
-  # Evaluator assignment
   def assign_evaluator!(evaluator)
-    with_lock do  # with_lock already wraps in a transaction
+    with_lock do
       evaluation = evaluations.create!(
         evaluator: evaluator,
         constituent: user,
-        status: :pending,
+        application: self,
         evaluation_type: determine_evaluation_type,
-        evaluation_date: Date.current
+        evaluation_datetime: nil, # Will be set when scheduling
+        needs: "",
+        location: ""
+        # Initialize other required fields as needed
       )
-      # Notification queued inside the same transaction
+      # Send email notification to evaluator
       EvaluatorMailer.with(
         evaluation: evaluation,
         constituent: user
@@ -132,7 +134,7 @@ class Application < ApplicationRecord
 
   # Certification management
   def update_certification!(certification:, status:, verified_by:)
-    with_lock do  # Simpler than nested transaction/lock blocks
+    with_lock do
       medical_certification.attach(certification) if certification.present?
 
       update!(
@@ -166,6 +168,10 @@ class Application < ApplicationRecord
     evaluations.order(created_at: :desc).first
   end
 
+  def all_evaluations
+    evaluations.order(created_at: :desc)
+  end
+
   private
 
   def log_status_change
@@ -194,7 +200,7 @@ class Application < ApplicationRecord
     return if new_record?
 
     last_application = user.applications.where.not(id: id)
-                          .order(application_date: :desc).first
+      .order(application_date: :desc).first
     return unless last_application
 
     waiting_period = Policy.get("waiting_period_years") || 3

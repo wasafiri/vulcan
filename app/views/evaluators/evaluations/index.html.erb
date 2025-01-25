@@ -1,2 +1,11 @@
-<h1>Evaluators::Evaluations#index</h1>
-<p>Find me in app/views/evaluator/evaluations/index.html.erb</p>
+<h1>Your Evaluations</h1>
+
+<% @evaluations.each do |evaluation| %>
+  <div class="evaluation">
+    <h2>Evaluation for <%= evaluation.constituent.full_name %> - Application ##<%= evaluation.application.id %></h2>
+    <p>Status: <%= evaluation.status.capitalize %></p>
+    <p>Date: <%= evaluation.evaluation_datetime.strftime("%B %d, %Y %H:%M") if evaluation.evaluation_datetime %></p>
+    <p>Location: <%= evaluation.location %></p>
+    <%= link_to "View Details", evaluator_evaluation_path(evaluation) %>
+  </div>
+<% end %>

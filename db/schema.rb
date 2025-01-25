@@ -10,9 +10,14 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_01_23_163717) do
+ActiveRecord::Schema[8.0].define(version: 2025_01_25_053008) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "accessories_evaluations", id: false, force: :cascade do |t|
+    t.bigint "evaluation_id", null: false
+    t.bigint "accessory_id", null: false
+  end
 
   create_table "active_storage_attachments", force: :cascade do |t|
     t.string "name", null: false
@@ -124,9 +129,21 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_23_163717) do
     t.datetime "updated_at", null: false
     t.integer "status", default: 0
     t.bigint "application_id", null: false
+    t.text "needs"
+    t.integer "recommended_product_ids", default: [], array: true
+    t.integer "recommended_accessory_ids", default: [], array: true
+    t.datetime "evaluation_datetime"
+    t.string "location"
+    t.jsonb "attendees", default: []
+    t.jsonb "products_tried", default: []
     t.index ["application_id"], name: "index_evaluations_on_application_id"
     t.index ["constituent_id"], name: "index_evaluations_on_constituent_id"
     t.index ["evaluator_id"], name: "index_evaluations_on_evaluator_id"
+  end
+
+  create_table "evaluations_products", id: false, force: :cascade do |t|
+    t.bigint "evaluation_id", null: false
+    t.bigint "product_id", null: false
   end
 
   create_table "events", force: :cascade do |t|
@@ -179,12 +196,23 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_23_163717) do
     t.text "description"
     t.decimal "price"
     t.integer "quantity"
-    t.string "device_type"
     t.datetime "archived_at"
-    t.bigint "user_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["user_id"], name: "index_products_on_user_id"
+    t.string "manufacturer"
+    t.string "model_number"
+    t.text "features"
+    t.text "compatibility_notes"
+    t.string "documentation_url"
+    t.string "device_types", default: [], array: true
+    t.index ["device_types"], name: "index_products_on_device_types", using: :gin
+  end
+
+  create_table "products_users", id: false, force: :cascade do |t|
+    t.bigint "product_id", null: false
+    t.bigint "user_id", null: false
+    t.index ["product_id"], name: "index_products_users_on_product_id"
+    t.index ["user_id"], name: "index_products_users_on_user_id"
   end
 
   create_table "proof_reviews", force: :cascade do |t|
@@ -318,7 +346,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_23_163717) do
   add_foreign_key "notifications", "users", column: "recipient_id"
   add_foreign_key "policy_changes", "policies"
   add_foreign_key "policy_changes", "users"
-  add_foreign_key "products", "users"
   add_foreign_key "proof_reviews", "applications"
   add_foreign_key "proof_reviews", "users", column: "admin_id"
   add_foreign_key "role_capabilities", "users"
