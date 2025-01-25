@@ -4,10 +4,9 @@ class Product < ApplicationRecord
     class_name: "User",
     join_table: "products_users"
 
-  validates :name, :manufacturer, :model_number, :device_type, presence: true
+  validates :name, :manufacturer, :model_number, :device_types, presence: true
   validates :documentation_url, format: { with: URI::DEFAULT_PARSER.make_regexp }, allow_blank: true
-
-  validates :device_types, presence: true
+  validate :device_types_must_be_valid
 
   DEVICE_TYPES = [
     "Smartphone",
@@ -28,18 +27,30 @@ class Product < ApplicationRecord
 
   scope :active, -> { where(archived_at: nil) }
   scope :archived, -> { where.not(archived_at: nil) }
-  scope :by_device_type, ->(type) { where(device_type: type) }
+  scope :ordered_by_name, -> { order(:manufacturer, :name) }
+  scope :with_selected_types, ->(types) {
+    where("device_types::text[] && ?::text[]", "{#{Array(types).join(',')}}")
+  }
+  scope :by_device_types, ->(types) { where("device_types && ARRAY[?]::text[]", Array(types)) }
   scope :by_manufacturer, ->(manufacturer) { where(manufacturer: manufacturer) }
 
   def archive!
-    update(archived_at: Time.current)
+    update!(archived_at: Time.current)
   end
 
   def unarchive!
-    update(archived_at: nil)
+    update!(archived_at: nil)
   end
 
   def archived?
     archived_at.present?
+  end
+
+  private
+
+  def device_types_must_be_valid
+    return if device_types.nil?
+    invalid_types = device_types - DEVICE_TYPES
+    errors.add(:device_types, "contains invalid types: #{invalid_types.join(', ')}") if invalid_types.any?
   end
 end
