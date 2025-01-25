@@ -1,70 +1,63 @@
 class Evaluators::EvaluationsController < ApplicationController
   before_action :authenticate_user!
   before_action :require_evaluator!
-  # Set the evaluation instance for specific actions
   before_action :set_evaluation, only: [ :show, :edit, :update, :submit_report, :request_additional_info, :pending, :completed ]
 
-  # GET /evaluator/evaluations
   def index
-    @evaluations = current_user.evaluations
+    @evaluations = current_user.evaluations.includes(:constituent, :application).order(created_at: :desc)
   end
 
-  # GET /evaluator/evaluations/:id
   def show
     # @evaluation is set by set_evaluation
   end
 
-  # GET /evaluator/evaluations/new
   def new
     @evaluation = current_user.evaluations.build
   end
 
-  # POST /evaluator/evaluations
   def create
     @evaluation = current_user.evaluations.build(evaluation_params)
+    @evaluation.status = :pending
+
     if @evaluation.save
-      redirect_to evaluator_evaluation_path(@evaluation), notice: "Evaluation was successfully created."
+      redirect_to evaluator_evaluation_path(@evaluation), notice: "Evaluation created successfully."
     else
-      render :new
+      render :new, status: :unprocessable_entity
     end
   end
 
-  # GET /evaluator/evaluations/:id/edit
   def edit
     # @evaluation is set by set_evaluation
   end
 
-  # PATCH/PUT /evaluator/evaluations/:id
   def update
     if @evaluation.update(evaluation_params)
-      redirect_to evaluator_evaluation_path(@evaluation), notice: "Evaluation was successfully updated."
+      redirect_to evaluator_evaluation_path(@evaluation), notice: "Evaluation updated successfully."
     else
-      render :edit
+      render :edit, status: :unprocessable_entity
     end
   end
 
-  # POST /evaluator/evaluations/:id/submit_report
   def submit_report
-    if @evaluation.update(report_submitted: true)
-      redirect_to evaluator_evaluation_path(@evaluation), notice: "Report submitted successfully."
+    service = Evaluations::SubmissionService.new(@evaluation, params)
+    if service.submit
+      redirect_to evaluator_evaluation_path(@evaluation), notice: "Evaluation submitted successfully."
     else
-      redirect_back fallback_location: evaluator_evaluations_path, alert: "Failed to submit report."
+      flash.now[:alert] = "Failed to submit evaluation."
+      render :edit, status: :unprocessable_entity
     end
   end
 
-  # POST /evaluator/evaluations/:id/request_additional_info
   def request_additional_info
     @evaluation.request_additional_info!
     redirect_to evaluator_evaluation_path(@evaluation), notice: "Requested additional information."
   end
 
-  # GET /evaluator/evaluations/pending
   def pending
     @evaluations = current_user.evaluations.pending
     render :index
   end
 
-  # GET /evaluator/evaluations/completed
   def completed
     @evaluations = current_user.evaluations.completed
     render :index
@@ -72,13 +65,32 @@ class Evaluators::EvaluationsController < ApplicationController
 
   private
 
-  # Set the @evaluation instance variable based on the provided ID
   def set_evaluation
     @evaluation = current_user.evaluations.find(params[:id])
+  rescue ActiveRecord::RecordNotFound
+    redirect_to evaluator_evaluations_path, alert: "Evaluation not found."
   end
 
-  # Strong parameters for evaluation
   def evaluation_params
-    params.require(:evaluation).permit(:constituent_id, :evaluation_date, :evaluation_type, :notes)
+    params.require(:evaluation).permit(
+      :constituent_id,
+      :application_id,
+      :evaluation_date,
+      :evaluation_type,
+      :status,
+      :notes,
+      :location,
+      :needs,
+      attendees: [ :name, :relationship ],
+      products_tried: [ :product_id, :reaction ],
+      recommended_product_ids: [],
+      recommended_accessory_ids: []
+    )
+  end
+
+  def require_evaluator!
+    unless current_user.evaluator?
+      redirect_to root_path, alert: "Access denied."
+    end
   end
 end

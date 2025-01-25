@@ -1,0 +1,75 @@
+<%= form_with(model: [ :evaluators, @evaluation ], local: true) do |form| %>
+  <% if @evaluation.errors.any? %>
+    <div id="error_explanation">
+      <h2><%= pluralize(@evaluation.errors.count, "error") %> prohibited this evaluation from being saved:</h2>
+
+      <ul>
+        <% @evaluation.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="field">
+    <%= form.label :evaluation_datetime %>
+    <%= form.datetime_select :evaluation_datetime %>
+  </div>
+
+  <div class="field">
+    <%= form.label :location %>
+    <%= form.text_field :location %>
+  </div>
+
+  <div class="field">
+    <%= form.label :needs %>
+    <%= form.text_area :needs %>
+  </div>
+
+  <div class="field">
+    <%= form.label :recommended_products %>
+    <%= form.collection_select :recommended_product_ids, Product.available, :id, :name, {}, { multiple: true } %>
+  </div>
+
+  <div class="field">
+    <%= form.label :recommended_accessories %>
+    <%= form.collection_select :recommended_accessory_ids, Accessory.available, :id, :name, {}, { multiple: true } %>
+  </div>
+
+  <div class="field">
+    <%= form.label :attendees %>
+    <%= form.fields_for :attendees do |attendee_form| %>
+      <div class="nested-fields">
+        <%= attendee_form.label :name, "Attendee Name" %>
+        <%= attendee_form.text_field :name %>
+
+        <%= attendee_form.label :relationship, "Relationship" %>
+        <%= attendee_form.text_field :relationship %>
+      </div>
+    <% end %>
+    <%= link_to_add_fields "Add Attendee", form, :attendees %>
+  </div>
+
+  <div class="field">
+    <%= form.label :products_tried %>
+    <%= form.fields_for :products_tried do |product_form| %>
+      <div class="nested-fields">
+        <%= product_form.label :product_id, "Product" %>
+        <%= product_form.collection_select :product_id, Product.available, :id, :name %>
+
+        <%= product_form.label :reaction, "Reaction" %>
+        <%= product_form.text_field :reaction %>
+      </div>
+    <% end %>
+    <%= link_to_add_fields "Add Product Tried", form, :products_tried %>
+  </div>
+
+  <div class="field">
+    <%= form.label :notes %>
+    <%= form.text_area :notes %>
+  </div>
+
+  <div class="actions">
+    <%= form.submit %>
+  </div>
+<% end %>

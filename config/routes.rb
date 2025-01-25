@@ -25,7 +25,7 @@ Rails.application.routes.draw do
   get "up", to: "rails/health#show", as: :rails_health_check
 
   namespace :admin do
-    root to: "dashboard#index"
+    root to: "applications#index"
 
     resources :applications do
       collection do
