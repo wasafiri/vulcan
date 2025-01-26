@@ -217,8 +217,6 @@ class Admin::ApplicationsController < ApplicationController
     end
   end
 
-  private
-
   def set_current_attributes
     Current.set(request, current_user)
   end
