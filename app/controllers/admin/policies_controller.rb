@@ -6,8 +6,8 @@ class Admin::PoliciesController < ApplicationController
   def edit
     @policies = Policy.all
     @recent_changes = PolicyChange.includes(:policy, :user)
-                                .order(created_at: :desc)
-                                .limit(10)
+      .order(created_at: :desc)
+      .limit(10)
   end
 
   def update

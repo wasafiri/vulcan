@@ -7,6 +7,9 @@ class User < ApplicationRecord
   LOCK_DURATION = 1.hour
   VALID_ROLES = %w[admin constituent evaluator vendor trainer].freeze
 
+  # Format phone numbers to include dashes
+  before_save :format_phone_number
+
   # Callbacks
   after_save :reset_all_caches
 
@@ -139,5 +142,20 @@ class User < ApplicationRecord
 
   def guardian_relationship=(value)
     super(value)
+  end
+
+  def format_phone_number
+    return if phone.blank?
+
+    # Strip all non-digits
+    digits = phone.gsub(/\D/, "")
+
+    # Remove leading 1 if present
+    digits = digits[1..-1] if digits.length == 11 && digits.start_with?("1")
+
+    # Format as XXX-XXX-XXXX if we have 10 digits
+    if digits.length == 10
+      self.phone = digits.gsub(/(\d{3})(\d{3})(\d{4})/, '\1-\2-\3')
+    end
   end
 end
