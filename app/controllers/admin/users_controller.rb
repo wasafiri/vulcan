@@ -1,6 +1,10 @@
 class Admin::UsersController < ApplicationController
+  before_action :authenticate_user!
+  before_action :require_admin!
+
   def index
-    @users = User.includes(:role_capabilities).all
+    @users = User.includes(:role_capabilities)
+      .order(:type, :last_name, :first_name)
   end
 
   def update_role
@@ -80,6 +84,12 @@ class Admin::UsersController < ApplicationController
 
   def full_name
     "#{first_name} #{last_name}"
+  end
+
+  def require_admin!
+    unless current_user&.admin?
+      redirect_to root_path, alert: "Not authorized"
+    end
   end
 
   private

@@ -57,6 +57,14 @@ class User < ApplicationRecord
     end
   end
 
+  def role_type
+    type.to_s.underscore.humanize
+  end
+
+  def inherent_capabilities
+    role_capabilities.pluck(:capability)
+  end
+
   # Authentication methods
   def track_sign_in!(ip)
     if failed_attempts.to_i >= MAX_LOGIN_ATTEMPTS
@@ -102,6 +110,33 @@ class User < ApplicationRecord
 
   def password_reset_expired?
     reset_password_sent_at.nil? || reset_password_sent_at < PASSWORD_RESET_EXPIRY.ago
+  end
+
+  def preloaded_capabilities
+    role_capabilities.loaded? ? role_capabilities : []
+  end
+
+  def available_capabilities
+    RoleCapability::CAPABILITIES - inherent_capabilities
+  end
+
+  def has_capability?(capability)
+    inherent_capabilities.include?(capability) ||
+      role_capabilities.exists?(capability: capability)
+  end
+
+  def prevent_self_role_update(current_user, new_role)
+    !(self == current_user && type != new_role)
+  end
+
+  def add_capability(capability)
+    return true if has_capability?(capability)
+    role_capabilities.create(capability: capability)
+  end
+
+  def remove_capability(capability)
+    return true if !has_capability?(capability)
+    role_capabilities.find_by(capability: capability)&.destroy
   end
 
   private

@@ -1,8 +1,7 @@
-# test/factories/users.rb
 FactoryBot.define do
   unless FactoryBot.factories.registered?(:user)
     factory :user do
-      email  # Uses the sequence defined in sequences.rb
+      sequence(:email) { |n| "user#{n}@example.com" }
       password { "password123" }
       first_name { "Test" }
       last_name { "User" }
@@ -14,6 +13,7 @@ FactoryBot.define do
       verified { true }
 
       factory :admin, class: "Admin" do
+        sequence(:email) { |n| "admin#{n}@example.com" }
         type { "Admin" }
         first_name { "Admin" }
       end
@@ -41,14 +41,33 @@ FactoryBot.define do
         state { "MD" }
         zip_code { "21201" }
 
+        # Set default disability to pass validation
+        after(:build) do |constituent|
+          unless constituent.hearing_disability ||
+                 constituent.vision_disability ||
+                 constituent.speech_disability ||
+                 constituent.mobility_disability ||
+                 constituent.cognition_disability
+            constituent.hearing_disability = true
+          end
+        end
+
         trait :with_disabilities do
           hearing_disability { true }
           vision_disability { true }
           speech_disability { true }
+          mobility_disability { true }
+          cognition_disability { true }
         end
 
         trait :with_internet do
           home_internet_service { true }
+        end
+
+        trait :with_active_application do
+          after(:create) do |constituent|
+            create(:application, user: constituent)
+          end
         end
       end
 

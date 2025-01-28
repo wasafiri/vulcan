@@ -1,9 +1,8 @@
-# test/mailers/medical_provider_mailer_test.rb
 require "test_helper"
 
 class MedicalProviderMailerTest < ActionMailer::TestCase
   def setup
-    @application = create(:application, :in_review) # Use factory instead of fixture
+    @application = create(:application, :in_progress) # Use factory instead of fixture
   end
 
   test "request_certification" do

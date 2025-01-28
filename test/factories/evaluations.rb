@@ -1,28 +1,58 @@
-# test/factories/evaluations.rb
 FactoryBot.define do
-  unless FactoryBot.factories.registered?(:evaluation)
-    factory :evaluation do
-      association :evaluator, factory: :evaluator
-      association :constituent, factory: :constituent
-      # Remove the application association since it will be provided
+  factory :evaluation do
+    evaluator
+    constituent
+    application
+    evaluation_date { Time.current }
+    evaluation_type { :initial }
+    status { :pending }
+    notes { "" }
+    report_submitted { false }
 
-      evaluation_date { Date.today }
-      evaluation_type { :initial }
-      report_submitted { false }
-      notes { "Initial evaluation notes." }
-      status { :pending }
+    # Required Fields
+    location { "Main Office" }
+    needs { "Additional support for mobility." }
 
-      trait :completed do
-        report_submitted { true }
-        status { :completed }
-        notes { "Evaluation completed successfully." }
+    # Attendees: Array of hashes with "name" and "relationship"
+    attendees { [
+      { "name" => "John Doe", "relationship" => "Self" },
+      { "name" => "Jane Smith", "relationship" => "Caregiver" }
+    ] }
+
+    # Products Tried: Array of hashes with "product_id" and "reaction"
+    products_tried { [
+      { "product_id" => Product.all.sample.id, "reaction" => "Satisfied" },
+      { "product_id" => Product.all.sample.id, "reaction" => "Neutral" }
+    ] }
+
+    # Recommended Products: Association
+    before(:create) do |evaluation|
+      # Ensure there are at least two products available
+      if Product.count < 2
+        raise "Not enough products available to associate with Evaluation."
       end
+      # Assign two random products as recommended_products
+      recommended = Product.order("RANDOM()").limit(2)
+      evaluation.recommended_products << recommended
+    end
 
-      trait :rejected do
-        report_submitted { false }
-        status { :rejected }
-        notes { "Evaluation rejected due to insufficient documentation." }
-      end
+    # Traits for different statuses
+    trait :completed do
+      status { :completed }
+      notes { "Evaluation completed successfully." }
+      report_submitted { true }
+    end
+
+    trait :with_custom_attendees do
+      attendees { [
+        { "name" => "Alice Johnson", "relationship" => "Self" }
+      ] }
+    end
+
+    trait :with_custom_products_tried do
+      products_tried { [
+        { "product_id" => Product.all.sample.id, "reaction" => "Very Satisfied" }
+      ] }
     end
   end
 end

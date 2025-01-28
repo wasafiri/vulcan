@@ -1,4 +1,3 @@
-# db/seeds.rb
 require 'factory_bot_rails'
 
 unless Rails.env.production?
@@ -63,7 +62,8 @@ unless Rails.env.production?
       })
       raise "Failed to create primary constituent" unless constituent.persisted?
       raise "Constituent ID not generated" unless constituent.id.present?
-      raise "Constituent disabilities not set" unless constituent.hearing_disability ||
+      raise "Constituent disabilities not set" unless
+        constituent.hearing_disability ||
         constituent.vision_disability ||
         constituent.speech_disability ||
         constituent.mobility_disability ||
@@ -111,16 +111,29 @@ unless Rails.env.production?
       raise "Missing required constituent" unless constituent&.id
       raise "No evaluators available" if evaluators.empty?
 
-      # Create applications with approved status
+      # **Create Products Before Applications and Evaluations**
+      puts "\nCreating products..."
+      products = [
+        FactoryBot.create(:product, name: "Generic Product"),
+        FactoryBot.create(:braille_device),
+        FactoryBot.create(:apple_iphone)
+      ]
+      raise "Failed to create products" unless products.all?(&:persisted?)
+      puts "Created products: #{products.map(&:name).join(', ')}"
+
+      # **Create Applications with Approved Status**
       puts "\nCreating applications with approved status..."
       10.times do |i|
         print "  Creating approved application #{i + 1}... "
 
-        # Create constituent first
+        first_names = [ "James", "Mary", "John", "Patricia", "Robert", "Jennifer" ]
+        last_names = [ "Smith", "Johnson", "Williams", "Brown", "Jones" ]
+
+        # Create a new constituent for each application
         new_constituent = FactoryBot.create(:constituent, :with_disabilities, {
           email: "constituent_approved_#{i + 1}@example.com",
-          first_name: "Constituent_Approved#{i + 1}",
-          last_name: "User#{i + 1}"
+          first_name: first_names.sample,
+          last_name: last_names.sample
         })
         raise "Failed to create constituent for approved application #{i + 1}" unless new_constituent.persisted?
 
@@ -140,8 +153,8 @@ unless Rails.env.production?
         # Select a random evaluator
         evaluator = evaluators.sample
 
-        # Create evaluation
-        evaluation = FactoryBot.create(:evaluation, {
+        # Create evaluation with notes
+        evaluation = FactoryBot.create(:evaluation, :completed, {
           evaluator: evaluator,
           constituent: new_constituent,
           application: application,
@@ -150,13 +163,14 @@ unless Rails.env.production?
           report_submitted: true,
           notes: "Initial evaluation completed.",
           status: :completed
+          # 'last_evaluation_completed_at' is not being set manually; handled by the Application model method
         })
         raise "Failed to create evaluation for approved application #{i + 1}" unless evaluation.persisted?
 
         puts "done"
       end
 
-      # Create applications with rejected status
+      # **Create Applications with Rejected Status**
       puts "\nCreating applications with rejected status..."
       5.times do |i|
         print "  Creating rejected application #{i + 1}... "
@@ -176,7 +190,8 @@ unless Rails.env.production?
         # Select a random evaluator
         evaluator = evaluators.sample
 
-        evaluation = FactoryBot.create(:evaluation, {
+        # Create evaluation with notes
+        evaluation = FactoryBot.create(:evaluation, :completed, {
           evaluator: evaluator,
           constituent: constituent,
           application: application,
@@ -191,7 +206,7 @@ unless Rails.env.production?
         puts "done"
       end
 
-      # Create applications with archived status
+      # **Create Applications with Archived Status**
       puts "\nCreating applications with archived status..."
       10.times do |i|
         print "  Creating archived application #{i + 1}... "
@@ -211,7 +226,8 @@ unless Rails.env.production?
         # Select a random evaluator
         evaluator = evaluators.sample
 
-        evaluation = FactoryBot.create(:evaluation, {
+        # Create evaluation with notes
+        evaluation = FactoryBot.create(:evaluation, :completed, {
           evaluator: evaluator,
           constituent: constituent,
           application: application,
@@ -226,12 +242,12 @@ unless Rails.env.production?
         puts "done"
       end
 
-      # Create in-progress applications with rejected proofs
+      # **Create In-Progress Applications with Rejected Proofs**
       puts "\nCreating in-progress applications with rejected proofs..."
       5.times do |i|
         print "  Creating in-progress application with rejected proofs #{i + 1}... "
 
-        # Create constituent first, following the exact pattern from approved applications
+        # Create constituent first
         new_constituent = FactoryBot.create(:constituent, :with_disabilities, {
           email: "constituent_rejected_proofs_#{i + 1}@example.com",
           first_name: "Constituent_RejectedProofs#{i + 1}",
@@ -248,15 +264,28 @@ unless Rails.env.production?
         raise "Proof files not attached for in-progress application #{i + 1}" unless
           application.income_proof.attached? && application.residency_proof.attached?
 
+        # Create evaluation with required fields
+        evaluation = FactoryBot.create(:evaluation, :completed, {
+          evaluator: evaluators.sample,
+          constituent: new_constituent,
+          application: application,
+          evaluation_date: base_date - 1.month,
+          evaluation_type: :initial,
+          report_submitted: false,
+          notes: "In-progress evaluation with rejected proofs.",
+          status: :completed
+        })
+        raise "Failed to create evaluation for in-progress application with rejected proofs #{i + 1}" unless evaluation.persisted?
+
         puts "done"
       end
 
-      # Create in-progress applications with approved proofs
+      # **Create In-Progress Applications with Approved Proofs**
       puts "\nCreating in-progress applications with approved proofs..."
       5.times do |i|
         print "  Creating in-progress application with approved proofs #{i + 1}... "
 
-        # Create constituent first, following the exact pattern from approved applications
+        # Create constituent first
         new_constituent = FactoryBot.create(:constituent, :with_disabilities, {
           email: "constituent_approved_proofs_#{i + 1}@example.com",
           first_name: "Constituent_ApprovedProofs#{i + 1}",
@@ -272,6 +301,19 @@ unless Rails.env.production?
         raise "Failed to create in-progress application with approved proofs #{i + 1}" unless application.persisted?
         raise "Proof files not attached for in-progress application #{i + 1}" unless
           application.income_proof.attached? && application.residency_proof.attached?
+
+        # Create evaluation with required fields
+        evaluation = FactoryBot.create(:evaluation, :completed, {
+          evaluator: evaluators.sample,
+          constituent: new_constituent,
+          application: application,
+          evaluation_date: base_date - 1.month,
+          evaluation_type: :initial,
+          report_submitted: true,
+          notes: "In-progress evaluation with approved proofs.",
+          status: :completed
+        })
+        raise "Failed to create evaluation for in-progress application with approved proofs #{i + 1}" unless evaluation.persisted?
 
         puts "done"
       end

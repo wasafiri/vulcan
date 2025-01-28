@@ -13,6 +13,24 @@ module ApplicationStatusManagement
       archived: 7           # Historical record
     }, validate: true
 
+    enum :application_type, {
+      new: 0,
+      renewal: 1
+    }, prefix: true
+
+    enum :submission_method, {
+      online: 0,
+      paper: 1,
+      phone: 2,
+      email: 3
+    }, prefix: true
+
+    enum :income_verification_status, {
+      pending: 0,
+      verified: 1,
+      failed: 2
+    }, prefix: true
+
     # Status-related scopes
     scope :active, -> { where(status: [ :in_progress, :needs_information, :reminder_sent, :awaiting_documents ]) }
     scope :draft, -> { where(status: :draft) }

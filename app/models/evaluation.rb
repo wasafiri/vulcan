@@ -6,7 +6,6 @@ class Evaluation < ApplicationRecord
   has_many :notifications, as: :notifiable, dependent: :destroy
 
   has_and_belongs_to_many :recommended_products, class_name: "Product", join_table: "evaluations_products"
-  has_and_belongs_to_many :recommended_accessories, class_name: "Accessory", join_table: "evaluations_accessories"
 
   enum :evaluation_type, { initial: 0, renewal: 1, special: 2 }
   enum :status, { pending: 0, completed: 1 }
@@ -18,12 +17,11 @@ class Evaluation < ApplicationRecord
   validates :location, presence: true
   validates :needs, presence: true
   validates :recommended_products, presence: true
-  validates :recommended_accessories, presence: true
   validates :attendees, presence: true
   validates :products_tried, presence: true
-  validates :notes, presence: true, if: :status_completed?
   validate :validate_attendees_structure
   validate :validate_products_tried_structure
+  validates :notes, presence: true, length: { maximum: 1000 }, if: :completed?
 
   # Callbacks
   after_save :update_application_record, if: :saved_change_to_status?
@@ -58,7 +56,6 @@ class Evaluation < ApplicationRecord
     if completed?
       application.update!(
         needs_review_since: nil,
-        last_evaluation_completed_at: Time.current
       )
       # Additional logic to handle post-evaluation actions
     end
