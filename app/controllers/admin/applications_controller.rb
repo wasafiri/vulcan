@@ -19,7 +19,9 @@ class Admin::ApplicationsController < ApplicationController
     @pending_services_count = Application.where(status: :approved).count
 
     # Get base scope with includes
-    scope = Application.includes(:user, :income_proof_attachment, :residency_proof_attachment)
+    scope = Application.includes(:user)
+      .with_attached_income_proof
+      .with_attached_residency_proof
       .where.not(status: [ :rejected, :archived ])
 
     # Apply filters
@@ -41,10 +43,11 @@ class Admin::ApplicationsController < ApplicationController
   end
 
   def show
-    # Eager load attachments to prevent N+1 queries
-    @application.documents.attachments.load
-    @application.income_proof.attachments.load
-    @application.residency_proof.attachments.load
+    @application = Application.includes(
+      :user,
+      :evaluations,
+      :training_sessions
+    ).find(params[:id])
   end
 
   def edit
@@ -101,11 +104,11 @@ class Admin::ApplicationsController < ApplicationController
       flash[:notice] = "Application approved."
       redirect_to admin_application_path(@application)
     else
-      flash[:alert] = "Failed to approve Application ##{@application.id}: #{@application.errors.full_messages.to_sentence}"
+      flash[:notice] = "Failed to approve Application ##{@application.id}: #{@application.errors.full_messages.to_sentence}"
       render :show, status: :unprocessable_entity
     end
   rescue ActiveRecord::RecordInvalid => e
-    flash[:alert] = "Failed to approve Application ##{@application.id}: #{e.record.errors.full_messages.to_sentence}"
+    flash[:notice] = "Failed to approve Application ##{@application.id}: #{e.record.errors.full_messages.to_sentence}"
     render :show, status: :unprocessable_entity
   end
 
@@ -191,13 +194,13 @@ class Admin::ApplicationsController < ApplicationController
     # Define your filter conditions based on params[:filter]
     case params[:filter]
     when "in_progress"
-      { status: "in_progress" }
+      { status: :in_progress }
     when "approved"
-      { status: "approved" }
+      { status: :approved }
     when "proofs_needing_review"
-      { status: "proofs_needing_review" }
+      { status: :proofs_needing_review }
     when "awaiting_medical_response"
-      { status: "awaiting_medical_response" }
+      { status: :awaiting_medical_response }
     else
       {}
     end
@@ -208,7 +211,17 @@ class Admin::ApplicationsController < ApplicationController
   end
 
   def application_params
-    params.require(:application).permit(:status, :household_size, :annual_income)
+    params.require(:application).permit(
+      :status,
+      :household_size,
+      :annual_income,
+      :application_type,
+      :submission_method,
+      :medical_provider_name,
+      :medical_provider_phone,
+      :medical_provider_fax,
+      :medical_provider_email
+    )
   end
 
   def require_admin!

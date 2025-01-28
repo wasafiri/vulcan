@@ -168,6 +168,10 @@ class Application < ApplicationRecord
     evaluations.order(created_at: :desc).first
   end
 
+  def last_evaluation_completed_at
+    evaluations.completed.order(evaluation_date: :desc).limit(1).pluck(:evaluation_date).first
+  end
+
   def all_evaluations
     evaluations.order(created_at: :desc)
   end
@@ -215,9 +219,16 @@ class Application < ApplicationRecord
   end
 
   def notify_admins_of_new_proofs
-    notifications = User.where(type: "Admin").map do |admin|
+    # Fetch only the admin IDs, ensuring STI compatibility
+    admin_ids = User.where(type: Admin.name).pluck(:id)
+
+    # Return early if there are no admins
+    return if admin_ids.empty?
+
+    # Build the notifications array
+    notifications = admin_ids.map do |admin_id|
       {
-        recipient_id: admin.id,
+        recipient_id: admin_id,
         actor_id: user.id,
         action: "proof_submitted",
         notifiable_type: self.class.name,
@@ -225,7 +236,9 @@ class Application < ApplicationRecord
         metadata: { proof_types: pending_proof_types }
       }
     end
-    Notification.insert_all!(notifications) # Use bulk insert
+
+    # Perform a bulk insert
+    Notification.insert_all!(notifications)
   end
 
   def pending_proof_types

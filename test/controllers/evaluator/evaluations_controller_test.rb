@@ -1,53 +1,64 @@
 require "test_helper"
 
 class Evaluator::EvaluationsControllerTest < ActionDispatch::IntegrationTest
+  setup do
+    @evaluator = create(:evaluator)
+    sign_in(@evaluator)
+    @evaluation = create(:evaluation, evaluator: @evaluator)
+  end
+
   test "gets index" do
-    get evaluator_evaluations_index_url
+    get evaluators_evaluations_path
     assert_response :success
   end
 
   test "gets show" do
-    get evaluator_evaluations_show_url
+    get evaluators_evaluation_path(@evaluation)
     assert_response :success
   end
 
   test "gets new" do
-    get evaluator_evaluations_new_url
+    get new_evaluators_evaluation_path
     assert_response :success
   end
 
-  test "gets create" do
-    get evaluator_evaluations_create_url
-    assert_response :success
+  test "creates evaluation" do
+    assert_difference("Evaluation.count", 1) do
+      post evaluators_evaluations_path, params: { evaluation: {
+        constituent_id: create(:constituent).id
+        # Add other required attributes
+      } }
+    end
+    assert_redirected_to evaluators_evaluation_path(Evaluation.last)
   end
 
   test "gets edit" do
-    get evaluator_evaluations_edit_url
+    get edit_evaluators_evaluation_path(@evaluation)
     assert_response :success
   end
 
-  test "gets update" do
-    get evaluator_evaluations_update_url
-    assert_response :success
+  test "updates evaluation" do
+    patch evaluators_evaluation_path(@evaluation), params: { evaluation: { status: "completed" } }
+    assert_redirected_to evaluators_evaluation_path(@evaluation)
   end
 
-  test "gets submit_request" do
-    get evaluator_evaluations_submit_request_url
-    assert_response :success
+  test "submits report" do
+    post submit_report_evaluators_evaluation_path(@evaluation)
+    assert_redirected_to evaluators_evaluation_path(@evaluation)
   end
 
-  test "gets request_additional_info" do
-    get evaluator_evaluations_request_additional_info_url
-    assert_response :success
+  test "requests additional info" do
+    post request_additional_info_evaluators_evaluation_path(@evaluation)
+    assert_redirected_to evaluators_evaluation_path(@evaluation)
   end
 
   test "gets pending" do
-    get evaluator_evaluations_pending_url
+    get pending_evaluators_evaluations_path
     assert_response :success
   end
 
   test "gets completed" do
-    get evaluator_evaluations_completed_url
+    get completed_evaluators_evaluations_path
     assert_response :success
   end
 end

@@ -16,6 +16,8 @@ FactoryBot.define do
     medical_provider_phone { generate(:medical_provider_phone) }
     medical_provider_fax { generate(:medical_provider_fax) }
     medical_provider_email { generate(:medical_provider_email) }
+    household_size { 4 }
+    annual_income  { 50_000 }
 
     after(:build) do |application|
       # Create and attach proofs
@@ -36,7 +38,9 @@ FactoryBot.define do
     end
 
     trait :completed do
-      status { :approved }  # Use symbol instead of integer
+      household_size { 4 }
+      annual_income  { 50_000 }
+      status { :approved }
       income_proof_status { :approved }
       residency_proof_status { :approved }
       terms_accepted { true }
@@ -48,7 +52,9 @@ FactoryBot.define do
     end
 
     trait :rejected do
-      status { :rejected }  # Use symbol instead of integer
+      household_size { 2 }
+      annual_income  { 300_000 }
+      status { :rejected }
       income_proof_status { :rejected }
       residency_proof_status { :rejected }
       terms_accepted { true }
@@ -60,7 +66,9 @@ FactoryBot.define do
     end
 
     trait :archived do
-      status { :archived }  # Use symbol instead of integer
+      household_size { 4 }
+      annual_income  { 50_000 }
+      status { :archived }
       income_proof_status { :approved }
       residency_proof_status { :approved }
       terms_accepted { true }
@@ -71,6 +79,8 @@ FactoryBot.define do
     end
 
     trait :in_progress_with_rejected_proofs do
+      household_size { 4 }
+      annual_income  { 50_000 }
       status { :in_progress }
       income_proof_status { :rejected }
       residency_proof_status { :rejected }
@@ -95,7 +105,17 @@ FactoryBot.define do
       end
     end
 
+    trait :with_approved_proofs do
+      income_proof_status { :approved }
+      residency_proof_status { :approved }
+      after(:create) do |application|
+        # Attach test files
+      end
+    end
+
     trait :in_progress_with_approved_proofs do
+      household_size { 4 }
+      annual_income  { 50_000 }
       status { :in_progress }
       income_proof_status { :approved }
       residency_proof_status { :approved }

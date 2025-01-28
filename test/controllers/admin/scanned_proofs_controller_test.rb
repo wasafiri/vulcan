@@ -1,4 +1,3 @@
-# test/controllers/admin/scanned_proofs_controller_test.rb
 require "test_helper"
 
 class Admin::ScannedProofsControllerTest < ActionDispatch::IntegrationTest
