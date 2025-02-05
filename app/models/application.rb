@@ -88,7 +88,15 @@ class Application < ApplicationRecord
   end
 
   def request_documents!
-    update!(status: :awaiting_documents)
+    with_lock do
+      update!(status: :awaiting_documents)
+      Notification.create!(
+        recipient: user,
+        actor: Current.user,
+        action: "documents_requested",
+        notifiable: self
+      )
+    end
   end
 
   def self.batch_update_status(ids, status)

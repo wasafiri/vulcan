@@ -1,2 +1,53 @@
-<h1>Evaluators::Evaluations#show</h1>
-<p>Find me in app/views/evaluator/evaluations/show.html.erb</p>
+<main class="container mx-auto px-4 py-8" role="main">
+  <div class="max-w-7xl mx-auto">
+    <h1 class="text-3xl font-bold mb-6">Evaluation Details</h1>
+
+    <div class="bg-white rounded-lg shadow p-6">
+      <h2 class="text-xl font-semibold mb-4">Application #<%= @evaluation.application_id %></h2>
+      <p>Constituent: <%= @evaluation.constituent.full_name %></p>
+      <p>Evaluation Date: <%= evaluation.evaluation_date&.strftime("%B %d, %Y") || "No evaluation date" %> </p>
+      <p>Evaluation Type: <%= @evaluation.evaluation_type.capitalize %></p>
+      <p>Status: <%= @evaluation.status.capitalize %></p>
+      <p>Location: <%= @evaluation.location %></p>
+      <p>Needs: <%= @evaluation.needs %></p>
+      <p>Notes: <%= @evaluation.notes %></p>
+
+      <h3 class="text-lg font-semibold mt-4">Attendees</h3>
+      <% if @evaluation.attendees.any? %>
+        <ul class="list-disc pl-5">
+          <% @evaluation.attendees.each do |attendee| %>
+            <li><%= "#{attendee['name']} - #{attendee['relationship']}" %></li>
+          <% end %>
+        </ul>
+      <% else %>
+        <p>No attendees listed.</p>
+      <% end %>
+
+      <h3 class="text-lg font-semibold mt-4">Products Tried by Constituent</h3>
+      <% if @evaluation.products_tried.any? %>
+        <ul class="list-disc pl-5">
+          <% @evaluation.products_tried.each do |product| %>
+            <li><%= "#{Product.find(product['product_id']).name} - #{product['reaction']}" %></li>
+          <% end %>
+        </ul>
+      <% else %>
+        <p>No products tried listed.</p>
+      <% end %>
+
+      <h3 class="text-lg font-semibold mt-4">Recommended Products</h3>
+      <% if @evaluation.recommended_product_ids.any? %>
+        <ul class="list-disc pl-5">
+          <% @evaluation.recommended_product_ids.each do |product_id| %>
+            <li><%= Product.find(product_id).name %></li>
+          <% end %>
+        </ul>
+      <% else %>
+        <p>No recommended products listed.</p>
+      <% end %>
+    </div>
+
+    <div class="mt-8">
+      <%= link_to "Edit Evaluation", edit_evaluators_evaluation_path(@evaluation), class: "text-indigo-600 hover:text-indigo-700 text-sm" %>
+    </div>
+  </div>
+</main>

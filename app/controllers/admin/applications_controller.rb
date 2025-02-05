@@ -70,8 +70,13 @@ class Admin::ApplicationsController < ApplicationController
   end
 
   def batch_approve
-    Application.batch_update_status(params[:ids], :approved)
-    redirect_to admin_applications_path, notice: "Applications approved."
+    result = Application.batch_update_status(params[:ids], :approved)
+    if result
+      redirect_to admin_applications_path, notice: "Applications approved."
+    else
+      render json: { error: "Unable to approve applications" },
+        status: :unprocessable_entity
+    end
   end
 
   def batch_reject
@@ -91,11 +96,16 @@ class Admin::ApplicationsController < ApplicationController
   end
 
   def update_proof_status
-    if @application.update_proof_status!(params[:proof_type], params[:status])
-      redirect_to admin_application_path(@application),
-        notice: "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
+    reviewer = Applications::ProofReviewer.new(@application, current_user)
+    if reviewer.review(
+      proof_type: params[:proof_type],
+      status: params[:status],
+      rejection_reason: params[:rejection_reason]
+    )
+      flash[:notice] = "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
+      redirect_to admin_application_path(@application)
     else
-      render json: { error: "Invalid proof type" }, status: :unprocessable_entity
+      render json: { error: "Failed to update proof status" }, status: :unprocessable_entity
     end
   end
 
@@ -126,6 +136,7 @@ class Admin::ApplicationsController < ApplicationController
   end
 
   def assign_evaluator
+    @application = Application.find(params[:id])
     evaluator = Evaluator.find(params[:evaluator_id])
 
     if @application.assign_evaluator!(evaluator)

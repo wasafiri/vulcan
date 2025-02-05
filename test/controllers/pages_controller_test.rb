@@ -1,27 +1,27 @@
 require "test_helper"
 
 class PagesControllerTest < ActionDispatch::IntegrationTest
-  test "should get how it works" do
+  def test_should_get_how_it_works
     get how_it_works_path
     assert_response :success
   end
 
-  test "should get help" do
+  def test_should_get_help
     get help_path
     assert_response :success
   end
 
-  test "should get contact" do
+  def test_should_get_contact
     get contact_path
     assert_response :success
   end
 
-  test "should get apply" do
+  def test_should_get_apply
     get apply_path
     assert_response :success
   end
 
-  test "should get eligibility" do
+  def test_should_get_eligibility
     get eligibility_path
     assert_response :success
   end

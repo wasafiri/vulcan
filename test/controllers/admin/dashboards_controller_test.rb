@@ -1,13 +1,9 @@
 require "test_helper"
 
 class Admin::DashboardsControllerTest < ActionDispatch::IntegrationTest
-  setup do
-    @admin = create(:admin)
-    sign_in(@admin) # Use sign_in instead of sign_in_as
-  end
-
-  test "should get index" do
-    get admin_dashboard_path
+  def test_should_get_index
+    sign_in users(:admin_david)
+    get admin_root_path
     assert_response :success
   end
 end

@@ -34,6 +34,10 @@ class User < ApplicationRecord
     format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :first_name, :last_name, presence: true
   validates :reset_password_token, uniqueness: true, allow_nil: true
+  validates :phone, format: {
+  with: /\A\d{3}-\d{3}-\d{4}\z/,
+  message: "must be in format XXX-XXX-XXXX"
+  }
 
   # Scopes
   scope :with_capability, ->(capability) {
@@ -55,6 +59,11 @@ class User < ApplicationRecord
     define_method "#{role}?" do
       type == role.classify
     end
+  end
+
+  def self.digest(string)
+    cost = ActiveModel::SecurePassword.min_cost ? BCrypt::Engine::MIN_COST : BCrypt::Engine.cost
+    BCrypt::Password.create(string, cost: cost)
   end
 
   def role_type
@@ -137,6 +146,30 @@ class User < ApplicationRecord
   def remove_capability(capability)
     return true if !has_capability?(capability)
     role_capabilities.find_by(capability: capability)&.destroy
+  end
+
+  def is_guardian=(value)
+    super(ActiveModel::Type::Boolean.new.cast(value))
+  end
+
+  def hearing_disability=(value)
+    super(ActiveModel::Type::Boolean.new.cast(value))
+  end
+
+  def vision_disability=(value)
+    super(ActiveModel::Type::Boolean.new.cast(value))
+  end
+
+  def speech_disability=(value)
+    super(ActiveModel::Type::Boolean.new.cast(value))
+  end
+
+  def mobility_disability=(value)
+    super(ActiveModel::Type::Boolean.new.cast(value))
+  end
+
+  def cognition_disability=(value)
+    super(ActiveModel::Type::Boolean.new.cast(value))
   end
 
   private

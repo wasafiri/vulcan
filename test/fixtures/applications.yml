@@ -1,0 +1,74 @@
+draft_application:
+  user_id: <%= User.find_by(email: 'john.doe@example.com').id %>
+  application_date: <%= 2.days.ago.strftime("%F %T") %>
+  status: draft
+  maryland_resident: true
+  annual_income: "50000"
+  household_size: 3
+  self_certify_disability: false
+  medical_provider_name: "Good Health Clinic"
+  medical_provider_phone: "555-123-4567"
+  medical_provider_email: "info@goodhealthclinic.com"
+  income_proof_status: not_reviewed
+  residency_proof_status: not_reviewed
+  medical_certification_status: not_requested
+
+submitted_application:
+  user_id: <%= User.find_by(email: 'kenneth.klein@example.com').id %>
+  application_date: <%= 1.week.ago.strftime("%F %T") %>
+  status: in_progress
+  maryland_resident: true
+  annual_income: "65000"
+  household_size: 4
+  self_certify_disability: true
+  medical_provider_name: "Downtown Medical"
+  medical_provider_phone: "555-987-6543"
+  medical_provider_email: "contact@downtownmed.com"
+  income_proof_status: approved
+  residency_proof_status: approved
+  medical_certification_status: received
+
+approved_application:
+  user_id: <%= User.find_by(email: 'constituent@example.com').id %>
+  application_date: <%= 2.months.ago.strftime("%F %T") %>
+  status: approved
+  maryland_resident: true
+  annual_income: "80000"
+  household_size: 2
+  self_certify_disability: false
+  medical_provider_name: "City Health Partners"
+  medical_provider_phone: "555-111-2222"
+  medical_provider_email: "appointments@cityhealth.com"
+  income_proof_status: approved
+  residency_proof_status: approved
+  medical_certification_status: accepted
+
+submitted_proofs_pending_application:
+  user_id: <%= User.find_by(email: 'alex.smith@example.com').id %>
+  application_date: <%= Time.zone.parse("2025-02-01 12:00:00").strftime("%F %T") %>
+  status: in_progress
+  maryland_resident: true
+  annual_income: "70000"
+  household_size: 3
+  self_certify_disability: false
+  medical_provider_name: "Downtown Medical"
+  medical_provider_phone: "555-987-6543"
+  medical_provider_email: "contact@downtownmed.com"
+  income_proof_status: not_reviewed
+  residency_proof_status: not_reviewed
+  medical_certification_status: not_requested
+
+awaiting_medical_response_application:
+  user_id: <%= User.find_by(email: 'jane.doe@example.com').id %>
+  application_date: <%= Time.zone.parse("2025-02-15 15:30:00").strftime("%F %T") %>
+  status: awaiting_documents
+  maryland_resident: true
+  annual_income: "90000"
+  household_size: 2
+  self_certify_disability: false
+  medical_provider_name: "City Health Partners"
+  medical_provider_phone: "555-111-2222"
+  medical_provider_email: "appointments@cityhealth.com"
+  income_proof_status: approved
+  residency_proof_status: approved
+  medical_certification_status: not_requested

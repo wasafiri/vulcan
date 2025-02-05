@@ -19,16 +19,25 @@ class Constituent::ApplicationsController < ApplicationController
       :cognition_disability
     ))
 
-    @application.status = :draft
+    # Determine the status based on the button clicked
+    if params[:submit_application]
+      @application.status = :in_progress
+    else
+      @application.status = :draft
+    end
+
     @application.application_date = Time.current
     @application.submission_method = :online
 
-    # Add medical provider info
-    if params[:medical_provider]
-      medical_provider_attrs = params[:medical_provider].permit(
+    # Add medical provider info from nested params
+    if params[:application][:medical_provider].present?
+      medical_provider_attrs = params[:application][:medical_provider].permit(
         :name, :phone, :fax, :email
-      ).transform_keys { |key| "medical_provider_#{key}" }
-      @application.assign_attributes(medical_provider_attrs)
+      )
+      @application.medical_provider_name = medical_provider_attrs[:name]
+      @application.medical_provider_phone = medical_provider_attrs[:phone]
+      @application.medical_provider_fax = medical_provider_attrs[:fax]
+      @application.medical_provider_email = medical_provider_attrs[:email]
     end
 
     # Extract user attributes
@@ -48,8 +57,14 @@ class Constituent::ApplicationsController < ApplicationController
 
     ActiveRecord::Base.transaction do
       if @application.valid? && update_user_attributes(user_attrs) && @application.save
-        redirect_to constituent_application_path(@application),
-                    notice: "Application saved as draft."
+        if params[:submit_application]
+          @application.update(status: :in_progress)
+          redirect_to constituent_application_path(@application),
+                      notice: "Application submitted successfully!"
+        else
+          redirect_to constituent_application_path(@application),
+                      notice: "Application saved as draft."
+        end
       else
         @application.errors.merge!(current_user.errors)
         render :new, status: :unprocessable_entity
@@ -65,14 +80,21 @@ class Constituent::ApplicationsController < ApplicationController
 
   def update
     ActiveRecord::Base.transaction do
-      # Clean annual income and prepare application attributes
-      medical_provider_attrs = params.require(:medical_provider).permit(
-        :name, :phone, :fax, :email
-      ).transform_keys { |key| "medical_provider_#{key}" }
+      # Handle medical provider attributes first
+      if params[:medical_provider].present?
+        medical_provider_attrs = params[:medical_provider].permit(
+          :name, :phone, :fax, :email
+        )
+        @application.medical_provider_name = medical_provider_attrs[:name]
+        @application.medical_provider_phone = medical_provider_attrs[:phone]
+        @application.medical_provider_fax = medical_provider_attrs[:fax]
+        @application.medical_provider_email = medical_provider_attrs[:email]
+      end
 
+      # Clean annual income and prepare application attributes
       application_attrs = application_params.merge(
         annual_income: params[:application][:annual_income]&.gsub(/[^\d.]/, "")
-      ).merge(medical_provider_attrs)
+      )
 
       # Extract user-related attributes
       user_attrs = {
@@ -127,8 +149,12 @@ class Constituent::ApplicationsController < ApplicationController
   private
 
   def update_user_attributes(attrs)
-    # Directly update the database without using model setters
-    current_user.update_columns(
+    Rails.logger.debug "Updating user attributes: #{attrs.inspect}"
+    Rails.logger.debug "Current user class: #{current_user.class}"
+    Rails.logger.debug "Current user attributes: #{current_user.attributes.keys}"
+
+    # Try update first
+    result = current_user.update(
       is_guardian: attrs[:is_guardian],
       guardian_relationship: attrs[:guardian_relationship],
       hearing_disability: attrs[:hearing_disability],
@@ -137,19 +163,33 @@ class Constituent::ApplicationsController < ApplicationController
       mobility_disability: attrs[:mobility_disability],
       cognition_disability: attrs[:cognition_disability]
     )
+
+    # If update fails, add detailed error logging
+    unless result
+      Rails.logger.error "Update failed."
+      Rails.logger.error "Current user errors: #{current_user.errors.full_messages}"
+
+      # Fall back to update_columns
+      result = current_user.update_columns(
+        is_guardian: ActiveModel::Type::Boolean.new.cast(attrs[:is_guardian]),
+        guardian_relationship: attrs[:guardian_relationship],
+        hearing_disability: ActiveModel::Type::Boolean.new.cast(attrs[:hearing_disability]),
+        vision_disability: ActiveModel::Type::Boolean.new.cast(attrs[:vision_disability]),
+        speech_disability: ActiveModel::Type::Boolean.new.cast(attrs[:speech_disability]),
+        mobility_disability: ActiveModel::Type::Boolean.new.cast(attrs[:mobility_disability]),
+        cognition_disability: ActiveModel::Type::Boolean.new.cast(attrs[:cognition_disability])
+      )
+    end
+
+    unless result
+      Rails.logger.error "Failed to update user attributes: #{current_user.errors.full_messages}"
+    end
+
+    result
   end
 
   def verify
     redirect_to constituent_application_path(@application) unless @application.draft?
-  end
-
-  def submit
-    if @application.update(verification_params.merge(status: :in_progress))
-      redirect_to constituent_application_path(@application),
-                  notice: "Application submitted successfully!"
-    else
-      render :verify, status: :unprocessable_entity
-    end
   end
 
   def upload_documents
@@ -239,13 +279,16 @@ class Constituent::ApplicationsController < ApplicationController
 
   def application_params
     params.require(:application).permit(
-      # Current fields
       :maryland_resident,
       :annual_income,
       :household_size,
       :self_certify_disability,
       :residency_proof,
       :income_proof,
+      :medical_provider_name,
+      :medical_provider_phone,
+      :medical_provider_fax,
+      :medical_provider_email,
 
       # Added verification fields
       :terms_accepted,

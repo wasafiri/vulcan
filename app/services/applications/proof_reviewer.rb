@@ -6,11 +6,15 @@ class Applications::ProofReviewer
 
   def review(proof_type:, status:, rejection_reason: nil)
     ApplicationRecord.transaction do
-      create_proof_review(proof_type, status, rejection_reason)
-      update_application_status(proof_type, status)
+      @proof_review = create_proof_review(proof_type, status, rejection_reason)
+      update_proof_status(proof_type, status)
       notify_constituent if status == :rejected
       check_all_proofs_approved
     end
+    true
+  rescue ActiveRecord::RecordInvalid => e
+    Rails.logger.error "Proof review failed: #{e.message}"
+    false
   end
 
   private
@@ -24,5 +28,34 @@ class Applications::ProofReviewer
     )
   end
 
-  # ... remaining private methods
+  def update_proof_status(proof_type, status)
+    case proof_type.to_s
+    when "income"
+      @application.update!(income_proof_status: status)
+    when "residency"
+      @application.update!(residency_proof_status: status)
+    end
+  end
+
+  def notify_constituent
+    return unless @proof_review
+    ApplicationNotificationsMailer.proof_rejected(@application, @proof_review).deliver_later
+    Notification.create!(
+      recipient: @application.user,
+      actor: @admin,
+      action: "proof_rejected",
+      notifiable: @application,
+      metadata: {
+        proof_type: @proof_review.proof_type,
+        rejection_reason: @proof_review.rejection_reason
+      }
+    )
+  end
+
+  def check_all_proofs_approved
+    if @application.all_proofs_approved?
+      MedicalProviderMailer.request_certification(@application).deliver_later
+      @application.update!(status: :awaiting_documents)
+    end
+  end
 end

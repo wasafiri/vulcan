@@ -70,7 +70,7 @@
                 <%= link_to (case current_user
                     when Admin then admin_applications_path
                     when Constituent then constituent_dashboard_path
-                    when Evaluator then evaluator_dashboard_path
+                    when Evaluator then evaluators_dashboard_path
                     when Vendor then vendor_dashboard_path
                     end),
                     class: "px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
@@ -127,7 +127,7 @@
                 (case current_user
                 when Admin then admin_applications_path
                 when Constituent then constituent_dashboard_path
-                when Evaluator then evaluator_dashboard_path
+                when Evaluator then evaluators_dashboard_path
                 when Vendor then vendor_dashboard_path
                 end),
                 class: "mt-2 block w-full text-left px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md",

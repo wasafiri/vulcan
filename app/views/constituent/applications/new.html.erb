@@ -9,10 +9,10 @@
         </div>
       <% end %>
 
-      <%= form_with(model: [:constituent, @application], 
-                    local: true, 
-                    class: "space-y-6",
-                    "aria-labelledby": "form-title") do |form| %>
+      <%= form_with(model: [:user, @application], 
+        local: true, 
+        class: "space-y-6",
+        "aria-labelledby": "form-title") do |form| %>
         
         <% if @application.errors.any? %>
           <div class="bg-red-50 p-4 rounded mb-6" role="alert" aria-atomic="true">

@@ -1,3 +1,4 @@
+# test/factories/evaluations.rb
 FactoryBot.define do
   factory :evaluation do
     evaluator
@@ -6,41 +7,42 @@ FactoryBot.define do
     evaluation_date { Time.current }
     evaluation_type { :initial }
     status { :pending }
-    notes { "" }
+    notes { "Default evaluation notes" }  # Default notes to avoid validation error
     report_submitted { false }
-
-    # Required Fields
     location { "Main Office" }
     needs { "Additional support for mobility." }
 
-    # Attendees: Array of hashes with "name" and "relationship"
+    # Default attendees
     attendees { [
       { "name" => "John Doe", "relationship" => "Self" },
       { "name" => "Jane Smith", "relationship" => "Caregiver" }
     ] }
 
-    # Products Tried: Array of hashes with "product_id" and "reaction"
-    products_tried { [
-      { "product_id" => Product.all.sample.id, "reaction" => "Satisfied" },
-      { "product_id" => Product.all.sample.id, "reaction" => "Neutral" }
-    ] }
+    # Set up default products using fixtures
+    after(:build) do |evaluation|
+      # Get our known iPad fixtures
+      ipad_air = Product.find_by(name: "iPad Air") || products(:ipad_air)
+      ipad_mini = Product.find_by(name: "iPad Mini") || products(:ipad_mini)
 
-    # Recommended Products: Association
-    before(:create) do |evaluation|
-      # Ensure there are at least two products available
-      if Product.count < 2
-        raise "Not enough products available to associate with Evaluation."
-      end
-      # Assign two random products as recommended_products
-      recommended = Product.order("RANDOM()").limit(2)
-      evaluation.recommended_products << recommended
+      # Set up products tried
+      evaluation.products_tried = [
+        { "product_id" => ipad_air.id, "reaction" => "Satisfied" },
+        { "product_id" => ipad_mini.id, "reaction" => "Neutral" }
+      ]
+
+      # Set recommended products
+      evaluation.recommended_product_ids = [ ipad_air.id, ipad_mini.id ]
     end
 
-    # Traits for different statuses
     trait :completed do
       status { :completed }
       notes { "Evaluation completed successfully." }
       report_submitted { true }
+    end
+
+    trait :pending do
+      status { :pending }
+      notes { "Pending evaluation notes" }
     end
 
     trait :with_custom_attendees do
@@ -49,10 +51,27 @@ FactoryBot.define do
       ] }
     end
 
-    trait :with_custom_products_tried do
-      products_tried { [
-        { "product_id" => Product.all.sample.id, "reaction" => "Very Satisfied" }
-      ] }
+    trait :with_mobile_devices do
+      after(:build) do |evaluation|
+        iphone = Product.find_by(name: "iPhone") || products(:iphone)
+        pixel = Product.find_by(name: "Pixel") || products(:pixel)
+
+        evaluation.products_tried = [
+          { "product_id" => iphone.id, "reaction" => "Very Satisfied" },
+          { "product_id" => pixel.id, "reaction" => "Satisfied" }
+        ]
+        evaluation.recommended_product_ids = [ iphone.id, pixel.id ]
+      end
+    end
+
+    trait :with_single_product do
+      after(:build) do |evaluation|
+        ipad = Product.find_by(name: "iPad Air") || products(:ipad_air)
+        evaluation.products_tried = [
+          { "product_id" => ipad.id, "reaction" => "Very Satisfied" }
+        ]
+        evaluation.recommended_product_ids = [ ipad.id ]
+      end
     end
   end
 end
