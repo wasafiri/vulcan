@@ -1,26 +1,27 @@
 require "test_helper"
 
 class SessionsControllerTest < ActionDispatch::IntegrationTest
-  setup do
-    @user = create(:user, password: "password123")
+  def setup
+    @admin = users(:admin_user)
   end
 
-  test "should get new" do
+  def test_should_sign_in_admin
+    post sign_in_path, params: { email: @admin.email, password: "password123" }
+    assert_redirected_to admin_applications_path
+    assert_equal "Signed in successfully", flash[:notice]
+  end
+
+  def test_should_get_new
     get sign_in_path
     assert_response :success
   end
 
-  test "should sign in" do
-    post sign_in_path, params: { email: @user.email, password: "password123" }
-    # Adjust expected redirect based on user role. For example, if @user is an Admin:
-    assert_redirected_to admin_applications_path
-    # Or, if it's a Constituent:
-    # assert_redirected_to constituent_dashboard_path
-  end
-
-  test "should not sign in with wrong credentials" do
-    post sign_in_path, params: { email: @user.email, password: "wrongpassword" }
-    assert_redirected_to sign_in_path(email_hint: @user.email)
+  def test_should_not_sign_in_with_wrong_credentials
+    post sign_in_path, params: {
+      email: @admin.email,
+      password: "wrongpassword"
+    }
+    assert_redirected_to sign_in_path(email_hint: @admin.email)
     follow_redirect!
     assert_match "Invalid email or password", flash[:alert]
   end

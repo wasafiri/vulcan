@@ -1,0 +1,279 @@
+ipad_air:
+  name: iPad Air
+  manufacturer: Apple
+  model_number: iPad-10
+  description: Standard iPad model with accessibility features
+  features: VoiceOver, Zoom, Switch Control, AssistiveTouch
+  compatibility_notes: Compatible with all iOS accessibility features
+  documentation_url: https://support.apple.com/guide/ipad
+  device_types: ["Tablet"]
+
+ipad_mini:
+  name: iPad Mini
+  manufacturer: Apple
+  model_number: iPad-Mini-6
+  description: Compact iPad with full accessibility support
+  features: VoiceOver, Zoom, Switch Control, AssistiveTouch
+  compatibility_notes: Compatible with all iOS accessibility features
+  documentation_url: https://support.apple.com/guide/ipad
+  device_types: ["Tablet"]
+
+ipad_pro:
+  name: iPad Pro
+  manufacturer: Apple
+  model_number: iPad-Pro-M4
+  description: Professional iPad with advanced accessibility features
+  features: VoiceOver, Zoom, Switch Control, AssistiveTouch
+  compatibility_notes: Compatible with all iOS accessibility features
+  documentation_url: https://support.apple.com/guide/ipad
+  device_types: ["Tablet"]
+
+iphone:
+  name: iPhone
+  manufacturer: Apple
+  model_number: iPhone-16
+  description: Smartphone with comprehensive accessibility features
+  features: VoiceOver, Zoom, Switch Control, AssistiveTouch
+  compatibility_notes: Compatible with all iOS accessibility features
+  documentation_url: https://support.apple.com/guide/iphone
+  device_types: ["Smartphone"]
+
+realsam:
+  name: RealSAM
+  manufacturer: RealThing
+  model_number: V1
+  description: Accessible smartphone for visually impaired users
+  features: Voice control, Screen reader, Simple interface
+  compatibility_notes: Designed for visually impaired users
+  documentation_url: https://realsam.co.uk/documentation
+  device_types: ["Smartphone"]
+
+pixel:
+  name: Pixel
+  manufacturer: Google
+  model_number: Pixel-8
+  description: Android smartphone with accessibility features
+  features: TalkBack, Magnification, Voice Access
+  compatibility_notes: Compatible with Android accessibility services
+  documentation_url: https://support.google.com/pixel
+  device_types: ["Smartphone"]
+
+samsung_phone:
+  name: Galaxy S24
+  manufacturer: Samsung
+  model_number: SM-S24
+  description: Android smartphone with accessibility features
+  features: TalkBack, Magnification, Voice Access
+  compatibility_notes: Compatible with Android accessibility services
+  documentation_url: https://www.samsung.com/accessibility
+  device_types: ["Smartphone"]
+
+blindshell_mini:
+  name: BlindShell Mini
+  manufacturer: BlindShell
+  model_number: BS-MINI
+  description: Simple phone designed for visually impaired users
+  features: Voice control, Large buttons, Simple interface
+  compatibility_notes: Specifically designed for visually impaired users
+  documentation_url: https://www.blindshell.com/mini
+  device_types: ["Smartphone"]
+
+vision2:
+  name: Vision 2
+  manufacturer: Vision
+  model_number: V2
+  description: Specialized phone for visually impaired users
+  features: Screen reader, Voice control, Simplified interface
+  compatibility_notes: Optimized for visually impaired users
+  documentation_url: https://vision-accessibility.com/v2
+  device_types: ["Smartphone"]
+
+raz_memory:
+  name: RAZ Memory Phone
+  manufacturer: RAZ Mobility
+  model_number: RAZ-MP
+  description: Phone designed for users with memory loss
+  features: Simplified interface, Emergency contacts, Picture-based dialing
+  compatibility_notes: Designed for users with cognitive impairments
+  documentation_url: https://razmobility.com/memory-phone
+  device_types: ["Smartphone", "Memory Aid Device"]
+
+jitterbug_flip:
+  name: Jitter Bug Flip
+  manufacturer: Lively
+  model_number: JBF
+  description: Simple flip phone with emergency features
+  features: Large buttons, Emergency button, Simple interface
+  compatibility_notes: Designed for seniors and users needing simplified interface
+  documentation_url: https://www.greatcall.com/flip
+  device_types: ["Cellular 911 Alerter"]
+
+jitterbug_smart3:
+  name: Jitter Bug Smart 3
+  manufacturer: Lively
+  model_number: JBS3
+  description: Simplified smartphone with emergency features
+  features: Large icons, Emergency button, Medical alert
+  compatibility_notes: Designed for seniors and users needing simplified interface
+  documentation_url: https://www.greatcall.com/smart3
+  device_types: ["Smartphone", "Cellular 911 Alerter"]
+
+smart_vision3:
+  name: Smart Vision 3
+  manufacturer: SmartVision
+  model_number: SV3
+  description: Accessible smartphone with voice control
+  features: Voice control, Screen reader, Physical keypad
+  compatibility_notes: Designed for visually impaired users
+  documentation_url: https://smartvision.com/sv3
+  device_types: ["Smartphone"]
+
+hable_one:
+  name: Hable One
+  manufacturer: Hable
+  model_number: HB1
+  description: Braille keyboard accessory for smartphones
+  features: Braille input, Compatible with iOS and Android
+  compatibility_notes: Works with VoiceOver and TalkBack
+  documentation_url: https://www.hableone.com/docs
+  device_types: ["Braille Device"]
+
+guardian_alerts:
+  name: Guardian Alerts
+  manufacturer: Guardian
+  model_number: GA911
+  description: Emergency alert system
+  features: One-touch emergency calling, GPS tracking
+  compatibility_notes: Compatible with most cellular networks
+  documentation_url: https://guardian.com/alerts
+  device_types: ["Cellular 911 Alerter"]
+
+sky_angel:
+  name: Sky Angel 911
+  manufacturer: Sky Angel
+  model_number: SA911
+  description: Emergency alert device
+  features: One-touch emergency calling, Fall detection
+  compatibility_notes: Works with cellular networks
+  documentation_url: https://skyangel.com/911
+  device_types: ["Cellular 911 Alerter"]
+
+slinger:
+  name: Device Sling Mount
+  manufacturer: SlingTech
+  model_number: ST-2023
+  description: Sling-style device mount
+  features: Adjustable straps, Universal compatibility
+  compatibility_notes: Fits most devices
+  documentation_url: https://slingtech.com/manual
+  device_types: ["Hands-free Device"]
+
+square_glow:
+  name: SquareGlow
+  manufacturer: SquareTech
+  model_number: SG-2023
+  description: Visual alert system
+  features: Visual notifications, Custom alert patterns
+  compatibility_notes: Works with most smart home systems
+  documentation_url: https://squareglow.com/docs
+  device_types: ["Signaler", "Smart Home Device"]
+
+clarity_jv35:
+  name: JV35
+  manufacturer: Clarity
+  model_number: JV35
+  description: Amplified telephone
+  features: Amplified sound, Large buttons
+  compatibility_notes: Compatible with hearing aids
+  documentation_url: https://jv-comm.com/jv35
+  device_types: ["Amplified Phone"]
+
+clarity_jv35w:
+  name: JV35W
+  manufacturer: Clarity
+  model_number: JV35W
+  description: Wireless amplified telephone
+  features: Wireless connectivity, Amplified sound
+  compatibility_notes: Compatible with hearing aids
+  documentation_url: https://jv-comm.com/jv35w
+  device_types: ["Amplified Phone"]
+
+csc600:
+  name: CSC600
+  manufacturer: ClearSound
+  model_number: CSC600
+  description: High-power amplified phone
+  features: Extra loud amplification, Tone control
+  compatibility_notes: T-coil compatible
+  documentation_url: https://clearsound.com/csc600
+  device_types: ["Amplified Phone"]
+
+csc500:
+  name: CSC500
+  manufacturer: ClearSound
+  model_number: CSC500
+  description: Standard amplified phone
+  features: Amplified sound, Emergency buttons
+  compatibility_notes: T-coil compatible
+  documentation_url: https://clearsound.com/csc500
+  device_types: ["Amplified Phone"]
+
+clarity_alto:
+  name: Clarity Alto
+  manufacturer: Clarity
+  model_number: ALTO
+  description: Basic amplified phone
+  features: Digital clarity, Amplified sound
+  compatibility_notes: Hearing aid compatible
+  documentation_url: https://clarityproducts.com/alto
+  device_types: ["Amplified Phone"]
+
+clarity_alto_plus:
+  name: Clarity Alto Plus
+  manufacturer: Clarity
+  model_number: ALTO-PLUS
+  description: Enhanced amplified phone
+  features: Digital clarity, Extra amplification
+  compatibility_notes: Hearing aid compatible
+  documentation_url: https://clarityproducts.com/alto-plus
+  device_types: ["Amplified Phone"]
+
+clearsounds_a1600bt:
+  name: Clearsounds A1600BT
+  manufacturer: Clearsounds
+  model_number: A1600BT
+  description: Bluetooth amplified phone
+  features: Bluetooth connectivity, Digital amplification
+  compatibility_notes: Works with hearing aids and mobile devices
+  documentation_url: https://clearsounds.com/a1600bt
+  device_types: ["Amplified Phone"]
+
+touchtalk:
+  name: Touchtalk
+  manufacturer: TouchCom
+  model_number: TT
+  description: Touch-screen communication device
+  features: Text-to-speech, Picture communication
+  compatibility_notes: Suitable for speech impairments
+  documentation_url: https://touchcom.com/touchtalk
+  device_types: ["Speech Device"]
+
+touchtalk_plus:
+  name: Touchtalk Plus
+  manufacturer: TouchCom
+  model_number: TT-PLUS
+  description: Advanced communication device
+  features: Enhanced text-to-speech, Symbol support
+  compatibility_notes: Comprehensive communication solution
+  documentation_url: https://touchcom.com/touchtalk-plus
+  device_types: ["Speech Device"]
+
+touchtalk_mini:
+  name: Touchtalk Mini
+  manufacturer: TouchCom
+  model_number: TT-MINI
+  description: Portable communication device
+  features: Compact design, Basic communication features
+  compatibility_notes: Portable speech solution
+  documentation_url: https://touchcom.com/touchtalk-mini
+  device_types: ["Speech Device"]

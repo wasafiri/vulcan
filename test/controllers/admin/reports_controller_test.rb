@@ -1,8 +1,8 @@
 require "test_helper"
 
-class Vendor::DashboardsControllerTest < ActionDispatch::IntegrationTest
+class Admin::ReportsControllerTest < ActionDispatch::IntegrationTest
   def setup
-    @vendor = users(:vendor_raz)  # Use fixture instead of factory
+    @admin = users(:admin_david)
 
     # Set standard test headers
     @headers = {
@@ -11,15 +11,15 @@ class Vendor::DashboardsControllerTest < ActionDispatch::IntegrationTest
     }
 
     post sign_in_path,
-      params: { email: @vendor.email, password: "password123" },
+      params: { email: @admin.email, password: "password123" },
       headers: @headers
 
     assert_response :redirect
     follow_redirect!
   end
 
-  def test_gets_show
-    get vendor_dashboard_path
+  def test_should_get_index
+    get admin_reports_path
     assert_response :success
   end
 end

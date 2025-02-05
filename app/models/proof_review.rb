@@ -40,6 +40,19 @@ class ProofReview < ApplicationRecord
   scope :rejections, -> { where(status: :rejected) }
   scope :last_3_days, -> { where("created_at > ?", 3.days.ago) }
 
+  def review(proof_type:, status:, rejection_reason: nil)
+    ApplicationRecord.transaction do
+      create_proof_review(proof_type, status, rejection_reason)
+      update_application_proof_status(proof_type, status)
+      notify_constituent if status == :rejected
+      check_all_proofs_approved
+    end
+    true
+  rescue ActiveRecord::RecordInvalid => e
+    Rails.logger.error "Proof review failed: #{e.message}"
+    false
+  end
+
   private
 
   def set_reviewed_at
@@ -71,16 +84,34 @@ class ProofReview < ApplicationRecord
     end
   end
 
-  def update_application_proof_status
-    case proof_type
-    when "income"
-      application.update!(income_proof_status: status)
-    when "residency"
-      application.update!(residency_proof_status: status)
+  def check_all_proofs_approved
+    if @application.all_proofs_approved?
+      MedicalProviderMailer.request_certification(@application).deliver_later
+      @application.update!(status: :awaiting_documents)
     end
-  rescue ActiveRecord::RecordInvalid => e
-    errors.add(:base, "Failed to update application status: #{e.message}")
-    raise ActiveRecord::Rollback
+  end
+
+  def update_application_proof_status(proof_type, status)
+    case proof_type.to_s
+    when "income"
+      @application.update!(income_proof_status: status)
+    when "residency"
+      @application.update!(residency_proof_status: status)
+    end
+  end
+
+  def notify_constituent
+    ApplicationNotificationsMailer.proof_rejected(@application, @proof_review).deliver_later
+    Notification.create!(
+      recipient: @application.user,
+      actor: @admin,
+      action: "proof_rejected",
+      notifiable: @application,
+      metadata: {
+        proof_type: @proof_review.proof_type,
+        rejection_reason: @proof_review.rejection_reason
+      }
+    )
   end
 
   def handle_post_review_actions
@@ -141,5 +172,14 @@ class ProofReview < ApplicationRecord
     Rails.logger.error("Failed to process max rejections: #{e.message}")
     errors.add(:base, "Failed to process rejection limits")
     raise ActiveRecord::Rollback
+  end
+
+  def create_proof_review(type, status, reason)
+    @application.proof_reviews.create!(
+      admin: @admin,
+      proof_type: type,
+      status: status,
+      rejection_reason: reason
+    )
   end
 end

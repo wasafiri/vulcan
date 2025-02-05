@@ -1,61 +1,64 @@
 require "test_helper"
 
 class ProofReviewTest < ActiveSupport::TestCase
-  setup do
-    @admin = create(:admin)
-    @application = create(:application)
-    @proof_review = create(:proof_review, :approved)  # Assuming you have a proof_review factory
+  def setup
+    @admin = users(:admin_david)
+    @application = create(:application, :in_progress)
   end
 
-  test "valid proof review" do
-    proof_review = ProofReview.new(
+  def test_valid_proof_review
+    proof_review = build(:proof_review,
       application: @application,
       admin: @admin,
       proof_type: :income,
       status: :approved,
       reviewed_at: Time.current
     )
+
     assert proof_review.valid?
   end
 
-  test "invalid without required fields" do
+  def test_invalid_without_required_fields
     proof_review = ProofReview.new
     assert_not proof_review.valid?
-    assert_not_nil proof_review.errors[:proof_type]
-    assert_not_nil proof_review.errors[:status]
-    assert_not_nil proof_review.errors[:admin]
-    assert_not_nil proof_review.errors[:application]
+
+    assert_includes proof_review.errors[:proof_type], "can't be blank"
+    assert_includes proof_review.errors[:status], "can't be blank"
+    assert_includes proof_review.errors[:admin], "must be present"
+    assert_includes proof_review.errors[:application], "must be present"
   end
 
-  test "requires rejection reason when rejected" do
-    proof_review = ProofReview.new(
+  def test_requires_rejection_reason_when_rejected
+    proof_review = build(:proof_review,
       application: @application,
       admin: @admin,
       proof_type: :income,
       status: :rejected,
-      reviewed_at: Time.current
+      rejection_reason: nil
     )
+
     assert_not proof_review.valid?
-    assert_not_nil proof_review.errors[:rejection_reason]
+    assert_includes proof_review.errors[:rejection_reason], "can't be blank"
   end
 
-  test "updates application status when proof is approved" do
+  def test_updates_application_status_when_proof_is_approved
     @application.update!(income_proof_status: :not_reviewed)
 
-    ProofReview.create!(
+    create(:proof_review,
       application: @application,
       admin: @admin,
       proof_type: :income,
       status: :approved
     )
 
-    assert_equal "approved", @application.reload.income_proof_status
+    @application.reload
+    assert @application.income_proof_status_approved?
   end
 
-  test "archives application after max rejections" do
+  def test_archives_application_after_max_rejections
     @application.update!(total_rejections: 8)
 
-    ProofReview.create!(
+    create(:proof_review,
       application: @application,
       admin: @admin,
       proof_type: :income,
@@ -63,20 +66,34 @@ class ProofReviewTest < ActiveSupport::TestCase
       rejection_reason: "Final rejection"
     )
 
-    assert @application.reload.archived?
+    @application.reload
+    assert @application.archived?
   end
 
-  test "prevents review of archived application" do
-    @application.update!(status: :archived)
+  def test_prevents_review_of_archived_application
+    application = create(:application, :archived)
 
-    proof_review = ProofReview.new(
-      application: @application,
+    proof_review = build(:proof_review,
+      application: application,
       admin: @admin,
       proof_type: :income,
       status: :approved
     )
 
     assert_not proof_review.valid?
-    assert_includes proof_review.errors[:application], "cannot be reviewed when archived"
+    assert_includes proof_review.errors[:application],
+                    "cannot be reviewed when archived"
+  end
+
+  def test_sends_notification_on_proof_rejection
+    assert_difference "Notification.count" do
+      create(:proof_review,
+        application: @application,
+        admin: @admin,
+        proof_type: :income,
+        status: :rejected,
+        rejection_reason: "Invalid documentation"
+      )
+    end
   end
 end

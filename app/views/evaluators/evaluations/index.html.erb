@@ -1,11 +1,24 @@
-<h1>Your Evaluations</h1>
+<div class="container mx-auto px-4 py-8">
+  <h1 class="text-2xl font-bold mb-6">
+    <%= params[:action].capitalize %> Evaluations
+  </h1>
 
-<% @evaluations.each do |evaluation| %>
-  <div class="evaluation">
-    <h2>Evaluation for <%= evaluation.constituent.full_name %> - Application ##<%= evaluation.application.id %></h2>
-    <p>Status: <%= evaluation.status.capitalize %></p>
-    <p>Date: <%= evaluation.evaluation_datetime.strftime("%B %d, %Y %H:%M") if evaluation.evaluation_datetime %></p>
-    <p>Location: <%= evaluation.location %></p>
-    <%= link_to "View Details", evaluator_evaluation_path(evaluation) %>
-  </div>
-<% end %>
+  <% if @evaluations.any? %>
+    <ul class="space-y-4">
+      <% @evaluations.each do |evaluation| %>
+        <li class="bg-white shadow rounded-lg p-4">
+          <h2 class="text-xl font-semibold">
+            <%= link_to evaluation.constituent.full_name, evaluators_evaluation_path(evaluation) %>
+          </h2>
+          <p>Status: <%= evaluation.status.capitalize %></p>
+          <p>Type: <%= evaluation.evaluation_type.capitalize %></p>
+          <p> Evaluation Date: <%= evaluation.evaluation_date&.strftime("%B %d, %Y") || "No evaluation date" %> </p>
+
+          <!-- Add more fields as necessary -->
+        </li>
+      <% end %>
+    </ul>
+  <% else %>
+    <p class="text-gray-600">No evaluations found.</p>
+  <% end %>
+</div>

@@ -1,9 +1,9 @@
-# test/controllers/webhooks/email_events_controller_test.rb
 require "test_helper"
 
 class Webhooks::EmailEventsControllerTest < ActionDispatch::IntegrationTest
-  setup do
-    @application = create(:application)
+  def setup
+    # Use application factory with medical provider
+    @application = create(:application, :in_progress)
     @valid_payload = {
       event: "bounce",
       type: "permanent",
@@ -13,38 +13,34 @@ class Webhooks::EmailEventsControllerTest < ActionDispatch::IntegrationTest
         diagnostics: "Invalid recipient"
       }
     }
-    @webhook_secret = Rails.application.credentials.webhook_secret
+    # Use a test webhook secret
+    @webhook_secret = "test_webhook_secret"
   end
 
-  test "accepts valid payload with correct signature" do
+  def test_accepts_valid_payload_with_correct_signature
     signature = compute_signature(@valid_payload.to_json)
-
     post webhooks_email_events_path,
       params: @valid_payload,
       headers: { "X-Webhook-Signature" => signature },
       as: :json
-
     assert_response :success
   end
 
-  test "rejects invalid signature" do
+  def test_rejects_invalid_signature
     post webhooks_email_events_path,
       params: @valid_payload,
       headers: { "X-Webhook-Signature" => "invalid" },
       as: :json
-
     assert_response :unauthorized
   end
 
-  test "rejects incomplete payload" do
+  def test_rejects_incomplete_payload
     invalid_payload = @valid_payload.except(:email)
     signature = compute_signature(invalid_payload.to_json)
-
     post webhooks_email_events_path,
       params: invalid_payload,
       headers: { "X-Webhook-Signature" => signature },
       as: :json
-
     assert_response :unprocessable_entity
   end
 

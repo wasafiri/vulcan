@@ -1,0 +1,156 @@
+# Admin user
+admin_david:
+  type: Admin
+  email: david.bahar@maryland.gov
+  first_name: David
+  last_name: Bahar
+  password_digest: <%= default_password_digest %>
+  phone: 555-555-0001
+  date_of_birth: <%= 44.years.ago.to_date %>
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  hearing_disability: true
+  email_verified: true
+
+admin_kevin:
+  type: Admin
+  email: kevin.steffy@maryland.gov
+  first_name: Kevin
+  last_name: Steffy
+  password_digest: <%= default_password_digest %>
+  phone: 555-555-0001
+  date_of_birth: <%= 55.years.ago.to_date %>
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  hearing_disability: true
+  email_verified: true
+
+admin_jane:
+  type: Admin
+  email: jane.hager@maryland.gov
+  first_name: Jane
+  last_name: Hager
+  password_digest: <%= default_password_digest %>
+  phone: 555-555-0001
+  date_of_birth: <%= 55.years.ago.to_date %>
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  hearing_disability: true
+  email_verified: true
+
+admin_brandie:
+  type: Admin
+  email: brandie.callender@maryland.gov
+  first_name: Brandie
+  last_name: Callender
+  password_digest: <%= default_password_digest %>
+  phone: 555-555-0001
+  date_of_birth: <%= 35.years.ago.to_date %>
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  hearing_disability: true
+  email_verified: true
+
+# Constituent with disabilities
+constituent_john:
+  type: Constituent
+  email: john.doe@example.com
+  first_name: John
+  last_name: Doe
+  password_digest: <%= default_password_digest %>
+  phone: 555-555-0002
+  date_of_birth: <%= 45.years.ago.to_date %>
+  physical_address_1: 123 Main St
+  city: Baltimore
+  state: MD
+  zip_code: 21201
+  hearing_disability: true
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+
+# Constituent with disabilities
+constituent_jane:
+  type: Constituent
+  email: jane.doe@example.com
+  first_name: Jane
+  last_name: Doe
+  password_digest: <%= default_password_digest %>
+  phone: 555-555-0002
+  date_of_birth: <%= 25.years.ago.to_date %>
+  physical_address_1: 124 Main St
+  city: Baltimore
+  state: MD
+  zip_code: 21201
+  mobility_disability: true
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+
+# Constituent with disabilities
+constituent_kenneth:
+  type: Constituent
+  email: kenneth.klein@example.com
+  first_name: Kenneth
+  last_name: Klein
+  password_digest: <%= default_password_digest %>
+  phone: 555-555-0002
+  date_of_birth: <%= 25.years.ago.to_date %>
+  physical_address_1: 125 Main St
+  city: Baltimore
+  state: MD
+  zip_code: 21201
+  cognition_disability: true
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+
+# Constituent with disabilities
+constituent_steven:
+  type: Constituent
+  email: steven.coopern@example.com
+  first_name: Steven
+  last_name: Cooper
+  password_digest: <%= default_password_digest %>
+  phone: 555-555-0002
+  date_of_birth: <%= 25.years.ago.to_date %>
+  physical_address_1: 126 Main St
+  city: Baltimore
+  state: MD
+  zip_code: 21201
+  speech_disability: true
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+
+# Evaluator
+evaluator_betsy:
+  type: Evaluator
+  email: betsya.hein@maryland.gov
+  first_name: Betsy
+  last_name: Hein
+  password_digest: <%= default_password_digest %>
+  phone: 555-555-0003
+  date_of_birth: <%= 50.years.ago.to_date %>
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+  status: active
+  availability_schedule:
+    monday: ["9:00", "17:00"]
+    wednesday: ["9:00", "17:00"]
+    friday: ["9:00", "17:00"]
+
+# Vendor
+vendor_raz:
+  type: Vendor
+  email: raz@testemail.com
+  first_name: Raz
+  last_name: Vendor
+  password_digest: <%= default_password_digest %>
+  phone: 555-555-0004
+  date_of_birth: <%= 50.years.ago.to_date %>
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+  status: approved

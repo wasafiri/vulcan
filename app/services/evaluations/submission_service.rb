@@ -7,9 +7,11 @@ module Evaluations
 
     def submit
       ApplicationRecord.transaction do
-        @evaluation.update!(submission_params)
+        @evaluation.assign_attributes(submission_params)
+        @evaluation.status = :completed
+        @evaluation.save!
         notify_constituent
-        update_application
+        update_application_status
       end
       true
     rescue ActiveRecord::RecordInvalid => e
@@ -22,13 +24,12 @@ module Evaluations
     def submission_params
       @params.require(:evaluation).permit(
         :needs,
-        :recommended_product_ids,
-        :recommended_accessory_ids,
-        :evaluation_datetime,
         :location,
-        :attendees,
-        :products_tried,
-        :notes
+        :notes,
+        :status,
+        recommended_product_ids: [],
+        attendees: [ :name, :relationship ],
+        products_tried: [ :product_id, :reaction ]
       )
     end
 
@@ -36,8 +37,8 @@ module Evaluations
       EvaluatorMailer.evaluation_submission_confirmation(@evaluation).deliver_later
     end
 
-    def update_application
-      @evaluation.application.update!(last_evaluation_completed_at: Time.current)
+    def update_application_status
+      @evaluation.application.update!(status: :evaluation_completed)
     end
   end
 end

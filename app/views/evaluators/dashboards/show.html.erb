@@ -1,0 +1,79 @@
+<main class="container mx-auto px-4 py-8" role="main">
+  <div class="max-w-7xl mx-auto">
+    <h1 class="text-3xl font-bold mb-6">Evaluator Dashboard</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <!-- Pending Evaluations Card -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-xl font-semibold mb-4">Pending Evaluations</h2>
+        <% if @pending_evaluations.any? %>
+          <ul class="space-y-2">
+            <% @pending_evaluations.each do |evaluation| %>
+              <li>
+                <%= link_to evaluators_evaluation_path(evaluation), 
+                    class: "text-indigo-600 hover:text-indigo-700 text-sm" do %>
+                  <%= "Application ##{evaluation.application_id}" %>
+                  <span class="text-gray-500 ml-2">
+                    <%= evaluation.created_at.strftime("%B %d, %Y") %>
+                  </span>
+                <% end %>
+              </li>
+            <% end %>
+          </ul>
+        <% else %>
+          <p class="text-gray-500 text-sm">No pending evaluations</p>
+        <% end %>
+      </div>
+
+      <!-- Completed Evaluations Card -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-xl font-semibold mb-4">Completed Evaluations</h2>
+        <% if @completed_evaluations.any? %>
+          <ul class="space-y-2">
+            <% @completed_evaluations.each do |evaluation| %>
+              <li>
+                <%= link_to evaluators_evaluation_path(evaluation), 
+                    class: "text-green-600 hover:text-green-700 text-sm" do %>
+                  <%= "Application ##{evaluation.application_id}" %>
+                  <span class="text-gray-500 ml-2">
+                    <%= evaluation.created_at.strftime("%B %d, %Y") %>
+                  </span>
+                <% end %>
+              </li>
+            <% end %>
+          </ul>
+        <% else %>
+          <p class="text-gray-500 text-sm">No completed evaluations</p>
+        <% end %>
+      </div>
+
+      <!-- Assigned Constituents Card -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-xl font-semibold mb-4">Assigned Constituents</h2>
+        <% if @assigned_constituents.any? %>
+          <ul class="space-y-2">
+            <% @assigned_constituents.each do |constituent| %>
+              <li class="text-sm">
+                <%= constituent.full_name %>
+                <span class="text-gray-500 ml-2">
+                  <%= constituent.email %>
+                </span>
+              </li>
+            <% end %>
+          </ul>
+        <% else %>
+          <p class="text-gray-500 text-sm">No assigned constituents</p>
+        <% end %>
+      </div>
+    </div>
+
+    <!-- Recent Activity Section -->
+    <section class="mt-8">
+      <h2 class="text-2xl font-bold mb-4">Recent Activity</h2>
+      <div class="bg-white rounded-lg shadow p-6">
+        <!-- You can add a more detailed recent activity log here -->
+        <p class="text-gray-500 text-sm">No recent activity</p>
+      </div>
+    </section>
+  </div>
+</main>

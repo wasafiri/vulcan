@@ -1,6 +1,6 @@
 class RegistrationsController < ApplicationController
   # Require authentication for all actions except new and create
-  before_action :authenticate_user!, except: [ :new, :create ]
+  skip_before_action :authenticate_user!, only: [ :new, :create ]
 
   # Set the current user for actions that require authentication
   before_action :set_user, only: [ :edit, :update, :destroy ]
@@ -66,16 +66,11 @@ class RegistrationsController < ApplicationController
 
   def registration_params
     params.require(:user).permit(
-      :email,
-      :password,
-      :password_confirmation,
-      :first_name,
-      :last_name,
-      :middle_initial,
-      :date_of_birth,
-      :phone,
-      :timezone,
-      :locale
+      :email, :password, :password_confirmation,
+      :first_name, :last_name, :middle_initial,
+      :date_of_birth, :phone, :timezone, :locale,
+      :hearing_disability, :vision_disability,
+      :speech_disability, :mobility_disability, :cognition_disability
     )
   end
 end

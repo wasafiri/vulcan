@@ -1,7 +1,7 @@
 <div class="bg-white shadow overflow-x-auto sm:rounded-lg">
-  <table class="table-fixed min-w-full divide-y divide-gray-200" role="table">
+  <table class="table-fixed min-w-full divide-y divide-gray-200 applications-table" role="table">
     <thead class="bg-gray-50">
-      <tr>
+      <tr>  <!-- Removed application-row class from header -->
         <%# Table Headers with Sorting Links %>
         <th scope="col" class="w-1/12 px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
           <%= link_to admin_applications_path(sort: 'application_date', direction: toggle_direction('application_date')),
@@ -42,7 +42,7 @@
     </thead>
     <tbody class="bg-white divide-y divide-gray-200">
       <% applications.each do |application| %>
-        <tr class="h-20 focus:outline-none focus:ring-2 focus:ring-indigo-500" tabindex="0">
+        <tr class="application-row h-20 focus:outline-none focus:ring-2 focus:ring-indigo-500" tabindex="0"> <!-- Added application-row class here -->
           <td class="px-4 py-2 text-sm text-gray-900">
             <%= application.application_date.strftime("%m/%d/%Y") %>
           </td>

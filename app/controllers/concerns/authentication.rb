@@ -2,11 +2,8 @@ module Authentication
   extend ActiveSupport::Concern
 
   included do
-    # Enforce user authentication before accessing protected actions
-    before_action :authenticate_user!
-
-    # Make `current_user` accessible in views
     helper_method :current_user
+    before_action :authenticate_user!
   end
 
   def require_role(role)
@@ -50,9 +47,9 @@ module Authentication
     end
   end
 
-  # Restricts access to evaluator users only
+  # Restricts access to evaluator and admin users only
   def require_evaluator!
-    unless current_user.evaluator?
+    unless current_user.evaluator? || current_user.admin?
       redirect_to root_path, alert: "Unauthorized access"
     end
   end
