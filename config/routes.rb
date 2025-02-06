@@ -78,6 +78,7 @@ Rails.application.routes.draw do
         post :assign_evaluator
         patch :update_role
         patch :update_capabilities
+        get :history
       end
 
       collection do

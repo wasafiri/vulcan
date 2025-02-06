@@ -1,0 +1,77 @@
+<main class="container mx-auto px-4 py-8" role="main">
+  <div class="bg-white rounded-lg shadow">
+    <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+      <h1 class="text-2xl font-semibold text-gray-900">
+        Nonactive Constituents
+      </h1>
+      <%= form_with url: constituents_admin_users_path, method: :get, local: true, class: "flex space-x-2" do |form| %>
+        <%= form.text_field :q, value: params[:q], placeholder: "Search by full name", class: "block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md" %>
+        <%= form.submit "Search", class: "px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700" %>
+      <% end %>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200" role="grid">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              User Details
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Email
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Latest Application Status
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Last Action
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Actions
+            </th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          <% @users.each do |user| %>
+            <%# Fetch the constituent’s latest application based on last_activity_at if available, otherwise application_date %>
+            <% latest_app = user.applications.order(Arel.sql("COALESCE(last_activity_at, application_date) DESC")).first %>
+            <tr class="hover:bg-gray-50">
+              <td class="px-6 py-4">
+                <div class="text-sm font-medium text-gray-900"><%= user.full_name %></div>
+              </td>
+              <td class="px-6 py-4">
+                <div class="text-sm text-gray-500"><%= mail_to user.email, class: "hover:text-indigo-600" %></div>
+              </td>
+              <td class="px-6 py-4">
+                <% if latest_app.present? %>
+                  <div class="text-sm text-gray-500"><%= latest_app.status %></div>
+                <% else %>
+                  <div class="text-sm text-gray-500">No Applications</div>
+                <% end %>
+              </td>
+              <td class="px-6 py-4">
+                <% if latest_app.present? %>
+                  <div class="text-sm text-gray-500">
+                    <%= (latest_app.last_activity_at || latest_app.application_date).strftime("%B %d, %Y") %>
+                  </div>
+                <% else %>
+                  <div class="text-sm text-gray-500">N/A</div>
+                <% end %>
+              </td>
+              <td class="px-6 py-4">
+                <%= link_to history_admin_user_path(user), 
+                    class: "inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                    aria: { label: "View history for #{user.full_name}" } do %>
+                  View History
+                  <svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
