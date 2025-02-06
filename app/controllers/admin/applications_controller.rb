@@ -98,14 +98,14 @@ class Admin::ApplicationsController < ApplicationController
   def update_proof_status
     reviewer = Applications::ProofReviewer.new(@application, current_user)
     if reviewer.review(
-      proof_type: params[:proof_type],
-      status: params[:status],
-      rejection_reason: params[:rejection_reason]
-    )
+         proof_type: params[:proof_type],
+         status: params[:status],
+         rejection_reason: params[:rejection_reason]
+       )
       flash[:notice] = "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
       redirect_to admin_application_path(@application)
     else
-      render json: { error: "Failed to update proof status" }, status: :unprocessable_entity
+      render :show, status: :unprocessable_entity
     end
   end
 
