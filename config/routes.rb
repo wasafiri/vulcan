@@ -145,5 +145,6 @@ Rails.application.routes.draw do
 
   namespace :webhooks do
     resources :email_events, only: [ :create ]
+    resources :medical_certifications, only: [ :create ]
   end
 end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_01_28_024453) do
+ActiveRecord::Schema[8.0].define(version: 2025_02_06_043412) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -82,9 +82,13 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_28_024453) do
     t.datetime "needs_review_since"
     t.bigint "trainer_id"
     t.integer "medical_certification_status", default: 0, null: false
+    t.datetime "medical_certification_verified_at"
+    t.bigint "medical_certification_verified_by_id"
+    t.text "medical_certification_rejection_reason"
     t.index ["income_verified_by_id"], name: "index_applications_on_income_verified_by_id"
     t.index ["last_proof_submitted_at"], name: "index_applications_on_last_proof_submitted_at"
     t.index ["medical_certification_status"], name: "index_applications_on_medical_certification_status"
+    t.index ["medical_certification_verified_by_id"], name: "index_applications_on_medical_certification_verified_by_id"
     t.index ["medical_provider_email", "status"], name: "index_applications_on_medical_provider_email_and_status"
     t.index ["needs_review_since"], name: "index_applications_on_needs_review_since"
     t.index ["status", "needs_review_since"], name: "index_applications_on_status_and_needs_review_since"
@@ -333,6 +337,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_01_28_024453) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "applications", "users"
   add_foreign_key "applications", "users", column: "income_verified_by_id"
+  add_foreign_key "applications", "users", column: "medical_certification_verified_by_id"
   add_foreign_key "applications", "users", column: "trainer_id"
   add_foreign_key "appointments", "users"
   add_foreign_key "appointments", "users", column: "evaluator_id"

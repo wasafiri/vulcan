@@ -265,6 +265,76 @@
       </dl>
     </section>
 
+    <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="certification-status-title">
+      <div class="flex justify-between items-start">
+        <h2 id="certification-status-title" class="text-xl font-semibold text-gray-900">Medical Certification Status</h2>
+        
+        <% if @application.medical_certification.attached? %>
+          <%= link_to url_for(@application.medical_certification),
+              class: "inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50",
+              target: "_blank" do %>
+            View DCF
+            <svg class="ml-2 -mr-1 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          <% end %>
+        <% end %>
+      </div>
+
+      <div class="mt-4">
+        <div class="flex items-center space-x-2">
+          <span class="px-2 py-1 text-sm font-medium rounded-full
+            <%= case @application.medical_certification_status
+                when 'not_requested' then 'bg-gray-100 text-gray-800'
+                when 'requested' then 'bg-yellow-100 text-yellow-800'
+                when 'received' then 'bg-blue-100 text-blue-800'
+                when 'accepted' then 'bg-green-100 text-green-800'
+                when 'rejected' then 'bg-red-100 text-red-800'
+                end %>">
+            <%= @application.medical_certification_status.titleize %>
+          </span>
+          
+          <% if @application.medical_certification_verified_at.present? %>
+            <span class="text-sm text-gray-500">
+              Verified <%= time_ago_in_words(@application.medical_certification_verified_at) %> ago
+              <% if @application.medical_certification_verified_by %>
+                by <%= @application.medical_certification_verified_by.full_name %>
+              <% end %>
+            </span>
+          <% end %>
+        </div>
+
+        <% if @application.medical_certification_status == 'received' %>
+          <div class="mt-4 flex space-x-4">
+            <%= button_to update_certification_status_admin_application_path(@application, status: :accepted),
+                method: :patch,
+                class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700",
+                data: { confirm: "Accept this medical certification?" } do %>
+              Accept Certification
+            <% end %>
+
+            <%= button_to update_certification_status_admin_application_path(@application, status: :rejected),
+                method: :patch,
+                class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700",
+                data: { 
+                  controller: "modal",
+                  action: "modal#openRejectionForm",
+                  certification_id: @application.id
+                } do %>
+              Reject Certification
+            <% end %>
+          </div>
+        <% end %>
+
+        <% if @application.medical_certification_status == 'rejected' && @application.rejection_reason.present? %>
+          <div class="mt-4">
+            <h3 class="text-sm font-medium text-gray-900">Rejection Reason:</h3>
+            <p class="mt-1 text-sm text-gray-500"><%= @application.rejection_reason %></p>
+          </div>
+        <% end %>
+      </div>
+    </section>
+
     <!-- Attachments Section -->
     <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="attachments-title">
       <h2 id="attachments-title" class="text-xl font-semibold text-gray-900 mb-4">Attachments</h2>
@@ -323,4 +393,37 @@
       <% end %>
     </section>
   </div>
+  <div id="rejectionModal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center" 
+      data-modal-target="dialog">
+    <div class="bg-white rounded-lg p-6 max-w-lg w-full">
+      <h3 class="text-lg font-medium text-gray-900 mb-4">Enter Rejection Reason</h3>
+      
+      <%= form_with url: update_certification_status_admin_application_path(@application),
+                    method: :patch,
+                    local: true,
+                    class: "space-y-4" do |f| %>
+        <%= f.hidden_field :status, value: :rejected %>
+        
+        <div>
+          <%= f.label :rejection_reason, "Reason for Rejection", class: "block text-sm font-medium text-gray-700" %>
+          <%= f.text_area :rejection_reason,
+              rows: 4,
+              class: "mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+              placeholder: "Please provide a detailed explanation..." %>
+        </div>
+
+        <div class="flex justify-end space-x-3">
+          <button type="button"
+                  class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  data-action="modal#close">
+            Cancel
+          </button>
+          <%= f.submit "Submit",
+              class: "px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
 </main>
+
+

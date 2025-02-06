@@ -12,6 +12,9 @@ class Application < ApplicationRecord
   has_many :evaluations, dependent: :destroy
   has_many :notifications, as: :notifiable, dependent: :destroy
   has_many :proof_reviews, dependent: :destroy
+  belongs_to :medical_certification_verified_by,
+  class_name: "User",
+  optional: true
 
   # Enums
   enum :income_proof_status, {
@@ -141,17 +144,26 @@ class Application < ApplicationRecord
   end
 
   # Certification management
-  def update_certification!(certification:, status:, verified_by:)
+  def update_certification!(certification:, status:, verified_by:, rejection_reason: nil)
     with_lock do
+      # Attach the certification if provided
       medical_certification.attach(certification) if certification.present?
 
-      update!(
+      # Update the certification status and metadata
+      attrs = {
         medical_certification_status: status,
         medical_certification_verified_at: Time.current,
         medical_certification_verified_by: verified_by
-      )
-      true
+      }
+
+      # Add rejection reason if provided
+      if status == "rejected"
+        attrs[:medical_certification_rejection_reason] = rejection_reason
+      end
+
+      update!(attrs)
     end
+    true
   rescue ActiveRecord::RecordInvalid => e
     Rails.logger.error "Failed to update certification: #{e.message}"
     false
