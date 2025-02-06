@@ -3,15 +3,17 @@ module ApplicationStatusManagement
 
   included do
     enum :status, {
-      draft: 0,              # Constituent still working on application
-      in_progress: 1,        # Submitted by constituent, being processed
-      approved: 2,           # Application approved
-      rejected: 3,           # Application rejected
-      needs_information: 4,  # Additional info needed from constituent
-      reminder_sent: 5,      # Reminder sent to constituent
-      awaiting_documents: 6, # Waiting for specific documents
-      archived: 7           # Historical record
+      draft: 0,               # Constituent still working on application
+      in_progress: 1,         # Submitted by constituent, being processed
+      approved: 2,            # Application approved
+      rejected: 3,            # Application rejected
+      needs_information: 4,   # Additional info needed from constituent
+      reminder_sent: 5,       # Reminder sent to constituent
+      awaiting_documents: 6,  # Waiting for specific documents
+      archived: 7             # Historical record
     }, validate: true
+
+    after_save :handle_status_change, if: :saved_change_to_status?
 
     enum :application_type, {
       new: 0,
@@ -96,5 +98,24 @@ module ApplicationStatusManagement
 
   def request_documents!
     update!(status: :awaiting_documents)
+  end
+
+  private
+
+  def handle_status_change
+    if status_previously_changed?(to: "awaiting_documents")
+      handle_awaiting_documents_transition
+    end
+  end
+
+  def handle_awaiting_documents_transition
+    return unless all_proofs_approved?
+    return if medical_certification_status_requested?
+
+    # Update certification status and send email
+    with_lock do
+      update!(medical_certification_status: :requested)
+      MedicalProviderMailer.request_certification(self).deliver_later
+    end
   end
 end

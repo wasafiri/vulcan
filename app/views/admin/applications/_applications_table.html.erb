@@ -73,10 +73,19 @@
             <% end %>
           </td>
           <td class="px-4 py-2 text-sm text-gray-900">
-            <% if application.status == 'awaiting_documents' %>
+            <% case application.medical_certification_status %>
+            <% when 'not_requested' %>
+              <span class="text-sm text-gray-500">Not Requested</span>
+            <% when 'requested' %>
               <span class="text-sm text-yellow-500">Awaiting Response</span>
+            <% when 'received' %>
+              <span class="text-sm text-blue-500">Received</span>
+            <% when 'accepted' %>
+              <span class="text-sm text-green-500">Accepted</span>
+            <% when 'rejected' %>
+              <span class="text-sm text-red-500">Rejected</span>
             <% else %>
-              <span class="text-sm text-green-500">Responded</span>
+              <span class="text-sm text-gray-500">Unknown</span>
             <% end %>
           </td>
           <td class="px-4 py-2 text-sm font-medium text-right">

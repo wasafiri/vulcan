@@ -181,7 +181,8 @@ class Admin::ApplicationsController < ApplicationController
     if @application.update_certification!(
         certification: params[:medical_certification],
         status: params[:status],
-        verified_by: current_user
+        verified_by: current_user,
+        rejection_reason: params[:rejection_reason]
       )
       redirect_to admin_application_path(@application),
         notice: "Medical certification status updated."
