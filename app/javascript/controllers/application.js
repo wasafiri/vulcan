@@ -4,6 +4,10 @@ const application = Application.start()
 
 // Configure Stimulus development experience
 application.debug = false
-window.Stimulus   = application
+window.Stimulus = application
+
+// Register the modal controller
+import ModalController from "./modal_controller"
+application.register("modal", ModalController)
 
 export { application }

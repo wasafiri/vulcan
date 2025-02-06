@@ -1,15 +1,18 @@
-// app/javascript/controllers/modal_controller.js
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = [ "dialog" ]
-
-  openRejectionForm(event) {
-    event.preventDefault()
-    this.dialogTarget.classList.remove('hidden')
+  open(event) {
+    event.preventDefault();
+    const modalId = event.currentTarget.getAttribute("data-modal-target");
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.classList.remove("hidden");
+    }
   }
 
-  close() {
-    this.dialogTarget.classList.add('hidden')
+  // The close() method adds the "hidden" class to the element where it's defined.
+  close(event) {
+    event.preventDefault();
+    this.element.classList.add("hidden");
   }
 }

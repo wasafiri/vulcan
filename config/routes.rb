@@ -45,6 +45,7 @@ Rails.application.routes.draw do
         post :assign_evaluator
         post :schedule_training
         post :complete_training
+        patch :update_proof_status
         patch :update_certification_status
       end
     end

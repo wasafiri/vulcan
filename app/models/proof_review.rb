@@ -30,7 +30,7 @@ class ProofReview < ApplicationRecord
   # Callbacks
   before_validation :set_reviewed_at, on: :create
 
-  after_create :update_application_proof_status
+  #  after_create :update_application_proof_status
 
   after_commit :handle_post_review_actions, on: :create
 
