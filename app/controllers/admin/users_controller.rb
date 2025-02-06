@@ -92,7 +92,32 @@ class Admin::UsersController < ApplicationController
     end
   end
 
+  def constituents
+    @q = params[:q]
+
+    scope = User.where(type: "Constituent")
+                .joins(:applications)
+                .where(applications: { status: [ Application.statuses[:rejected], Application.statuses[:archived] ] })
+                .group("users.id")
+
+    if @q.present?
+      scope = scope.where("first_name ILIKE :q OR last_name ILIKE :q OR (first_name || ' ' || last_name) ILIKE :q", q: "%#{@q}%")
+    end
+
+    @users = scope.order(:last_name)
+  end
+
+  def history
+    @user = User.find(params[:id])
+    # Assuming you have a has_many :applications association on your Constituent model:
+    @applications = @user.applications.order(application_date: :desc)
+  end
+
   private
+
+  def require_admin!
+    redirect_to root_path, alert: "Not authorized" unless current_user&.admin?
+  end
 
   def update_user_capabilities(user, capabilities)
     # Remove capabilities that aren't in the new list

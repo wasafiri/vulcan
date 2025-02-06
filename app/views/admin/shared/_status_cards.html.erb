@@ -4,6 +4,16 @@
     <h3 class="text-lg font-medium text-gray-900">Constituents YTD</h3>
     <p class="text-3xl font-bold text-indigo-600" aria-live="polite"><%= @ytd_constituents_count || 0 %></p>
     <p class="text-sm text-gray-500">Since July 1st, <%= @current_fiscal_year %></p>
+    <div class="mt-2 space-y-2">
+      <%= link_to constituents_admin_users_path,
+          class: "block inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+          aria: { label: "View all nonactive constituents" } do %>
+        View All Nonactive Constituents
+        <svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+      <% end %>
+    </div>
   </div>
 
   <!-- Active Applications Card -->
