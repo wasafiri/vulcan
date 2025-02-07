@@ -19,7 +19,9 @@
       <div class="flex flex-col md:flex-row items-start md:items-center justify-between">
         <div class="flex items-center space-x-2">
           <%= application_status_badge(@application) %>
-          <p class="text-sm text-gray-500">Last Updated: <%= @application.updated_at.strftime("%B %d, %Y at %I:%M %p") %></p>
+          <p class="text-sm text-gray-500">
+            Last Updated: <%= @application.updated_at.strftime("%B %d, %Y at %I:%M %p") %>
+          </p>
         </div>
         <div class="flex space-x-2 mt-4 md:mt-0">
           <% if @application.status != 'approved' %>
@@ -45,7 +47,9 @@
     <!-- Evaluation and Training Status Section -->
     <% if @application.approved? %>
       <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="evaluation-status-title">
-        <h2 id="evaluation-status-title" class="text-xl font-semibold text-gray-900 mb-4">Evaluation and Training Status</h2>
+        <h2 id="evaluation-status-title" class="text-xl font-semibold text-gray-900 mb-4">
+          Evaluation and Training Status
+        </h2>
         <div class="mb-6">
           <% latest_evaluation = @application.latest_evaluation %>
           <% if latest_evaluation.present? %>
@@ -54,7 +58,9 @@
                 <h3 class="text-sm font-medium text-gray-500">Current Evaluator</h3>
                 <div class="mt-2 flex items-center space-x-2">
                   <% if latest_evaluation.evaluator.present? %>
-                    <span class="text-sm text-gray-900"><%= latest_evaluation.evaluator.full_name %></span>
+                    <span class="text-sm text-gray-900">
+                      <%= latest_evaluation.evaluator.full_name %>
+                    </span>
                   <% else %>
                     <span class="text-sm text-gray-500">No Evaluator Assigned</span>
                   <% end %>
@@ -96,7 +102,9 @@
                 <% @application.training_sessions.order(scheduled_for: :desc).each do |session| %>
                   <div class="bg-gray-50 p-4 rounded-md shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center">
                     <div class="flex items-center space-x-4">
-                      <p class="text-sm font-medium text-gray-900"><%= session.trainer.full_name %></p>
+                      <p class="text-sm font-medium text-gray-900">
+                        <%= session.trainer.full_name %>
+                      </p>
                       <%= training_session_status_badge(session) %>
                     </div>
                     <div class="flex space-x-2 mt-2 md:mt-0">
@@ -151,9 +159,7 @@
         </div>
         <div>
           <dt class="text-sm font-medium text-gray-500">Phone</dt>
-          <dd class="mt-1 text-sm text-gray-900">
-            <%= @application.user.phone || "Not provided" %>
-          </dd>
+          <dd class="mt-1 text-sm text-gray-900"><%= @application.user.phone || "Not provided" %></dd>
         </div>
         <div>
           <dt class="text-sm font-medium text-gray-500">Address</dt>
@@ -205,21 +211,15 @@
         </div>
         <div>
           <dt class="text-sm font-medium text-gray-500">Annual Income</dt>
-          <dd class="mt-1 text-sm text-gray-900">
-            <%= number_to_currency(@application.annual_income) if @application.annual_income %>
-          </dd>
+          <dd class="mt-1 text-sm text-gray-900"><%= number_to_currency(@application.annual_income) if @application.annual_income %></dd>
         </div>
         <div>
           <dt class="text-sm font-medium text-gray-500">Income Verification Status</dt>
-          <dd class="mt-1 text-sm text-gray-900">
-            <%= @application.income_proof_status&.titleize || "Pending" %>
-          </dd>
+          <dd class="mt-1 text-sm text-gray-900"><%= @application.income_proof_status&.titleize || "Pending" %></dd>
         </div>
         <div>
           <dt class="text-sm font-medium text-gray-500">Income Details</dt>
-          <dd class="mt-1 text-sm text-gray-900">
-            <%= @application.income_details.presence || "No additional details provided" %>
-          </dd>
+          <dd class="mt-1 text-sm text-gray-900"><%= @application.income_details.presence || "No additional details provided" %></dd>
         </div>
       </dl>
     </section>
@@ -259,14 +259,13 @@
       </div>
       <div class="mt-4">
         <div class="flex items-center space-x-2">
-          <span class="px-2 py-1 text-sm font-medium rounded-full
-            <%= case @application.medical_certification_status
-                when 'not_requested' then 'bg-gray-100 text-gray-800'
-                when 'requested' then 'bg-yellow-100 text-yellow-800'
-                when 'received' then 'bg-blue-100 text-blue-800'
-                when 'accepted' then 'bg-green-100 text-green-800'
-                when 'rejected' then 'bg-red-100 text-red-800'
-                end %>">
+          <span class="px-2 py-1 text-sm font-medium rounded-full <%= case @application.medical_certification_status
+              when 'not_requested' then 'bg-gray-100 text-gray-800'
+              when 'requested' then 'bg-yellow-100 text-yellow-800'
+              when 'received' then 'bg-blue-100 text-blue-800'
+              when 'accepted' then 'bg-green-100 text-green-800'
+              when 'rejected' then 'bg-red-100 text-red-800'
+              end %>">
             <%= @application.medical_certification_status.titleize %>
           </span>
           <% if @application.medical_certification_verified_at.present? %>
@@ -299,44 +298,73 @@
       <h2 id="attachments-title" class="text-xl font-semibold text-gray-900 mb-4">Attachments</h2>
       <div class="space-y-4">
         <!-- Income Proof Section -->
-        <div class="flex items-center">
-          <svg class="h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-          </svg>
-          <span class="ml-2 text-sm text-gray-900">
-            Income Proof: <%= @application.income_proof_status.titleize %>
+        <div>
+          <div class="flex items-center space-x-2">
+            <svg class="h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span class="text-sm text-gray-900">
+              Income Proof:
+              <span class="px-2 py-1 text-sm font-medium rounded-full <%= badge_class_for(:proof, @application.income_proof_status) %>">
+                <%= @application.income_proof_status.titleize %>
+              </span>
+            </span>
+          </div>
+          <div class="mt-4">
             <% if @application.income_proof.attached? %>
-              <% if @application.income_proof_status == "not_reviewed" %>
-                <button data-controller="modal" data-action="click->modal#open" data-modal-target="incomeProofReviewModal" class="ml-2 text-indigo-600 hover:text-indigo-500 focus:outline-none">
-                  Review
-                </button>
+              <% if @application.income_proof_status == "approved" %>
+                <%= link_to url_for(@application.income_proof),
+                    class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none",
+                    target: "_blank" do %>
+                  View Proof
+                  <svg class="ml-2 -mr-1 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                <% end %>
               <% else %>
-                <%= link_to "View", url_for(@application.income_proof), target: "_blank", class: "ml-2 text-indigo-600 hover:text-indigo-500" %>
+                <button data-controller="modal" data-action="click->modal#open" data-modal-target="incomeProofReviewModal" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">
+                  Review Proof
+                </button>
               <% end %>
             <% else %>
-              Not Attached
+              <span class="text-sm text-gray-500">Not Attached</span>
             <% end %>
-          </span>
+          </div>
         </div>
+
         <!-- Residency Proof Section -->
-        <div class="flex items-center">
-          <svg class="h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-          </svg>
-          <span class="ml-2 text-sm text-gray-900">
-            Residency Proof: <%= @application.residency_proof_status.titleize %>
+        <div>
+          <div class="flex items-center space-x-2">
+            <svg class="h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span class="text-sm text-gray-900">
+              Residency Proof:
+              <span class="px-2 py-1 text-sm font-medium rounded-full <%= badge_class_for(:proof, @application.residency_proof_status) %>">
+                <%= @application.residency_proof_status.titleize %>
+              </span>
+            </span>
+          </div>
+          <div class="mt-4">
             <% if @application.residency_proof.attached? %>
-              <% if @application.residency_proof_status == "not_reviewed" %>
-                <button data-controller="modal" data-action="click->modal#open" data-modal-target="residencyProofReviewModal" class="ml-2 text-indigo-600 hover:text-indigo-500 focus:outline-none">
-                  Review
-                </button>
+              <% if @application.residency_proof_status == "approved" %>
+                <%= link_to url_for(@application.residency_proof),
+                    class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none",
+                    target: "_blank" do %>
+                  View Proof
+                  <svg class="ml-2 -mr-1 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                <% end %>
               <% else %>
-                <%= link_to "View", url_for(@application.residency_proof), target: "_blank", class: "ml-2 text-indigo-600 hover:text-indigo-500" %>
+                <button data-controller="modal" data-action="click->modal#open" data-modal-target="residencyProofReviewModal" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">
+                  Review Proof
+                </button>
               <% end %>
             <% else %>
-              Not Attached
+              <span class="text-sm text-gray-500">Not Attached</span>
             <% end %>
-          </span>
+          </div>
         </div>
       </div>
     </section>
