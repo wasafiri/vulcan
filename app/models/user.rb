@@ -126,12 +126,11 @@ class User < ApplicationRecord
   end
 
   def available_capabilities
-    RoleCapability::CAPABILITIES - inherent_capabilities
+    RoleCapability::CAPABILITIES
   end
 
   def has_capability?(capability)
-    inherent_capabilities.include?(capability) ||
-      role_capabilities.exists?(capability: capability)
+    role_capabilities.exists?(capability: capability)
   end
 
   def prevent_self_role_update(current_user, new_role)
@@ -140,7 +139,16 @@ class User < ApplicationRecord
 
   def add_capability(capability)
     return true if has_capability?(capability)
-    role_capabilities.create(capability: capability)
+
+    new_capability = role_capabilities.new(capability: capability)
+    if new_capability.save
+      Rails.logger.info "Successfully added capability #{capability} to user #{id}"
+      reset_all_caches
+      new_capability
+    else
+      Rails.logger.error "Failed to add capability #{capability} to user #{id}: #{new_capability.errors.full_messages}"
+      new_capability
+    end
   end
 
   def remove_capability(capability)
@@ -202,10 +210,6 @@ class User < ApplicationRecord
 
   def active_application
     applications.where.not(status: "draft").order(created_at: :desc).first
-  end
-
-  def is_guardian=(value)
-    super(ActiveModel::Type::Boolean.new.cast(value))
   end
 
   def guardian_relationship=(value)

@@ -4,7 +4,7 @@ class Admin::UsersController < ApplicationController
 
   def index
     @users = User.includes(:role_capabilities)
-      .order(:type, :last_name, :first_name)
+                 .order(:type, :last_name, :first_name)
   end
 
   def update_role
@@ -38,35 +38,35 @@ class Admin::UsersController < ApplicationController
   end
 
   def update_capabilities
-    user = User.find(params[:id])
+    @user = User.find(params[:id])
     capability = params[:capability]
+    enabled = ActiveModel::Type::Boolean.new.cast(params[:enabled])
 
-    if params[:enabled].to_s == "true"
-      if user.add_capability(capability)
-        render json: {
-          success: true,
-          message: "Added #{capability.titleize} capability to #{user.full_name}"
-        }
+    if enabled
+      result = @user.add_capability(capability)
+      Rails.logger.info "Adding capability #{capability} to user #{@user.id}: #{result}"
+
+      if result.is_a?(RoleCapability)
+        message = "Added #{capability.titleize} Capability"
+        render json: { message: message, success: true }
       else
-        render json: {
-          success: false,
-          message: "Could not add capability: #{user.errors.full_messages.join(', ')}"
-        }, status: :unprocessable_entity
+        error_message = result.errors.full_messages.join(", ") if result.respond_to?(:errors)
+        Rails.logger.error "Failed to add capability: #{error_message}"
+        render json: { message: error_message || "Failed to add capability", success: false }, status: :unprocessable_entity
       end
     else
-      if user.remove_capability(capability)
-        render json: {
-          success: true,
-          message: "Removed #{capability.titleize} capability from #{user.full_name}"
-        }
+      result = @user.remove_capability(capability)
+      Rails.logger.info "Removing capability #{capability} from user #{@user.id}: #{result}"
+
+      if result
+        message = "Removed #{capability.titleize} Capability"
+        render json: { message: message, success: true }
       else
-        render json: {
-          success: false,
-          message: "Could not remove capability: #{user.errors.full_messages.join(', ')}"
-        }, status: :unprocessable_entity
+        render json: { message: "Failed to remove capability", success: false }, status: :unprocessable_entity
       end
     end
   rescue => e
+    Rails.logger.error "Error in update_capabilities: #{e.message}\n#{e.backtrace.join("\n")}"
     render json: {
       success: false,
       message: e.message
@@ -82,19 +82,8 @@ class Admin::UsersController < ApplicationController
   def update
   end
 
-  def full_name
-    "#{first_name} #{last_name}"
-  end
-
-  def require_admin!
-    unless current_user&.admin?
-      redirect_to root_path, alert: "Not authorized"
-    end
-  end
-
   def constituents
     @q = params[:q]
-
     scope = User.where(type: "Constituent")
                 .joins(:applications)
                 .where(applications: { status: [ Application.statuses[:rejected], Application.statuses[:archived] ] })
@@ -109,7 +98,6 @@ class Admin::UsersController < ApplicationController
 
   def history
     @user = User.find(params[:id])
-    # Assuming you have a has_many :applications association on your Constituent model:
     @applications = @user.applications.order(application_date: :desc)
   end
 
@@ -117,16 +105,6 @@ class Admin::UsersController < ApplicationController
 
   def require_admin!
     redirect_to root_path, alert: "Not authorized" unless current_user&.admin?
-  end
-
-  def update_user_capabilities(user, capabilities)
-    # Remove capabilities that aren't in the new list
-    user.role_capabilities.where.not(capability: capabilities).destroy_all
-
-    # Add new capabilities
-    capabilities.each do |capability|
-      user.add_capability(capability) unless user.has_capability?(capability)
-    end
   end
 
   def user_params

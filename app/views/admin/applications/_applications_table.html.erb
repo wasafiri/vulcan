@@ -1,8 +1,7 @@
 <div class="bg-white shadow overflow-x-auto sm:rounded-lg">
   <table class="table-fixed min-w-full divide-y divide-gray-200 applications-table" role="table">
     <thead class="bg-gray-50">
-      <tr>  <!-- Removed application-row class from header -->
-        <%# Table Headers with Sorting Links %>
+      <tr> 
         <th scope="col" class="w-1/12 px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
           <%= link_to admin_applications_path(sort: 'application_date', direction: toggle_direction('application_date')),
                       class: "flex items-center",
