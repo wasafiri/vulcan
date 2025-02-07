@@ -6,7 +6,7 @@
         Application #<%= @application.id %> Details
       </h1>
       <div class="flex space-x-4">
-        <%= link_to admin_applications_path, 
+        <%= link_to admin_applications_path,
             class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
             aria: { label: "Return to applications list" } do %>
           <span>Back to List</span>
@@ -21,7 +21,6 @@
           <%= application_status_badge(@application) %>
           <p class="text-sm text-gray-500">Last Updated: <%= @application.updated_at.strftime("%B %d, %Y at %I:%M %p") %></p>
         </div>
-        
         <div class="flex space-x-2 mt-4 md:mt-0">
           <% if @application.status != 'approved' %>
             <%= button_to approve_admin_application_path(@application),
@@ -31,7 +30,6 @@
                 data: { confirm: "Are you sure you want to approve this application?" } do %>
               Approve
             <% end %>
-
             <%= button_to reject_admin_application_path(@application),
                 method: :patch,
                 class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500",
@@ -48,8 +46,6 @@
     <% if @application.approved? %>
       <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="evaluation-status-title">
         <h2 id="evaluation-status-title" class="text-xl font-semibold text-gray-900 mb-4">Evaluation and Training Status</h2>
-        
-        <!-- Evaluation Status -->
         <div class="mb-6">
           <% latest_evaluation = @application.latest_evaluation %>
           <% if latest_evaluation.present? %>
@@ -62,17 +58,14 @@
                   <% else %>
                     <span class="text-sm text-gray-500">No Evaluator Assigned</span>
                   <% end %>
-                  
                   <%= evaluation_status_badge(latest_evaluation) %>
                 </div>
-                
                 <% if latest_evaluation.evaluation_date.present? %>
                   <p class="text-sm text-gray-500 mt-1">
                     Scheduled for: <%= latest_evaluation.evaluation_date.strftime("%B %d, %Y") %>
                   </p>
                 <% end %>
               </div>
-              
               <% unless latest_evaluation.completed? %>
                 <%= link_to "View Evaluation",
                     evaluators_evaluation_path(latest_evaluation),
@@ -95,8 +88,6 @@
             </div>
           <% end %>
         </div>
-
-        <!-- Training Sessions -->
         <% if latest_evaluation&.completed? %>
           <div>
             <h3 class="text-sm font-medium text-gray-500 mb-2">Training Sessions</h3>
@@ -108,7 +99,6 @@
                       <p class="text-sm font-medium text-gray-900"><%= session.trainer.full_name %></p>
                       <%= training_session_status_badge(session) %>
                     </div>
-                    
                     <div class="flex space-x-2 mt-2 md:mt-0">
                       <% if session.scheduled? %>
                         <%= button_to complete_training_admin_application_path(@application, training_session_id: session.id),
@@ -126,15 +116,13 @@
           </div>
         <% end %>
       </section>
-
-      <!-- Schedule New Training Session -->
       <div class="mt-6">
         <h4 class="text-sm font-medium text-gray-500 mb-2">Schedule New Training Session</h4>
         <div class="flex flex-wrap gap-3">
           <% Trainer.available.each do |trainer| %>
             <%= form_with(url: schedule_training_admin_application_path(@application), method: :post, local: true, class: "flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-2") do |f| %>
               <%= hidden_field_tag :trainer_id, trainer.id %>
-              <%= f.date_field :scheduled_for, 
+              <%= f.date_field :scheduled_for,
                   class: "rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 w-full md:w-auto",
                   required: true,
                   placeholder: "Select Date" %>
@@ -147,7 +135,7 @@
       </div>
     <% end %>
 
-    <!-- Applicant Information -->
+    <!-- Applicant Information Section -->
     <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="applicant-info-title">
       <h2 id="applicant-info-title" class="text-xl font-semibold text-gray-900 mb-4">Applicant Information</h2>
       <dl class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -155,21 +143,18 @@
           <dt class="text-sm font-medium text-gray-500">Full Name</dt>
           <dd class="mt-1 text-sm text-gray-900"><%= @application.user.full_name %></dd>
         </div>
-
         <div>
           <dt class="text-sm font-medium text-gray-500">Email</dt>
           <dd class="mt-1 text-sm text-gray-900">
             <%= mail_to @application.user.email, class: "text-indigo-600 hover:text-indigo-500" %>
           </dd>
         </div>
-
         <div>
           <dt class="text-sm font-medium text-gray-500">Phone</dt>
           <dd class="mt-1 text-sm text-gray-900">
             <%= @application.user.phone || "Not provided" %>
           </dd>
         </div>
-
         <div>
           <dt class="text-sm font-medium text-gray-500">Address</dt>
           <dd class="mt-1 text-sm text-gray-900">
@@ -183,7 +168,7 @@
       </dl>
     </section>
 
-    <!-- Application Details -->
+    <!-- Application Details Section -->
     <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="application-details-title">
       <h2 id="application-details-title" class="text-xl font-semibold text-gray-900 mb-4">Application Details</h2>
       <dl class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -191,19 +176,16 @@
           <dt class="text-sm font-medium text-gray-500">Application Type</dt>
           <dd class="mt-1 text-sm text-gray-900"><%= @application.application_type&.titleize || "Not specified" %></dd>
         </div>
-
         <div>
           <dt class="text-sm font-medium text-gray-500">Submission Method</dt>
           <dd class="mt-1 text-sm text-gray-900"><%= @application.submission_method&.titleize || "Online" %></dd>
         </div>
-
         <div>
           <dt class="text-sm font-medium text-gray-500">Application Date</dt>
           <dd class="mt-1 text-sm text-gray-900">
             <%= @application.application_date&.strftime("%B %d, %Y") || "Not recorded" %>
           </dd>
         </div>
-
         <div>
           <dt class="text-sm font-medium text-gray-500">Last Activity</dt>
           <dd class="mt-1 text-sm text-gray-900">
@@ -213,7 +195,7 @@
       </dl>
     </section>
 
-    <!-- Financial Information -->
+    <!-- Financial Information Section -->
     <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="financial-info-title">
       <h2 id="financial-info-title" class="text-xl font-semibold text-gray-900 mb-4">Financial Information</h2>
       <dl class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -221,21 +203,18 @@
           <dt class="text-sm font-medium text-gray-500">Household Size</dt>
           <dd class="mt-1 text-sm text-gray-900"><%= @application.household_size || "Not specified" %></dd>
         </div>
-
         <div>
           <dt class="text-sm font-medium text-gray-500">Annual Income</dt>
           <dd class="mt-1 text-sm text-gray-900">
             <%= number_to_currency(@application.annual_income) if @application.annual_income %>
           </dd>
         </div>
-
         <div>
           <dt class="text-sm font-medium text-gray-500">Income Verification Status</dt>
           <dd class="mt-1 text-sm text-gray-900">
             <%= @application.income_proof_status&.titleize || "Pending" %>
           </dd>
         </div>
-
         <div>
           <dt class="text-sm font-medium text-gray-500">Income Details</dt>
           <dd class="mt-1 text-sm text-gray-900">
@@ -245,7 +224,7 @@
       </dl>
     </section>
 
-    <!-- Medical Provider Information -->
+    <!-- Medical Provider Information Section -->
     <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="medical-info-title">
       <h2 id="medical-info-title" class="text-xl font-semibold text-gray-900 mb-4">Medical Provider Information</h2>
       <dl class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -253,7 +232,6 @@
           <dt class="text-sm font-medium text-gray-500">Provider Name</dt>
           <dd class="mt-1 text-sm text-gray-900"><%= @application.medical_provider_name || "Not provided" %></dd>
         </div>
-
         <div>
           <dt class="text-sm font-medium text-gray-500">Provider Contact</dt>
           <dd class="mt-1 text-sm text-gray-900">
@@ -268,7 +246,7 @@
     <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="certification-status-title">
       <div class="flex justify-between items-start">
         <h2 id="certification-status-title" class="text-xl font-semibold text-gray-900">Medical Certification Status</h2>
-        <% if @application.medical_certification.attached? %>
+        <% if @application.medical_certification.attached? && @application.medical_certification_status == 'accepted' %>
           <%= link_to url_for(@application.medical_certification),
               class: "inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50",
               target: "_blank" do %>
@@ -301,19 +279,10 @@
           <% end %>
         </div>
         <% if @application.medical_certification_status == 'received' %>
-          <div class="mt-4 flex space-x-4">
-            <%= button_to update_certification_status_admin_application_path(@application, status: :accepted),
-                method: :patch,
-                class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700",
-                data: { confirm: "Accept this medical certification?" } do %>
-              Accept Certification
-            <% end %>
-            <%= button_to update_certification_status_admin_application_path(@application, status: :rejected),
-                method: :patch,
-                class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700",
-                data: { controller: "modal", action: "click->modal#open", "modal-target": "rejectionModal", certification_id: @application.id } do %>
-              Reject Certification
-            <% end %>
+          <div class="mt-4">
+            <button data-controller="modal" data-action="click->modal#open" data-modal-target="medicalCertificationReviewModal" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">
+              Review Certification
+            </button>
           </div>
         <% end %>
         <% if @application.medical_certification_status == 'rejected' && @application.rejection_reason.present? %>
@@ -349,7 +318,6 @@
             <% end %>
           </span>
         </div>
-
         <!-- Residency Proof Section -->
         <div class="flex items-center">
           <svg class="h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -373,7 +341,7 @@
       </div>
     </section>
 
-    <!-- Documents Section (unchanged) -->
+    <!-- Documents Section -->
     <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="documents-title">
       <h2 id="documents-title" class="text-xl font-semibold text-gray-900 mb-4">Documents</h2>
       <% if @application.documents.any? %>
@@ -440,7 +408,36 @@
     </div>
   </div>
 
-  <!-- Existing Rejection Modal for Medical Certification -->
+  <!-- Modal for Medical Certification Review -->
+  <div id="medicalCertificationReviewModal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center" data-controller="modal">
+    <div class="bg-white rounded-lg p-6 max-w-3xl w-full">
+      <h3 class="text-lg font-medium text-gray-900 mb-4">Review Medical Certification</h3>
+      <% if @application.medical_certification.attached? %>
+        <% if @application.medical_certification.content_type.start_with?('application/pdf') %>
+          <embed src="<%= url_for(@application.medical_certification) %>" type="application/pdf" width="100%" height="500px" />
+        <% else %>
+          <%= image_tag url_for(@application.medical_certification), class: "max-w-full h-auto" %>
+        <% end %>
+      <% else %>
+        <p class="text-gray-500">No certification file attached.</p>
+      <% end %>
+      <div class="mt-4 flex space-x-4">
+        <%= button_to update_certification_status_admin_application_path(@application), method: :patch, params: { status: 'accepted' }, class: "inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md", data: { confirm: "Approve this medical certification?" } do %>
+          Approve
+        <% end %>
+        <%= button_to update_certification_status_admin_application_path(@application), method: :patch, params: { status: 'rejected' }, class: "inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md", data: { confirm: "Reject this medical certification?" } do %>
+          Reject
+        <% end %>
+      </div>
+      <div class="mt-4">
+        <button type="button" data-action="click->modal#close" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rejection Modal for Medical Certification (for detailed rejection reason) -->
   <div id="rejectionModal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center" data-controller="modal">
     <div class="bg-white rounded-lg p-6 max-w-lg w-full">
       <h3 class="text-lg font-medium text-gray-900 mb-4">Enter Rejection Reason</h3>
