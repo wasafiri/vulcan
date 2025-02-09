@@ -86,7 +86,7 @@ class ProofReview < ApplicationRecord
 
   def check_all_proofs_approved
     if @application.all_proofs_approved?
-      MedicalProviderMailer.request_certification(@application).deliver_later
+      MedicalProviderMailer.request_certification(@application).deliver_now
       @application.update!(status: :awaiting_documents)
     end
   end
@@ -101,7 +101,7 @@ class ProofReview < ApplicationRecord
   end
 
   def notify_constituent
-    ApplicationNotificationsMailer.proof_rejected(@application, @proof_review).deliver_later
+    ApplicationNotificationsMailer.proof_rejected(@application, @proof_review).deliver_now
     Notification.create!(
       recipient: @application.user,
       actor: @admin,
@@ -134,7 +134,7 @@ class ProofReview < ApplicationRecord
   end
 
   def send_rejection_notification_if_rejected
-    ApplicationNotificationsMailer.proof_rejected(application, self).deliver_later
+    ApplicationNotificationsMailer.proof_rejected(application, self).deliver_now
     Rails.logger.info "Sending proof rejection email to User ID: #{application.user.id}"
     Notification.create!(
       recipient: application.user,
@@ -165,7 +165,7 @@ class ProofReview < ApplicationRecord
 
       if application.total_rejections > 8
         application.update!(status: :archived)
-        ApplicationNotificationsMailer.max_rejections_reached(application).deliver_later
+        ApplicationNotificationsMailer.max_rejections_reached(application).deliver_now
       end
     end
   rescue StandardError => e

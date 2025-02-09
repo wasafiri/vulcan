@@ -110,7 +110,7 @@ class Admin::ScannedProofsController < ApplicationController
     ApplicationNotificationsMailer.proof_received(
       @application,
       params[:proof_type]
-    ).deliver_later
+    ).deliver_now
   rescue StandardError => e
     Rails.logger.error("Failed to queue notification: #{e.message}")
     # Continue without failing the upload

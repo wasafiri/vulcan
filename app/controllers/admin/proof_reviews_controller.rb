@@ -47,11 +47,11 @@ class Admin::ProofReviewsController < ApplicationController
     if @proof_review.save
       # Check if the proof was rejected
       if @proof_review.status == :rejected
-        ApplicationNotificationsMailer.proof_rejected(@application, @proof_review).deliver_later
+        ApplicationNotificationsMailer.proof_rejected(@application, @proof_review).deliver_now
       end
 
       if @application.all_proofs_approved?
-        MedicalProviderMailer.request_certification(@application).deliver_later
+        MedicalProviderMailer.request_certification(@application).deliver_now
         @application.update!(status: :awaiting_documents)
       end
 
