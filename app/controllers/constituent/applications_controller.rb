@@ -210,7 +210,7 @@ class Constituent::ApplicationsController < ApplicationController
     @application = current_user.applications.find(params[:id])
 
     if @application.update(submission_params.merge(status: :in_progress))
-      ApplicationNotificationsMailer.submission_confirmation(@application).deliver_later
+      ApplicationNotificationsMailer.submission_confirmation(@application).deliver_now
       redirect_to constituent_application_path(@application),
         notice: "Application submitted successfully!"
     else

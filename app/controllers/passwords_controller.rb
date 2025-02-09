@@ -10,7 +10,7 @@ class PasswordsController < ApplicationController
     if @user
       # Generate reset token and send email
       @user.generate_password_reset_token!
-      # UserMailer.password_reset(@user).deliver_later # You'll need to create this mailer
+      # UserMailer.password_reset(@user).deliver_now # You'll need to create this mailer
       redirect_to sign_in_path, notice: "Check your email for password reset instructions."
     else
       redirect_to new_password_path, alert: "Email address not found."

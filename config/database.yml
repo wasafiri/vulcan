@@ -11,8 +11,7 @@ development:
     timeout: 5000
   queue:
     <<: *primary
-    database: mat_vulcan_queue_development
-    migrations_paths: db/queue_migrate
+    database: mat_vulcan_development  # Same database in development
 
 test:
   primary: &test
@@ -22,8 +21,7 @@ test:
     timeout: 5000
   queue:
     <<: *test
-    database: mat_vulcan_queue_test
-    migrations_paths: db/queue_migrate
+    database: mat_vulcan_test  # Same database in test
 
 production:
   primary: &primary_production

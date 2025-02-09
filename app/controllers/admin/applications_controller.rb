@@ -8,7 +8,7 @@ class Admin::ApplicationsController < ApplicationController
     :show, :edit, :update,
     :verify_income, :request_documents, :review_proof, :update_proof_status,
     :approve, :reject, :assign_evaluator, :schedule_training, :complete_training,
-    :update_certification_status
+    :update_certification_status, :resend_medical_certification
   ]
 
   def index
@@ -192,6 +192,19 @@ class Admin::ApplicationsController < ApplicationController
     end
   end
 
+  def resend_medical_certification
+    # Send the certification request email
+    MedicalProviderMailer.request_certification(@application).deliver_now
+
+    # Update the certification requested date and increment the count
+    @application.transaction do
+      @application.update!(medical_certification_requested_at: Time.current)
+      @application.increment!(:medical_certification_request_count)
+    end
+
+    redirect_to admin_application_path(@application), notice: "Certification request resent."
+  end
+
   private
 
   def sort_column
@@ -220,6 +233,8 @@ class Admin::ApplicationsController < ApplicationController
 
   def set_application
     @application = Application.find(params[:id])
+  rescue ActiveRecord::RecordNotFound
+    redirect_to admin_applications_path, alert: "Application not found"
   end
 
   def application_params

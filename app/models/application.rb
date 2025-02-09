@@ -135,7 +135,7 @@ class Application < ApplicationRecord
       EvaluatorMailer.with(
         evaluation: evaluation,
         constituent: user
-      ).new_evaluation_assigned.deliver_later
+      ).new_evaluation_assigned.deliver_now
     end
     true
   rescue ActiveRecord::RecordInvalid => e
@@ -194,6 +194,12 @@ class Application < ApplicationRecord
 
   def all_evaluations
     evaluations.order(created_at: :desc)
+  end
+
+  def constituent_full_name
+    # Checking if user exists and has both names to avoid nil errors
+    return "#{user.first_name} #{user.last_name}".strip if user&.first_name || user&.last_name
+    "Unknown Constituent"
   end
 
   private

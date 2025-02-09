@@ -5,12 +5,15 @@ class ApplicationMailer < ActionMailer::Base
   )
 
   layout "mailer"
-
   before_action :set_default_host_url
 
   private
 
   def set_default_host_url
-    @host_url = ENV.fetch("MAILER_HOST")
+    @host_url = if Rails.env.development?
+                  "localhost:3000"
+    else
+      ENV.fetch("MAILER_HOST")
+    end
   end
 end

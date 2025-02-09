@@ -47,6 +47,7 @@ Rails.application.routes.draw do
         post :complete_training
         patch :update_proof_status
         patch :update_certification_status
+        post :resend_medical_certification
       end
     end
 
