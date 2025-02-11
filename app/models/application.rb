@@ -12,6 +12,7 @@ class Application < ApplicationRecord
   has_many :evaluations, dependent: :destroy
   has_many :notifications, as: :notifiable, dependent: :destroy
   has_many :proof_reviews, dependent: :destroy
+  has_one_attached :medical_certification
   belongs_to :medical_certification_verified_by,
   class_name: "User",
   optional: true

@@ -29,7 +29,7 @@ submitted_application:
   medical_certification_status: received
 
 approved_application:
-  user_id: <%= User.find_by(email: 'constituent@example.com').id %>
+  user_id: <%= User.find_by(email: 'steven.cooper@example.com').id %>
   application_date: <%= 2.months.ago.strftime("%F %T") %>
   status: approved
   maryland_resident: true
@@ -72,3 +72,18 @@ awaiting_medical_response_application:
   income_proof_status: approved
   residency_proof_status: approved
   medical_certification_status: not_requested
+
+new_user_application:
+  user_id: <%= User.find_by(email: 'rex.canine@example.com').id %>
+  application_date: <%= 3.days.ago.strftime("%F %T") %>
+  status: in_progress
+  maryland_resident: true
+  annual_income: "55000"
+  household_size: 2
+  self_certify_disability: false
+  medical_provider_name: "New Health Clinic"
+  medical_provider_phone: "555-222-3333"
+  medical_provider_email: "info@newhealthclinic.com"
+  income_proof_status: approved
+  residency_proof_status: not_reviewed
+  medical_certification_status: requested

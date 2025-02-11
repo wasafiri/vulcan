@@ -201,6 +201,24 @@ unless Rails.env.production?
           timezone: 'Eastern Time (US & Canada)',
           locale: 'en',
           email_verified: true
+        },
+        {
+          type: 'Constituent',
+          email: 'rex.canine@example.com',
+          first_name: 'Rex',
+          last_name: 'Canine',
+          password: 'password123',
+          password_confirmation: 'password123',
+          phone: '555-555-0005',
+          date_of_birth: 18.years.ago.to_date,
+          physical_address_1: '300 Oar Street',
+          city: 'Baltimore',
+          state: 'MD',
+          zip_code: '21203',
+          hearing_disability: false,
+          timezone: 'Eastern Time (US & Canada)',
+          locale: 'en',
+          email_verified: true
         }
       ]
       constituent_users.each do |attributes|
@@ -270,48 +288,46 @@ unless Rails.env.production?
       end
 
       # ------------------------------
-      # Create Primary Constituent for Applications
+      # Ensure Primary Constituent for Applications
       # ------------------------------
-      puts "\nCreating primary constituent for applications..."
-      primary_constituent = User.find_or_create_by(email: "constituent@example.com") do |user|
-        user.assign_attributes(
+      puts "\nEnsuring primary constituent for applications..."
+      primary_constituent = User.find_by(email: "john.doe@example.com")
+      unless primary_constituent
+        primary_constituent = User.create!(
           type: 'Constituent',
-          first_name: "Test",
-          last_name: "User",
-          phone: "555-555-5555",
-          date_of_birth: base_date - 25.years,
-          timezone: "Eastern Time (US & Canada)",
-          locale: "en",
-          physical_address_1: "123 Main St",
-          city: "Baltimore",
-          state: "MD",
-          zip_code: "21201",
-          home_internet_service: true,
-          password: "SecurePass123!",
-          password_confirmation: "SecurePass123!"
+          email: 'john.doe@example.com',
+          first_name: 'John',
+          last_name: 'Doe',
+          password: 'password123',
+          password_confirmation: 'password123',
+          phone: '555-555-0002',
+          date_of_birth: 45.years.ago.to_date,
+          physical_address_1: '123 Main St',
+          city: 'Baltimore',
+          state: 'MD',
+          zip_code: '21201',
+          hearing_disability: true,
+          timezone: 'Eastern Time (US & Canada)',
+          locale: 'en',
+          email_verified: true
         )
       end
-      puts "  Primary constituent #{primary_constituent.email} created or found."
+      puts "  Primary constituent #{primary_constituent.email} found."
 
       # ------------------------------
       # Load Applications Fixture
       # ------------------------------
-      # (Ensure your applications fixture uses user_id and no keys for attachments.)
+      puts "\nLoading applications fixture from #{Rails.root.join('test/fixtures/applications.yml')}..."
       applications_fixture_path = Rails.root.join('test/fixtures/applications.yml')
       if File.exist?(applications_fixture_path)
-        puts "\nLoading applications fixture from #{applications_fixture_path}..."
         ActiveRecord::FixtureSet.create_fixtures(Rails.root.join('test/fixtures'), 'applications')
         puts "Applications fixture loaded."
       else
         puts "\nApplications fixture not found at #{applications_fixture_path}."
       end
 
-      # ------------------------------
-      # Attach Proof Files to Applications via Active Storage
-      # ------------------------------
-      puts "\nAttaching proof files to applications..."
+      puts "\nAttaching income proof files to applications..."
       Application.find_each do |app|
-        # Attach an income proof if not already attached.
         unless app.income_proof.attached?
           app.income_proof.attach(
             io: File.open(Rails.root.join('test/fixtures/files/income_proof.pdf')),
@@ -321,14 +337,50 @@ unless Rails.env.production?
           puts "  Attached income proof for Application ##{app.id}"
         end
 
-        # Attach a residency proof if not already attached.
         unless app.residency_proof.attached?
-          app.residency_proof.attach(
-            io: File.open(Rails.root.join('test/fixtures/files/residency_proof.pdf')),
-            filename: 'residency_proof.pdf',
-            content_type: 'application/pdf'
-          )
-          puts "  Attached residency proof for Application ##{app.id}"
+          if app.user.email == 'new.constituent@example.com'
+            app.residency_proof.attach(
+              io: File.open(Rails.root.join('test/fixtures/files/residency_proof_invalid.pdf')),
+              filename: 'residency_proof_invalid.pdf',
+              content_type: 'application/pdf'
+            )
+            puts "  Attached invalid residency proof for Application ##{app.id} (new user)"
+          else
+            app.residency_proof.attach(
+              io: File.open(Rails.root.join('test/fixtures/files/residency_proof.pdf')),
+              filename: 'residency_proof.pdf',
+              content_type: 'application/pdf'
+            )
+            puts "  Attached residency proof for Application ##{app.id}"
+          end
+        end
+      end
+
+      # ------------------------------
+      # Attach Medical Certification Files to Applications via Active Storage
+      # ------------------------------
+      puts "\nAttaching medical certification files to applications..."
+      Application.find_each do |app|
+        # Only attach if a medical certification file is not already attached
+        unless app.medical_certification.attached?
+          case app.medical_certification_status.to_s
+          when 'received', 'accepted'
+            app.medical_certification.attach(
+              io: File.open(Rails.root.join('test/fixtures/files/medical_certification_valid.pdf')),
+              filename: 'medical_certification_valid.pdf',
+              content_type: 'application/pdf'
+            )
+            puts "  Attached valid medical certification for Application ##{app.id}"
+          when 'rejected'
+            app.medical_certification.attach(
+              io: File.open(Rails.root.join('test/fixtures/files/medical_certification_invalid.pdf')),
+              filename: 'medical_certification_invalid.pdf',
+              content_type: 'application/pdf'
+            )
+            puts "  Attached invalid medical certification for Application ##{app.id}"
+          else
+            puts "  No medical certification attachment needed for Application ##{app.id} (status: #{app.medical_certification_status})"
+          end
         end
       end
     end
