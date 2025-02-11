@@ -25,13 +25,13 @@ class TrainingSessionNotifier
   def send_email_notifications
     case training_session.status
     when "scheduled", "confirmed"
-      TrainingSessionNotificationsMailer.training_scheduled(training_session).deliver_later
+      TrainingSessionNotificationsMailer.training_scheduled(training_session).deliver_now
     when "completed"
-      TrainingSessionNotificationsMailer.training_completed(training_session).deliver_later
+      TrainingSessionNotificationsMailer.training_completed(training_session).deliver_now
     when "cancelled"
-      TrainingSessionNotificationsMailer.training_cancelled(training_session).deliver_later
+      TrainingSessionNotificationsMailer.training_cancelled(training_session).deliver_now
     when "no_show"
-      TrainingSessionNotificationsMailer.no_show_notification(training_session).deliver_later
+      TrainingSessionNotificationsMailer.no_show_notification(training_session).deliver_now
     end
   end
 

@@ -1,4 +1,4 @@
-# Admin user
+# Admins
 admin_david:
   type: Admin
   email: david.bahar@maryland.gov
@@ -51,7 +51,24 @@ admin_brandie:
   hearing_disability: true
   email_verified: true
 
-# Constituent with disabilities
+# Constituents
+constituent_alex:
+  type: Constituent
+  email: alex.smith@example.com
+  first_name: Alex
+  last_name: Smith
+  password_digest: <%= default_password_digest %>
+  phone: 555-555-0002
+  date_of_birth: <%= 30.years.ago.to_date %>
+  physical_address_1: 127 Main St
+  city: Baltimore
+  state: MD
+  zip_code: 21201
+  hearing_disability: true
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+
 constituent_john:
   type: Constituent
   email: john.doe@example.com
@@ -69,7 +86,6 @@ constituent_john:
   locale: en
   email_verified: true
 
-# Constituent with disabilities
 constituent_jane:
   type: Constituent
   email: jane.doe@example.com
@@ -87,7 +103,6 @@ constituent_jane:
   locale: en
   email_verified: true
 
-# Constituent with disabilities
 constituent_kenneth:
   type: Constituent
   email: kenneth.klein@example.com
@@ -105,10 +120,9 @@ constituent_kenneth:
   locale: en
   email_verified: true
 
-# Constituent with disabilities
 constituent_steven:
   type: Constituent
-  email: steven.coopern@example.com
+  email: steven.cooper@example.com
   first_name: Steven
   last_name: Cooper
   password_digest: <%= default_password_digest %>
@@ -119,6 +133,40 @@ constituent_steven:
   state: MD
   zip_code: 21201
   speech_disability: true
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+
+constituent_mark:
+  type: Constituent
+  email: mark.jones@example.com
+  first_name: Mark
+  last_name: Jones
+  password_digest: <%= default_password_digest %>
+  phone: 555-555-0002
+  date_of_birth: <%= 20.years.ago.to_date %>
+  physical_address_1: 128 Main St
+  city: Baltimore
+  state: MD
+  zip_code: 21201
+  hearing_disability: true
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+
+constituent_rex:
+  type: Constituent
+  email: rex.canine@example.com
+  first_name: Rex
+  last_name: Canine
+  password_digest: <%= default_password_digest %>
+  phone: 555-555-0005
+  date_of_birth: <%= 18.years.ago.to_date %>
+  physical_address_1: "300 Oar Street"
+  city: Baltimore
+  state: MD
+  zip_code: "21203"
+  hearing_disability: false
   timezone: "Eastern Time (US & Canada)"
   locale: en
   email_verified: true

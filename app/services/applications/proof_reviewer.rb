@@ -39,7 +39,7 @@ class Applications::ProofReviewer
 
   def notify_constituent
     return unless @proof_review
-    ApplicationNotificationsMailer.proof_rejected(@application, @proof_review).deliver_later
+    ApplicationNotificationsMailer.proof_rejected(@application, @proof_review).deliver_now
     Notification.create!(
       recipient: @application.user,
       actor: @admin,
@@ -54,7 +54,7 @@ class Applications::ProofReviewer
 
   def check_all_proofs_approved
     if @application.all_proofs_approved?
-      MedicalProviderMailer.request_certification(@application).deliver_later
+      MedicalProviderMailer.request_certification(@application).deliver_now
       @application.update!(status: :awaiting_documents)
     end
   end
