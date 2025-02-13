@@ -295,64 +295,9 @@
     </section>
 
     <!-- Attachments Section (Proofs) -->
-    <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="attachments-title">
+    <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="attachments-title" id="attachments-section">
       <h2 id="attachments-title" class="text-xl font-semibold text-gray-900 mb-4">Attachments</h2>
-      <div class="space-y-4">
-        <!-- Income Proof Section -->
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-2">
-            <svg class="h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            <span class="text-sm text-gray-900">
-              Income Proof:
-              <span class="px-2 py-1 text-sm font-medium rounded-full <%= badge_class_for(:proof, @application.income_proof_status) %>">
-                <%= @application.income_proof_status.titleize %>
-              </span>
-            </span>
-          </div>
-          <div>
-            <% if @application.income_proof.attached? %>
-              <% if @application.income_proof_status == "approved" %>
-                <%= link_to "View Proof", url_for(@application.income_proof), target: "_blank", class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none" %>
-              <% else %>
-                <button data-controller="modal" data-action="click->modal#open" data-modal-target="incomeProofReviewModal" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">
-                  Review Proof
-                </button>
-              <% end %>
-            <% else %>
-              <span class="text-sm text-gray-500">Not Attached</span>
-            <% end %>
-          </div>
-        </div>
-        <!-- Residency Proof Section -->
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-2">
-            <svg class="h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            <span class="text-sm text-gray-900">
-              Residency Proof:
-              <span class="px-2 py-1 text-sm font-medium rounded-full <%= badge_class_for(:proof, @application.residency_proof_status) %>">
-                <%= @application.residency_proof_status.titleize %>
-              </span>
-            </span>
-          </div>
-          <div>
-            <% if @application.residency_proof.attached? %>
-              <% if @application.residency_proof_status == "approved" %>
-                <%= link_to "View Proof", url_for(@application.residency_proof), target: "_blank", class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none" %>
-              <% else %>
-                <button data-controller="modal" data-action="click->modal#open" data-modal-target="residencyProofReviewModal" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">
-                  Review Proof
-                </button>
-              <% end %>
-            <% else %>
-              <span class="text-sm text-gray-500">Not Attached</span>
-            <% end %>
-          </div>
-        </div>
-      </div>
+      <%= render "attachments" %>
     </section>
 
     <!-- Documents Section -->
@@ -382,7 +327,14 @@
           <%= image_tag url_for(@application.income_proof), class: "max-w-full h-auto" %>
         <% end %>
         <div class="mt-4 flex space-x-4">
-          <%= button_to update_proof_status_admin_application_path(@application), method: :patch, params: { proof_type: 'income', status: 'approved' }, class: "inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md", data: { confirm: "Approve income proof?" } do %>
+          <%= button_to update_proof_status_admin_application_path(@application), 
+              method: :patch, 
+              params: { proof_type: 'income', status: 'approved' }, 
+              class: "inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md", 
+              data: { 
+                turbo: true,
+                confirm: "Approve income proof?" 
+              } do %>
             Approve
           <% end %>
           <button type="button" data-action="click->modal#open" data-modal-target="proofRejectionModal" data-proof-type="income" class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md">
@@ -407,7 +359,14 @@
           <%= image_tag url_for(@application.residency_proof), class: "max-w-full h-auto" %>
         <% end %>
         <div class="mt-4 flex space-x-4">
-          <%= button_to update_proof_status_admin_application_path(@application), method: :patch, params: { proof_type: 'residency', status: 'approved' }, class: "inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md", data: { confirm: "Approve residency proof?" } do %>
+          <%= button_to update_proof_status_admin_application_path(@application), 
+              method: :patch, 
+              params: { proof_type: 'residency', status: 'approved' }, 
+              class: "inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md", 
+              data: { 
+                turbo: true,
+                confirm: "Approve residency proof?" 
+              } do %>
             Approve
           <% end %>
           <button type="button" data-action="click->modal#open" data-modal-target="proofRejectionModal" data-proof-type="residency" class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md">
@@ -468,9 +427,10 @@
         </div>
         <%= form_with url: update_proof_status_admin_application_path(@application),
                       method: :patch,
-                      local: true,
+                      local: false,
                       id: "proof-rejection-form",
-                      class: "space-y-4" do |f| %>
+                      class: "space-y-4",
+                      data: { turbo: true } do |f| %>
           <%= f.hidden_field :status, value: "rejected" %>
           <%= f.hidden_field :proof_type, id: "rejection-proof-type" %>
           <div>

@@ -10,6 +10,10 @@ class EmailTemplate < ApplicationRecord
       required_vars: %w[constituent_name proof_type rejection_reason],
       optional_vars: %w[admin_name application_id]
     },
+    "proof_approval" => {
+      required_vars: %w[constituent_name proof_type],
+      optional_vars: %w[admin_name application_id]
+    },
     "medical_provider_request" => {
       required_vars: %w[provider_name constituent_name],
       optional_vars: %w[application_id]

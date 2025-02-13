@@ -22,7 +22,9 @@
   
   <body class="font-sans antialiased bg-gray-50">
     <%= render "shared/header" %>
-    <%= render "layouts/flash" %>
+    <div id="flash">
+      <%= render "layouts/flash" %>
+    </div>
     
     <main>
       <%= yield %>

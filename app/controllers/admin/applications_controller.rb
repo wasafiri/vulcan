@@ -102,10 +102,30 @@ class Admin::ApplicationsController < ApplicationController
          status: params[:status],
          rejection_reason: params[:rejection_reason]
        )
-      flash[:notice] = "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
-      redirect_to admin_application_path(@application)
+      respond_to do |format|
+        format.html {
+          flash[:notice] = "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
+          redirect_to admin_application_path(@application)
+        }
+        format.turbo_stream {
+          flash.now[:notice] = "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
+          render turbo_stream: [
+            turbo_stream.update("flash", partial: "shared/flash"),
+            turbo_stream.update("attachments-section", partial: "attachments"),
+            turbo_stream.remove("proofRejectionModal"),
+            turbo_stream.remove("incomeProofReviewModal"),
+            turbo_stream.remove("residencyProofReviewModal")
+          ]
+        }
+      end
     else
-      render :show, status: :unprocessable_entity
+      respond_to do |format|
+        format.html { render :show, status: :unprocessable_entity }
+        format.turbo_stream {
+          flash.now[:error] = "Failed to update proof status"
+          render turbo_stream: turbo_stream.update("flash", partial: "shared/flash")
+        }
+      end
     end
   end
 
