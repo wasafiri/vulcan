@@ -12,17 +12,17 @@
       h1 {
         color: #2d3748;
       }
-      ul {
-        margin: 20px 0;
-        padding-left: 20px;
-      }
-      li {
-        margin-bottom: 10px;
-      }
       .footer {
         margin-top: 30px;
         font-size: 0.9em;
         color: #555555;
+      }
+      .status-box {
+        background: #fff5f5;
+        padding: 15px;
+        margin: 20px 0;
+        border-radius: 5px;
+        border-left: 4px solid #f56565;
       }
       .reason-box {
         background: #f3f4f6;
@@ -39,18 +39,22 @@
 
     <p>Thank you for submitting your application to MDMAT. We appreciate your interest in our services and look forward to assisting you.</p>
 
-    <p>We have reviewed your <strong><%= @proof_type.titleize %></strong> document and need some additional information or clarification:</p>
+    <div class="status-box">
+      <p>We have reviewed your <%= format_proof_type(@proof_review.proof_type) %> documentation and need some additional information or clarification.</p>
+    </div>
 
     <div class="reason-box">
       <p><strong>Reason for Revision:</strong></p>
-      <p><%= @rejection_reason %></p>
+      <p><%= @proof_review.rejection_reason %></p>
     </div>
 
     <% if @remaining_attempts > 0 %>
-      <p>You have <strong><%= @remaining_attempts %> <%= 'attempt'.pluralize(@remaining_attempts) %></strong> to submit your revised document. You can submit your revised document by:</p>
+      <p>You have <strong><%= @remaining_attempts %> <%= 'attempt'.pluralize(@remaining_attempts) %></strong> remaining to submit your revised document.</p>
+      
+      <p>Please ensure all required documentation has been submitted for review. You can:</p>
       <ul>
-        <li>Logging into your account and uploading a new document</li>
-        <li>Replying to this email with the document attached</li>
+        <li>Visit <%= link_to "your profile page", constituent_profile_url(host: Rails.application.config.action_mailer.default_url_options[:host]) %> to upload new documentation</li>
+        <li>Reply to this email with your documentation attached</li>
       </ul>
     <% else %>
       <p>Please note that this was your final attempt to submit this document. Your application (ID: <%= @application.id %>) has been archived. You are welcome to start a new application after <strong><%= @reapply_date %></strong>.</p>

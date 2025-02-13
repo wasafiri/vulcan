@@ -12,6 +12,7 @@ class Application < ApplicationRecord
   has_many :evaluations, dependent: :destroy
   has_many :notifications, as: :notifiable, dependent: :destroy
   has_many :proof_reviews, dependent: :destroy
+  has_many :status_changes, class_name: "ApplicationStatusChange"
   has_one_attached :medical_certification
   belongs_to :medical_certification_verified_by,
   class_name: "User",
@@ -103,6 +104,7 @@ class Application < ApplicationRecord
     end
   end
 
+  # On chopping block
   def self.batch_update_status(ids, status)
     transaction do
       where(id: ids).lock("FOR UPDATE SKIP LOCKED").find_each do |application|
@@ -201,6 +203,20 @@ class Application < ApplicationRecord
     # Checking if user exists and has both names to avoid nil errors
     return "#{user.first_name} #{user.last_name}".strip if user&.first_name || user&.last_name
     "Unknown Constituent"
+  end
+
+  # Application status change tracking
+  def update_status(new_status, user: nil, notes: nil)
+    old_status = status
+
+    if update(status: new_status)
+      status_changes.create!(
+        from_status: old_status,
+        to_status: new_status,
+        user: user,
+        notes: notes
+      )
+    end
   end
 
   private

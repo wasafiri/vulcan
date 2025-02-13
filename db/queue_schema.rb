@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_02_09_034602) do
+ActiveRecord::Schema[8.0].define(version: 2025_02_13_182901) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -45,6 +45,21 @@ ActiveRecord::Schema[8.0].define(version: 2025_02_09_034602) do
     t.bigint "blob_id", null: false
     t.string "variation_digest", null: false
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  end
+
+  create_table "application_status_changes", force: :cascade do |t|
+    t.bigint "application_id", null: false
+    t.bigint "user_id"
+    t.string "from_status", null: false
+    t.string "to_status", null: false
+    t.datetime "changed_at", null: false
+    t.text "notes"
+    t.json "metadata"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["application_id"], name: "index_application_status_changes_on_application_id"
+    t.index ["changed_at"], name: "index_application_status_changes_on_changed_at"
+    t.index ["user_id"], name: "index_application_status_changes_on_user_id"
   end
 
   create_table "applications", force: :cascade do |t|
@@ -451,6 +466,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_02_09_034602) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "application_status_changes", "applications"
+  add_foreign_key "application_status_changes", "users"
   add_foreign_key "applications", "users"
   add_foreign_key "applications", "users", column: "income_verified_by_id"
   add_foreign_key "applications", "users", column: "medical_certification_verified_by_id"

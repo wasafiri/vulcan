@@ -6,7 +6,6 @@ export default class extends Controller {
     this.element.querySelectorAll('.predefined-reason-btn').forEach((btn) => {
       btn.addEventListener('click', (event) => {
         event.preventDefault();
-        console.log("Predefined reason button clicked");
         // Read the current proof type from the hidden field inside this modal
         const proofType = this.element.querySelector("#rejection-proof-type").value;
         let reasonText = '';
@@ -23,12 +22,21 @@ export default class extends Controller {
         const textarea = this.element.querySelector('#rejection_reason_field');
         if (textarea) {
           textarea.value = reasonText;
-          console.log("Text area populated with:", reasonText);
-        } else {
-          console.log("Textarea not found");
         }
       });
     });
+
+    // Handle form submission
+    const form = this.element.querySelector('#proof-rejection-form');
+    if (form) {
+      form.addEventListener('submit', (event) => {
+        // Disable the submit button to prevent multiple submissions
+        const submitButton = form.querySelector('input[type="submit"]');
+        if (submitButton) {
+          submitButton.disabled = true;
+        }
+      });
+    }
   }
 
   open(event) {

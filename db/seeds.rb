@@ -39,6 +39,33 @@ unless Rails.env.production?
       end
 
       # ------------------------------
+      # Create Policies
+      # ------------------------------
+      puts "\nCreating policies..."
+      policies = {
+        "fpl_modifier_percentage" => 400,
+        "fpl_1_person" => 15_060,
+        "fpl_2_person" => 20_440,
+        "fpl_3_person" => 25_820,
+        "fpl_4_person" => 31_200,
+        "fpl_5_person" => 36_580,
+        "fpl_6_person" => 41_960,
+        "fpl_7_person" => 47_340,
+        "fpl_8_person" => 52_720,
+        "max_training_sessions" => 3,
+        "waiting_period_years" => 3
+      }
+
+      policies.each do |key, value|
+        policy = Policy.find_or_create_by!(key: key) do |p|
+          p.value = value
+        end
+        raise "Failed to create policy #{key}" unless policy.persisted?
+        raise "Policy #{key} ID not generated" unless policy.id.present?
+        raise "Policy #{key} has wrong value" unless policy.value == value
+      end
+
+      # ------------------------------
       # Create Admin Users
       # ------------------------------
       puts "\nCreating admin users..."
