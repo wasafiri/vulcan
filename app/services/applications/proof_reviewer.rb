@@ -8,7 +8,6 @@ class Applications::ProofReviewer
     ApplicationRecord.transaction do
       @proof_review = create_proof_review(proof_type, status, rejection_reason)
       update_proof_status(proof_type, status)
-      notify_constituent(status)
       check_all_proofs_approved if status == :approved
     end
     true
@@ -20,9 +19,9 @@ class Applications::ProofReviewer
   private
 
   def create_proof_review(type, status, reason)
-    @application.proof_reviews.create!(
+    @proof_review = @application.proof_reviews.create!(
       admin: @admin,
-      proof_type: type,
+      proof_type: type.to_sym, # Ensure we pass a symbol for the enum
       status: status,
       rejection_reason: reason
     )
@@ -34,35 +33,6 @@ class Applications::ProofReviewer
       @application.update!(income_proof_status: status)
     when "residency"
       @application.update!(residency_proof_status: status)
-    end
-  end
-
-  def notify_constituent(status)
-    return unless @proof_review
-
-    if status.to_sym == :rejected
-      ApplicationNotificationsMailer.proof_rejected(@application, @proof_review).deliver_now
-      Notification.create!(
-        recipient: @application.user,
-        actor: @admin,
-        action: "proof_rejected",
-        notifiable: @application,
-        metadata: {
-          proof_type: @proof_review.proof_type,
-          rejection_reason: @proof_review.rejection_reason
-        }
-      )
-    else
-      ApplicationNotificationsMailer.proof_approved(@application, @proof_review).deliver_now
-      Notification.create!(
-        recipient: @application.user,
-        actor: @admin,
-        action: "proof_approved",
-        notifiable: @application,
-        metadata: {
-          proof_type: @proof_review.proof_type
-        }
-      )
     end
   end
 

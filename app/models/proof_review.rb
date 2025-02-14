@@ -44,7 +44,6 @@ class ProofReview < ApplicationRecord
     ApplicationRecord.transaction do
       create_proof_review(proof_type, status, rejection_reason)
       update_application_proof_status(proof_type, status)
-      notify_constituent if status == :rejected
       check_all_proofs_approved
     end
     true
@@ -100,26 +99,12 @@ class ProofReview < ApplicationRecord
     end
   end
 
-  def notify_constituent
-    ApplicationNotificationsMailer.proof_rejected(@application, @proof_review).deliver_now
-    Notification.create!(
-      recipient: @application.user,
-      actor: @admin,
-      action: "proof_rejected",
-      notifiable: @application,
-      metadata: {
-        proof_type: @proof_review.proof_type,
-        rejection_reason: @proof_review.rejection_reason
-      }
-    )
-  end
-
   def handle_post_review_actions
     return unless status_rejected?
     Rails.logger.info "Processing proof rejection for Application ID: #{application.id}"
     ActiveRecord::Base.transaction do
       increment_rejections_if_rejected
-      send_rejection_notification_if_rejected
+      send_rejection_notification
       check_max_rejections
     end
   end
@@ -133,14 +118,14 @@ class ProofReview < ApplicationRecord
     raise ActiveRecord::Rollback
   end
 
-  def send_rejection_notification_if_rejected
+  def send_rejection_notification
     ApplicationNotificationsMailer.proof_rejected(application, self).deliver_now
     Rails.logger.info "Sending proof rejection email to User ID: #{application.user.id}"
     Notification.create!(
       recipient: application.user,
       actor: admin,
       action: "proof_rejected",
-      notifiable: self,
+      notifiable: application,
       metadata: {
         proof_type: proof_type,
         rejection_reason: rejection_reason
