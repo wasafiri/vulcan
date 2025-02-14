@@ -40,7 +40,7 @@ class Applications::ProofReviewer
   def notify_constituent(status)
     return unless @proof_review
 
-    if status.to_s == "rejected"
+    if status.to_sym == :rejected
       ApplicationNotificationsMailer.proof_rejected(@application, @proof_review).deliver_now
       Notification.create!(
         recipient: @application.user,
