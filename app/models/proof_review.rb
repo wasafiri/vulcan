@@ -40,18 +40,6 @@ class ProofReview < ApplicationRecord
   scope :rejections, -> { where(status: :rejected) }
   scope :last_3_days, -> { where("created_at > ?", 3.days.ago) }
 
-  def review(proof_type:, status:, rejection_reason: nil)
-    ApplicationRecord.transaction do
-      create_proof_review(proof_type, status, rejection_reason)
-      update_application_proof_status(proof_type, status)
-      check_all_proofs_approved
-    end
-    true
-  rescue ActiveRecord::RecordInvalid => e
-    Rails.logger.error "Proof review failed: #{e.message}"
-    false
-  end
-
   private
 
   def set_reviewed_at
@@ -83,30 +71,38 @@ class ProofReview < ApplicationRecord
     end
   end
 
-  def check_all_proofs_approved
-    if @application.all_proofs_approved?
-      MedicalProviderMailer.request_certification(@application).deliver_now
-      @application.update!(status: :awaiting_documents)
-    end
-  end
-
-  def update_application_proof_status(proof_type, status)
-    case proof_type.to_s
-    when "income"
-      @application.update!(income_proof_status: status)
-    when "residency"
-      @application.update!(residency_proof_status: status)
-    end
-  end
-
   def handle_post_review_actions
-    return unless status_rejected?
-    Rails.logger.info "Processing proof rejection for Application ID: #{application.id}"
-    ActiveRecord::Base.transaction do
-      increment_rejections_if_rejected
-      send_rejection_notification
-      check_max_rejections
+    if status_rejected?
+      Rails.logger.info "Processing proof rejection for Application ID: #{application.id}"
+      ActiveRecord::Base.transaction do
+        increment_rejections_if_rejected
+        send_rejection_notification
+        check_max_rejections
+      end
+    else
+      Rails.logger.info "Processing proof approval for Application ID: #{application.id}"
+      ActiveRecord::Base.transaction do
+        send_approval_notification
+      end
     end
+  end
+
+  def send_approval_notification
+    ApplicationNotificationsMailer.proof_approved(application, self).deliver_now
+    Rails.logger.info "Sending proof approval email to User ID: #{application.user.id}"
+    Notification.create!(
+      recipient: application.user,
+      actor: admin,
+      action: "proof_approved",
+      notifiable: application,
+      metadata: {
+        proof_type: proof_type
+      }
+    )
+  rescue StandardError => e
+    Rails.logger.error("Failed to send approval notification: #{e.message}")
+    errors.add(:base, "Failed to send approval notification")
+    raise ActiveRecord::Rollback
   end
 
   def increment_rejections_if_rejected
@@ -157,14 +153,5 @@ class ProofReview < ApplicationRecord
     Rails.logger.error("Failed to process max rejections: #{e.message}")
     errors.add(:base, "Failed to process rejection limits")
     raise ActiveRecord::Rollback
-  end
-
-  def create_proof_review(type, status, reason)
-    @application.proof_reviews.create!(
-      admin: @admin,
-      proof_type: type,
-      status: status,
-      rejection_reason: reason
-    )
   end
 end
