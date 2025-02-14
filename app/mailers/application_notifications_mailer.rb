@@ -1,5 +1,6 @@
 class ApplicationNotificationsMailer < ApplicationMailer
   include Rails.application.routes.url_helpers
+  include Mailers::ApplicationNotificationsHelper
 
   def self.default_url_options
     Rails.application.config.action_mailer.default_url_options
@@ -70,9 +71,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
     Rails.logger.error("Failed to send review reminder email: #{e.message}")
   end
 
-  private
+  helper Mailers::ApplicationNotificationsHelper
 
-  def format_proof_type(proof_type)
-    proof_type.to_s.humanize.downcase
-  end
+  private
 end
