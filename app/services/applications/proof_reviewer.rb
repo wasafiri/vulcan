@@ -5,48 +5,49 @@ class Applications::ProofReviewer
   end
 
   def review(proof_type:, status:, rejection_reason: nil)
-    ApplicationRecord.transaction do
-      # Convert status to symbol if it's a string
-      status = status.to_sym if status.is_a?(String)
+    Rails.logger.info "Starting review with proof_type: #{proof_type.inspect}, status: #{status.inspect}"
 
-      @proof_review = create_proof_review(proof_type, status, rejection_reason)
-      update_proof_status(proof_type, status)
-      check_all_proofs_approved if status == :approved
+    # Store the string values we'll need for application status
+    @proof_type_key = proof_type.to_s
+    @status_key = status.to_s
+
+    Rails.logger.info "Converted values - proof_type: #{@proof_type_key.inspect}, status: #{@status_key.inspect}"
+
+    # Create the proof review and update application status in a transaction
+    ApplicationRecord.transaction do
+      Rails.logger.info "Creating proof review record"
+      @proof_review = @application.proof_reviews.create!(
+        admin: @admin,
+        proof_type: @proof_type_key,
+        status: @status_key,
+        rejection_reason: rejection_reason
+      )
+      Rails.logger.info "Created ProofReview ID: #{@proof_review.id}, status: #{@proof_review.status}, proof_type: #{@proof_review.proof_type}"
+
+      # Update application status directly
+      update_application_status
+      Rails.logger.info "Updated application status"
     end
+
+    # Return true to indicate success
+    # The after_commit callback will handle notifications
     true
-  rescue ActiveRecord::RecordInvalid => e
+  rescue StandardError => e
     Rails.logger.error "Proof review failed: #{e.message}"
-    false
+    Rails.logger.error e.backtrace.join("\n")
+    raise # Re-raise to ensure errors are visible
   end
 
   private
 
-  def create_proof_review(type, status, reason)
-    # Ensure we're using strings consistently for proof_type to match the enum keys
-    proof_type_key = type.to_s
+  def update_application_status
+    Rails.logger.info "Updating application status for proof_type: #{@proof_type_key}, status: #{@status_key}"
 
-    @proof_review = @application.proof_reviews.create!(
-      admin: @admin,
-      proof_type: proof_type_key,
-      status: status,
-      rejection_reason: reason
-    )
-  end
-
-  def update_proof_status(proof_type, status)
-    status_key = status.to_sym
-    case proof_type.to_s
+    case @proof_type_key
     when "income"
-      @application.update!(income_proof_status: status_key)
+      @application.update!(income_proof_status: @status_key)
     when "residency"
-      @application.update!(residency_proof_status: status_key)
-    end
-  end
-
-  def check_all_proofs_approved
-    if @application.all_proofs_approved?
-      MedicalProviderMailer.request_certification(@application).deliver_now
-      @application.update!(status: :awaiting_documents)
+      @application.update!(residency_proof_status: @status_key)
     end
   end
 end

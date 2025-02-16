@@ -45,20 +45,11 @@ class Admin::ProofReviewsController < ApplicationController
     @proof_review.admin = current_user
 
     if @proof_review.save
-      # Check if the proof was rejected
-      if @proof_review.status == :rejected
-        ApplicationNotificationsMailer.proof_rejected(@application, @proof_review).deliver_now
-      end
-
-      if @application.all_proofs_approved?
-        MedicalProviderMailer.request_certification(@application).deliver_now
-        @application.update!(status: :awaiting_documents)
-      end
-
       redirect_to admin_application_path(@application),
-                  notice: success_message
+        notice: "Proof review completed successfully"
     else
-      render :new, status: :unprocessable_entity
+      render :new, status: :unprocessable_entity,
+        alert: "Proof review failed to save"
     end
   end
 
@@ -103,14 +94,6 @@ class Admin::ProofReviewsController < ApplicationController
     unless @application.proofs_reviewable?
       redirect_to admin_application_path(@application),
         alert: "Application is not in a reviewable state"
-    end
-  end
-
-  def success_message
-    if @application.all_proofs_approved?
-      "Proof reviewed successfully. Medical provider has been contacted."
-    else
-      "Proof reviewed successfully."
     end
   end
 end

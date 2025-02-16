@@ -4,8 +4,8 @@ class AddProofTrackingToApplications < ActiveRecord::Migration[8.0]
     create_table :proof_reviews do |t|
       t.references :application, null: false, foreign_key: true
       t.references :admin, null: false, foreign_key: { to_table: :users }
-      t.string :proof_type, null: false # 'income' or 'residency'
-      t.string :status, null: false # 'approved' or 'rejected'
+      t.integer :proof_type
+      t.integer :status
       t.text :rejection_reason
       t.string :submission_method # 'web', 'email', 'scanned'
       t.datetime :reviewed_at, null: false
