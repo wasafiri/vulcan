@@ -3,22 +3,10 @@ class ProofReview < ApplicationRecord
   belongs_to :application
   belongs_to :admin, class_name: "User"
 
-  # Enums
-  enum :proof_type, {
-    income: 0,
-    residency: 1
-  }, prefix: true
-
-  enum :status, {
-    approved: 0,
-    rejected: 1
-  }, prefix: true
-
-  enum :submission_method, {
-    web: 0,
-    email: 1,
-    scanned: 2
-  }, prefix: true
+  # Enums (using the original syntax to avoid argument errors)
+  enum :proof_type, { income: 0, residency: 1 }, prefix: true
+  enum :status, { approved: 0, rejected: 1 }, prefix: true
+  enum :submission_method, { web: 0, email: 1, scanned: 2 }, prefix: true
 
   # Validations
   validates :proof_type, :status, :reviewed_at, presence: true
@@ -29,9 +17,6 @@ class ProofReview < ApplicationRecord
 
   # Callbacks
   before_validation :set_reviewed_at, on: :create
-
-  #  after_create :update_application_proof_status
-
   after_commit :handle_post_review_actions, on: :create
 
   # Scopes
@@ -47,89 +32,78 @@ class ProofReview < ApplicationRecord
   end
 
   def admin_must_be_admin_type
-    unless admin&.type == "Admin"
-      errors.add(:admin, "must be an administrator")
-    end
+    errors.add(:admin, "must be an administrator") unless admin&.type == "Admin"
   end
 
   def application_must_be_active
-    if application&.archived?
-      errors.add(:application, "cannot be reviewed when archived")
-    end
+    errors.add(:application, "cannot be reviewed when archived") if application&.archived?
   end
 
   def proof_must_be_attached
     proof = case proof_type
-    when "income"
-      application&.income_proof
-    when "residency"
-      application&.residency_proof
+    when "income" then application&.income_proof
+    when "residency" then application&.residency_proof
     end
-
-    unless proof&.attached?
-      errors.add(:base, "No #{proof_type} proof found for review")
-    end
+    errors.add(:base, "No #{proof_type} proof found for review") unless proof&.attached?
   end
 
   def handle_post_review_actions
-    if status_rejected?
-      Rails.logger.info "Processing proof rejection for Application ID: #{application.id}"
+    Rails.logger.info "Starting handle_post_review_actions for ProofReview ID: #{id}"
+    Rails.logger.info "Initial status check - status: #{status.inspect}, blank?: #{status.blank?}"
+    return if status.blank?
+
+    Rails.logger.info "Processing proof review for Application ID: #{application.id}"
+    Rails.logger.info "Status details: raw: #{status.inspect}, before type cast: #{status_before_type_cast.inspect}, rejected?: #{status_rejected?}"
+
+    begin
       ActiveRecord::Base.transaction do
-        increment_rejections_if_rejected
-        send_rejection_notification
-        check_max_rejections
+        if status_rejected?
+          Rails.logger.info "Status is rejected, handling rejection flow"
+          increment_rejections_if_rejected
+          check_max_rejections
+        else
+          Rails.logger.info "Status is approved, skipping rejection flow"
+        end
       end
-    else
-      Rails.logger.info "Processing proof approval for Application ID: #{application.id}"
-      ActiveRecord::Base.transaction do
-        send_approval_notification
+
+      # Send appropriate notification based on status
+      if status_rejected?
+        send_notification("proof_rejected", :proof_rejected, { proof_type: proof_type, rejection_reason: rejection_reason })
+      else
+        send_notification("proof_approved", :proof_approved, { proof_type: proof_type })
       end
+    rescue StandardError => e
+      Rails.logger.error "Failed to process proof review actions: #{e.message}\n#{e.backtrace.join("\n")}"
+      raise
     end
   end
 
-  def send_approval_notification
-    ApplicationNotificationsMailer.proof_approved(application, self).deliver_now
-    Rails.logger.info "Sending proof approval email to User ID: #{application.user.id}"
-    Notification.create!(
+  # DRY method to create a notification record and send the email
+  def send_notification(action_name, mail_method, metadata)
+    notification = Notification.create!(
       recipient: application.user,
       actor: admin,
-      action: "proof_approved",
+      action: action_name,
       notifiable: application,
-      metadata: {
-        proof_type: proof_type
-      }
+      metadata: metadata
     )
+    Rails.logger.info "Created notification ID: #{notification.id}"
+
+    mail = ApplicationNotificationsMailer.send(mail_method, application, self)
+    Rails.logger.info "Generated mail with subject: #{mail.subject}"
+    mail.deliver_now
+    Rails.logger.info "Successfully sent #{action_name} email to User ID: #{application.user.id}"
   rescue StandardError => e
-    Rails.logger.error("Failed to send approval notification: #{e.message}")
-    errors.add(:base, "Failed to send approval notification")
-    raise ActiveRecord::Rollback
+    Rails.logger.error "Failed to send #{action_name} email: #{e.message}\n#{e.backtrace.join("\n")}"
+    raise
   end
 
   def increment_rejections_if_rejected
     application.with_lock do
       application.increment!(:total_rejections)
     end
-  rescue ActiveRecord::StaleObjectError => e
-    errors.add(:base, "Failed to update rejection count. Please try again. Status: #{e.message}")
-    raise ActiveRecord::Rollback
-  end
-
-  def send_rejection_notification
-    ApplicationNotificationsMailer.proof_rejected(application, self).deliver_now
-    Rails.logger.info "Sending proof rejection email to User ID: #{application.user.id}"
-    Notification.create!(
-      recipient: application.user,
-      actor: admin,
-      action: "proof_rejected",
-      notifiable: application,
-      metadata: {
-        proof_type: proof_type,
-        rejection_reason: rejection_reason
-      }
-    )
   rescue StandardError => e
-    Rails.logger.error("Failed to send rejection notification: #{e.message}")
-    errors.add(:base, "Failed to send rejection notification")
+    errors.add(:base, "Failed to update rejection count. Please try again. Status: #{e.message}")
     raise ActiveRecord::Rollback
   end
 
@@ -143,14 +117,13 @@ class ProofReview < ApplicationRecord
           notifiable: application
         )
       end
-
       if application.total_rejections > 8
         application.update!(status: :archived)
         ApplicationNotificationsMailer.max_rejections_reached(application).deliver_now
       end
     end
   rescue StandardError => e
-    Rails.logger.error("Failed to process max rejections: #{e.message}")
+    Rails.logger.error "Failed to process max rejections: #{e.message}"
     errors.add(:base, "Failed to process rejection limits")
     raise ActiveRecord::Rollback
   end

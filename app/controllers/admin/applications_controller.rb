@@ -24,20 +24,7 @@ class Admin::ApplicationsController < ApplicationController
       .with_attached_residency_proof
       .where.not(status: [ :rejected, :archived ])
 
-    # Apply filters
-    scope = case params[:filter]
-    when "in_progress"
-      scope.where(status: :in_progress)
-    when "approved"
-      scope.where(status: :approved)
-    when "proofs_needing_review"
-      scope.where(income_proof_status: 0)
-           .or(scope.where(residency_proof_status: 0))
-    when "awaiting_medical_response"
-      scope.where(status: :awaiting_documents)
-    else
-      scope
-    end
+    scope = apply_filters(scope, params[:filter])
 
     @pagy, @applications = pagy(scope, items: 20)
   end
@@ -97,11 +84,18 @@ class Admin::ApplicationsController < ApplicationController
 
   def update_proof_status
     reviewer = Applications::ProofReviewer.new(@application, current_user)
-    if reviewer.review(
-         proof_type: params[:proof_type],
-         status: params[:status],
-         rejection_reason: params[:rejection_reason]
-       )
+    begin
+      Rails.logger.info "Starting proof review in controller"
+      Rails.logger.info "Parameters: proof_type=#{params[:proof_type]}, status=#{params[:status]}"
+
+      reviewer.review(
+        proof_type: params[:proof_type],
+        status: params[:status],
+        rejection_reason: params[:rejection_reason]
+      )
+
+      Rails.logger.info "Proof review completed successfully"
+
       respond_to do |format|
         format.html {
           flash[:notice] = "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
@@ -118,41 +112,43 @@ class Admin::ApplicationsController < ApplicationController
           ]
         }
       end
-    else
+    rescue StandardError => e
+      Rails.logger.error "Failed to update proof status: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+
       respond_to do |format|
-        format.html { render :show, status: :unprocessable_entity }
+        format.html {
+          flash[:error] = "Failed to update proof status: #{e.message}"
+          render :show, status: :unprocessable_entity
+        }
         format.turbo_stream {
-          flash.now[:error] = "Failed to update proof status"
+          flash.now[:error] = "Failed to update proof status: #{e.message}"
           render turbo_stream: turbo_stream.update("flash", partial: "shared/flash")
         }
       end
     end
   end
 
-  def approve
-    if @application.approve!
-      flash[:notice] = "Application approved."
+  def process_application_status(action)
+    past_tense = { "approve" => "approved", "reject" => "rejected" }
+    if @application.send("#{action}!")
+      flash[:notice] = "Application #{past_tense[action.to_s]}."
       redirect_to admin_application_path(@application)
     else
-      flash[:notice] = "Failed to approve Application ##{@application.id}: #{@application.errors.full_messages.to_sentence}"
+      flash[:alert] = "Failed to #{action} Application ##{@application.id}: #{@application.errors.full_messages.to_sentence}"
       render :show, status: :unprocessable_entity
     end
   rescue ActiveRecord::RecordInvalid => e
-    flash[:notice] = "Failed to approve Application ##{@application.id}: #{e.record.errors.full_messages.to_sentence}"
+    flash[:alert] = "Failed to #{action} Application ##{@application.id}: #{e.record.errors.full_messages.to_sentence}"
     render :show, status: :unprocessable_entity
   end
 
+  def approve
+    process_application_status(:approve)
+  end
+
   def reject
-    if @application.reject!
-      flash[:alert] = "Application rejected."
-      redirect_to admin_application_path(@application)
-    else
-      flash[:alert] = "Failed to reject Application ##{@application.id}: #{@application.errors.full_messages.to_sentence}"
-      render :show, status: :unprocessable_entity
-    end
-  rescue ActiveRecord::RecordInvalid => e
-    flash[:alert] = "Failed to reject Application ##{@application.id}: #{e.record.errors.full_messages.to_sentence}"
-    render :show, status: :unprocessable_entity
+    process_application_status(:reject)
   end
 
   def assign_evaluator
@@ -226,6 +222,22 @@ class Admin::ApplicationsController < ApplicationController
   end
 
   private
+
+  def apply_filters(scope, filter)
+    case filter
+    when "in_progress"
+      scope.where(status: :in_progress)
+    when "approved"
+      scope.where(status: :approved)
+    when "proofs_needing_review"
+      scope.where(income_proof_status: 0)
+           .or(scope.where(residency_proof_status: 0))
+    when "awaiting_medical_response"
+      scope.where(status: :awaiting_documents)
+    else
+      scope
+    end
+  end
 
   def sort_column
     params[:sort] || "application_date"
