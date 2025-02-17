@@ -30,7 +30,7 @@ class Applications::ProofReviewer
     end
 
     # Return true to indicate success
-    # The after_commit callback will handle notifications
+    # Notifications are handled by ProofReview model callbacks
     true
   rescue StandardError => e
     Rails.logger.error "Proof review failed: #{e.message}"
