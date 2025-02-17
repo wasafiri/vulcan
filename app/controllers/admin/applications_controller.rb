@@ -35,6 +35,28 @@ class Admin::ApplicationsController < ApplicationController
       :evaluations,
       :training_sessions
     ).find(params[:id])
+
+    # Fetch all audit logs and combine them
+    proof_reviews = @application.proof_reviews.includes(admin: :role_capabilities).order(created_at: :desc)
+    status_changes = @application.status_changes.includes(user: :role_capabilities).order(created_at: :desc)
+    notifications = Notification.includes(actor: :role_capabilities)
+      .where(notifiable: @application)
+      .where(
+      action: %w[
+        medical_certification_requested
+        medical_certification_received
+        medical_certification_approved
+        medical_certification_rejected
+        review_requested
+        documents_requested
+        proof_approved
+        proof_rejected
+      ]
+    ).order(created_at: :desc)
+
+    @audit_logs = (proof_reviews + status_changes + notifications)
+      .sort_by(&:created_at)
+      .reverse
   end
 
   def edit
@@ -102,14 +124,52 @@ class Admin::ApplicationsController < ApplicationController
           redirect_to admin_application_path(@application)
         }
         format.turbo_stream {
+          # Reload application and fetch audit logs
+          @application = Application.includes(
+            :user,
+            :evaluations,
+            :training_sessions
+          ).find(params[:id])
+
+          proof_reviews = @application.proof_reviews.includes(admin: :role_capabilities).order(created_at: :desc)
+          status_changes = @application.status_changes.includes(user: :role_capabilities).order(created_at: :desc)
+          notifications = Notification.includes(actor: :role_capabilities)
+            .where(notifiable: @application)
+            .where(
+            action: %w[
+              medical_certification_requested
+              medical_certification_received
+              medical_certification_approved
+              medical_certification_rejected
+              review_requested
+              documents_requested
+              proof_approved
+              proof_rejected
+            ]
+          ).order(created_at: :desc)
+
+          @audit_logs = (proof_reviews + status_changes + notifications)
+            .sort_by(&:created_at)
+            .reverse
+
           flash.now[:notice] = "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
-          render turbo_stream: [
-            turbo_stream.update("flash", partial: "shared/flash"),
-            turbo_stream.update("attachments-section", partial: "attachments"),
+          # First remove all modals
+          streams = [
             turbo_stream.remove("proofRejectionModal"),
             turbo_stream.remove("incomeProofReviewModal"),
-            turbo_stream.remove("residencyProofReviewModal")
+            turbo_stream.remove("residencyProofReviewModal"),
+            turbo_stream.remove("medicalCertificationReviewModal")
           ]
+
+          # Then update content
+          streams.concat([
+            turbo_stream.update("flash", partial: "shared/flash"),
+            turbo_stream.update("attachments-section", partial: "attachments"),
+            turbo_stream.update("audit-logs", partial: "audit_logs"),
+            turbo_stream.update("modals", partial: "modals")
+          ])
+
+          render turbo_stream: streams
         }
       end
     rescue StandardError => e

@@ -1,64 +1,108 @@
 import { Controller } from "@hotwired/stimulus"
 
+// Declare targets for type safety and better structure
 export default class extends Controller {
+  static targets = [
+    "modal",        // The modal elements
+    "backdrop",     // The modal backdrop
+  ]
+
+  static values = {
+    open: { type: Boolean, default: false }
+  }
+
   connect() {
-    // Attach listeners for predefined reason buttons within this modal
-    this.element.querySelectorAll('.predefined-reason-btn').forEach((btn) => {
-      btn.addEventListener('click', (event) => {
-        event.preventDefault();
-        // Read the current proof type from the hidden field inside this modal
-        const proofType = this.element.querySelector("#rejection-proof-type").value;
-        let reasonText = '';
-        if (btn.getAttribute('data-reason-type') === 'address') {
-          reasonText = proofType === 'residency'
-            ? this.element.dataset.modalAddressMismatchResidencyValue
-            : this.element.dataset.modalAddressMismatchIncomeValue;
-        } else if (btn.getAttribute('data-reason-type') === 'expired') {
-          reasonText = proofType === 'residency'
-            ? this.element.dataset.modalExpiredResidencyValue
-            : this.element.dataset.modalExpiredIncomeValue;
-        }
-        // Populate the text area with the predefined reason using the explicit ID
-        const textarea = this.element.querySelector('#rejection_reason_field');
-        if (textarea) {
-          textarea.value = reasonText;
-        }
-      });
-    });
+    console.log('Modal controller connected')
+    // Ensure modals start hidden
+    this.modalTargets.forEach(modal => {
+      modal.classList.add("hidden")
+      console.log('Found modal:', modal.id)
+    })
+    this.openValue = false
+    
+    // Bind event handlers with proper context
+    this._handleKeydown = this.handleKeydown.bind(this)
+    this._handleClickOutside = this.handleClickOutside.bind(this)
+    
+    // Add event listeners
+    document.addEventListener("keydown", this._handleKeydown)
+    
+    // Add click handler to all backdrop targets
+    this.backdropTargets.forEach(backdrop => {
+      backdrop.addEventListener("click", this._handleClickOutside)
+    })
+  }
 
-    // Handle form submission
-    const form = this.element.querySelector('#proof-rejection-form');
-    if (form) {
-      form.addEventListener('submit', (event) => {
-        // Disable the submit button to prevent multiple submissions
-        const submitButton = form.querySelector('input[type="submit"]');
-        if (submitButton) {
-          submitButton.disabled = true;
-        }
-      });
+  disconnect() {
+    // Clean up event listeners
+    document.removeEventListener("keydown", this._handleKeydown)
+    if (this.hasBackdropTarget) {
+      this.backdropTarget.removeEventListener("click", this._handleClickOutside)
     }
   }
 
+  // Action methods
+  initialize() {
+    // Store the modal's ID for external targeting
+    this.modalIdValue = this.element.id
+  }
+
+  // Handle opening modal
   open(event) {
-    event.preventDefault();
-    const modalId = event.currentTarget.getAttribute("data-modal-target");
-    const modal = document.getElementById(modalId);
-    if (modal) {
-      // Check if the triggering element has a data-proof-type attribute
-      const proofType = event.currentTarget.getAttribute("data-proof-type");
-      if (proofType) {
-        // Set the hidden field's value inside the modal
-        const hiddenField = modal.querySelector("#rejection-proof-type");
-        if (hiddenField) {
-          hiddenField.value = proofType;
-        }
-      }
-      modal.classList.remove("hidden");
+    event?.preventDefault()
+    const targetModalId = event.currentTarget.dataset.modalId
+    console.log('Opening modal:', targetModalId)
+    console.log('Available modals:', this.modalTargets.map(m => m.id))
+    
+    const modal = this.modalTargets.find(m => m.id === targetModalId)
+    if (!modal) {
+      console.error('Modal not found:', targetModalId)
+      return
+    }
+
+    // Hide all other modals
+    this.modalTargets.forEach(m => m.classList.add("hidden"))
+
+    // Show this modal
+    modal.classList.remove("hidden")
+    this.openValue = true
+    console.log('Modal opened:', targetModalId)
+  }
+
+  // Handle closing modal
+  close(event) {
+    event?.preventDefault()
+    this.modalTargets.forEach(modal => modal.classList.add("hidden"))
+    this.openValue = false
+  }
+
+  // Handle clicking outside modal
+  handleClickOutside(event) {
+    const backdrop = event.target.closest("[data-modal-target='backdrop']")
+    if (backdrop) {
+      this.close(event)
     }
   }
 
-  close(event) {
-    event.preventDefault();
-    this.element.classList.add("hidden");
+  // Handle escape key
+  handleKeydown(event) {
+    if (event.key === "Escape" && this.openValue) {
+      this.close(event)
+    }
   }
+
+  // Handle form validation
+  validateForm(event) {
+    if (!this.hasReasonFieldTarget) return
+
+    const reasonField = this.reasonFieldTarget
+    if (!reasonField.value.trim()) {
+      event.preventDefault()
+      reasonField.classList.add('border-red-500')
+      reasonField.focus()
+      return
+    }
+    reasonField.classList.remove('border-red-500')
+  }
+
 }

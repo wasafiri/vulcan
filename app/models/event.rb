@@ -9,6 +9,16 @@ class Event < ApplicationRecord
     self.ip_address = Current.ip_address
   end
 
+  # Ensure metadata is always a hash
+  def metadata
+    super || {}
+  end
+
+  # Scope for finding events by metadata key/value
+  scope :with_metadata, ->(key, value) {
+    where("metadata @> ?", { key => value }.to_json)
+  }
+
   private
 
   def validate_metadata_structure

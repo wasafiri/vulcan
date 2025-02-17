@@ -75,6 +75,17 @@ class Constituent::ProofsController < ApplicationController
   end
 
   def track_submission
+    # Create Event for application audit log
+    Event.create!(
+      user: current_user,
+      action: "proof_submitted",
+      metadata: {
+        application_id: @application.id,
+        proof_type: params[:proof_type]
+      }
+    )
+
+    # Create ProofSubmissionAudit for policy audit log
     ProofSubmissionAudit.create!(
       application: @application,
       user: current_user,

@@ -1,0 +1,195 @@
+<div id="modals">
+  <!-- Modal for Income Proof Review -->
+  <div id="incomeProofReviewModal" class="fixed inset-0 hidden" data-modal-target="modal">
+    <!-- Backdrop -->
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-modal-target="backdrop"></div>
+    <!-- Modal Container -->
+    <div class="fixed inset-0 flex items-center justify-center">
+      <div class="bg-white rounded-lg p-6 max-w-3xl w-full relative">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Review Income Proof</h3>
+        <% if @application.income_proof.content_type.start_with?('application/pdf') %>
+          <iframe src="<%= url_for(@application.income_proof) %>" type="application/pdf" width="100%" height="500px"></iframe>
+        <% elsif @application.income_proof.content_type.start_with?('image') %>
+          <%= image_tag url_for(@application.income_proof), class: "max-w-full h-auto" %>
+        <% end %>
+        <div class="mt-4 flex space-x-4">
+          <%= button_to update_proof_status_admin_application_path(@application), 
+              method: :patch, 
+              params: { proof_type: 'income', status: 'approved' }, 
+              class: "inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md", 
+              data: { 
+                turbo: true,
+                confirm: "Approve income proof?" 
+              } do %>
+            Approve
+          <% end %>
+          <button type="button" 
+                  data-action="click->modal#open" 
+                  data-modal-id="proofRejectionModal"
+                  data-proof-type="income" 
+                  class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md">
+            Reject
+          </button>
+        </div>
+        <div class="mt-4">
+          <button type="button" 
+                  data-action="click->modal#close"
+                  class="px-4 py-2 border border-gray-300 rounded-md text-gray-700">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Residency Proof Review -->
+  <div id="residencyProofReviewModal" class="fixed inset-0 hidden" data-modal-target="modal">
+    <!-- Backdrop -->
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-modal-target="backdrop"></div>
+    <!-- Modal Container -->
+    <div class="fixed inset-0 flex items-center justify-center">
+      <div class="bg-white rounded-lg p-6 max-w-3xl w-full relative">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Review Residency Proof</h3>
+        <% if @application.residency_proof.content_type.start_with?('application/pdf') %>
+          <iframe src="<%= url_for(@application.residency_proof) %>" type="application/pdf" width="100%" height="500px"></iframe>
+        <% elsif @application.residency_proof.content_type.start_with?('image') %>
+          <%= image_tag url_for(@application.residency_proof), class: "max-w-full h-auto" %>
+        <% end %>
+        <div class="mt-4 flex space-x-4">
+          <%= button_to update_proof_status_admin_application_path(@application), 
+              method: :patch, 
+              params: { proof_type: 'residency', status: 'approved' }, 
+              class: "inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md", 
+              data: { 
+                turbo: true,
+                confirm: "Approve residency proof?" 
+              } do %>
+            Approve
+          <% end %>
+          <button type="button" 
+                  data-action="click->modal#open" 
+                  data-modal-id="proofRejectionModal"
+                  data-proof-type="residency" 
+                  class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md">
+            Reject
+          </button>
+        </div>
+        <div class="mt-4">
+          <button type="button" 
+                  data-action="click->modal#close"
+                  class="px-4 py-2 border border-gray-300 rounded-md text-gray-700">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Medical Certification Review -->
+  <div id="medicalCertificationReviewModal" class="fixed inset-0 hidden" data-modal-target="modal">
+    <!-- Backdrop -->
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-modal-target="backdrop"></div>
+    <!-- Modal Container -->
+    <div class="fixed inset-0 flex items-center justify-center">
+      <div class="bg-white rounded-lg p-6 max-w-3xl w-full relative">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Review Medical Certification</h3>
+        <% if @application.medical_certification.attached? %>
+          <% if @application.medical_certification.content_type.start_with?('application/pdf') %>
+            <iframe src="<%= url_for(@application.medical_certification) %>" type="application/pdf" width="100%" height="500px"></iframe>
+          <% else %>
+            <%= image_tag url_for(@application.medical_certification), class: "max-w-full h-auto" %>
+          <% end %>
+        <% else %>
+          <p class="text-gray-500">No certification file attached.</p>
+        <% end %>
+        <div class="mt-4 flex space-x-4">
+          <%= button_to update_certification_status_admin_application_path(@application), 
+              method: :patch, 
+              params: { status: 'accepted' }, 
+              class: "inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md", 
+              data: { confirm: "Approve this medical certification?" } do %>
+            Approve
+          <% end %>
+          <%= button_to update_certification_status_admin_application_path(@application), 
+              method: :patch, 
+              params: { status: 'rejected' }, 
+              class: "inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md", 
+              data: { confirm: "Reject this medical certification?" } do %>
+            Reject
+          <% end %>
+        </div>
+        <div class="mt-4">
+          <button type="button" 
+                  data-action="click->modal#close"
+                  class="px-4 py-2 border border-gray-300 rounded-md text-gray-700">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rejection Modal for Proof Reviews -->
+  <div id="proofRejectionModal" class="fixed inset-0 hidden" data-modal-target="modal" data-controller="rejection-form"
+       data-rejection-form-address-mismatch-income-value="<%= 'The address provided on your income documentation does not match the application address. Please submit documentation that contains the address exactly matching the one shared in your application: ' + @application.user.physical_address_1 + (@application.user.physical_address_2.present? ? ' ' + @application.user.physical_address_2 : '') + ' ' + @application.user.city + ', ' + @application.user.state + ' ' + @application.user.zip_code %>"
+       data-rejection-form-address-mismatch-residency-value="<%= 'The address provided on your residency documentation does not match the application address. Please submit documentation that contains the address exactly matching the one shared in your application: ' + @application.user.physical_address_1 + (@application.user.physical_address_2.present? ? ' ' + @application.user.physical_address_2 : '') + ' ' + @application.user.city + ', ' + @application.user.state + ' ' + @application.user.zip_code %>"
+       data-rejection-form-expired-income-value="The income documentation you provided is more than 1 year old or is expired. Please submit documentation that is less than 1 year old and which is not expired."
+       data-rejection-form-expired-residency-value="The residency documentation you provided is more than 1 year old or is expired. Please submit documentation that is less than 1 year old and which is not expired.">
+    <!-- Backdrop -->
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-modal-target="backdrop"></div>
+    <!-- Modal Container -->
+    <div class="fixed inset-0 flex items-center justify-center">
+      <div class="bg-white rounded-lg p-6 max-w-lg w-full relative">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Enter Rejection Reason</h3>
+        <div class="mb-4">
+          <p class="text-sm font-medium text-gray-700 mb-1">Predefined Rejection Reasons:</p>
+          <div class="flex space-x-2">
+            <button type="button" 
+                    class="px-3 py-1 bg-gray-200 rounded" 
+                    data-action="click->rejection-form#selectPredefinedReason"
+                    data-reason-type="addressMismatch">
+              Address Mismatch
+            </button>
+            <button type="button" 
+                    class="px-3 py-1 bg-gray-200 rounded" 
+                    data-action="click->rejection-form#selectPredefinedReason"
+                    data-reason-type="expired">
+              Expired Documentation
+            </button>
+          </div>
+        </div>
+        <%= form_with url: update_proof_status_admin_application_path(@application),
+                      method: :patch,
+                      local: false,
+                      class: "space-y-4",
+                      data: { 
+                        turbo: true,
+                        action: "submit->rejection-form#validateForm"
+                      } do |f| %>
+          <%= f.hidden_field :status, value: "rejected" %>
+          <%= f.hidden_field :proof_type, 
+              id: "rejection-proof-type",
+              data: { rejection_form_target: "proofType" } %>
+          <div>
+            <%= f.label :rejection_reason, "Reason for Rejection", class: "block text-sm font-medium text-gray-700" %>
+            <%= f.text_area :rejection_reason,
+                rows: 4,
+                class: "mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+                required: true,
+                placeholder: "Please provide a detailed explanation...",
+                data: { rejection_form_target: "reasonField" } %>
+          </div>
+          <div class="flex justify-end space-x-3">
+            <button type="button" 
+                    data-action="click->modal#close"
+                    class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+              Cancel
+            </button>
+            <%= f.submit "Submit", 
+                class: "px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700" %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
