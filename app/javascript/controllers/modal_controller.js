@@ -67,6 +67,19 @@ export default class extends Controller {
     modal.classList.remove("hidden")
     this.openValue = true
     console.log('Modal opened:', targetModalId)
+
+    // Wait for modal to be visible then load PDFs
+    requestAnimationFrame(() => {
+      const iframes = modal.querySelectorAll('iframe')
+      iframes.forEach(iframe => {
+        // Store original src
+        if (!iframe.dataset.originalSrc) {
+          iframe.dataset.originalSrc = iframe.src
+        }
+        // Reset src to trigger load
+        iframe.src = iframe.dataset.originalSrc
+      })
+    })
   }
 
   // Handle closing modal
