@@ -34,7 +34,10 @@ class Admin::ApplicationsController < ApplicationController
       :user,
       :evaluations,
       :training_sessions
-    ).find(params[:id])
+    ).with_attached_income_proof
+      .with_attached_residency_proof
+      .with_attached_medical_certification
+      .find(params[:id])
 
     # Fetch all audit logs and combine them
     proof_reviews = @application.proof_reviews.includes(admin: :role_capabilities).order(created_at: :desc)
@@ -129,7 +132,10 @@ class Admin::ApplicationsController < ApplicationController
             :user,
             :evaluations,
             :training_sessions
-          ).find(params[:id])
+          ).with_attached_income_proof
+            .with_attached_residency_proof
+            .with_attached_medical_certification
+            .find(params[:id])
 
           proof_reviews = @application.proof_reviews.includes(admin: :role_capabilities).order(created_at: :desc)
           status_changes = @application.status_changes.includes(user: :role_capabilities).order(created_at: :desc)
@@ -324,7 +330,10 @@ class Admin::ApplicationsController < ApplicationController
   end
 
   def set_application
-    @application = Application.find(params[:id])
+    @application = Application.with_attached_income_proof
+      .with_attached_residency_proof
+      .with_attached_medical_certification
+      .find(params[:id])
   rescue ActiveRecord::RecordNotFound
     redirect_to admin_applications_path, alert: "Application not found"
   end

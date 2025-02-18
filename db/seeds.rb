@@ -353,6 +353,9 @@ unless Rails.env.production?
         puts "\nApplications fixture not found at #{applications_fixture_path}."
       end
 
+      # ------------------------------
+      # Attaching income proof files to applications...
+      # ------------------------------
       puts "\nAttaching income proof files to applications..."
       Application.find_each do |app|
         unless app.income_proof.attached?
