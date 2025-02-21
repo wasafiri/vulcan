@@ -1,4 +1,3 @@
-# test/test_helper.rb
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
@@ -77,4 +76,18 @@ class ActionDispatch::IntegrationTest
 
   # Alias sign_in_as to sign_in for compatibility with existing tests
   alias_method :sign_in_as, :sign_in
+end
+
+class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
+  include TestPasswordHelper
+  include ActionDispatch::TestProcess::FixtureFile
+
+  driven_by :selenium, using: :headless_chrome, screen_size: [ 1400, 1400 ]
+
+  def sign_in_as(user, password: "password123")
+    visit sign_in_path
+    fill_in "Email Address", with: user.email
+    fill_in "Password", with: password
+    click_button "Sign In"
+  end
 end

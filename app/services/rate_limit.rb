@@ -1,18 +1,15 @@
 class RateLimit
   class ExceededError < StandardError; end
 
-  LIMITS = {
-    proof_submission: { max: 3, period: 1.hour }
-  }.freeze
-
-  def self.check!(action, identifier)
-    new(action, identifier).check!
+  def self.check!(action, identifier, method = :web)
+    new(action, identifier, method).check!
   end
 
-  def initialize(action, identifier)
+  def initialize(action, identifier, method = :web)
     @action = action
     @identifier = identifier
-    @limit = LIMITS[action]
+    @method = method.to_sym
+    @limit = Policy.rate_limit_for(@action, @method)
   end
 
   def check!
@@ -21,7 +18,7 @@ class RateLimit
     Rails.cache.with_local_cache do
       current_count = get_count
       if current_count >= @limit[:max]
-        raise ExceededError, "Rate limit exceeded for #{@action}"
+        raise ExceededError, "Rate limit exceeded for #{@action} (#{@method}): maximum #{@limit[:max]} submissions per #{@limit[:period] / 1.hour} hour(s)"
       end
       increment_count
     end
@@ -30,7 +27,7 @@ class RateLimit
   private
 
   def cache_key
-    "rate_limit:#{@action}:#{@identifier}"
+    "rate_limit:#{@action}:#{@method}:#{@identifier}"
   end
 
   def get_count

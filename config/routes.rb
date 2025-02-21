@@ -38,7 +38,7 @@ Rails.application.routes.draw do
 
       member do
         post :request_documents
-        post :review_proof  # if you’re handling via standard POST or GET
+        post :review_proof  # if you're handling via standard POST or GET
         post :update_proof_status
         patch :approve
         patch :reject
@@ -138,6 +138,11 @@ Rails.application.routes.draw do
         get :verify
         patch :submit
         post :resubmit_proof
+        namespace :proofs do
+          get "new/:proof_type", to: "proofs#new", as: :new_proof
+          post "resubmit", to: "proofs#resubmit"
+          post "direct_upload", to: "proofs#direct_upload", as: :direct_upload_proof
+        end
       end
     end
     resources :appointments, only: [ :index, :show ]

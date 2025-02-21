@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_02_16_045346) do
+ActiveRecord::Schema[8.0].define(version: 2025_02_18_212041) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -252,6 +252,25 @@ ActiveRecord::Schema[8.0].define(version: 2025_02_16_045346) do
     t.index ["status"], name: "index_proof_reviews_on_status"
   end
 
+  create_table "proof_submission_audits", force: :cascade do |t|
+    t.bigint "application_id", null: false
+    t.bigint "user_id", null: false
+    t.string "proof_type", null: false
+    t.string "ip_address"
+    t.jsonb "metadata", default: {}, null: false
+    t.integer "submission_method", default: 0, null: false
+    t.string "inbound_email_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["application_id", "created_at"], name: "idx_proof_audits_app_created"
+    t.index ["application_id"], name: "index_proof_submission_audits_on_application_id"
+    t.index ["created_at"], name: "index_proof_submission_audits_on_created_at"
+    t.index ["inbound_email_id"], name: "index_proof_submission_audits_on_inbound_email_id"
+    t.index ["submission_method"], name: "index_proof_submission_audits_on_submission_method"
+    t.index ["user_id", "created_at"], name: "idx_proof_audits_user_created"
+    t.index ["user_id"], name: "index_proof_submission_audits_on_user_id"
+  end
+
   create_table "role_capabilities", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.string "capability", null: false
@@ -485,6 +504,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_02_16_045346) do
   add_foreign_key "policy_changes", "users"
   add_foreign_key "proof_reviews", "applications"
   add_foreign_key "proof_reviews", "users", column: "admin_id"
+  add_foreign_key "proof_submission_audits", "applications"
+  add_foreign_key "proof_submission_audits", "users"
   add_foreign_key "role_capabilities", "users"
   add_foreign_key "sessions", "users"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

@@ -1,0 +1,2 @@
+This is a test file for proof submission validation.
+It will be treated as a PDF for testing purposes.

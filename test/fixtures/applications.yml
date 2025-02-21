@@ -1,5 +1,43 @@
+# Applications for proof testing
+one:
+  user: constituent_john
+  application_date: <%= Time.current %>
+  status: needs_information
+  income_proof_status: rejected
+  residency_proof_status: rejected
+  maryland_resident: true
+  terms_accepted: true
+  information_verified: true
+  medical_release_authorized: true
+  medical_provider_name: Dr. Test Provider
+  medical_provider_phone: 555-555-0003
+  medical_provider_email: provider@example.com
+  household_size: 2
+  annual_income: 25000
+  self_certify_disability: true
+  needs_review_since: null
+
+two:
+  user: constituent_john
+  application_date: <%= 2.years.ago %>
+  status: approved
+  income_proof_status: approved
+  residency_proof_status: approved
+  maryland_resident: true
+  terms_accepted: true
+  information_verified: true
+  medical_release_authorized: true
+  medical_provider_name: Dr. Past Provider
+  medical_provider_phone: 555-555-0004
+  medical_provider_email: past.provider@example.com
+  household_size: 1
+  annual_income: 20000
+  self_certify_disability: true
+  needs_review_since: null
+
+# Additional applications from previous fixture
 draft_application:
-  user_id: <%= User.find_by(email: 'john.doe@example.com').id %>
+  user: constituent_john
   application_date: <%= 2.days.ago.strftime("%F %T") %>
   status: draft
   maryland_resident: true
@@ -14,7 +52,7 @@ draft_application:
   medical_certification_status: not_requested
 
 submitted_application:
-  user_id: <%= User.find_by(email: 'kenneth.klein@example.com').id %>
+  user: constituent_kenneth
   application_date: <%= 1.week.ago.strftime("%F %T") %>
   status: in_progress
   maryland_resident: true
@@ -29,7 +67,7 @@ submitted_application:
   medical_certification_status: received
 
 approved_application:
-  user_id: <%= User.find_by(email: 'steven.cooper@example.com').id %>
+  user: constituent_steven
   application_date: <%= 2.months.ago.strftime("%F %T") %>
   status: approved
   maryland_resident: true
@@ -44,7 +82,7 @@ approved_application:
   medical_certification_status: accepted
 
 submitted_proofs_pending_application:
-  user_id: <%= User.find_by(email: 'alex.smith@example.com').id %>
+  user: constituent_alex
   application_date: <%= Time.zone.parse("2025-02-01 12:00:00").strftime("%F %T") %>
   status: in_progress
   maryland_resident: true
@@ -59,7 +97,7 @@ submitted_proofs_pending_application:
   medical_certification_status: not_requested
 
 awaiting_medical_response_application:
-  user_id: <%= User.find_by(email: 'jane.doe@example.com').id %>
+  user: constituent_jane
   application_date: <%= Time.zone.parse("2025-02-15 15:30:00").strftime("%F %T") %>
   status: awaiting_documents
   maryland_resident: true
@@ -74,7 +112,7 @@ awaiting_medical_response_application:
   medical_certification_status: not_requested
 
 new_user_application:
-  user_id: <%= User.find_by(email: 'rex.canine@example.com').id %>
+  user: constituent_rex
   application_date: <%= 3.days.ago.strftime("%F %T") %>
   status: in_progress
   maryland_resident: true

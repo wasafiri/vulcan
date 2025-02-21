@@ -96,8 +96,43 @@
         </div>
       </div>
 
+      <!-- Rate Limits Section -->
+      <div class="p-6 border-t border-gray-200">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Proof Submission Rate Limits</h2>
+        
+        <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+          <p class="text-sm text-blue-700">
+            Configure how many proof submissions are allowed within a time period.
+            Portal submissions are through the web interface, while email submissions are through email attachments.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 gap-6">
+          <!-- Time Period -->
+          <div>
+            <%= render "rate_limit_input", 
+                policy: @policies.find_by(key: 'proof_submission_rate_period'),
+                label: "Time Window (hours)" %>
+          </div>
+
+          <!-- Submission Limits -->
+          <div class="grid grid-cols-2 gap-6">
+            <div>
+              <%= render "rate_limit_input", 
+                  policy: @policies.find_by(key: 'proof_submission_rate_limit_web'),
+                  label: "Portal Submissions" %>
+            </div>
+            <div>
+              <%= render "rate_limit_input", 
+                  policy: @policies.find_by(key: 'proof_submission_rate_limit_email'),
+                  label: "Email Submissions" %>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Other Policies Section -->
-      <div class="p-6">
+      <div class="p-6 border-t border-gray-200">
         <h2 class="text-lg font-medium text-gray-900 mb-4">Other System Policies</h2>
         
         <div class="overflow-x-auto">
@@ -113,7 +148,10 @@
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-              <% @policies.reject { |p| p.key.start_with?('fpl_') }.each do |policy| %>
+              <% @policies
+                  .reject { |p| p.key.start_with?('fpl_') }
+                  .reject { |p| p.key.start_with?('proof_submission_rate_') }
+                  .each do |policy| %>
                 <tr>
                   <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     <%= policy.key.humanize %>

@@ -27,11 +27,12 @@ class RegistrationsController < ApplicationController
     end
   end
 
-  private
-
   # GET /edit_registration
   def edit
-    # @user is set by before_action
+    @user = current_user
+    unless @user
+      redirect_to sign_in_path, alert: "You need to sign in to access this page."
+    end
   end
 
   # PATCH/PUT /update_registration

@@ -1,0 +1,4 @@
+<%=
+  # Generate a string that's larger than our MAX_FILE_SIZE (10MB)
+  'X' * (11 * 1024 * 1024) # 11MB of data
+%>
