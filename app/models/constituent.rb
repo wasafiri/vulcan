@@ -13,41 +13,28 @@ class Constituent < User
     where("created_at >= ?", Date.new(Date.current.year >= 7 ? Date.current.year : Date.current.year - 1, 7, 1))
   }
 
+  DISABILITY_TYPES = %w[hearing vision speech mobility cognition].freeze
+
+  # Define boolean attributes with defaults
   attribute :is_guardian, :boolean, default: false
   attribute :guardian_relationship, :string
-  attribute :hearing_disability, :boolean, default: false
-  attribute :vision_disability, :boolean, default: false
-  attribute :speech_disability, :boolean, default: false
-  attribute :mobility_disability, :boolean, default: false
-  attribute :cognition_disability, :boolean, default: false
+  
+  DISABILITY_TYPES.each do |type|
+    attribute :"#{type}_disability", :boolean, default: false
+  end
 
-  # Add explicit setters to ensure proper type casting
+  # Validations for disability fields
+  validates :guardian_relationship, presence: true, if: :is_guardian
+  
+  # Cast boolean values properly
   def is_guardian=(value)
     super(ActiveModel::Type::Boolean.new.cast(value))
   end
-
-  def guardian_relationship=(value)
-    super(value)
-  end
-
-  def hearing_disability=(value)
-    super(ActiveModel::Type::Boolean.new.cast(value))
-  end
-
-  def vision_disability=(value)
-    super(ActiveModel::Type::Boolean.new.cast(value))
-  end
-
-  def speech_disability=(value)
-    super(ActiveModel::Type::Boolean.new.cast(value))
-  end
-
-  def mobility_disability=(value)
-    super(ActiveModel::Type::Boolean.new.cast(value))
-  end
-
-  def cognition_disability=(value)
-    super(ActiveModel::Type::Boolean.new.cast(value))
+  
+  DISABILITY_TYPES.each do |type|
+    define_method("#{type}_disability=") do |value|
+      super(ActiveModel::Type::Boolean.new.cast(value))
+    end
   end
 
   # Optional: Method to check inherited columns

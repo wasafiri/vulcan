@@ -156,29 +156,6 @@ class User < ApplicationRecord
     role_capabilities.find_by(capability: capability)&.destroy
   end
 
-  def is_guardian=(value)
-    super(ActiveModel::Type::Boolean.new.cast(value))
-  end
-
-  def hearing_disability=(value)
-    super(ActiveModel::Type::Boolean.new.cast(value))
-  end
-
-  def vision_disability=(value)
-    super(ActiveModel::Type::Boolean.new.cast(value))
-  end
-
-  def speech_disability=(value)
-    super(ActiveModel::Type::Boolean.new.cast(value))
-  end
-
-  def mobility_disability=(value)
-    super(ActiveModel::Type::Boolean.new.cast(value))
-  end
-
-  def cognition_disability=(value)
-    super(ActiveModel::Type::Boolean.new.cast(value))
-  end
 
   private
 
