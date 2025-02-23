@@ -11,3 +11,8 @@ import ModalController from "./modal_controller"
 application.register("modal", ModalController)
 
 export { application }
+import { Application } from "@hotwired/stimulus"
+
+const application = Application.start()
+
+export { application }
