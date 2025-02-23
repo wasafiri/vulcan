@@ -1,0 +1,86 @@
+<section aria-labelledby="medical-info-heading" class="space-y-4 p-4 bg-gray-50 rounded">
+  <h2 id="medical-info-heading" class="text-lg font-medium text-gray-900">Medical Professional Information</h2>
+  
+  <p class="text-sm text-gray-600 mb-4">
+    Please provide contact information for your Doctor or a qualified Medical Professional. 
+    The system will automatically send your Disability Certification form to them to complete.
+  </p>
+
+  <div class="text-sm text-gray-600 mb-4">
+    <p class="font-medium mb-2">Qualified Medical Professionals include:</p>
+    <ul class="list-disc list-inside space-y-1 ml-2" aria-label="List of qualified medical professionals">
+      <li>Doctor / Physician</li>
+      <li>Audiologist</li>
+      <li>Rehabilitation Counselor</li>
+      <li>Speech-Language Pathologist</li>
+      <li>Social Worker</li>
+      <li>Psychologist</li>
+      <li>Mental Health Counselor</li>
+      <li>Registered Nurse (RN)</li>
+      <li>Licensed Practical Nurse (LPN)</li>
+      <li>Physical Therapist</li>
+      <li>Other Medical Professional</li>
+    </ul>
+  </div>
+
+  <%= fields_for :medical_provider do |mp| %>
+    <div class="space-y-4">
+      <div>
+        <%= mp.label :name, "Name", class: "block text-sm font-medium text-gray-700" %>
+        <%= mp.text_field :name, 
+            class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500",
+            required: true,
+            "aria-required": "true",
+            "aria-describedby": "name-description" %>
+        <p id="name-description" class="mt-1 text-xs text-gray-500">Enter the full name of your medical professional</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <%= mp.label :phone, "Phone", class: "block text-sm font-medium text-gray-700" %>
+          <%= mp.telephone_field :phone, 
+              class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500",
+              required: true,
+              "aria-required": "true",
+              "aria-describedby": "phone-description",
+              pattern: "[0-9]{10}|[0-9]{3}-[0-9]{3}-[0-9]{4}" %>
+          <p id="phone-description" class="mt-1 text-xs text-gray-500">Enter 10-digit phone number</p>
+        </div>
+
+        <div>
+          <%= mp.label :fax, "Fax (Optional)", class: "block text-sm font-medium text-gray-700" %>
+          <%= mp.telephone_field :fax, 
+              class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500",
+              "aria-describedby": "fax-description" %>
+          <p id="fax-description" class="mt-1 text-xs text-gray-500">Enter fax number if available</p>
+        </div>
+      </div>
+
+      <div>
+        <%= mp.label :email, "Email", class: "block text-sm font-medium text-gray-700" %>
+        <%= mp.email_field :email, 
+            class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500",
+            required: true,
+            "aria-required": "true",
+            "aria-describedby": "email-description" %>
+        <p id="email-description" class="mt-1 text-xs text-gray-500">Enter professional email address</p>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded" role="alert">
+    <h3 class="text-sm font-semibold text-blue-800 mb-2">Release of Information Consent</h3>
+    <div class="text-sm text-blue-700 space-y-2">
+      <p>
+        By providing the phone, email address, and/or fax number for your chosen Doctor / Medical Professional,  
+        you consent to the release of your information to the recipient(s). 
+        This release of information will include the capability to view your application, in its entirety.
+      </p>
+      <p>
+        You are responsible for ensuring that the contact information provided is the correct Doctor or Medical 
+        Professional. For security and privacy, you cannot make changes after you submit this application. 
+        If you need to update your doctor / professional's email or fax after submission, you must contact MAT staff.
+      </p>
+    </div>
+  </div>
+</section>

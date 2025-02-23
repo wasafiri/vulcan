@@ -1,0 +1,62 @@
+<main class="container mx-auto px-4 py-8">
+  <div class="bg-white shadow rounded-lg p-6">
+    <h1 class="text-2xl font-bold mb-4">Application #<%= @application.id %></h1>
+    
+    <div class="mb-4">
+      <h2 class="text-xl font-semibold mb-2">Application Details</h2>
+      <p><strong>Application Type:</strong> <%= @application.application_type&.titleize || "Not specified" %></p>
+      <p><strong>Submission Method:</strong> <%= @application.submission_method&.titleize || "Not specified" %></p>
+      <p><strong>Status:</strong> <%= @application.status&.titleize || "Not specified" %></p>
+      <p><strong>Application Date:</strong> <%= @application.application_date&.strftime("%B %d, %Y") || "Not specified" %></p>
+      <p><strong>Household Size:</strong> <%= @application.household_size || "Not specified" %></p>
+      <p><strong>Annual Income:</strong> <%= number_to_currency(@application.annual_income) if @application.annual_income %></p>
+      <p><strong>Income Verification Status:</strong> <%= @application.income_proof_status&.titleize || "Not specified" %></p>
+      <p><strong>Income Verified At:</strong> <%= @application.income_verified_at&.strftime("%B %d, %Y") || "Not verified" %></p>
+      <p><strong>Income Verified By:</strong> <%= @application.income_verified_by&.full_name || "Not verified" %></p>
+      <p><strong>Income Details:</strong> <%= @application.income_details.presence || "None provided" %></p>
+      <p><strong>Residency Details:</strong> <%= @application.residency_details.presence || "None provided" %></p>
+      <p><strong>Current Step:</strong> <%= @application.current_step&.titleize || "Not specified" %></p>
+      <p><strong>Received At:</strong> <%= @application.received_at&.strftime("%B %d, %Y") || "Not specified" %></p>
+      <p><strong>Last Activity At:</strong> <%= @application.last_activity_at&.strftime("%B %d, %Y") || "Not specified" %></p>
+      <p><strong>Review Count:</strong> <%= @application.review_count || 0 %></p>
+    </div>
+
+    <div class="mb-4">
+      <h2 class="text-xl font-semibold mb-2">Medical Provider Information</h2>
+      <% if @application.medical_provider_name.present? %>
+        <p><strong>Name:</strong> <%= @application.medical_provider_name %></p>
+        <p><strong>Phone:</strong> <%= @application.medical_provider_phone %></p>
+        <% if @application.medical_provider_fax.present? %>
+          <p><strong>Fax:</strong> <%= @application.medical_provider_fax %></p>
+        <% end %>
+        <p><strong>Email:</strong> <%= @application.medical_provider_email %></p>
+      <% else %>
+        <p>No medical provider information provided</p>
+      <% end %>
+    </div>
+
+    <div class="mb-4">
+      <h2>Income Proof</h2>
+      <% if @application.rejected_income_proof? %>
+        <%= link_to "Resubmit Income Proof", 
+            new_proof_constituent_portal_application_path(@application, proof_type: 'income'),
+            class: "text-blue-500 hover:text-blue-700" %>
+      <% end %>
+    </div>
+
+    <div class="mb-4">
+      <h2>Residency Proof</h2>
+      <% if @application.rejected_residency_proof? %>
+        <%= link_to "Resubmit Residency Proof", 
+            new_proof_constituent_portal_application_path(@application, proof_type: 'residency'),
+            class: "text-blue-500 hover:text-blue-700" %>
+      <% end %>
+    </div>
+
+    <div class="mb-4">
+      <h2 class="text-xl font-semibold mb-2">Actions</h2>
+      <%= link_to "Edit Application", edit_constituent_portal_application_path(@application), class: "bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600" %>
+      <%= link_to "Back to Dashboard", constituent_portal_dashboard_path, class: "bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 ml-2" %>
+    </div>
+  </div>
+</main>

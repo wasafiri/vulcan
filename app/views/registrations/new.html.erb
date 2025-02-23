@@ -159,17 +159,27 @@
         <% end %>
       </div>
 
-     <div class="space-y-1">
+     <div class="space-y-1" data-controller="date-input">
        <%= form.label :date_of_birth, "Date of Birth", class: "block text-sm font-medium text-gray-700" %>
-       <%= form.date_field :date_of_birth, 
+       <%= form.hidden_field :date_of_birth,
+           value: @user.date_of_birth&.strftime('%Y-%m-%d'),
+           data: { 
+             date_input_target: "hidden"
+           } %>
+       <%= text_field_tag :visible_date_of_birth,
+           @user.date_of_birth&.strftime('%m/%d/%Y'),
            class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
            required: true,
-           max: Date.today,
+           placeholder: "MM/DD/YYYY",
+           data: { 
+             date_input_target: "input"
+           },
            aria: {
              required: "true",
              invalid: @user.errors[:date_of_birth].any?,
              errormessage: "dob-error"
            } %>
+       <p class="text-xs text-gray-500">Enter date as MM/DD/YYYY or type numbers like 01011977</p>
        <% if @user.errors[:date_of_birth].any? %>
          <p id="dob-error" class="mt-1 text-sm text-red-600">
            <%= @user.errors[:date_of_birth].join(", ") %>

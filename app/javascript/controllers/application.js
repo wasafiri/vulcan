@@ -10,9 +10,8 @@ window.Stimulus = application
 import ModalController from "./modal_controller"
 application.register("modal", ModalController)
 
-export { application }
-import { Application } from "@hotwired/stimulus"
-
-const application = Application.start()
+// Register the date input controller
+import DateInputController from "./date_input_controller"
+application.register("date-input", DateInputController)
 
 export { application }
