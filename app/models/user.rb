@@ -34,10 +34,7 @@ class User < ApplicationRecord
     format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :first_name, :last_name, presence: true
   validates :reset_password_token, uniqueness: true, allow_nil: true
-  validates :phone, format: {
-  with: /\A\d{3}-\d{3}-\d{4}\z/,
-  message: "must be in format XXX-XXX-XXXX"
-  }
+  validate :phone_number_must_be_valid
 
   # Scopes
   scope :with_capability, ->(capability) {
@@ -196,15 +193,33 @@ class User < ApplicationRecord
   def format_phone_number
     return if phone.blank?
 
-    # Strip all non-digits
+    # Strip all non-digit characters
     digits = phone.gsub(/\D/, "")
 
-    # Remove leading 1 if present
+    # Remove leading '1' if present
     digits = digits[1..-1] if digits.length == 11 && digits.start_with?("1")
 
     # Format as XXX-XXX-XXXX if we have 10 digits
     if digits.length == 10
       self.phone = digits.gsub(/(\d{3})(\d{3})(\d{4})/, '\1-\2-\3')
+    else
+      # Keep the original input if invalid
+      self.phone = phone
+    end
+  end
+
+  def phone_number_must_be_valid
+    return if phone.blank?
+
+    # Strip all non-digit characters
+    digits = phone.gsub(/\D/, "")
+
+    # Remove leading '1' if present
+    digits = digits[1..-1] if digits.length == 11 && digits.start_with?("1")
+
+    # Validate that there are exactly 10 digits
+    if digits.length != 10
+      errors.add(:phone, "must be a valid 10-digit US phone number")
     end
   end
 end
