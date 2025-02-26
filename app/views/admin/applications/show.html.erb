@@ -289,10 +289,16 @@
             <% end %>
           </div>
         <% end %>
-        <% if @application.medical_certification_status == 'rejected' && @application.rejection_reason.present? %>
+        <% if @application.medical_certification_status == 'rejected' %>
           <div class="mt-4">
             <h3 class="text-sm font-medium text-gray-900">Rejection Reason:</h3>
-            <p class="mt-1 text-sm text-gray-500"><%= @application.rejection_reason %></p>
+            <p class="mt-1 text-sm text-gray-500">
+              <% if @application.respond_to?(:rejection_reason) && @application.rejection_reason.present? %>
+                <%= @application.rejection_reason %>
+              <% else %>
+                No reason provided
+              <% end %>
+            </p>
           </div>
         <% end %>
       </div>
@@ -330,5 +336,6 @@
 
     <!-- Audit Logs Section -->
     <%= render "audit_logs" %>
+  </div>
   </div>
 </main>

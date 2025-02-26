@@ -53,7 +53,15 @@ unless Rails.env.production?
         "waiting_period_years" => 3,
         "proof_submission_rate_limit_web" => 5,
         "proof_submission_rate_limit_email" => 10,
-        "proof_submission_rate_period" => 1
+        "proof_submission_rate_period" => 1,
+        # Voucher policies
+        "voucher_value_hearing_disability" => 500,
+        "voucher_value_vision_disability" => 500,
+        "voucher_value_speech_disability" => 500,
+        "voucher_value_mobility_disability" => 500,
+        "voucher_value_cognition_disability" => 500,
+        "voucher_validity_period_months" => 6,
+        "voucher_minimum_redemption_amount" => 10
       }
 
       policies.each do |key, value|

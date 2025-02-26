@@ -1,15 +1,30 @@
 <div id="modals">
   <!-- Modal for Income Proof Review -->
-  <div id="incomeProofReviewModal" class="fixed inset-0 hidden" data-modal-target="modal">
+  <div id="incomeProofReviewModal" class="fixed inset-0 hidden" data-modal-target="container">
     <!-- Backdrop -->
-    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-modal-target="backdrop"></div>
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-modal-target="overlay"></div>
     <!-- Modal Container -->
     <div class="fixed inset-0 flex items-center justify-center">
       <div class="bg-white rounded-lg p-6 max-w-3xl w-full relative">
         <h3 class="text-lg font-medium text-gray-900 mb-4">Review Income Proof</h3>
         <% if @application.income_proof.content_type.start_with?('application/pdf') %>
+          <%# 
+            IMPORTANT: PDF Preview Fix
+            
+            Setting both src and data-original-src attributes is critical for PDF previews to work correctly.
+            Previous implementations only set data-original-src and relied on JavaScript to set the src,
+            but this was unreliable and often resulted in blank PDF previews.
+            
+            The current implementation:
+            1. Sets the src attribute directly in the HTML
+            2. Also keeps data-original-src for the modal controller to use
+            3. Uses data-turbo="false" to prevent Turbo from interfering with the iframe
+            
+            DO NOT REMOVE the src attribute or change this implementation without thorough testing.
+            Changes here have repeatedly broken PDF previews in the past.
+          %>
           <iframe 
-            src=""
+            src="<%= url_for(@application.income_proof) %>"
             data-original-src="<%= url_for(@application.income_proof) %>" 
             type="application/pdf" 
             width="100%" 
@@ -57,16 +72,31 @@
   </div>
 
   <!-- Modal for Residency Proof Review -->
-  <div id="residencyProofReviewModal" class="fixed inset-0 hidden" data-modal-target="modal">
+  <div id="residencyProofReviewModal" class="fixed inset-0 hidden" data-modal-target="container">
     <!-- Backdrop -->
-    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-modal-target="backdrop"></div>
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-modal-target="overlay"></div>
     <!-- Modal Container -->
     <div class="fixed inset-0 flex items-center justify-center">
       <div class="bg-white rounded-lg p-6 max-w-3xl w-full relative">
         <h3 class="text-lg font-medium text-gray-900 mb-4">Review Residency Proof</h3>
         <% if @application.residency_proof.content_type.start_with?('application/pdf') %>
+          <%# 
+            IMPORTANT: PDF Preview Fix
+            
+            Setting both src and data-original-src attributes is critical for PDF previews to work correctly.
+            Previous implementations only set data-original-src and relied on JavaScript to set the src,
+            but this was unreliable and often resulted in blank PDF previews.
+            
+            The current implementation:
+            1. Sets the src attribute directly in the HTML
+            2. Also keeps data-original-src for the modal controller to use
+            3. Uses data-turbo="false" to prevent Turbo from interfering with the iframe
+            
+            DO NOT REMOVE the src attribute or change this implementation without thorough testing.
+            Changes here have repeatedly broken PDF previews in the past.
+          %>
           <iframe 
-            src=""
+            src="<%= url_for(@application.residency_proof) %>"
             data-original-src="<%= url_for(@application.residency_proof) %>" 
             type="application/pdf" 
             width="100%" 
@@ -114,17 +144,32 @@
   </div>
 
   <!-- Modal for Medical Certification Review -->
-  <div id="medicalCertificationReviewModal" class="fixed inset-0 hidden" data-modal-target="modal">
+  <div id="medicalCertificationReviewModal" class="fixed inset-0 hidden" data-modal-target="container">
     <!-- Backdrop -->
-    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-modal-target="backdrop"></div>
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-modal-target="overlay"></div>
     <!-- Modal Container -->
     <div class="fixed inset-0 flex items-center justify-center">
       <div class="bg-white rounded-lg p-6 max-w-3xl w-full relative">
         <h3 class="text-lg font-medium text-gray-900 mb-4">Review Medical Certification</h3>
         <% if @application.medical_certification.attached? %>
           <% if @application.medical_certification.content_type.start_with?('application/pdf') %>
+            <%# 
+              IMPORTANT: PDF Preview Fix
+              
+              Setting both src and data-original-src attributes is critical for PDF previews to work correctly.
+              Previous implementations only set data-original-src and relied on JavaScript to set the src,
+              but this was unreliable and often resulted in blank PDF previews.
+              
+              The current implementation:
+              1. Sets the src attribute directly in the HTML
+              2. Also keeps data-original-src for the modal controller to use
+              3. Uses data-turbo="false" to prevent Turbo from interfering with the iframe
+              
+              DO NOT REMOVE the src attribute or change this implementation without thorough testing.
+              Changes here have repeatedly broken PDF previews in the past.
+            %>
             <iframe 
-              src=""
+              src="<%= url_for(@application.medical_certification) %>"
               data-original-src="<%= url_for(@application.medical_certification) %>" 
               type="application/pdf" 
               width="100%" 
@@ -172,13 +217,13 @@
   </div>
 
   <!-- Rejection Modal for Proof Reviews -->
-  <div id="proofRejectionModal" class="fixed inset-0 hidden" data-modal-target="modal" data-controller="rejection-form"
+  <div id="proofRejectionModal" class="fixed inset-0 hidden" data-modal-target="container" data-controller="rejection-form"
        data-rejection-form-address-mismatch-income-value="<%= 'The address provided on your income documentation does not match the application address. Please submit documentation that contains the address exactly matching the one shared in your application: ' + @application.user.physical_address_1 + (@application.user.physical_address_2.present? ? ' ' + @application.user.physical_address_2 : '') + ' ' + @application.user.city + ', ' + @application.user.state + ' ' + @application.user.zip_code %>"
        data-rejection-form-address-mismatch-residency-value="<%= 'The address provided on your residency documentation does not match the application address. Please submit documentation that contains the address exactly matching the one shared in your application: ' + @application.user.physical_address_1 + (@application.user.physical_address_2.present? ? ' ' + @application.user.physical_address_2 : '') + ' ' + @application.user.city + ', ' + @application.user.state + ' ' + @application.user.zip_code %>"
        data-rejection-form-expired-income-value="The income documentation you provided is more than 1 year old or is expired. Please submit documentation that is less than 1 year old and which is not expired."
        data-rejection-form-expired-residency-value="The residency documentation you provided is more than 1 year old or is expired. Please submit documentation that is less than 1 year old and which is not expired.">
     <!-- Backdrop -->
-    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-modal-target="backdrop"></div>
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-modal-target="overlay"></div>
     <!-- Modal Container -->
     <div class="fixed inset-0 flex items-center justify-center">
       <div class="bg-white rounded-lg p-6 max-w-lg w-full relative">

@@ -99,6 +99,8 @@ class Vendor::RedemptionsController < Vendor::BaseController
       "Voucher has been fully redeemed"
     elsif voucher.voucher_cancelled?
       "Voucher has been cancelled"
+    elsif voucher.remaining_value.zero?
+      "Voucher has a zero balance and cannot be redeemed"
     else
       "Voucher cannot be redeemed"
     end

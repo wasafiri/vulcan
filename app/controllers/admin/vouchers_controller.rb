@@ -25,7 +25,11 @@ class Admin::VouchersController < Admin::BaseController
     @transactions = @voucher.voucher_transactions
       .includes(:vendor)
       .order(processed_at: :desc)
-    @audit_logs = @voucher.events.order(created_at: :desc)
+
+    # Find events related to this voucher
+    @audit_logs = Event.where("metadata @> ?", { voucher_id: @voucher.id }.to_json)
+      .or(Event.where("metadata @> ?", { voucher_code: @voucher.code }.to_json))
+      .order(created_at: :desc)
   end
 
   def update
@@ -116,12 +120,16 @@ class Admin::VouchersController < Admin::BaseController
   end
 
   def log_event!(action)
-    @voucher.events.create!(
+    Event.create!(
       user: current_user,
       action: action,
       metadata: {
+        voucher_id: @voucher.id,
+        voucher_code: @voucher.code,
+        application_id: @voucher.application_id,
         changes: @voucher.saved_changes,
-        admin_id: current_user.id
+        admin_id: current_user.id,
+        timestamp: Time.current.iso8601
       }
     )
   end
