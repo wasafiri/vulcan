@@ -36,21 +36,61 @@
     </div>
 
     <div class="mb-4">
-      <h2>Income Proof</h2>
-      <% if @application.rejected_income_proof? %>
-        <%= link_to "Resubmit Income Proof", 
-            new_proof_constituent_portal_application_path(@application, proof_type: 'income'),
-            class: "text-blue-500 hover:text-blue-700" %>
-      <% end %>
-    </div>
-
-    <div class="mb-4">
-      <h2>Residency Proof</h2>
-      <% if @application.rejected_residency_proof? %>
-        <%= link_to "Resubmit Residency Proof", 
-            new_proof_constituent_portal_application_path(@application, proof_type: 'residency'),
-            class: "text-blue-500 hover:text-blue-700" %>
-      <% end %>
+      <h2 class="text-xl font-semibold mb-2">Uploaded Documents</h2>
+      
+      <div class="mb-3">
+        <h3 class="text-lg font-medium">Income Proof</h3>
+        <% if @application.income_proof.attached? %>
+          <p class="text-gray-700">
+            <strong>Filename:</strong> <%= @application.income_proof.filename %>
+            <span class="ml-2 px-2 py-1 text-xs rounded-full <%= @application.income_proof_status == 'approved' ? 'bg-green-100 text-green-800' : (@application.income_proof_status == 'rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800') %>">
+              <%= @application.income_proof_status.titleize %>
+            </span>
+          </p>
+          <% if @application.income_proof.content_type.start_with?('image/') %>
+            <div class="mt-2">
+              <%= image_tag url_for(@application.income_proof), class: "max-w-xs rounded border border-gray-200", alt: "Income proof document" %>
+            </div>
+          <% end %>
+        <% else %>
+          <p class="text-gray-500 italic">No income proof document uploaded</p>
+        <% end %>
+        
+        <% if @application.rejected_income_proof? %>
+          <div class="mt-2">
+            <%= link_to "Resubmit Income Proof", 
+                new_proof_constituent_portal_application_path(@application, proof_type: 'income'),
+                class: "text-blue-500 hover:text-blue-700" %>
+          </div>
+        <% end %>
+      </div>
+      
+      <div class="mb-3">
+        <h3 class="text-lg font-medium">Residency Proof</h3>
+        <% if @application.residency_proof.attached? %>
+          <p class="text-gray-700">
+            <strong>Filename:</strong> <%= @application.residency_proof.filename %>
+            <span class="ml-2 px-2 py-1 text-xs rounded-full <%= @application.residency_proof_status == 'approved' ? 'bg-green-100 text-green-800' : (@application.residency_proof_status == 'rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800') %>">
+              <%= @application.residency_proof_status.titleize %>
+            </span>
+          </p>
+          <% if @application.residency_proof.content_type.start_with?('image/') %>
+            <div class="mt-2">
+              <%= image_tag url_for(@application.residency_proof), class: "max-w-xs rounded border border-gray-200", alt: "Residency proof document" %>
+            </div>
+          <% end %>
+        <% else %>
+          <p class="text-gray-500 italic">No residency proof document uploaded</p>
+        <% end %>
+        
+        <% if @application.rejected_residency_proof? %>
+          <div class="mt-2">
+            <%= link_to "Resubmit Residency Proof", 
+                new_proof_constituent_portal_application_path(@application, proof_type: 'residency'),
+                class: "text-blue-500 hover:text-blue-700" %>
+          </div>
+        <% end %>
+      </div>
     </div>
 
     <div class="mb-4">

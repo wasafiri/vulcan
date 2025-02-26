@@ -1,12 +1,12 @@
 <section aria-labelledby="medical-info-heading" class="space-y-4 p-4 bg-gray-50 rounded">
   <h2 id="medical-info-heading" class="text-lg font-medium text-gray-900">Medical Professional Information</h2>
   
-  <p class="text-sm text-gray-600 mb-4">
+  <p class="text-sm text-gray-700 mb-4">
     Please provide contact information for your Doctor or a qualified Medical Professional. 
     The system will automatically send your Disability Certification form to them to complete.
   </p>
 
-  <div class="text-sm text-gray-600 mb-4">
+  <div class="text-sm text-gray-700 mb-4">
     <p class="font-medium mb-2">Qualified Medical Professionals include:</p>
     <ul class="list-disc list-inside space-y-1 ml-2" aria-label="List of qualified medical professionals">
       <li>Doctor / Physician</li>
@@ -19,7 +19,6 @@
       <li>Registered Nurse (RN)</li>
       <li>Licensed Practical Nurse (LPN)</li>
       <li>Physical Therapist</li>
-      <li>Other Medical Professional</li>
     </ul>
   </div>
 
@@ -32,7 +31,7 @@
             required: true,
             "aria-required": "true",
             "aria-describedby": "name-description" %>
-        <p id="name-description" class="mt-1 text-xs text-gray-500">Enter the full name of your medical professional</p>
+        <p id="name-description" class="mt-1 text-xs text-gray-700">Enter the full name of your medical professional</p>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -44,7 +43,7 @@
               "aria-required": "true",
               "aria-describedby": "phone-description",
               pattern: "[0-9]{10}|[0-9]{3}-[0-9]{3}-[0-9]{4}" %>
-          <p id="phone-description" class="mt-1 text-xs text-gray-500">Enter 10-digit phone number</p>
+          <p id="phone-description" class="mt-1 text-xs text-gray-700">Enter 10-digit phone number</p>
         </div>
 
         <div>
@@ -52,7 +51,7 @@
           <%= mp.telephone_field :fax, 
               class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500",
               "aria-describedby": "fax-description" %>
-          <p id="fax-description" class="mt-1 text-xs text-gray-500">Enter fax number if available</p>
+          <p id="fax-description" class="mt-1 text-xs text-gray-700">Enter fax number if available</p>
         </div>
       </div>
 
@@ -63,7 +62,7 @@
             required: true,
             "aria-required": "true",
             "aria-describedby": "email-description" %>
-        <p id="email-description" class="mt-1 text-xs text-gray-500">Enter professional email address</p>
+        <p id="email-description" class="mt-1 text-xs text-gray-700">Enter professional email address</p>
       </div>
     </div>
   <% end %>
