@@ -30,11 +30,11 @@
         <% if current_user&.constituent? %>
           <% if current_user.active_application? %>
             <div class="mt-6">
-              <%= link_to "View/Edit Application", constituent_application_path(current_user.active_application), class: "inline-block bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500", aria_label: "View or edit your current application" %>
+              <%= link_to "View/Edit Application", constituent_portal_application_path(current_user.active_application), class: "inline-block bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500", aria_label: "View or edit your current application" %>
             </div>
           <% else %>
             <div class="mt-6">
-              <%= link_to "Apply Now", new_constituent_application_path, class: "inline-block bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500", aria_label: "Begin your application for telecommunications equipment" %>
+              <%= link_to "Apply Now", new_constituent_portal_application_path, class: "inline-block bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500", aria_label: "Begin your application for telecommunications equipment" %>
             </div>
           <% end %>
         <% end %>

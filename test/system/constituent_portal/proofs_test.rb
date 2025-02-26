@@ -19,8 +19,8 @@ class ProofsSystemTest < ApplicationSystemTestCase
       end
     end
 
-    @valid_pdf = fixture_file_upload("test/fixtures/files/valid.pdf", "application/pdf")
-    @invalid_file = fixture_file_upload("test/fixtures/files/invalid.exe")
+    @valid_pdf = file_fixture("valid.pdf")
+    @invalid_file = file_fixture("invalid.exe")
 
     # Ensure application has rejected proofs
     @application.update!(

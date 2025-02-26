@@ -1,14 +1,9 @@
-class Admin::ApplicationsController < ApplicationController
-  include Pagy::Backend
-
-  before_action :authenticate_user!
-  before_action :require_admin!
-  before_action :set_current_attributes
+class Admin::ApplicationsController < Admin::BaseController
   before_action :set_application, only: [
     :show, :edit, :update,
     :verify_income, :request_documents, :review_proof, :update_proof_status,
     :approve, :reject, :assign_evaluator, :schedule_training, :complete_training,
-    :update_certification_status, :resend_medical_certification
+    :update_certification_status, :resend_medical_certification, :assign_voucher
   ]
 
   def index
@@ -57,7 +52,13 @@ class Admin::ApplicationsController < ApplicationController
       ]
     ).order(created_at: :desc)
 
-    @audit_logs = (proof_reviews + status_changes + notifications)
+    # Include voucher-related events
+    voucher_events = Event.where(
+      action: [ "voucher_assigned", "voucher_redeemed", "voucher_expired", "voucher_cancelled" ],
+      metadata: { application_id: @application.id }
+    ).includes(:user).order(created_at: :desc)
+
+    @audit_logs = (proof_reviews + status_changes + notifications + voucher_events)
       .sort_by(&:created_at)
       .reverse
   end
@@ -154,7 +155,13 @@ class Admin::ApplicationsController < ApplicationController
             ]
           ).order(created_at: :desc)
 
-          @audit_logs = (proof_reviews + status_changes + notifications)
+          # Include voucher-related events
+          voucher_events = Event.where(
+            action: [ "voucher_assigned", "voucher_redeemed", "voucher_expired", "voucher_cancelled" ],
+            metadata: { application_id: @application.id }
+          ).includes(:user).order(created_at: :desc)
+
+          @audit_logs = (proof_reviews + status_changes + notifications + voucher_events)
             .sort_by(&:created_at)
             .reverse
 
@@ -285,6 +292,16 @@ class Admin::ApplicationsController < ApplicationController
     end
 
     redirect_to admin_application_path(@application), notice: "Certification request resent."
+  end
+
+  def assign_voucher
+    if @application.assign_voucher!(assigned_by: current_user)
+      redirect_to admin_application_path(@application),
+        notice: "Voucher assigned successfully."
+    else
+      redirect_to admin_application_path(@application),
+        alert: "Failed to assign voucher. Please ensure all requirements are met."
+    end
   end
 
   private

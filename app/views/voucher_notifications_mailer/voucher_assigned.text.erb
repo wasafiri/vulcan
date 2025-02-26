@@ -1,0 +1,23 @@
+Your Voucher Has Been Assigned
+
+Dear <%= @user.first_name %>,
+
+We are pleased to inform you that a voucher has been assigned to your application.
+
+Voucher Details:
+- Voucher Code: <%= @voucher.code %>
+- Value: <%= number_to_currency(@voucher.initial_value) %>
+- Expiration Date: <%= (@voucher.issued_at + Policy.voucher_validity_period).strftime("%B %d, %Y") %>
+
+Important Information:
+* Your voucher is valid for <%= Policy.get("voucher_validity_period_months") %> months from today
+* The minimum redemption amount is <%= number_to_currency(Policy.voucher_minimum_redemption_amount) %>
+* You can use this voucher at any of our approved vendors
+* Keep your voucher code secure and do not share it with others
+
+To use your voucher, simply present the code to any of our approved vendors. They will verify the code and process your purchase.
+
+If you have any questions about using your voucher, please don't hesitate to contact us.
+
+Best regards,
+The MAT Program Team

@@ -1,0 +1,31 @@
+Your Voucher Has Expired
+
+Dear <%= @user.first_name %>,
+
+We regret to inform you that your voucher has expired.
+
+Expired Voucher Details:
+- Voucher Code: <%= @voucher.code %>
+- Initial Value: <%= number_to_currency(@voucher.initial_value) %>
+- Unused Value: <%= number_to_currency(@voucher.remaining_value) %>
+- Expiration Date: <%= @voucher.expiration_date.strftime("%B %d, %Y") %>
+
+<% if @voucher.transactions.any? %>
+Transaction History:
+<% @voucher.transactions.order(processed_at: :desc).each do |transaction %>
+* <%= transaction.processed_at.strftime("%B %d, %Y") %>
+  Amount: <%= number_to_currency(transaction.amount) %>
+  Vendor: <%= transaction.vendor.business_name %>
+
+<% end %>
+<% end %>
+
+What This Means:
+* The voucher can no longer be used for purchases
+* Any remaining balance has been forfeited
+* You may be eligible for a new voucher in the future
+
+If you believe this voucher expired in error or have any questions, please contact us immediately.
+
+Best regards,
+The MAT Program Team

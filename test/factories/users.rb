@@ -23,14 +23,14 @@ FactoryBot.define do
         first_name { "Test" }
         last_name { "Evaluator" }
         availability_schedule { { monday: [ "9:00", "17:00" ] } }
-        status { :active }
+        status { :evaluator_active }
 
         trait :inactive do
-          status { :inactive }
+          status { :evaluator_inactive }
         end
 
         trait :suspended do
-          status { :suspended }
+          status { :evaluator_suspended }
         end
       end
 
@@ -68,19 +68,6 @@ FactoryBot.define do
           after(:create) do |constituent|
             create(:application, user: constituent)
           end
-        end
-      end
-
-      factory :vendor, class: "Vendor" do
-        type { "Vendor" }
-        status { :approved }
-
-        trait :pending do
-          status { :pending }
-        end
-
-        trait :suspended do
-          status { :suspended }
         end
       end
     end

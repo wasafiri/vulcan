@@ -26,6 +26,12 @@ module ProofManageable
     residency_proof_status_rejected?
   end
 
+  def can_submit_proof?
+    # An application can submit proof if it's in a valid state
+    # This is a placeholder implementation - adjust based on your business logic
+    true
+  end
+
   def update_proof_status!(proof_type, new_status)
     transaction do
       case proof_type

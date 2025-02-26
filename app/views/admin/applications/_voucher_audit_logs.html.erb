@@ -1,0 +1,58 @@
+<div class="space-y-4">
+  <% events = Event.where(
+      action: ["voucher_assigned", "voucher_redeemed", "voucher_expired", "voucher_cancelled"],
+      metadata: { application_id: @application.id }
+    ).order(created_at: :desc) %>
+
+  <% if events.any? %>
+    <div class="flow-root">
+      <ul role="list" class="-mb-8">
+        <% events.each do |event| %>
+          <li>
+            <div class="relative pb-8">
+              <span class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+              <div class="relative flex space-x-3">
+                <div>
+                  <span class="h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white
+                    <%= case event.action
+                      when "voucher_assigned" then "bg-green-500"
+                      when "voucher_redeemed" then "bg-blue-500"
+                      when "voucher_expired" then "bg-yellow-500"
+                      when "voucher_cancelled" then "bg-red-500"
+                      end %>">
+                    <svg class="h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V4a2 2 0 00-2-2H4zm2 4a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm0 4a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm0 4a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1z" clip-rule="evenodd" />
+                    </svg>
+                  </span>
+                </div>
+                <div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
+                  <div>
+                    <p class="text-sm text-gray-500">
+                      <%= case event.action
+                        when "voucher_assigned"
+                          "Voucher #{event.metadata['voucher_code']} assigned with value #{number_to_currency(event.metadata['initial_value'])}"
+                        when "voucher_redeemed"
+                          "Voucher #{event.metadata['voucher_code']} redeemed for #{number_to_currency(event.metadata['amount'])} at #{event.metadata['vendor_name']}"
+                        when "voucher_expired"
+                          "Voucher #{event.metadata['voucher_code']} expired with unused value #{number_to_currency(event.metadata['unused_value'])}"
+                        when "voucher_cancelled"
+                          "Voucher #{event.metadata['voucher_code']} cancelled"
+                        end %>
+                    </p>
+                  </div>
+                  <div class="whitespace-nowrap text-right text-sm text-gray-500">
+                    <time datetime="<%= event.created_at.iso8601 %>">
+                      <%= event.created_at.strftime("%B %d, %Y at %I:%M %p") %>
+                    </time>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+  <% else %>
+    <p class="text-sm text-gray-500">No voucher activity recorded</p>
+  <% end %>
+</div>

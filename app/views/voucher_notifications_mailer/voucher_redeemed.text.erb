@@ -1,0 +1,30 @@
+Voucher Transaction Confirmation
+
+Dear <%= @user.first_name %>,
+
+This email confirms that your voucher has been used for a purchase.
+
+Transaction Details:
+- Date: <%= @transaction.processed_at.strftime("%B %d, %Y at %I:%M %p") %>
+- Amount: <%= number_to_currency(@transaction.amount) %>
+- Vendor: <%= @vendor.business_name %>
+- Reference Number: <%= @transaction.reference_number %>
+
+Voucher Status:
+- Voucher Code: <%= @voucher.code %>
+- Remaining Balance: <%= number_to_currency(@voucher.remaining_value) %>
+- Expiration Date: <%= @voucher.expiration_date.strftime("%B %d, %Y") %>
+
+<% if @voucher.remaining_value > 0 %>
+Important Reminders:
+* Your voucher has a remaining balance of <%= number_to_currency(@voucher.remaining_value) %>
+* The minimum redemption amount is <%= number_to_currency(Policy.voucher_minimum_redemption_amount) %>
+* Your voucher will expire on <%= @voucher.expiration_date.strftime("%B %d, %Y") %>
+<% else %>
+Note: This voucher has been fully redeemed and cannot be used for further purchases.
+<% end %>
+
+If you did not authorize this transaction or notice any discrepancies, please contact us immediately.
+
+Best regards,
+The MAT Program Team

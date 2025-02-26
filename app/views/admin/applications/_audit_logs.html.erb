@@ -38,6 +38,19 @@
                       else
                         log.action.titleize.gsub('_', ' ')
                       end
+                    when Event
+                      case log.action
+                      when "voucher_assigned"
+                        "Voucher Assigned"
+                      when "voucher_redeemed"
+                        "Voucher Redeemed"
+                      when "voucher_expired"
+                        "Voucher Expired"
+                      when "voucher_cancelled"
+                        "Voucher Cancelled"
+                      else
+                        log.action.titleize.gsub('_', ' ')
+                      end
                     end %>
               </div>
             </td>
@@ -50,6 +63,8 @@
                       log.user&.full_name || "System"
                     when Notification
                       log.actor&.full_name || "System"
+                    when Event
+                      log.user&.full_name || "System"
                     end %>
               </div>
             </td>
@@ -94,6 +109,19 @@
                       proof_type = log.metadata.try(:[], 'proof_type') || 'Unknown'
                       rejection_text = log.metadata.try(:[], 'rejection_reason').present? ? " - #{log.metadata['rejection_reason']}" : ""
                       "Constituent notified: #{proof_type.titleize} proof rejected#{rejection_text}"
+                    else
+                      log.action.titleize.gsub('_', ' ')
+                    end
+                  when Event
+                    case log.action
+                    when "voucher_assigned"
+                      "Voucher #{log.metadata['voucher_code']} assigned with value #{number_to_currency(log.metadata['initial_value'])}"
+                    when "voucher_redeemed"
+                      "Voucher #{log.metadata['voucher_code']} redeemed for #{number_to_currency(log.metadata['amount'])} at #{log.metadata['vendor_name']}"
+                    when "voucher_expired"
+                      "Voucher #{log.metadata['voucher_code']} expired with unused value #{number_to_currency(log.metadata['unused_value'])}"
+                    when "voucher_cancelled"
+                      "Voucher #{log.metadata['voucher_code']} cancelled"
                     else
                       log.action.titleize.gsub('_', ' ')
                     end

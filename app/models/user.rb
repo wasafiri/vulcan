@@ -1,4 +1,18 @@
 class User < ApplicationRecord
+  # Class methods
+  def self.system_user
+    @system_user ||= begin
+      user = User.find_or_create_by!(email: "system@example.com") do |u|
+        u.first_name = "System"
+        u.last_name = "User"
+        u.password = SecureRandom.hex(32)
+        u.type = "Admin"
+        u.verified = true
+      end
+      user.admin? ? user : user.tap { |u| u.update!(type: "Admin") }
+    end
+  end
+
   has_secure_password
 
   # Constants
@@ -35,6 +49,9 @@ class User < ApplicationRecord
   validates :first_name, :last_name, presence: true
   validates :reset_password_token, uniqueness: true, allow_nil: true
   validate :phone_number_must_be_valid
+
+  # Status enum
+  enum :status, { inactive: 0, active: 1, suspended: 2 }, default: :active
 
   # Scopes
   scope :with_capability, ->(capability) {

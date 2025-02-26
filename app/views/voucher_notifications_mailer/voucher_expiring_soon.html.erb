@@ -1,0 +1,34 @@
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+  <h2>Important: Your Voucher Will Expire Soon</h2>
+
+  <p>Dear <%= @user.first_name %>,</p>
+
+  <p>This is a reminder that your voucher will expire in <%= @days_remaining %> days on <%= @expiration_date %>.</p>
+
+  <div style="background-color: #fff3cd; padding: 20px; margin: 20px 0; border-radius: 5px; border: 1px solid #ffeeba;">
+    <h3 style="margin-top: 0; color: #856404;">Voucher Details</h3>
+    <p><strong>Voucher Code:</strong> <%= @voucher.code %></p>
+    <p><strong>Remaining Value:</strong> <%= number_to_currency(@voucher.remaining_value) %></p>
+    <p><strong>Expiration Date:</strong> <%= @expiration_date %></p>
+  </div>
+
+  <% if @voucher.vendor %>
+    <p>Your voucher is currently associated with <%= @voucher.vendor.business_name %>.</p>
+  <% else %>
+    <p>You can use this voucher at any of our approved vendors.</p>
+  <% end %>
+
+  <h3>Important Reminders</h3>
+  <ul>
+    <li>Any unused value will be forfeited after the expiration date</li>
+    <li>The minimum redemption amount is <%= number_to_currency(Policy.voucher_minimum_redemption_amount) %></li>
+    <li>Contact us immediately if you have any issues using your voucher</li>
+  </ul>
+
+  <p>To ensure you don't lose your voucher value, please make arrangements to use it before the expiration date.</p>
+
+  <p>If you need assistance or have any questions, please don't hesitate to contact us.</p>
+
+  <p>Best regards,<br>
+  The MAT Program Team</p>
+</div>

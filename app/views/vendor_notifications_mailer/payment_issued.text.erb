@@ -1,0 +1,30 @@
+Payment Processed
+
+Dear <%= @vendor.business_name %>,
+
+We are pleased to inform you that your invoice has been processed by our General Accounting Department.
+
+PAYMENT DETAILS
+--------------
+Invoice Number: <%= @invoice.invoice_number %>
+Total Amount: <%= number_to_currency(@invoice.total_amount) %>
+GAD Reference: <%= @invoice.gad_invoice_reference %>
+<% if @invoice.check_number.present? %>
+Check Number: <%= @invoice.check_number %>
+<% end %>
+
+PAYMENT INFORMATION
+-----------------
+The payment has been processed and should be received according to standard payment terms.
+Please reference the GAD invoice number in any future correspondence about this payment.
+
+CONTACT INFORMATION
+-----------------
+For questions about this payment:
+General Accounting Department - accounting@example.com
+Reference: GAD invoice number <%= @invoice.gad_invoice_reference %>
+
+For all other inquiries:
+Support Team - support@example.com
+
+Thank you for your participation in our program!

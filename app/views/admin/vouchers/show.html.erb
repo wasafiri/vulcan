@@ -1,0 +1,232 @@
+<div class="container mx-auto px-4 py-8">
+  <div class="md:flex md:items-center md:justify-between mb-8">
+    <div class="flex-1 min-w-0">
+      <nav class="flex" aria-label="Breadcrumb">
+        <ol role="list" class="flex items-center space-x-4">
+          <li>
+            <div class="flex">
+              <%= link_to "Vouchers", admin_vouchers_path, class: "text-sm font-medium text-gray-500 hover:text-gray-700" %>
+            </div>
+          </li>
+          <li>
+            <div class="flex items-center">
+              <svg class="flex-shrink-0 h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+              </svg>
+              <span class="ml-4 text-sm font-medium text-gray-500"><%= @voucher.code %></span>
+            </div>
+          </li>
+        </ol>
+      </nav>
+      <h1 class="mt-2 text-3xl font-bold text-gray-900">Voucher Details</h1>
+    </div>
+    <div class="mt-4 flex md:mt-0 md:ml-4 space-x-4">
+      <% if @voucher.can_cancel? %>
+        <%= button_to "Cancel Voucher",
+            cancel_admin_voucher_path(@voucher),
+            method: :patch,
+            class: "inline-flex items-center px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500",
+            data: {
+              turbo_confirm: "Are you sure you want to cancel this voucher?"
+            } %>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <!-- Voucher Information -->
+    <div class="bg-white shadow rounded-lg">
+      <div class="px-4 py-5 sm:p-6">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Voucher Information</h2>
+        
+        <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Code</dt>
+            <dd class="mt-1 text-sm text-gray-900 font-mono"><%= @voucher.code %></dd>
+          </div>
+
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Status</dt>
+            <dd class="mt-1"><%= voucher_status_badge(@voucher) %></dd>
+          </div>
+
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Initial Value</dt>
+            <dd class="mt-1 text-sm text-gray-900">
+              <span class="<%= voucher_amount_class(@voucher.initial_value) %>">
+                <%= number_to_currency(@voucher.initial_value) %>
+              </span>
+            </dd>
+          </div>
+
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Remaining Value</dt>
+            <dd class="mt-1 text-sm text-gray-900">
+              <%= number_to_currency(@voucher.remaining_value) %>
+              <%= voucher_usage_bar(@voucher) %>
+            </dd>
+          </div>
+
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Created</dt>
+            <dd class="mt-1 text-sm text-gray-900">
+              <%= @voucher.created_at.strftime("%B %d, %Y %I:%M %p") %>
+            </dd>
+          </div>
+
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Expires</dt>
+            <dd class="mt-1 text-sm text-gray-900">
+              <%= @voucher.expiration_date.strftime("%B %d, %Y") %>
+              <%= voucher_expiration_warning(@voucher) %>
+            </dd>
+          </div>
+
+          <div class="sm:col-span-2">
+            <dt class="text-sm font-medium text-gray-500">Vendor</dt>
+            <dd class="mt-1 text-sm text-gray-900">
+              <% if @voucher.vendor %>
+                <%= link_to @voucher.vendor.business_name,
+                    [:admin, @voucher.vendor],
+                    class: "text-indigo-600 hover:text-indigo-900" %>
+              <% else %>
+                <span class="text-gray-400">Unassigned</span>
+              <% end %>
+            </dd>
+          </div>
+
+          <div class="sm:col-span-2">
+            <dt class="text-sm font-medium text-gray-500">Notes</dt>
+            <dd class="mt-1 text-sm text-gray-900">
+              <%= simple_format(@voucher.notes) || "No notes" %>
+            </dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Transaction History -->
+    <div class="bg-white shadow rounded-lg">
+      <div class="px-4 py-5 sm:p-6">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Transaction History</h2>
+        
+        <% if @transactions.any? %>
+          <div class="flow-root">
+            <ul role="list" class="-mb-8">
+              <% @transactions.each do |transaction| %>
+                <li>
+                  <div class="relative pb-8">
+                    <% unless transaction == @transactions.last %>
+                      <span class="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+                    <% end %>
+                    <div class="relative flex space-x-3">
+                      <div>
+                        <span class="h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white">
+                          <% case transaction.status %>
+                          <% when "completed" %>
+                            <svg class="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                          <% when "pending" %>
+                            <svg class="h-5 w-5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                          <% when "failed" %>
+                            <svg class="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                          <% end %>
+                        </span>
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <div class="text-sm text-gray-500">
+                          <%= number_to_currency(transaction.amount) %>
+                          processed by
+                          <%= link_to transaction.vendor.business_name,
+                              [:admin, transaction.vendor],
+                              class: "font-medium text-gray-900" %>
+                        </div>
+                        <div class="mt-1 text-sm text-gray-500 flex items-center">
+                          <span><%= transaction.processed_at.strftime("%B %d, %Y %I:%M %p") %></span>
+                          <span class="mx-2">&middot;</span>
+                          <span>Ref: <%= transaction.reference_number %></span>
+                          <% if transaction.invoice %>
+                            <span class="mx-2">&middot;</span>
+                            <%= link_to "Invoice ##{transaction.invoice.invoice_number}",
+                                [:admin, transaction.invoice],
+                                class: "text-indigo-600 hover:text-indigo-900" %>
+                          <% end %>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              <% end %>
+            </ul>
+          </div>
+        <% else %>
+          <p class="text-sm text-gray-500">No transactions yet</p>
+        <% end %>
+      </div>
+    </div>
+
+    <!-- Audit Log -->
+    <div class="bg-white shadow rounded-lg lg:col-span-2">
+      <div class="px-4 py-5 sm:p-6">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Audit Log</h2>
+        
+        <% if @audit_logs.any? %>
+          <div class="flow-root">
+            <ul role="list" class="-mb-8">
+              <% @audit_logs.each do |event| %>
+                <li>
+                  <div class="relative pb-8">
+                    <% unless event == @audit_logs.last %>
+                      <span class="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+                    <% end %>
+                    <div class="relative flex space-x-3">
+                      <div>
+                        <span class="h-8 w-8 rounded-full bg-gray-400 flex items-center justify-center ring-8 ring-white">
+                          <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                          </svg>
+                        </span>
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <div class="text-sm text-gray-500">
+                          <%= event.action.titleize %>
+                          by
+                          <%= link_to event.user.full_name,
+                              [:admin, event.user],
+                              class: "font-medium text-gray-900" %>
+                        </div>
+                        <div class="mt-1 text-sm text-gray-500">
+                          <%= event.created_at.strftime("%B %d, %Y %I:%M %p") %>
+                        </div>
+                        <% if event.metadata.present? && event.metadata["changes"].present? %>
+                          <div class="mt-2 text-sm">
+                            <% event.metadata["changes"].each do |attribute, (before, after)| %>
+                              <div class="text-gray-500">
+                                <span class="font-medium"><%= attribute.humanize %>:</span>
+                                <span class="line-through text-red-500"><%= before || "nil" %></span>
+                                <span class="mx-1">&rarr;</span>
+                                <span class="text-green-500"><%= after || "nil" %></span>
+                              </div>
+                            <% end %>
+                          </div>
+                        <% end %>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              <% end %>
+            </ul>
+          </div>
+        <% else %>
+          <p class="text-sm text-gray-500">No audit logs yet</p>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

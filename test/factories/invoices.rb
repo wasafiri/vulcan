@@ -1,0 +1,71 @@
+FactoryBot.define do
+  factory :invoice do
+    association :vendor
+    start_date { 2.weeks.ago.beginning_of_day }
+    end_date { Time.current.end_of_day }
+    status { :invoice_pending }
+    total_amount { 0 }
+    invoice_number { "INV-#{Time.current.strftime("%Y%m")}-#{SecureRandom.hex(4).upcase}" }
+
+    trait :pending do
+      status { :invoice_pending }
+    end
+
+    trait :approved do
+      status { :invoice_approved }
+      approved_at { Time.current }
+    end
+
+    trait :paid do
+      status { :invoice_paid }
+      approved_at { 1.day.ago }
+      payment_recorded_at { Time.current }
+      gad_invoice_reference { "GAD-#{SecureRandom.hex(6).upcase}" }
+      check_number { "CHK#{SecureRandom.hex(4).upcase}" } # Optional
+    end
+
+    trait :cancelled do
+      status { :invoice_cancelled }
+    end
+
+    trait :with_transactions do
+      transient do
+        transaction_count { 3 }
+        amount_per_transaction { 100.00 }
+      end
+
+      after(:create) do |invoice, evaluator|
+        transactions = create_list(:voucher_transaction, evaluator.transaction_count,
+          vendor: invoice.vendor,
+          amount: evaluator.amount_per_transaction,
+          invoice: invoice,
+          status: :transaction_completed)
+
+        # Update total amount
+        invoice.update!(
+          total_amount: transactions.sum(&:amount)
+        )
+      end
+    end
+
+    trait :current_period do
+      start_date { 2.weeks.ago.beginning_of_day }
+      end_date { Time.current.end_of_day }
+    end
+
+    trait :previous_period do
+      start_date { 4.weeks.ago.beginning_of_day }
+      end_date { 2.weeks.ago.end_of_day }
+    end
+
+    trait :with_notes do
+      notes { "Payment processed via direct deposit" }
+    end
+
+    # Ensure total amount matches transactions
+    after(:create) do |invoice|
+      actual_total = invoice.voucher_transactions.sum(:amount)
+      invoice.update_column(:total_amount, actual_total) if invoice.total_amount != actual_total
+    end
+  end
+end

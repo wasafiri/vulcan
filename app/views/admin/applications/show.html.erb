@@ -323,6 +323,11 @@
     <!-- Modals -->
     <%= render "modals" %>
 
+    <!-- Voucher Details Section -->
+    <% if @application.approved? && @application.medical_certification_status_accepted? %>
+      <%= render "voucher_details" %>
+    <% end %>
+
     <!-- Audit Logs Section -->
     <%= render "audit_logs" %>
   </div>

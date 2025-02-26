@@ -1,0 +1,29 @@
+New Invoice Generated
+
+Dear <%= @vendor.business_name %>,
+
+A new invoice has been generated for your recent voucher transactions.
+
+INVOICE DETAILS
+--------------
+Invoice Number: <%= @invoice.invoice_number %>
+Period: <%= @invoice.period_start.strftime("%B %d, %Y") %> - <%= @invoice.period_end.strftime("%B %d, %Y") %>
+Total Amount: <%= number_to_currency(@invoice.total_amount) %>
+
+TRANSACTION SUMMARY
+-----------------
+<% @transactions.each do |transaction| %>
+Date: <%= transaction.processed_at.strftime("%B %d, %Y") %>
+Voucher: <%= transaction.voucher.code %>
+Amount: <%= number_to_currency(transaction.amount) %>
+<% end %>
+
+NEXT STEPS
+---------
+Our accounting team will review this invoice and process payment within 30 days. You will receive another notification when the invoice has been approved and sent to accounting for payment.
+
+A PDF copy of this invoice is attached for your records.
+
+If you have any questions about this invoice, please contact our support team at support@example.com.
+
+Thank you for participating in our program!

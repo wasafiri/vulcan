@@ -1,10 +1,17 @@
-# production:
-#   periodic_cleanup:
-#     class: CleanSoftDeletedRecordsJob
-#     queue: background
-#     args: [ 1000, { batch_size: 500 } ]
-#     schedule: every hour
-#   periodic_command:
-#     command: "SoftDeletedRecord.due.delete_all"
-#     priority: 2
-#     schedule: at 5am every day
+# Recurring tasks configuration
+# Format: https://github.com/sidekiq-scheduler/sidekiq-scheduler#schedule-types
+
+# Generate vendor invoices every 2 weeks
+generate_vendor_invoices:
+  class: GenerateVendorInvoicesJob
+  cron: "0 0 */14 * *"  # At midnight every 14 days
+  description: "Generate biweekly invoices for vendors with pending transactions"
+
+# Check voucher expiration daily
+check_voucher_expiration:
+  class: CheckVoucherExpirationJob
+  cron: "0 1 * * *"  # At 1 AM every day
+  description: "Check for expiring vouchers and notify constituents"
+  queue: "default"
+  args: []
+  static: true

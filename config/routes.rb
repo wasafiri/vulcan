@@ -37,6 +37,7 @@ Rails.application.routes.draw do
       end
 
       member do
+        post :assign_voucher
         post :request_documents
         post :review_proof  # if you're handling via standard POST or GET
         post :update_proof_status
@@ -108,6 +109,27 @@ Rails.application.routes.draw do
         get :vendor_performance
       end
     end
+
+    resources :vouchers do
+      member do
+        patch :cancel
+      end
+      collection do
+        get :expired
+        get :expiring_soon
+      end
+    end
+
+    resources :invoices do
+      member do
+        patch :approve
+        patch :cancel
+      end
+      collection do
+        get :paid
+        get :export_batch
+      end
+    end
   end
 
   namespace :evaluators do
@@ -126,8 +148,27 @@ Rails.application.routes.draw do
   end
 
   namespace :vendor do
-    resource :dashboard, only: [ :show ]
+    resource :dashboard, only: [ :show ], controller: :dashboard
+    resource :profile, only: [ :edit, :update ]
+    resources :redemptions, only: [ :new, :create ] do
+      collection do
+        get :check_voucher
+        get :verify
+      end
+    end
+    resources :transactions, only: [ :index ] do
+      get :report, on: :collection
+    end
+    resources :invoices, only: [ :index, :show ]
   end
+
+  # Original constituent namespace (will be deprecated)
+  # Direct routing to new controllers instead of redirects
+  get "/constituent/applications/:id/proofs/resubmit", to: "constituent_portal/proofs/proofs#new"
+  post "/constituent/applications/:id/proofs/resubmit", to: "constituent_portal/proofs/proofs#resubmit"
+  # Keep these redirects for now
+  get "/constituent/applications/:id", to: redirect("/constituent_portal/applications/%{id}")
+  get "/constituent/dashboard", to: redirect("/constituent_portal/dashboard")
 
   namespace :constituent do
     resource :dashboard, only: [ :show ]
@@ -143,6 +184,26 @@ Rails.application.routes.draw do
           post "resubmit", to: "proofs#resubmit"
           post "direct_upload", to: "proofs#direct_upload", as: :direct_upload_proof
         end
+      end
+    end
+    resources :appointments, only: [ :index, :show ]
+    resources :evaluations, only: [ :index, :show ]
+    resources :devices, only: [ :index, :show ]
+  end
+
+  # New constituent_portal namespace (replacing constituent)
+  namespace :constituent_portal do
+    resource :dashboard, only: [ :show ]
+    resources :applications, path: "applications" do
+      member do
+        patch :upload_documents
+        post :request_review
+        get :verify
+        patch :submit
+        # Define the route with a custom name
+        get "proofs/new/:proof_type", to: "proofs/proofs#new", as: :new_proof
+        post "proofs/resubmit", to: "proofs/proofs#resubmit", as: :resubmit_proof
+        post "proofs/direct_upload", to: "proofs/proofs#direct_upload", as: :direct_upload_proof
       end
     end
     resources :appointments, only: [ :index, :show ]

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_02_18_212041) do
+ActiveRecord::Schema[8.0].define(version: 2025_02_23_204130) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -178,6 +178,40 @@ ActiveRecord::Schema[8.0].define(version: 2025_02_18_212041) do
     t.index ["user_id"], name: "index_events_on_user_id"
   end
 
+  create_table "invoices", force: :cascade do |t|
+    t.bigint "vendor_id", null: false
+    t.datetime "start_date", null: false
+    t.datetime "end_date", null: false
+    t.decimal "total_amount", precision: 10, scale: 2, default: "0.0", null: false
+    t.integer "status", default: 0, null: false
+    t.datetime "payment_date"
+    t.string "payment_reference"
+    t.text "notes"
+    t.string "invoice_number", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "check_number"
+    t.datetime "check_issued_at"
+    t.datetime "check_cashed_at"
+    t.string "check_cashed_by"
+    t.string "gad_invoice_reference"
+    t.text "payment_notes"
+    t.datetime "approved_at"
+    t.datetime "payment_recorded_at"
+    t.index ["approved_at"], name: "index_invoices_on_approved_at"
+    t.index ["check_cashed_at"], name: "index_invoices_on_check_cashed_at"
+    t.index ["check_issued_at"], name: "index_invoices_on_check_issued_at"
+    t.index ["check_number"], name: "index_invoices_on_check_number"
+    t.index ["gad_invoice_reference"], name: "index_invoices_on_gad_invoice_reference"
+    t.index ["invoice_number"], name: "index_invoices_on_invoice_number", unique: true
+    t.index ["payment_date"], name: "index_invoices_on_payment_date"
+    t.index ["payment_recorded_at"], name: "index_invoices_on_payment_recorded_at"
+    t.index ["start_date", "end_date"], name: "index_invoices_on_start_date_and_end_date"
+    t.index ["status"], name: "index_invoices_on_status"
+    t.index ["vendor_id", "status"], name: "index_invoices_on_vendor_id_and_status"
+    t.index ["vendor_id"], name: "index_invoices_on_vendor_id"
+  end
+
   create_table "notifications", force: :cascade do |t|
     t.bigint "recipient_id", null: false
     t.bigint "actor_id", null: false
@@ -198,6 +232,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_02_18_212041) do
     t.integer "value"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["key"], name: "index_policies_on_key", unique: true
   end
 
   create_table "policy_changes", force: :cascade do |t|
@@ -473,6 +508,11 @@ ActiveRecord::Schema[8.0].define(version: 2025_02_18_212041) do
     t.string "guardian_relationship"
     t.bigint "guardian_id"
     t.string "fax"
+    t.string "business_name"
+    t.string "business_tax_id"
+    t.datetime "terms_accepted_at"
+    t.index ["business_name"], name: "index_users_on_business_name"
+    t.index ["business_tax_id"], name: "index_users_on_business_tax_id"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["evaluator_id"], name: "index_users_on_evaluator_id"
     t.index ["guardian_id"], name: "index_users_on_guardian_id"
@@ -481,6 +521,52 @@ ActiveRecord::Schema[8.0].define(version: 2025_02_18_212041) do
     t.index ["recipient_id"], name: "index_users_on_recipient_id"
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
     t.index ["type"], name: "index_users_on_type"
+  end
+
+  create_table "voucher_transactions", force: :cascade do |t|
+    t.bigint "voucher_id", null: false
+    t.bigint "vendor_id", null: false
+    t.bigint "invoice_id"
+    t.decimal "amount", precision: 10, scale: 2, null: false
+    t.integer "transaction_type", default: 0, null: false
+    t.integer "status", default: 0, null: false
+    t.datetime "processed_at"
+    t.text "notes"
+    t.string "reference_number"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["invoice_id"], name: "index_voucher_transactions_on_invoice_id"
+    t.index ["processed_at"], name: "index_voucher_transactions_on_processed_at"
+    t.index ["reference_number"], name: "index_voucher_transactions_on_reference_number"
+    t.index ["status"], name: "index_voucher_transactions_on_status"
+    t.index ["transaction_type"], name: "index_voucher_transactions_on_transaction_type"
+    t.index ["vendor_id", "status"], name: "index_voucher_transactions_on_vendor_id_and_status"
+    t.index ["vendor_id"], name: "index_voucher_transactions_on_vendor_id"
+    t.index ["voucher_id", "transaction_type"], name: "index_voucher_transactions_on_voucher_id_and_transaction_type"
+    t.index ["voucher_id"], name: "index_voucher_transactions_on_voucher_id"
+  end
+
+  create_table "vouchers", force: :cascade do |t|
+    t.string "code", null: false
+    t.decimal "initial_value", precision: 10, scale: 2, null: false
+    t.decimal "remaining_value", precision: 10, scale: 2, null: false
+    t.integer "status", default: 0, null: false
+    t.bigint "application_id", null: false
+    t.bigint "vendor_id"
+    t.datetime "issued_at"
+    t.datetime "redeemed_at"
+    t.datetime "last_used_at"
+    t.bigint "invoice_id"
+    t.text "notes"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["application_id"], name: "index_vouchers_on_application_id"
+    t.index ["code"], name: "index_vouchers_on_code", unique: true
+    t.index ["invoice_id"], name: "index_vouchers_on_invoice_id"
+    t.index ["issued_at"], name: "index_vouchers_on_issued_at"
+    t.index ["status"], name: "index_vouchers_on_status"
+    t.index ["vendor_id", "status"], name: "index_vouchers_on_vendor_id_and_status"
+    t.index ["vendor_id"], name: "index_vouchers_on_vendor_id"
   end
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
@@ -498,6 +584,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_02_18_212041) do
   add_foreign_key "evaluations", "users", column: "constituent_id"
   add_foreign_key "evaluations", "users", column: "evaluator_id"
   add_foreign_key "events", "users"
+  add_foreign_key "invoices", "users", column: "vendor_id"
   add_foreign_key "notifications", "users", column: "actor_id"
   add_foreign_key "notifications", "users", column: "recipient_id"
   add_foreign_key "policy_changes", "policies"
@@ -520,4 +607,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_02_18_212041) do
   add_foreign_key "users", "users", column: "income_verified_by_id"
   add_foreign_key "users", "users", column: "medical_provider_id"
   add_foreign_key "users", "users", column: "recipient_id"
+  add_foreign_key "voucher_transactions", "invoices"
+  add_foreign_key "voucher_transactions", "users", column: "vendor_id"
+  add_foreign_key "voucher_transactions", "vouchers"
+  add_foreign_key "vouchers", "applications"
+  add_foreign_key "vouchers", "invoices"
+  add_foreign_key "vouchers", "users", column: "vendor_id"
 end

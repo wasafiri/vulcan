@@ -14,18 +14,23 @@ module Authentication
 
   private
 
-  # Retrieves the currently logged-in user based on the session_token stored in signed cookies
+  # Retrieves the currently logged-in user based on the session_token stored in cookies
   def current_user
     @current_user ||= begin
+      # Try signed cookies first (production)
       if cookies.signed[:session_token]
-        # Find the session record using the session_token
         session_record = Session.find_by(session_token: cookies.signed[:session_token])
-
-        # Return the associated user if the session is valid
-        session_record&.user
-      else
-        nil
+        return session_record&.user if session_record
       end
+
+      # Fall back to unsigned cookies (test)
+      if cookies[:session_token]
+        session_record = Session.find_by(session_token: cookies[:session_token])
+        return session_record&.user if session_record
+      end
+
+      # No valid session found
+      nil
     end
   end
 

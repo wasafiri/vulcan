@@ -21,18 +21,32 @@ class ConstituentPortal::Proofs::ProofsController < ApplicationController
       end
 
       def resubmit
+        Rails.logger.debug "RESUBMIT PROOF: application_id=#{params[:application_id]}, proof_type=#{params[:proof_type]}"
+
         authorize_proof_access!
+        Rails.logger.debug "PROOF ACCESS AUTHORIZED"
 
         ActiveRecord::Base.transaction do
           attach_and_update_proof
+          Rails.logger.debug "PROOF ATTACHED AND UPDATED"
+
           track_submission
+          Rails.logger.debug "SUBMISSION TRACKED"
         end
 
-        redirect_to constituent_portal_application_path(@application),
-          notice: "Proof submitted successfully"
+        # Set flash and keep it through redirects
+        flash[:notice] = "Proof submitted successfully"
+        flash.keep(:notice)
+        redirect_to resubmit_proof_constituent_portal_application_path(@application)
       rescue RateLimit::ExceededError
-        redirect_to constituent_portal_application_path(@application),
-          alert: "Please wait before submitting another proof"
+        # Set flash and keep it through redirects
+        flash[:alert] = "Please wait before submitting another proof"
+        flash.keep(:alert)
+        redirect_to resubmit_proof_constituent_portal_application_path(@application)
+      rescue => e
+        Rails.logger.error "ERROR IN RESUBMIT: #{e.class.name}: #{e.message}"
+        Rails.logger.error e.backtrace.join("\n")
+        raise
       end
 
       private
@@ -52,7 +66,7 @@ class ConstituentPortal::Proofs::ProofsController < ApplicationController
       end
 
       def set_application
-        @application = current_user.applications.find(params[:id])
+        @application = current_user.applications.find(params[:application_id])
       rescue ActiveRecord::RecordNotFound
         redirect_to constituent_portal_dashboard_path, alert: "Application not found"
       end
@@ -100,7 +114,7 @@ class ConstituentPortal::Proofs::ProofsController < ApplicationController
 
       def track_submission
         # Create Event for application audit log
-        Event.create!(
+        event = Event.create!(
           user: current_user,
           action: "proof_submitted",
           metadata: {
@@ -108,9 +122,10 @@ class ConstituentPortal::Proofs::ProofsController < ApplicationController
             proof_type: params[:proof_type]
           }
         )
+        Rails.logger.debug "EVENT CREATED: #{event.inspect}"
 
         # Create ProofSubmissionAudit for policy audit log
-        ProofSubmissionAudit.create!(
+        audit = ProofSubmissionAudit.create!(
           application: @application,
           user: current_user,
           proof_type: params[:proof_type],
@@ -121,6 +136,7 @@ class ConstituentPortal::Proofs::ProofsController < ApplicationController
             submission_method: "web"
           }
         )
+        Rails.logger.debug "AUDIT CREATED: #{audit.inspect}"
       end
 
       def valid_proof_type?

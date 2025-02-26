@@ -53,7 +53,7 @@
       
       <p>Please ensure all required documentation has been submitted for review. You can:</p>
       <ul>
-        <li>Visit <%= link_to "your application page", constituent_application_url(@application, host: Rails.application.config.action_mailer.default_url_options[:host]) %> to upload new documentation</li>
+        <li>Visit <%= link_to "your application page", constituent_portal_application_url(@application, host: Rails.application.config.action_mailer.default_url_options[:host]) %> to upload new documentation</li>
         <li>Reply to this email with your documentation attached</li>
       </ul>
     <% else %>

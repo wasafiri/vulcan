@@ -1,94 +1,117 @@
 ENV["RAILS_ENV"] ||= "test"
-ENV["MAILER_HOST"] = "example.com"
 require_relative "../config/environment"
 require "rails/test_help"
 require "minitest/mock"
-require "factory_bot_rails"
-require "database_cleaner/active_record"
+require "capybara/rails"
+require "support/voucher_test_helper"
 
-# Require all files in test/support
-Dir[Rails.root.join("test", "support", "**", "*.rb")].each { |f| require f }
+module ActiveSupport
+  class TestCase
+    include FactoryBot::Syntax::Methods
+    include VoucherTestHelper
+    include ActionMailer::TestHelper
 
-# Configure DatabaseCleaner
-DatabaseCleaner.strategy = :transaction
+    def assert_enqueued_email_with(mailer_class, method_name, args: nil)
+      block_result = nil
+      assert_enqueued_with(job: ActionMailer::MailDeliveryJob) do
+        block_result = yield
+      end
+      block_result
+    end
 
-class ActiveSupport::TestCase
-  include FactoryBot::Syntax::Methods
-  include TestPasswordHelper
+    # Run tests in parallel with specified workers
+    parallelize(workers: :number_of_processors)
 
-  # Make helper methods available in fixtures
-  ActiveRecord::FixtureSet.context_class.include(TestPasswordHelper)
+    # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
+    fixtures :all
 
-  # Start DatabaseCleaner before each test
-  setup do
-    DatabaseCleaner.start
-  end
+    # Configure Active Storage for testing
+    setup do
+      ActiveStorage::Current.url_options = { host: "localhost:3000" }
+    end
 
-  # Setup fixtures for all tests in alphabetical order.
-  fixtures :all  # Ensure all fixtures are loaded only in test
+    # Add more helper methods to be used by all tests here...
+    def sign_in(user)
+      if respond_to?(:post)
+        # Integration test
+        post sign_in_path, params: {
+          email: user.email, password: "password123"
+        }
+      else
+        # Controller/Model test
+        session = user.sessions.create!(
+          user_agent: "Rails Testing",
+          ip_address: "127.0.0.1"
+        )
+        cookies[:session_token] = session.session_token
+      end
+    end
 
-  # Clean the database after each test
-  teardown do
-    DatabaseCleaner.clean
-  end
-end
+    def assert_not_authorized
+      assert_response :redirect
+      assert_redirected_to root_path
+      assert_equal "Not authorized", flash[:alert]
+    end
 
-class ActionDispatch::IntegrationTest
-  include FactoryBot::Syntax::Methods
+    def assert_must_sign_in
+      assert_response :redirect
+      assert_redirected_to sign_in_path
+      assert_equal "You need to sign in first", flash[:alert]
+    end
 
-  def sign_in(user, password: "password123")
-    # Set standard test headers
-    @headers = {
-      "HTTP_USER_AGENT" => "Rails Testing",
-      "REMOTE_ADDR" => "127.0.0.1"
-    }
+    # Helper methods for flash assertions
+    def assert_flash(type, message)
+      assert_equal message, flash[type.to_sym]
+    end
 
-    post sign_in_path,
-      params: { email: user.email, password: password },
-      headers: @headers
+    def assert_flash_after_redirect(type, message)
+      follow_redirect!
+      assert_flash(type, message)
+    end
 
-    assert_response :redirect
-    follow_redirect!
-  end
+    def sign_out
+      if respond_to?(:delete)
+        # Integration test
+        delete sign_out_path
+      else
+        # Controller/Model test
+        cookies.delete(:session_token)
+      end
+    end
 
-  def sign_out
-    delete sign_out_path
-    assert_response :redirect
-    follow_redirect!
-  end
-
-  def assert_application_in_list(application)
-    assert_select ".application-row" do |elements|
-      assert elements.any? { |e| e.text =~ /#{application.user.last_name}/ }
+    def assert_requires_verification
+      assert_response :redirect
+      assert_redirected_to new_verification_path
+      assert_equal "Please verify your account first", flash[:alert]
     end
   end
-
-  def assert_application_row(application)
-    assert_select ".application-row", text: /#{application.user.last_name}/i
-  end
-
-  # Helper to run test in main thread with Current attributes
-  def with_current_attributes(user)
-    Current.set(request, user)
-    yield
-  ensure
-    Current.reset
-  end
-
-  # Alias sign_in_as to sign_in for compatibility with existing tests
-  alias_method :sign_in_as, :sign_in
 end
 
-class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
-  include TestPasswordHelper
-  include ActionDispatch::TestProcess::FixtureFile
+# Configure Capybara
+Capybara.register_driver :headless_chrome do |app|
+  options = Selenium::WebDriver::Chrome::Options.new
+  options.add_argument("--headless")
+  options.add_argument("--disable-gpu")
+  options.add_argument("--no-sandbox")
+  options.add_argument("--disable-dev-shm-usage")
+  options.add_argument("--window-size=1400,1400")
 
-  driven_by :selenium, using: :headless_chrome, screen_size: [ 1400, 1400 ]
-
-  def sign_in_as(user, password: "password123")
-    visit sign_in_path
-    fill_in "Email Address", with: user.email
-    fill_in "Password", with: password
-    click_button "Sign In"
-  end
+  Capybara::Selenium::Driver.new(app, browser: :chrome, options: options)
 end
+
+Capybara.javascript_driver = :headless_chrome
+Capybara.default_max_wait_time = 5
+
+# Configure ActionMailer
+ActionMailer::Base.delivery_method = :test
+ActionMailer::Base.perform_deliveries = true
+ActionMailer::Base.deliveries = []
+
+# Configure Active Job
+ActiveJob::Base.queue_adapter = :test
+
+# Configure Active Storage
+Rails.application.config.active_storage.service = :test
+
+# Suppress logging in tests
+Rails.logger.level = Logger::ERROR

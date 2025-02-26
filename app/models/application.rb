@@ -14,10 +14,11 @@ class Application < ApplicationRecord
   has_many :proof_reviews, dependent: :destroy
   has_many :status_changes, class_name: "ApplicationStatusChange"
   has_many :proof_submission_audits, dependent: :destroy
+  has_many :vouchers, dependent: :restrict_with_error
   has_one_attached :medical_certification
   belongs_to :medical_certification_verified_by,
-  class_name: "User",
-  optional: true
+    class_name: "User",
+    optional: true
 
   # Enums
   enum :income_proof_status, {
@@ -78,10 +79,67 @@ class Application < ApplicationRecord
   def approve!
     with_lock do
       update!(status: :approved)
+
+      # Create event for approval
+      Event.create!(
+        user: Current.user,
+        action: "application_approved",
+        metadata: {
+          application_id: id,
+          timestamp: Time.current.iso8601
+        }
+      )
+
+      # Create initial voucher
+      create_initial_voucher if can_create_voucher?
     end
   rescue => e
     Rails.logger.error "Failed to approve application #{id}: #{e.message}"
     false
+  end
+
+  def assign_voucher!(assigned_by: nil)
+    return false unless can_create_voucher?
+
+    with_lock do
+      voucher = vouchers.create!
+
+      Event.create!(
+        user: assigned_by || Current.user,
+        action: "voucher_assigned",
+        metadata: {
+          application_id: id,
+          voucher_id: voucher.id,
+          voucher_code: voucher.code,
+          initial_value: voucher.initial_value,
+          timestamp: Time.current.iso8601
+        }
+      )
+
+      # Notify constituent
+      create_system_notification!(
+        recipient: user,
+        actor: assigned_by || Current.user,
+        action: "voucher_assigned"
+      )
+
+      voucher
+    end
+  rescue => e
+    Rails.logger.error "Failed to assign voucher for application #{id}: #{e.message}"
+    false
+  end
+
+  def can_create_voucher?
+    approved? &&
+    medical_certification_status_accepted? &&
+    !vouchers.exists?
+  end
+
+  def create_initial_voucher
+    return unless can_create_voucher?
+
+    assign_voucher!(assigned_by: Current.user)
   end
 
   def reject!
@@ -218,6 +276,10 @@ class Application < ApplicationRecord
         notes: notes
       )
     end
+  end
+
+  def medical_provider_name
+    self[:medical_provider_name]
   end
 
   private
