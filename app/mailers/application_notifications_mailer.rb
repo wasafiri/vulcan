@@ -131,4 +131,31 @@ class ApplicationNotificationsMailer < ApplicationMailer
   end
 
   helper Mailers::ApplicationNotificationsHelper
+
+  def account_created(constituent, temp_password)
+    @constituent = constituent
+    @temp_password = temp_password
+    @login_url = sign_in_url
+
+    mail(
+      to: @constituent.email,
+      subject: "Your MAT Application Account Has Been Created"
+    )
+  end
+
+  def income_threshold_exceeded(constituent_params, notification_params)
+    @constituent = OpenStruct.new(constituent_params)
+    @notification = OpenStruct.new(notification_params)
+
+    # Calculate the threshold for display in the email
+    household_size = @notification.household_size.to_i
+    base_fpl = Policy.get("fpl_#{[ household_size, 8 ].min}_person").to_i
+    modifier = Policy.get("fpl_modifier_percentage").to_i
+    @threshold = base_fpl * (modifier / 100.0)
+
+    mail(
+      to: @constituent.email,
+      subject: "Important Information About Your MAT Application"
+    )
+  end
 end

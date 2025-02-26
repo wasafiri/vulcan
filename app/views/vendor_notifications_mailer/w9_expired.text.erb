@@ -9,7 +9,7 @@ To resume payment processing for voucher transactions, please submit an updated 
 HOW TO SUBMIT YOUR UPDATED W9:
 1. Download the current W9 form from the IRS website: https://www.irs.gov/pub/irs-pdf/fw9.pdf
 2. Complete and sign the form
-3. Log in to your vendor portal at <%= vendor_root_path %>
+3. Log in to your vendor portal at <%= vendor_root_url(host: Rails.application.config.action_mailer.default_url_options[:host]) %>
 4. Navigate to "Profile" and upload your new W9 form
 
 <%= render 'shared/mailers/status_box.text', status: :info, title: "Payment Status" do %>

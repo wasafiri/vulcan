@@ -221,7 +221,14 @@
        data-rejection-form-address-mismatch-income-value="<%= 'The address provided on your income documentation does not match the application address. Please submit documentation that contains the address exactly matching the one shared in your application: ' + @application.user.physical_address_1 + (@application.user.physical_address_2.present? ? ' ' + @application.user.physical_address_2 : '') + ' ' + @application.user.city + ', ' + @application.user.state + ' ' + @application.user.zip_code %>"
        data-rejection-form-address-mismatch-residency-value="<%= 'The address provided on your residency documentation does not match the application address. Please submit documentation that contains the address exactly matching the one shared in your application: ' + @application.user.physical_address_1 + (@application.user.physical_address_2.present? ? ' ' + @application.user.physical_address_2 : '') + ' ' + @application.user.city + ', ' + @application.user.state + ' ' + @application.user.zip_code %>"
        data-rejection-form-expired-income-value="The income documentation you provided is more than 1 year old or is expired. Please submit documentation that is less than 1 year old and which is not expired."
-       data-rejection-form-expired-residency-value="The residency documentation you provided is more than 1 year old or is expired. Please submit documentation that is less than 1 year old and which is not expired.">
+       data-rejection-form-expired-residency-value="The residency documentation you provided is more than 1 year old or is expired. Please submit documentation that is less than 1 year old and which is not expired."
+       data-rejection-form-missing-name-income-value="The income documentation you provided does not show your name. Please submit documentation that clearly displays your full name as it appears on your application."
+       data-rejection-form-missing-name-residency-value="The residency documentation you provided does not show your name. Please submit documentation that clearly displays your full name as it appears on your application."
+       data-rejection-form-wrong-document-income-value="The document you submitted is not an acceptable type of income proof. Please submit one of the following: recent pay stubs, tax returns, Social Security benefit statements, or other official documentation that verifies your income."
+       data-rejection-form-wrong-document-residency-value="The document you submitted is not an acceptable type of residency proof. Please submit one of the following: utility bill, lease agreement, mortgage statement, or other official documentation that verifies your Maryland residence."
+       data-rejection-form-missing-amount-income-value="The income documentation you provided does not clearly show your income amount. Please submit documentation that clearly displays your income figures, such as pay stubs with earnings clearly visible or benefit statements showing payment amounts."
+       data-rejection-form-exceeds-threshold-income-value="Based on the income documentation you provided, your household income exceeds the maximum threshold to qualify for the MAT program. The program is designed to assist those with financial need, and unfortunately, your income level is above our current eligibility limits."
+       data-rejection-form-outdated-ss-award-income-value="Your Social Security benefit award letter is out-of-date. Please submit your most recent award letter, which should be dated within the last 12 months. You can obtain a new benefit verification letter by visiting the Social Security Administration website or contacting your local SSA office.">
     <!-- Backdrop -->
     <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-modal-target="overlay"></div>
     <!-- Modal Container -->
@@ -230,7 +237,7 @@
         <h3 class="text-lg font-medium text-gray-900 mb-4">Enter Rejection Reason</h3>
         <div class="mb-4">
           <p class="text-sm font-medium text-gray-700 mb-1">Predefined Rejection Reasons:</p>
-          <div class="flex space-x-2">
+          <div class="flex flex-wrap gap-2 mb-2">
             <button type="button" 
                     class="px-3 py-1 bg-gray-200 rounded" 
                     data-action="click->rejection-form#selectPredefinedReason"
@@ -242,6 +249,38 @@
                     data-action="click->rejection-form#selectPredefinedReason"
                     data-reason-type="expired">
               Expired Documentation
+            </button>
+            <button type="button" 
+                    class="px-3 py-1 bg-gray-200 rounded" 
+                    data-action="click->rejection-form#selectPredefinedReason"
+                    data-reason-type="missingName">
+              Missing Name
+            </button>
+            <button type="button" 
+                    class="px-3 py-1 bg-gray-200 rounded" 
+                    data-action="click->rejection-form#selectPredefinedReason"
+                    data-reason-type="wrongDocument">
+              Wrong Document Type
+            </button>
+          </div>
+          <div class="flex flex-wrap gap-2 income-only-reasons hidden">
+            <button type="button" 
+                    class="px-3 py-1 bg-gray-200 rounded" 
+                    data-action="click->rejection-form#selectPredefinedReason"
+                    data-reason-type="missingAmount">
+              Missing Amount
+            </button>
+            <button type="button" 
+                    class="px-3 py-1 bg-gray-200 rounded" 
+                    data-action="click->rejection-form#selectPredefinedReason"
+                    data-reason-type="exceedsThreshold">
+              Income Exceeds Threshold
+            </button>
+            <button type="button" 
+                    class="px-3 py-1 bg-gray-200 rounded" 
+                    data-action="click->rejection-form#selectPredefinedReason"
+                    data-reason-type="outdatedSsAward">
+              Outdated SS Award Letter
             </button>
           </div>
         </div>

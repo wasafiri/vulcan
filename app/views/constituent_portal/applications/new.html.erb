@@ -14,7 +14,8 @@
       <%= form_with(model: [:constituent_portal, @application], 
         local: true, 
         class: "space-y-6",
-        "aria-labelledby": "form-title") do |form| %>
+        "aria-labelledby": "form-title",
+        data: { controller: "application-form" }) do |form| %>
         
         <% if @application.errors.any? %>
           <div class="bg-red-50 p-4 rounded mb-6" role="alert" aria-atomic="true">
@@ -68,7 +69,11 @@
                   min: 1,
                   required: true,
                   class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md",
-                  "aria-describedby": "household_size_help" %>
+                  "aria-describedby": "household_size_help",
+                  data: { 
+                    application_form_target: "householdSize",
+                    action: "change->application-form#validateIncomeThreshold blur->application-form#validateIncomeThreshold"
+                  } %>
             </div>
             <p class="mt-2 text-sm text-gray-700" id="household_size_help">
               Total number of people living in your household
@@ -85,7 +90,11 @@
                   step: "0.01",
                   required: true,
                   class: "pl-7 focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md",
-                  "aria-describedby": "annual_income_help" %>
+                  "aria-describedby": "annual_income_help",
+                  data: { 
+                    application_form_target: "annualIncome",
+                    action: "change->application-form#validateIncomeThreshold blur->application-form#validateIncomeThreshold"
+                  } %>
             </div>
             <p class="mt-2 text-sm text-gray-700" id="annual_income_help">
               Total yearly household income before taxes
@@ -211,7 +220,8 @@
           <%= form.submit "Submit Application", 
               name: "submit_application",
               class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500",
-              "aria-label": "Submit final application" %>
+              "aria-label": "Submit final application",
+              data: { application_form_target: "submitButton" } %>
         </div>
       <% end %>
     </div>

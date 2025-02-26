@@ -10,7 +10,14 @@ export default class extends Controller {
     addressMismatchIncome: String,
     addressMismatchResidency: String,
     expiredIncome: String,
-    expiredResidency: String
+    expiredResidency: String,
+    missingNameIncome: String,
+    missingNameResidency: String,
+    wrongDocumentIncome: String,
+    wrongDocumentResidency: String,
+    missingAmountIncome: String,
+    exceedsThresholdIncome: String,
+    outdatedSsAwardIncome: String
   }
 
   connect() {
@@ -23,9 +30,35 @@ export default class extends Controller {
     // Listen for proof type changes
     document.addEventListener('click', (event) => {
       if (event.target.matches('[data-proof-type]')) {
-        this.proofTypeTarget.value = event.target.dataset.proofType
+        const proofType = event.target.dataset.proofType
+        this.proofTypeTarget.value = proofType
+        
+        // Show/hide income-only reasons based on proof type
+        const incomeOnlyReasons = document.querySelector('.income-only-reasons')
+        if (incomeOnlyReasons) {
+          if (proofType === 'income') {
+            incomeOnlyReasons.classList.remove('hidden')
+          } else {
+            incomeOnlyReasons.classList.add('hidden')
+          }
+        }
       }
     })
+    
+    // Initialize income-only reasons visibility based on initial proof type
+    this.updateIncomeOnlyReasonsVisibility()
+  }
+  
+  updateIncomeOnlyReasonsVisibility() {
+    const proofType = this.proofTypeTarget.value
+    const incomeOnlyReasons = document.querySelector('.income-only-reasons')
+    if (incomeOnlyReasons) {
+      if (proofType === 'income') {
+        incomeOnlyReasons.classList.remove('hidden')
+      } else {
+        incomeOnlyReasons.classList.add('hidden')
+      }
+    }
   }
 
   disconnect() {

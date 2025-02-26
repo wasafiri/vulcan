@@ -10,7 +10,7 @@
 <ol>
   <li>Download the current W9 form from the <a href="https://www.irs.gov/pub/irs-pdf/fw9.pdf">IRS website</a></li>
   <li>Complete and sign the form</li>
-  <li>Log in to your vendor portal at <%= link_to "Vendor Portal", vendor_root_path %></li>
+  <li>Log in to your vendor portal at <%= link_to "Vendor Portal", vendor_root_url(host: Rails.application.config.action_mailer.default_url_options[:host]) %></li>
   <li>Navigate to "Profile" and upload your new W9 form</li>
 </ol>
 

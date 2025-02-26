@@ -1,0 +1,439 @@
+<div class="min-h-screen bg-gray-100 py-12">
+  <div class="form-container max-w-4xl mx-auto">
+    <div class="bg-white p-8 rounded shadow-md">
+      <h1 class="text-2xl font-semibold mb-6">Upload Paper Application</h1>
+      
+      <% if flash[:alert] %>
+        <div class="bg-red-100 border border-red-400 text-red-700 p-4 rounded mb-4" role="alert">
+          <span><%= flash[:alert] %></span>
+        </div>
+      <% end %>
+      
+      <%= form_with(url: admin_paper_applications_path, method: :post, local: true, multipart: true, 
+                    data: { controller: "paper-application" }) do |form| %>
+        
+        <!-- Income Threshold Warning (hidden by default) -->
+        <div id="income-threshold-warning" class="hidden mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700">
+          <h3 class="font-medium">Income Exceeds Threshold</h3>
+          <p>The applicant's income exceeds the maximum threshold for their household size.</p>
+          <p>This application cannot be submitted. Please use the "Send Rejection Notification" button below.</p>
+        </div>
+        
+        <!-- Constituent Information Section -->
+        <fieldset class="mb-6 p-4 border border-gray-200 rounded">
+          <legend class="text-lg font-medium">Constituent Information</legend>
+          
+          <%= fields_for :constituent do |c| %>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <%= c.label :first_name, "First Name", class: "block text-sm font-medium text-gray-700" %>
+                <%= c.text_field :first_name, required: true, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" %>
+              </div>
+              
+              <div>
+                <%= c.label :last_name, "Last Name", class: "block text-sm font-medium text-gray-700" %>
+                <%= c.text_field :last_name, required: true, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" %>
+              </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div>
+                <%= c.label :email, "Email", class: "block text-sm font-medium text-gray-700" %>
+                <%= c.email_field :email, required: true, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" %>
+              </div>
+              
+              <div>
+                <%= c.label :phone, "Phone", class: "block text-sm font-medium text-gray-700" %>
+                <%= c.telephone_field :phone, required: true, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" %>
+              </div>
+            </div>
+            
+            <div class="mt-4">
+              <%= c.label :physical_address_1, "Address Line 1", class: "block text-sm font-medium text-gray-700" %>
+              <%= c.text_field :physical_address_1, required: true, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" %>
+            </div>
+            
+            <div class="mt-4">
+              <%= c.label :physical_address_2, "Address Line 2", class: "block text-sm font-medium text-gray-700" %>
+              <%= c.text_field :physical_address_2, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" %>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div>
+                <%= c.label :city, "City", class: "block text-sm font-medium text-gray-700" %>
+                <%= c.text_field :city, required: true, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" %>
+              </div>
+              
+              <div>
+                <%= c.label :state, "State", class: "block text-sm font-medium text-gray-700" %>
+                <%= c.text_field :state, required: true, value: "MD", class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" %>
+              </div>
+              
+              <div>
+                <%= c.label :zip_code, "ZIP Code", class: "block text-sm font-medium text-gray-700" %>
+                <%= c.text_field :zip_code, required: true, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" %>
+              </div>
+            </div>
+          <% end %>
+        </fieldset>
+        
+        <!-- Application Information Section -->
+        <fieldset class="mb-6 p-4 border border-gray-200 rounded">
+          <legend class="text-lg font-medium">Application Details</legend>
+          
+          <%= fields_for :application do |a| %>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <%= a.label :household_size, "Household Size", class: "block text-sm font-medium text-gray-700" %>
+                <%= a.number_field :household_size, 
+                    min: 1, 
+                    required: true,
+                    class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
+                    data: { 
+                      action: "change->paper-application#validateIncomeThreshold",
+                      paper_application_target: "householdSize" 
+                    } %>
+              </div>
+              
+              <div>
+                <%= a.label :annual_income, "Annual Income", class: "block text-sm font-medium text-gray-700" %>
+                <div class="mt-1 relative rounded-md shadow-sm">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span class="text-gray-500 sm:text-sm">$</span>
+                  </div>
+                  <%= a.number_field :annual_income, 
+                      step: "0.01", 
+                      required: true,
+                      class: "pl-7 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
+                      data: { 
+                        action: "change->paper-application#validateIncomeThreshold",
+                        paper_application_target: "annualIncome" 
+                      } %>
+                </div>
+              </div>
+            </div>
+            
+            <div class="mt-4">
+              <div class="flex items-start">
+                <%= a.check_box :maryland_resident,
+                    class: "mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
+                    required: true %>
+                <%= a.label :maryland_resident, "I certify that the applicant is a resident of Maryland",
+                    class: "ml-2 block text-sm text-gray-700" %>
+                <p class="ml-6 text-xs text-gray-500 mt-1">Note: This will be verified through the residency proof upload/review process</p>
+              </div>
+            </div>
+            
+            <div class="mt-4">
+              <div class="flex items-start">
+                <%= a.check_box :self_certify_disability,
+                    class: "mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
+                    required: true %>
+                <%= a.label :self_certify_disability,
+                    "The applicant certifies that they have a disability that affects their ability to access telecommunications services",
+                    class: "ml-2 block text-sm text-gray-700" %>
+              </div>
+            </div>
+            
+            <div class="mt-4">
+              <div class="flex items-start">
+                <%= a.check_box :terms_accepted,
+                    class: "mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
+                    required: true %>
+                <%= a.label :terms_accepted, "The applicant has accepted the terms and conditions",
+                    class: "ml-2 block text-sm text-gray-700" %>
+              </div>
+            </div>
+            
+            <div class="mt-4">
+              <div class="flex items-start">
+                <%= a.check_box :information_verified,
+                    class: "mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
+                    required: true %>
+                <%= a.label :information_verified, "The applicant has verified that all information is correct",
+                    class: "ml-2 block text-sm text-gray-700" %>
+              </div>
+            </div>
+            
+            <div class="mt-4">
+              <div class="flex items-start">
+                <%= a.check_box :medical_release_authorized,
+                    class: "mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
+                    required: true %>
+                <%= a.label :medical_release_authorized, "The applicant has authorized the release of medical information",
+                    class: "ml-2 block text-sm text-gray-700" %>
+              </div>
+            </div>
+          <% end %>
+        </fieldset>
+        
+        <!-- Disability Information Section -->
+        <fieldset class="mb-6 p-4 border border-gray-200 rounded">
+          <legend class="text-lg font-medium">Disability Information</legend>
+          
+          <%= fields_for :constituent do |c| %>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <% disabilities = [:hearing, :vision, :speech, :mobility, :cognition] %>
+              <% disabilities.each do |disability| %>
+                <div class="flex items-center">
+                  <%= c.check_box "#{disability}_disability",
+                      class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" %>
+                  <%= c.label "#{disability}_disability", disability.to_s.titleize,
+                      class: "ml-2 text-sm text-gray-700" %>
+                </div>
+              <% end %>
+            </div>
+            
+            <div class="mt-4">
+              <div class="flex items-start">
+                <%= c.check_box :is_guardian,
+                    class: "mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" %>
+                <%= c.label :is_guardian, "Applying on behalf of someone under 18",
+                    class: "ml-2 block text-sm text-gray-700" %>
+              </div>
+            </div>
+            
+            <div class="mt-4">
+              <%= c.label :guardian_relationship, "Relationship to Applicant",
+                  class: "block text-sm font-medium text-gray-700" %>
+              <%= c.select :guardian_relationship,
+                  options_for_select(["Parent", "Legal Guardian"]),
+                  { include_blank: "Select Relationship" },
+                  { class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" } %>
+            </div>
+          <% end %>
+        </fieldset>
+        
+        <!-- Medical Provider Information Section -->
+        <fieldset class="mb-6 p-4 border border-gray-200 rounded">
+          <legend class="text-lg font-medium">Medical Provider Information</legend>
+          
+          <%= fields_for :application do |a| %>
+            <div>
+              <%= a.label :medical_provider_name, "Name", class: "block text-sm font-medium text-gray-700" %>
+              <%= a.text_field :medical_provider_name, 
+                  required: true,
+                  class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" %>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div>
+                <%= a.label :medical_provider_phone, "Phone", class: "block text-sm font-medium text-gray-700" %>
+                <%= a.telephone_field :medical_provider_phone, 
+                    required: true,
+                    class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" %>
+              </div>
+
+              <div>
+                <%= a.label :medical_provider_fax, "Fax (Optional)", class: "block text-sm font-medium text-gray-700" %>
+                <%= a.telephone_field :medical_provider_fax, 
+                    class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" %>
+              </div>
+            </div>
+
+            <div class="mt-4">
+              <%= a.label :medical_provider_email, "Email", class: "block text-sm font-medium text-gray-700" %>
+              <%= a.email_field :medical_provider_email, 
+                  required: true,
+                  class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" %>
+            </div>
+          <% end %>
+        </fieldset>
+        
+        <!-- Proof Upload Section -->
+        <fieldset class="mb-6 p-4 border border-gray-200 rounded">
+          <legend class="text-lg font-medium">Proof Documents</legend>
+          
+          <!-- Income Threshold Badge (hidden by default) -->
+          <div id="income-threshold-badge" class="hidden mb-4">
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium <%= badge_class_for(:application, :rejected) %>">
+              Exceeds Income Threshold
+            </span>
+            <p class="text-sm text-gray-600 mt-1">
+              This application cannot be submitted because the income exceeds the maximum threshold.
+            </p>
+          </div>
+          
+          <!-- Income Proof Section -->
+          <div class="mb-6">
+            <h3 class="text-md font-medium mb-2">Income Proof</h3>
+            
+            <div class="flex items-center space-x-4 mb-4">
+              <div>
+                <input type="radio" id="accept_income_proof" name="income_proof_action" value="accept" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
+                <label for="accept_income_proof" class="ml-2 text-sm text-gray-700">Accept Income Proof and Upload</label>
+              </div>
+              <div>
+                <input type="radio" id="reject_income_proof" name="income_proof_action" value="reject" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
+                <label for="reject_income_proof" class="ml-2 text-sm text-gray-700">Reject Income Proof</label>
+              </div>
+            </div>
+            
+            <!-- File upload field (shown when Accept is selected) -->
+            <div id="income_proof_upload" class="hidden mb-4">
+              <%= form.file_field :income_proof, class: "block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" %>
+            </div>
+            
+            <!-- Rejection reason (shown when Reject is selected) -->
+            <div id="income_proof_rejection" class="hidden mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Rejection Reason</label>
+              <select name="income_proof_rejection_reason" 
+                      class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                      data-paper-application-target="incomeProofRejectionReason">
+                <option value="">Select a reason</option>
+                <option value="address_mismatch">Address Mismatch</option>
+                <option value="expired">Expired Documentation</option>
+                <option value="missing_name">Missing Name</option>
+                <option value="wrong_document">Wrong Document Type</option>
+                <option value="missing_amount">Missing Income Amount</option>
+                <option value="exceeds_threshold">Income Exceeds Threshold</option>
+                <option value="outdated_ss_award">Outdated Social Security Award Letter</option>
+                <option value="other">Other</option>
+              </select>
+              
+              <!-- Reason Preview -->
+              <div id="income_proof_reason_preview" class="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700 hidden"></div>
+              
+              <div class="mt-2">
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  Notes to Constituent
+                </label>
+                <textarea name="income_proof_rejection_notes" 
+                          rows="3" 
+                          class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                          data-paper-application-target="incomeProofRejectionNotes"></textarea>
+                <p class="mt-1 text-xs text-gray-500">
+                  Review and modify this text as needed to provide clear instructions to the constituent. 
+                  This message will be included in the notification sent to the applicant.
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Residency Proof Section -->
+          <div class="mb-6">
+            <h3 class="text-md font-medium mb-2">Residency Proof</h3>
+            
+            <div class="flex items-center space-x-4 mb-4">
+              <div>
+                <input type="radio" id="accept_residency_proof" name="residency_proof_action" value="accept" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
+                <label for="accept_residency_proof" class="ml-2 text-sm text-gray-700">Accept Residency Proof and Upload</label>
+              </div>
+              <div>
+                <input type="radio" id="reject_residency_proof" name="residency_proof_action" value="reject" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
+                <label for="reject_residency_proof" class="ml-2 text-sm text-gray-700">Reject Residency Proof</label>
+              </div>
+            </div>
+            
+            <!-- File upload field (shown when Accept is selected) -->
+            <div id="residency_proof_upload" class="hidden mb-4">
+              <%= form.file_field :residency_proof, class: "block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" %>
+            </div>
+            
+            <!-- Rejection reason (shown when Reject is selected) -->
+            <div id="residency_proof_rejection" class="hidden mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Rejection Reason</label>
+              <select name="residency_proof_rejection_reason" 
+                      class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                      data-paper-application-target="residencyProofRejectionReason">
+                <option value="">Select a reason</option>
+                <option value="address_mismatch">Address Mismatch</option>
+                <option value="expired">Expired Documentation</option>
+                <option value="missing_name">Missing Name</option>
+                <option value="wrong_document">Wrong Document Type</option>
+                <option value="other">Other</option>
+              </select>
+              
+              <!-- Reason Preview -->
+              <div id="residency_proof_reason_preview" class="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700 hidden"></div>
+              
+              <div class="mt-2">
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  Notes to Constituent
+                </label>
+                <textarea name="residency_proof_rejection_notes" 
+                          rows="3" 
+                          class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                          data-paper-application-target="residencyProofRejectionNotes"></textarea>
+                <p class="mt-1 text-xs text-gray-500">
+                  Review and modify this text as needed to provide clear instructions to the constituent. 
+                  This message will be included in the notification sent to the applicant.
+                </p>
+              </div>
+            </div>
+          </div>
+        </fieldset>
+        
+        <!-- Form Actions -->
+        <div class="flex justify-end space-x-3">
+          <%= link_to "Cancel", admin_applications_path, class: "px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50" %>
+          
+          <%= button_tag "Send Rejection Notification", 
+              type: "button",
+              id: "rejection-button",
+              class: "hidden px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700",
+              data: { action: "click->paper-application#openRejectionModal" } %>
+              
+          <%= form.submit "Submit Paper Application", 
+              id: "submit-button",
+              class: "px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700",
+              data: { paper_application_target: "submitButton" } %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<!-- Rejection Modal -->
+<div id="rejection-modal" class="fixed inset-0 hidden" data-paper-application-target="rejectionModal">
+  <div class="fixed inset-0 bg-gray-500 bg-opacity-75"></div>
+  <div class="fixed inset-0 flex items-center justify-center">
+    <div class="bg-white rounded-lg p-6 max-w-lg w-full">
+      <h3 class="text-lg font-medium text-gray-900 mb-4">Send Rejection Notification</h3>
+      
+      <%= form_with(url: send_rejection_notification_admin_paper_applications_path, method: :post, local: true) do |form| %>
+        <!-- Hidden fields to carry over constituent information -->
+        <%= form.hidden_field :first_name %>
+        <%= form.hidden_field :last_name %>
+        <%= form.hidden_field :email %>
+        <%= form.hidden_field :phone %>
+        <%= form.hidden_field :household_size %>
+        <%= form.hidden_field :annual_income %>
+        
+        <div class="mb-4">
+          <p class="text-sm text-gray-700">
+            A notification will be sent to the applicant informing them that their application was rejected because their income exceeds the maximum threshold for their household size.
+          </p>
+        </div>
+        
+        <div class="mb-4">
+          <%= form.label :notification_method, "Notification Method", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <div class="mt-1">
+            <div class="flex items-center space-x-4">
+              <div>
+                <%= form.radio_button :notification_method, "email", class: "focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" %>
+                <%= form.label :notification_method_email, "Email", class: "ml-2 text-sm text-gray-700" %>
+              </div>
+              <div>
+                <%= form.radio_button :notification_method, "letter", class: "focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" %>
+                <%= form.label :notification_method_letter, "Printed Letter", class: "ml-2 text-sm text-gray-700" %>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="mb-4">
+          <%= form.label :additional_notes, "Additional Notes", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= form.text_area :additional_notes, rows: 3, class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" %>
+        </div>
+        
+        <div class="flex justify-end space-x-3">
+          <button type="button" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50" data-action="click->paper-application#closeRejectionModal">
+            Cancel
+          </button>
+          <%= form.submit "Send Notification", class: "px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

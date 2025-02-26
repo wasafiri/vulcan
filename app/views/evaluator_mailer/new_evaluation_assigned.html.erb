@@ -31,7 +31,7 @@
 </ul>
 
 <p style="margin-top: 20px;">
-  <a href="<%= evaluators_evaluation_path(@evaluation) %>" style="display: inline-block; padding: 10px 20px; background-color: #3182ce; color: #ffffff; text-decoration: none; border-radius: 4px;">View Evaluation</a>
+  <a href="<%= evaluators_evaluation_url(@evaluation, host: Rails.application.config.action_mailer.default_url_options[:host]) %>" style="display: inline-block; padding: 10px 20px; background-color: #3182ce; color: #ffffff; text-decoration: none; border-radius: 4px;">View Evaluation</a>
 </p>
 
 <p>Please begin the evaluation process by contacting the constituent to schedule an assessment.</p>

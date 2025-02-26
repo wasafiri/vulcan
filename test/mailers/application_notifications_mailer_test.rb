@@ -115,4 +115,84 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     text_part = email.parts.find { |part| part.content_type.include?("text/plain") }
     assert_includes text_part.body.to_s, "APPLICATIONS REQUIRING ATTENTION"
   end
+
+  test "account_created" do
+    constituent = Constituent.create!(
+      first_name: "John",
+      last_name: "Doe",
+      email: "john.doe@example.com",
+      phone: "555-123-4567",
+      password: "password",
+      password_confirmation: "password"
+    )
+    temp_password = "temporary123"
+
+    email = ApplicationNotificationsMailer.account_created(constituent, temp_password)
+
+    assert_emails 1 do
+      email.deliver_now
+    end
+
+    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ constituent.email ], email.to
+    assert_match "Your MAT Application Account", email.subject
+
+    # Test both HTML and text parts
+    assert_equal 2, email.parts.size
+
+    # HTML part
+    html_part = email.parts.find { |part| part.content_type.include?("text/html") }
+    assert_includes html_part.body.to_s, "temporary123"
+    assert_includes html_part.body.to_s, "John"
+
+    # Text part
+    text_part = email.parts.find { |part| part.content_type.include?("text/plain") }
+    assert_includes text_part.body.to_s, "temporary123"
+    assert_includes text_part.body.to_s, "John"
+  end
+
+  test "income_threshold_exceeded" do
+    constituent_params = {
+      first_name: "John",
+      last_name: "Doe",
+      email: "john.doe@example.com",
+      phone: "555-123-4567"
+    }
+
+    notification_params = {
+      household_size: 2,
+      annual_income: 100000,
+      notification_method: "email",
+      additional_notes: "Income exceeds threshold"
+    }
+
+    # Set up FPL policies for testing
+    Policy.find_or_create_by(key: "fpl_2_person").update(value: 20000)
+    Policy.find_or_create_by(key: "fpl_modifier_percentage").update(value: 400)
+
+    email = ApplicationNotificationsMailer.income_threshold_exceeded(constituent_params, notification_params)
+
+    assert_emails 1 do
+      email.deliver_now
+    end
+
+    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "john.doe@example.com" ], email.to
+    assert_match "Important Information About Your MAT Application", email.subject
+
+    # Test both HTML and text parts
+    assert_equal 2, email.parts.size
+
+    # HTML part
+    html_part = email.parts.find { |part| part.content_type.include?("text/html") }
+    assert_includes html_part.body.to_s, "Application Rejected"
+    assert_includes html_part.body.to_s, "John"
+    assert_includes html_part.body.to_s, "Income exceeds threshold"
+
+    # Text part
+    text_part = email.parts.find { |part| part.content_type.include?("text/plain") }
+    assert_includes text_part.body.to_s, "APPLICATION REJECTED"
+    assert_includes text_part.body.to_s, "John"
+    assert_includes text_part.body.to_s, "Income exceeds threshold"
+  end
 end

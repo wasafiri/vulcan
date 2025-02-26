@@ -1,0 +1,25 @@
+<%= render partial: "shared/mailers/header.text" %>
+
+Important Information About Your MAT Application
+
+Dear <%= @constituent.first_name %>,
+
+We have reviewed your application for the Maryland Accessible Telecommunications program.
+
+APPLICATION REJECTED
+
+Unfortunately, we are unable to approve your application at this time because your reported annual income exceeds our program's eligibility threshold.
+
+Your household size: <%= @notification.household_size %>
+Your reported annual income: <%= number_to_currency(@notification.annual_income) %>
+Maximum income threshold for your household size: <%= number_to_currency(@threshold) %>
+
+<% if @notification.additional_notes.present? %>
+Additional information: <%= @notification.additional_notes %>
+<% end %>
+
+If your financial situation changes, or if you believe this determination was made in error, you may submit a new application with updated information.
+
+If you have any questions or need assistance, please contact our support team.
+
+<%= render partial: "shared/mailers/footer.text" %>

@@ -1,7 +1,7 @@
 <div class="container mx-auto px-4 py-8">
   <h1 class="text-xl font-bold mb-4">Resubmit <%= @proof_type.titleize %> Proof</h1>
   
-  <%= form_with(url: resubmit_proof_constituent_portal_application_path(@application), 
+  <%= form_with(url: resubmit_proof_document_constituent_portal_application_path(@application), 
               method: :post, 
               multipart: true,
               data: { controller: "upload" }) do |f| %>

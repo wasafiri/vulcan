@@ -22,7 +22,7 @@ DISABILITIES:
 <% if @constituent.cognition_disability %>- Cognition<% end %>
 
 You can view and update the evaluation here:
-<%= evaluators_evaluation_path(@evaluation) %>
+<%= evaluators_evaluation_url(@evaluation, host: Rails.application.config.action_mailer.default_url_options[:host]) %>
 
 Please begin the evaluation process by contacting the constituent to schedule an assessment.
 

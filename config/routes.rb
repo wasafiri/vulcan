@@ -27,6 +27,13 @@ Rails.application.routes.draw do
   namespace :admin do
     root to: "applications#index"
 
+    resources :paper_applications, only: [ :new, :create ] do
+      collection do
+        post :send_rejection_notification
+        get :fpl_thresholds
+      end
+    end
+
     resources :applications do
       collection do
         post :batch_approve
@@ -198,14 +205,19 @@ Rails.application.routes.draw do
   namespace :constituent_portal do
     resource :dashboard, only: [ :show ]
     resources :applications, path: "applications" do
+      collection do
+        get :fpl_thresholds
+      end
+
       member do
         patch :upload_documents
         post :request_review
         get :verify
         patch :submit
+        post :resubmit_proof
         # Define the route with a custom name
         get "proofs/new/:proof_type", to: "proofs/proofs#new", as: :new_proof
-        post "proofs/resubmit", to: "proofs/proofs#resubmit", as: :resubmit_proof
+        post "proofs/resubmit", to: "proofs/proofs#resubmit", as: :resubmit_proof_document
         post "proofs/direct_upload", to: "proofs/proofs#direct_upload", as: :direct_upload_proof
       end
     end

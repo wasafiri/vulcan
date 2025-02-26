@@ -37,12 +37,12 @@ class ConstituentPortal::Proofs::ProofsController < ApplicationController
         # Set flash and keep it through redirects
         flash[:notice] = "Proof submitted successfully"
         flash.keep(:notice)
-        redirect_to resubmit_proof_constituent_portal_application_path(@application)
+        redirect_to resubmit_proof_document_constituent_portal_application_path(@application)
       rescue RateLimit::ExceededError
         # Set flash and keep it through redirects
         flash[:alert] = "Please wait before submitting another proof"
         flash.keep(:alert)
-        redirect_to resubmit_proof_constituent_portal_application_path(@application)
+        redirect_to resubmit_proof_document_constituent_portal_application_path(@application)
       rescue => e
         Rails.logger.error "ERROR IN RESUBMIT: #{e.class.name}: #{e.message}"
         Rails.logger.error e.backtrace.join("\n")

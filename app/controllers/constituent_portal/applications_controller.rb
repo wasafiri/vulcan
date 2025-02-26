@@ -1,7 +1,7 @@
 module ConstituentPortal
   class ApplicationsController < ApplicationController
-    before_action :authenticate_user!
-    before_action :require_constituent!
+    before_action :authenticate_user!, except: [ :fpl_thresholds ]
+    before_action :require_constituent!, except: [ :fpl_thresholds ]
     before_action :set_application, only: [ :show, :edit, :update, :verify, :submit ]
     before_action :ensure_editable, only: [ :edit, :update ]
 
@@ -215,17 +215,31 @@ module ConstituentPortal
       end
     end
 
-    def resubmit_proof
-      @application = current_user.applications.find(params[:id])
+  def resubmit_proof
+    @application = current_user.applications.find(params[:id])
 
-      if @application.resubmit_proof!
-        redirect_to constituent_portal_application_path(@application),
-          notice: "Proof resubmitted successfully"
-      else
-        redirect_to constituent_portal_application_path(@application),
-          alert: "Failed to resubmit proof"
-      end
+    if @application.resubmit_proof!
+      redirect_to constituent_portal_application_path(@application),
+        notice: "Proof resubmitted successfully"
+    else
+      redirect_to constituent_portal_application_path(@application),
+        alert: "Failed to resubmit proof"
     end
+  end
+
+  def fpl_thresholds
+    # Get FPL thresholds from policies
+    thresholds = {}
+    (1..8).each do |size|
+      policy = Policy.find_by(key: "fpl_#{size}_person")
+      thresholds[size.to_s] = policy&.value.to_i
+    end
+
+    # Get FPL modifier percentage
+    modifier = Policy.find_by(key: "fpl_modifier_percentage")&.value.to_i || 400
+
+    render json: { thresholds: thresholds, modifier: modifier }
+  end
 
     private
 
