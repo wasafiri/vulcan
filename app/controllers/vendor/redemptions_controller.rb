@@ -1,4 +1,5 @@
 class Vendor::RedemptionsController < Vendor::BaseController
+  include ActionView::Helpers::NumberHelper
   def new
     @redemption = VoucherRedemption.new
   end

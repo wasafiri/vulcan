@@ -13,6 +13,7 @@ class Voucher < ApplicationRecord
   before_validation :set_initial_values, on: :create
   after_create :send_assigned_notification
   after_update :check_status_changes
+  after_update :log_status_change, if: -> { saved_change_to_status? && respond_to?(:events) }
 
   enum :status, {
     issued: 0,      # Initial state when voucher is created
@@ -25,6 +26,7 @@ class Voucher < ApplicationRecord
   scope :available, -> { where(status: [ :issued, :active ]) }
   scope :for_vendor, ->(vendor_id) { where(vendor_id: vendor_id) }
   scope :not_invoiced, -> { where(invoice_id: nil) }
+  scope :pending_activation, -> { where(status: :issued) }
   scope :expiring_soon, -> {
     expiration_threshold = 7.days
     where(status: [ :issued, :active ])
@@ -113,6 +115,16 @@ class Voucher < ApplicationRecord
     super(value.try(:round, 2))
   end
 
+  def activate_if_valid!
+    return if voucher_active? || voucher_redeemed? || voucher_cancelled?
+
+    if expired?
+      update!(status: :expired)
+    else
+      update!(status: :active)
+    end
+  end
+
   private
 
   def send_assigned_notification
@@ -126,6 +138,18 @@ class Voucher < ApplicationRecord
         VoucherNotificationsMailer.voucher_expired(self).deliver_later
       end
     end
+  end
+
+  def log_status_change
+    events.create!(
+      user: nil,
+      action: "status_changed_to_#{status}",
+      metadata: {
+        previous_status: status_before_last_save,
+        current_status: status,
+        timestamp: Time.current
+      }
+    )
   end
 
   def remaining_value_cannot_exceed_initial_value
