@@ -152,16 +152,68 @@
       </div>
     </div>
 
-    <!-- Monthly Totals Chart -->
-    <div class="bg-white shadow rounded-lg">
-      <div class="px-4 py-5 sm:px-6">
-        <h2 class="text-lg font-medium text-gray-900">Monthly Totals</h2>
+    <!-- Monthly Totals Table and Chart -->
+    <div class="bg-white shadow rounded-lg" data-controller="chart-toggle">
+      <div class="px-4 py-5 sm:px-6 flex justify-between items-center">
+        <h2 id="monthly-totals-heading" class="text-lg font-medium text-gray-900">Monthly Totals</h2>
+        <button type="button" 
+                data-chart-toggle-target="button"
+                data-action="chart-toggle#toggle" 
+                class="text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+          Show Chart
+        </button>
       </div>
-      <div class="p-6 border-t border-gray-200">
+      
+      <!-- Monthly Totals Table -->
+      <div class="border-t border-gray-200">
+        <div class="overflow-x-auto">
+          <table id="monthly-totals-table" aria-labelledby="monthly-totals-heading" class="min-w-full divide-y divide-gray-200">
+            <caption class="sr-only">Monthly transaction totals for the past 6 months. This table provides the same data as the chart below.</caption>
+            <thead class="bg-gray-50">
+              <tr>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Month</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <% # Get the last 6 months, including current month %>
+              <% 6.times.map { |i| (Time.current - i.months).beginning_of_month }.reverse.each do |month| %>
+                <tr>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <%= link_to month.strftime("%B %Y"), vendor_transactions_path(
+                      period: "custom",
+                      start_date: month.beginning_of_month.strftime("%Y-%m-%d"),
+                      end_date: month.end_of_month.strftime("%Y-%m-%d")
+                    ), class: "text-indigo-600 hover:text-indigo-900" %>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <%= number_to_currency(@monthly_totals[month] || 0) %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      <!-- Chart description for screen readers -->
+      <div id="chart-description" class="sr-only">
+        This chart displays the total voucher amounts processed each month for the past 6 months.
+        <% if @monthly_totals_chart.present? %>
+          <% max_value = @monthly_totals_chart.values.map(&:to_f).max %>
+          <% max_month = @monthly_totals_chart.key(@monthly_totals_chart.values.map(&:to_s).find { |v| v.to_f == max_value }) %>
+          The highest monthly total was <%= number_to_currency(max_value) %> in <%= max_month %>.
+        <% else %>
+          No transaction data is available for this period.
+        <% end %>
+      </div>
+      
+      <!-- Chart (hidden by default) -->
+      <div id="monthly-totals-chart" data-chart-toggle-target="chart" class="hidden p-6 border-t border-gray-200">
         <div data-controller="chart"
              data-chart-data-value="<%= @monthly_totals_chart.to_json %>"
              data-chart-type-value="bar"
-             style="height: 300px;">
+             style="height: 300px; width: 100%;">
         </div>
       </div>
     </div>

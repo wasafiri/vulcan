@@ -118,7 +118,50 @@
 
       <!-- Pagination -->
       <div class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
-        <%== pagy_nav(@pagy) %>
+        <% if @pagy.pages > 1 %>
+          <nav class="flex items-center justify-between">
+            <div class="flex-1 flex justify-between">
+              <% if @pagy.prev %>
+                <%= link_to vendor_transactions_path(page: @pagy.prev, **request.query_parameters.except(:page)), 
+                    class: "relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50" do %>
+                  Previous
+                <% end %>
+              <% else %>
+                <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-300 bg-gray-100 cursor-not-allowed">
+                  Previous
+                </span>
+              <% end %>
+              
+              <div class="hidden md:flex">
+                <% @pagy.series.each do |item| %>
+                  <% if item.is_a?(Integer) %>
+                    <%= link_to item, vendor_transactions_path(page: item, **request.query_parameters.except(:page)), 
+                        class: "relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md #{item == @pagy.page ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}" %>
+                  <% elsif item.is_a?(String) && item == @pagy.page.to_s %>
+                    <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md bg-indigo-600 text-white">
+                      <%= item %>
+                    </span>
+                  <% elsif item == :gap %>
+                    <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md bg-white text-gray-700">
+                      &hellip;
+                    </span>
+                  <% end %>
+                <% end %>
+              </div>
+              
+              <% if @pagy.next %>
+                <%= link_to vendor_transactions_path(page: @pagy.next, **request.query_parameters.except(:page)), 
+                    class: "relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50" do %>
+                  Next
+                <% end %>
+              <% else %>
+                <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-300 bg-gray-100 cursor-not-allowed">
+                  Next
+                </span>
+              <% end %>
+            </div>
+          </nav>
+        <% end %>
       </div>
     </div>
   </div>
