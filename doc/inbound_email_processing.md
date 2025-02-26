@@ -1,154 +1,168 @@
 # Inbound Email Processing
 
-This document describes how to set up and use the inbound email processing functionality for receiving proof submissions and medical certifications via email.
+This document explains how to set up and use the inbound email processing feature in the application. This feature allows constituents to submit proofs (income and residency) and medical providers to submit medical certifications via email.
 
 ## Overview
 
-The application uses Action Mailbox to process incoming emails from constituents and medical professionals. This allows:
+The application uses Rails' Action Mailbox to process incoming emails. When a constituent or medical provider sends an email to a designated address, the system:
 
-1. Constituents to submit income and residency proofs via email
-2. Medical professionals to submit medical certifications via email
+1. Receives the email via a webhook from Postmark
+2. Routes the email to the appropriate mailbox based on the recipient address
+3. Processes the email and its attachments
+4. Associates the attachments with the correct application
+5. Updates the application status as needed
+6. Notifies administrators of the new submission
 
 ## Setup
 
-### 1. Configuration
+### 1. Configure Postmark
 
-The Action Mailbox is already configured to use Postmark as the ingress. The configuration is in `config/initializers/action_mailbox.rb`.
+1. Log in to your [Postmark account](https://postmarkapp.com)
+2. Navigate to your server settings
+3. Go to the "Inbound" tab
+4. Set up an inbound domain (e.g., `inbound.yourdomain.com`)
+5. Configure the webhook URL to point to your application's Action Mailbox endpoint:
+   ```
+   https://yourdomain.com/rails/action_mailbox/postmark/inbound_emails
+   ```
+6. **Important**: Check the box labeled "Include raw email content in JSON payload"
 
-### 2. Credentials
+### 2. Configure Action Mailbox
 
-You need to add the following credentials to your Rails application:
+1. Set the inbound email hash in your credentials:
 
-```bash
-bin/rails credentials:edit
-```
+   ```bash
+   bin/rails credentials:edit
+   ```
 
-Add the following:
+   Add the following:
 
-```yaml
-postmark:
-  inbound_email_hash: "your_inbound_email_hash"  # The hash for your inbound email address
+   ```yaml
+   action_mailbox:
+     ingress_password: your_secure_password_here
+     postmark_api_key: your_postmark_api_key_here
+   ```
 
-action_mailbox:
-  ingress_password: "strong_random_password"  # Password for authenticating webhook requests
-```
+2. Configure the inbound email hash in your initializer:
 
-### 3. Postmark Setup
+   ```ruby
+   # config/initializers/action_mailbox.rb
+   Rails.application.config.action_mailbox.ingress = :postmark
+   ```
 
-1. In your Postmark account, go to the Server Settings > Inbound
-2. Enable Inbound Email Processing
-3. Set the Webhook URL to your production URL:
-   `https://actionmailbox:YOUR_INGRESS_PASSWORD@yourdomain.com/rails/action_mailbox/postmark/inbound_emails`
-4. Make sure "Include raw email content in JSON payload" is checked
+### 3. Set Up Email Addresses
 
-### 4. Email Addresses
+The system is configured to route emails to different mailboxes based on the recipient address:
 
-Configure the following email addresses in your domain:
+- **Proof submissions**: `proof@yourdomain.com`
+- **Medical certifications**: `medical-cert@yourdomain.com`
 
-- `proof@yourdomain.com` - For proof submissions from constituents
-- `medical-cert@yourdomain.com` - For medical certifications from medical professionals
+You can customize these addresses in the `app/mailboxes/application_mailbox.rb` file.
 
-## Local Development and Testing
+## Usage
 
-For local development and testing, you can use Ultrahook to forward webhook requests from Postmark to your local machine:
+### For Constituents
 
-1. Install Ultrahook:
+Constituents can submit proof documents by:
 
-```bash
-gem install ultrahook
-```
+1. Sending an email to `proof@yourdomain.com`
+2. Including a clear subject line indicating the type of proof (e.g., "Income Proof" or "Residency Proof")
+3. Attaching the proof document(s) in PDF, JPG, or PNG format
+4. Including any additional information in the email body
 
-2. Configure your Ultrahook API key:
+The system will automatically:
+- Identify the constituent by their email address
+- Determine the proof type from the subject and body
+- Attach the document to the constituent's application
+- Update the proof status to "pending review"
+- Notify administrators of the new submission
 
-```bash
-echo "api_key: YOUR_ULTRAHOOK_API_KEY" > ~/.ultrahook
-```
+### For Medical Providers
 
-3. Start Ultrahook:
+Medical providers can submit medical certifications by:
 
-```bash
-ultrahook postmark 3000
-```
+1. Sending an email to `medical-cert@yourdomain.com`
+2. Including the application ID in the subject line (e.g., "Medical Certification for Application #123")
+3. Attaching the signed certification document in PDF format
+4. Including any additional information in the email body
 
-4. Update your Postmark webhook URL to the Ultrahook URL:
-   `http://postmark.YOUR_USER.ultrahook.com/rails/action_mailbox/postmark/inbound_emails`
+The system will automatically:
+- Identify the medical provider by their email address
+- Determine the application from the subject line or email body
+- Attach the certification to the application
+- Update the certification status to "pending review"
+- Notify administrators of the new submission
 
-5. You can also use the Rails conductor to manually create and process inbound emails:
-   http://localhost:3000/rails/conductor/action_mailbox/inbound_emails
+### For Administrators
 
-## Email Processing Flow
+Administrators can review submitted documents through the admin interface:
 
-### Proof Submission
-
-1. Constituent sends an email to `proof@yourdomain.com` with proof documents attached
-2. The email is routed to the `ProofSubmissionMailbox`
-3. The mailbox validates the constituent and application
-4. The mailbox determines the proof type (income or residency) based on the email subject and content
-5. The mailbox attaches the documents to the appropriate proof type in the application
-6. An event is created to record the submission
-7. The admin can view the submitted proofs in the application details page
-
-### Medical Certification
-
-1. Medical professional sends an email to `medical-cert@yourdomain.com` with certification document attached
-2. The email is routed to the `MedicalCertificationMailbox`
-3. The mailbox validates the medical provider and application
-4. The mailbox attaches the document to the medical certification in the application
-5. An event is created to record the submission
-6. The constituent is notified that their certification has been received
-7. The admin can view the submitted certification in the application details page
+1. Navigate to the Applications section
+2. Select the application with the new submission
+3. Review the attached documents
+4. Approve or reject the submission with appropriate notes
+5. The system will automatically notify the constituent of the decision
 
 ## Testing
 
-The inbound email processing functionality is thoroughly tested with:
+You can test the inbound email processing locally using Ultrahook:
 
-1. Unit tests for the mailboxes in `test/mailboxes/`:
-   - `test/mailboxes/proof_submission_mailbox_test.rb` - Tests for the proof submission mailbox
-   - `test/mailboxes/medical_certification_mailbox_test.rb` - Tests for the medical certification mailbox
-   - `test/mailboxes/edge_cases_test.rb` - Tests for edge cases and error handling
+1. Install Ultrahook:
+   ```bash
+   gem install ultrahook
+   ```
 
-2. Integration tests for the end-to-end flow:
-   - `test/integration/inbound_email_processing_test.rb` - Tests the full flow from receiving an email to processing it
+2. Register for an API key at [ultrahook.com](https://www.ultrahook.com)
 
-3. Controller tests for the Postmark webhook endpoint:
-   - `test/controllers/rails/action_mailbox/postmark/inbound_emails_controller_test.rb` - Tests the webhook endpoint
+3. Add your API key to the configuration file:
+   ```bash
+   echo "api_key: YOUR_ULTRAHOOK_API_KEY" > ~/.ultrahook
+   ```
 
-4. System tests for the admin interface:
-   - `test/system/admin/proof_email_submission_test.rb` - Tests the admin interface for viewing submitted proofs
+4. Start Ultrahook to forward webhooks to your local server:
+   ```bash
+   ultrahook postmark 3000
+   ```
 
-These tests cover:
-- Basic functionality for receiving and processing emails
-- Edge cases like emails with no attachments, invalid attachments, or oversized attachments
-- Error handling for rate limiting, invalid senders, etc.
-- Security aspects like authentication for the webhook endpoint
-- End-to-end flow from receiving an email to viewing the attachments in the admin interface
+5. Configure Postmark to send webhooks to your Ultrahook URL:
+   ```
+   http://postmark.YOUR_USERNAME.ultrahook.com/rails/action_mailbox/postmark/inbound_emails
+   ```
 
-To run the tests:
-
-```bash
-bin/rails test:mailboxes     # Run mailbox tests
-bin/rails test:integration   # Run integration tests
-bin/rails test:controllers   # Run controller tests
-bin/rails test:system        # Run system tests
-bin/rails test               # Run all tests
-```
+6. Send a test email to your Postmark inbound email address
 
 ## Troubleshooting
 
-### Webhook Issues
+### Common Issues
 
-If webhooks are not being received:
+1. **Emails not being processed**:
+   - Check that the Postmark webhook is correctly configured
+   - Verify that "Include raw email content" is enabled in Postmark
+   - Check your application logs for any errors
 
-1. Check the Postmark webhook URL is correct
-2. Verify the ingress password is set correctly
-3. Check the Postmark logs for any errors
-4. Check your application logs for any errors
+2. **Constituent not found**:
+   - Ensure the constituent is using the same email address registered in the system
+   - Check if the email address is properly formatted
 
-### Email Processing Issues
+3. **Proof type not detected**:
+   - Make sure the subject line clearly indicates the proof type
+   - Check the email body for proof type indicators
 
-If emails are not being processed correctly:
+4. **Attachments not processed**:
+   - Verify that the attachment is in a supported format (PDF, JPG, PNG)
+   - Check that the attachment size is within limits (typically under 10MB)
+   - Ensure the attachment is not password-protected or corrupted
 
-1. Check the Action Mailbox inbound emails in the Rails conductor
-2. Verify the email addresses are configured correctly
-3. Check the application logs for any errors
-4. Verify the mailbox routing is correct
+### Logs and Monitoring
+
+- Action Mailbox logs are stored in the standard Rails logs
+- You can monitor inbound email processing in the Action Mailbox dashboard at `/rails/conductor/action_mailbox/inbound_emails`
+- Failed inbound emails are marked as "bounced" and can be reviewed in the dashboard
+
+## Security Considerations
+
+- All inbound emails are authenticated using the ingress password
+- Attachments are scanned for viruses and malware (if configured)
+- File size and type validations are enforced
+- Emails from unknown senders are rejected
+- All email processing activities are logged for audit purposes

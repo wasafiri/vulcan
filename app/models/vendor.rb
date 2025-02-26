@@ -4,6 +4,7 @@ class Vendor < User
   has_many :vouchers, foreign_key: :vendor_id
   has_many :voucher_transactions, foreign_key: :vendor_id
   has_many :invoices, foreign_key: :vendor_id
+  has_many :w9_reviews, foreign_key: :vendor_id
 
   has_one_attached :w9_form
 
@@ -19,12 +20,17 @@ class Vendor < User
 
   enum :status, { pending: 0, approved: 1, suspended: 2 }, prefix: :vendor
 
+  # Explicitly declare the attribute type for w9_status
+  attribute :w9_status, :integer, default: 0
+  enum :w9_status, { not_submitted: 0, pending_review: 1, approved: 2, rejected: 3 }, prefix: :w9_status
+
   scope :active, -> { where(status: :approved) }
   scope :with_pending_invoices, -> {
     joins(:voucher_transactions)
       .where(voucher_transactions: { invoice_id: nil, status: :completed })
       .distinct
   }
+  scope :with_pending_w9_reviews, -> { where(w9_status: :pending_review) }
 
   def pending_transaction_total
     voucher_transactions
@@ -42,7 +48,7 @@ class Vendor < User
   end
 
   def can_process_vouchers?
-    vendor_approved? && w9_form.attached?
+    vendor_approved? && w9_form.attached? && w9_status_approved?
   end
 
   def can_be_approved?

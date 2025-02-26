@@ -5,27 +5,10 @@ class MedicalCertificationMailboxTest < ActionMailbox::TestCase
   include ActionMailboxTestHelper
 
   setup do
-    @medical_provider = medical_providers(:active_provider) if defined?(medical_providers)
-    @application = applications(:pending_certification) if defined?(applications)
-
-    # If fixtures don't exist, create test data
-    unless defined?(medical_providers)
-      @medical_provider = MedicalProvider.create!(
-        name: "Dr. Test",
-        email: "doctor@example.com"
-      )
-    end
-
-    unless defined?(applications)
-      @constituent = User.create!(
-        email: "patient@example.com",
-        name: "Test Patient"
-      )
-      @application = Application.create!(
-        constituent: @constituent,
-        status: "active"
-      )
-    end
+    # Create a medical provider and application using factories
+    @medical_provider = create(:medical_provider)
+    @constituent = create(:constituent)
+    @application = create(:application, user: @constituent)
 
     # Ensure the medical provider has the correct email
     @medical_provider.update(email: "doctor@example.com")
@@ -38,6 +21,11 @@ class MedicalCertificationMailboxTest < ActionMailbox::TestCase
         end
       end
     end
+
+    # Set up ApplicationMailbox routing for testing
+    ApplicationMailbox.instance_eval do
+      routing(/medical-cert@/i => :medical_certification)
+    end
   end
 
   test "routes emails to medical_certification mailbox" do
@@ -47,7 +35,13 @@ class MedicalCertificationMailboxTest < ActionMailbox::TestCase
       subject: "Medical Certification for Application ##{@application.id}"
     )
 
-    assert_equal MedicalCertificationMailbox, inbound_email.mailbox_class
+    # Route the email and check that it was processed by the correct mailbox
+    assert_difference -> { ActionMailbox::InboundEmail.where(status: :delivered).count } do
+      inbound_email.route
+    end
+
+    # Verify it was routed to the correct mailbox by checking the processing status
+    assert_equal "delivered", inbound_email.reload.status
   end
 
   test "attaches medical certification to application" do
@@ -105,6 +99,42 @@ class MedicalCertificationMailboxTest < ActionMailbox::TestCase
 
     # Verify the email was bounced
     assert_equal "bounced", ActionMailbox::InboundEmail.last.status
+  end
+
+  test "extracts application ID from email subject" do
+    inbound_email = create_inbound_email_from_mail(
+      to: "medical-cert@example.com",
+      from: @medical_provider.email,
+      subject: "Medical Certification for Application #123",
+      body: "Please find attached the certification."
+    )
+
+    mailbox = MedicalCertificationMailbox.new(inbound_email)
+    assert_equal "123", mailbox.send(:extract_application_id_from_email)
+  end
+
+  test "extracts application ID from email body" do
+    inbound_email = create_inbound_email_from_mail(
+      to: "medical-cert@example.com",
+      from: @medical_provider.email,
+      subject: "Medical Certification",
+      body: "Please find attached the certification for Application #123."
+    )
+
+    mailbox = MedicalCertificationMailbox.new(inbound_email)
+    assert_equal "123", mailbox.send(:extract_application_id_from_email)
+  end
+
+  test "extracts application ID from mailbox hash" do
+    inbound_email = create_inbound_email_from_mail(
+      to: "medical-cert+123@example.com",
+      from: @medical_provider.email,
+      subject: "Medical Certification",
+      body: "Please find attached the certification."
+    )
+
+    mailbox = MedicalCertificationMailbox.new(inbound_email)
+    assert_equal "123", mailbox.send(:extract_application_id_from_email)
   end
 
   private

@@ -1,0 +1,87 @@
+<div class="container mx-auto px-4 py-8">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">W9 Review Details</h1>
+    <div class="flex space-x-2">
+      <%= link_to "Back to Vendor", admin_vendor_path(@vendor), class: "btn btn-outline" %>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- W9 Form Preview -->
+    <div class="bg-white shadow overflow-hidden rounded-lg">
+      <div class="px-4 py-5 sm:px-6 bg-gray-50">
+        <h3 class="text-lg leading-6 font-medium text-gray-900">W9 Form Preview</h3>
+        <p class="mt-1 max-w-2xl text-sm text-gray-500">
+          <%= @vendor.business_name %>'s W9 Form
+        </p>
+      </div>
+      <div class="border-t border-gray-200 p-4">
+        <% if @w9_form.attached? %>
+          <div class="w-full h-[600px] overflow-hidden">
+            <iframe src="<%= rails_blob_path(@w9_form, disposition: 'inline') %>" class="w-full h-full"></iframe>
+          </div>
+          <div class="mt-4 flex justify-center">
+            <%= link_to "Open in New Tab", rails_blob_path(@w9_form, disposition: "inline"), target: "_blank", class: "btn btn-outline" %>
+          </div>
+        <% else %>
+          <div class="flex items-center justify-center h-[600px] bg-gray-100">
+            <p class="text-gray-500">W9 form no longer available</p>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <!-- Review Details -->
+    <div class="bg-white shadow overflow-hidden rounded-lg">
+      <div class="px-4 py-5 sm:px-6 bg-gray-50">
+        <h3 class="text-lg leading-6 font-medium text-gray-900">Review Details</h3>
+        <p class="mt-1 max-w-2xl text-sm text-gray-500">
+          Review performed on <%= @w9_review.reviewed_at.strftime("%B %d, %Y at %I:%M %p") %>
+        </p>
+      </div>
+      <div class="border-t border-gray-200">
+        <dl>
+          <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+            <dt class="text-sm font-medium text-gray-500">Vendor</dt>
+            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2"><%= @vendor.business_name %></dd>
+          </div>
+          <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+            <dt class="text-sm font-medium text-gray-500">Reviewed By</dt>
+            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2"><%= @w9_review.admin.email %></dd>
+          </div>
+          <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+            <dt class="text-sm font-medium text-gray-500">Decision</dt>
+            <dd class="mt-1 text-sm sm:mt-0 sm:col-span-2">
+              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                <%= @w9_review.status_approved? ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' %>">
+                <%= @w9_review.status.titleize %>
+              </span>
+            </dd>
+          </div>
+          
+          <% if @w9_review.status_rejected? %>
+            <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+              <dt class="text-sm font-medium text-gray-500">Rejection Reason</dt>
+              <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                <%= @w9_review.rejection_reason_code.to_s.titleize %>
+              </dd>
+            </div>
+            <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+              <dt class="text-sm font-medium text-gray-500">Detailed Explanation</dt>
+              <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                <%= @w9_review.rejection_reason %>
+              </dd>
+            </div>
+          <% end %>
+          
+          <div class="<%= @w9_review.status_rejected? ? 'bg-gray-50' : 'bg-white' %> px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+            <dt class="text-sm font-medium text-gray-500">Vendor Notified</dt>
+            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+              Yes, email sent on <%= @w9_review.created_at.strftime("%B %d, %Y at %I:%M %p") %>
+            </dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>

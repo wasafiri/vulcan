@@ -1,0 +1,72 @@
+<div class="container mx-auto px-4 py-8">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Vendors</h1>
+    <div class="flex space-x-2">
+      <div class="dropdown">
+        <button class="btn btn-outline dropdown-toggle" type="button" id="filterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+          Filter by W9 Status
+        </button>
+        <ul class="dropdown-menu" aria-labelledby="filterDropdown">
+          <li><%= link_to "All", admin_vendors_path, class: "dropdown-item" %></li>
+          <li><%= link_to "Not Submitted", admin_vendors_path(w9_status: :not_submitted), class: "dropdown-item" %></li>
+          <li><%= link_to "Pending Review", admin_vendors_path(w9_status: :pending_review), class: "dropdown-item" %></li>
+          <li><%= link_to "Approved", admin_vendors_path(w9_status: :approved), class: "dropdown-item" %></li>
+          <li><%= link_to "Rejected", admin_vendors_path(w9_status: :rejected), class: "dropdown-item" %></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white shadow overflow-hidden rounded-lg">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Business Name</th>
+          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tax ID</th>
+          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">W9 Status</th>
+          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-200">
+        <% @vendors.each do |vendor| %>
+          <tr>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="text-sm font-medium text-gray-900"><%= vendor.business_name %></div>
+              <div class="text-sm text-gray-500"><%= vendor.email %></div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="text-sm text-gray-900"><%= vendor.business_tax_id %></div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                <%= vendor.vendor_approved? ? 'bg-green-100 text-green-800' : 
+                    vendor.vendor_pending? ? 'bg-yellow-100 text-yellow-800' : 
+                    'bg-red-100 text-red-800' %>">
+                <%= vendor.status.titleize %>
+              </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                <%= vendor.w9_status_approved? ? 'bg-green-100 text-green-800' : 
+                    vendor.w9_status_pending_review? ? 'bg-yellow-100 text-yellow-800' : 
+                    vendor.w9_status_rejected? ? 'bg-red-100 text-red-800' : 
+                    'bg-gray-100 text-gray-800' %>">
+                <%= vendor.w9_status.to_s.titleize %>
+              </span>
+              <% if vendor.w9_status_pending_review? %>
+                <span class="ml-2 text-xs text-red-600 font-medium">Needs Review</span>
+              <% end %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+              <%= link_to "View", admin_vendor_path(vendor), class: "text-indigo-600 hover:text-indigo-900 mr-3" %>
+              <% if vendor.w9_status_pending_review? && vendor.w9_form.attached? %>
+                <%= link_to "Review W9", new_admin_vendor_w9_review_path(vendor), class: "text-green-600 hover:text-green-900" %>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>

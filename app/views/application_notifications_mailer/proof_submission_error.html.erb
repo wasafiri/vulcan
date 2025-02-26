@@ -1,0 +1,19 @@
+<%= render partial: 'shared/mailers/header' %>
+
+<div class="content">
+  <h1>Error Processing Your Proof Submission</h1>
+  
+  <p>Dear <%= @constituent.full_name %>,</p>
+  
+  <p>We encountered an issue while processing your recent proof submission via email.</p>
+  
+  <%= render partial: 'shared/mailers/status_box', locals: { status: 'error', message: @message } %>
+  
+  <p>Please review the error message above and try again. If you continue to experience issues, you can also upload your proof directly through our online portal.</p>
+  
+  <p>If you need assistance, please contact our support team.</p>
+  
+  <p>Thank you for your understanding.</p>
+</div>
+
+<%= render partial: 'shared/mailers/footer' %>

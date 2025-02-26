@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_02_26_203443) do
+ActiveRecord::Schema[8.0].define(version: 2025_02_26_213907) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -520,6 +520,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_02_26_203443) do
     t.string "business_name"
     t.string "business_tax_id"
     t.datetime "terms_accepted_at"
+    t.integer "w9_status", default: 0, null: false
+    t.integer "w9_rejections_count", default: 0, null: false
+    t.datetime "last_w9_reminder_sent_at"
     t.index ["business_name"], name: "index_users_on_business_name"
     t.index ["business_tax_id"], name: "index_users_on_business_tax_id"
     t.index ["email"], name: "index_users_on_email", unique: true
@@ -530,6 +533,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_02_26_203443) do
     t.index ["recipient_id"], name: "index_users_on_recipient_id"
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
     t.index ["type"], name: "index_users_on_type"
+    t.index ["w9_rejections_count"], name: "index_users_on_w9_rejections_count", where: "((type)::text = 'Vendor'::text)"
+    t.index ["w9_status"], name: "index_users_on_w9_status", where: "((type)::text = 'Vendor'::text)"
   end
 
   create_table "voucher_transactions", force: :cascade do |t|
@@ -578,6 +583,19 @@ ActiveRecord::Schema[8.0].define(version: 2025_02_26_203443) do
     t.index ["vendor_id"], name: "index_vouchers_on_vendor_id"
   end
 
+  create_table "w9_reviews", force: :cascade do |t|
+    t.bigint "vendor_id", null: false
+    t.bigint "admin_id", null: false
+    t.integer "status", default: 0, null: false
+    t.integer "rejection_reason_code"
+    t.text "rejection_reason"
+    t.datetime "reviewed_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["admin_id"], name: "index_w9_reviews_on_admin_id"
+    t.index ["vendor_id"], name: "index_w9_reviews_on_vendor_id"
+  end
+
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "application_status_changes", "applications"
@@ -622,4 +640,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_02_26_203443) do
   add_foreign_key "vouchers", "applications"
   add_foreign_key "vouchers", "invoices"
   add_foreign_key "vouchers", "users", column: "vendor_id"
+  add_foreign_key "w9_reviews", "users", column: "admin_id"
+  add_foreign_key "w9_reviews", "users", column: "vendor_id"
 end

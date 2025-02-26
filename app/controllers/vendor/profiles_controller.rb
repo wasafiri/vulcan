@@ -6,7 +6,15 @@ class Vendor::ProfilesController < Vendor::BaseController
   def update
     @vendor = current_user
 
+    # Check if a new W9 form is being uploaded
+    w9_form_changed = params.dig(:vendor, :w9_form).present?
+
     if @vendor.update(vendor_params)
+      # If W9 form was updated, set status to pending_review
+      if w9_form_changed
+        @vendor.update(w9_status: :pending_review)
+      end
+
       redirect_to vendor_dashboard_path,
         notice: "Profile updated successfully."
     else

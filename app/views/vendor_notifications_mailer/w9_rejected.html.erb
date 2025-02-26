@@ -1,0 +1,40 @@
+<%= render "shared/mailers/header" %>
+
+<h1>W9 Form Requires Attention</h1>
+
+<p>Dear <%= @vendor.business_name %>,</p>
+
+<p>We have reviewed your submitted W9 form and found that it requires some corrections before we can proceed.</p>
+
+<%= render "shared/mailers/status_box", status: "Action Required", color: "red" %>
+
+<h2>Reason for Rejection</h2>
+
+<% if @w9_review.rejection_reason_code_address_mismatch? %>
+  <p><strong>Address Mismatch:</strong> The address on your W9 form does not match the address in our system.</p>
+<% elsif @w9_review.rejection_reason_code_tax_id_mismatch? %>
+  <p><strong>Tax ID Mismatch:</strong> The Tax ID (EIN/SSN) on your W9 form does not match the Tax ID in our system.</p>
+<% else %>
+  <p><strong>Other Issue:</strong> <%= @w9_review.rejection_reason %></p>
+<% end %>
+
+<div style="margin: 20px 0; padding: 15px; border: 1px solid #ddd; background-color: #f9f9f9;">
+  <p><strong>Additional Details:</strong></p>
+  <p><%= @w9_review.rejection_reason %></p>
+</div>
+
+<h2>Next Steps</h2>
+
+<ol>
+  <li>Please log in to your vendor account</li>
+  <li>Navigate to your profile settings</li>
+  <li>Upload a corrected W9 form</li>
+</ol>
+
+<p>Once you've submitted a corrected W9 form, our team will review it promptly.</p>
+
+<p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+
+<p>Thank you for your cooperation.</p>
+
+<%= render "shared/mailers/footer" %>

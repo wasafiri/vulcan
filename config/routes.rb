@@ -98,6 +98,10 @@ Rails.application.routes.draw do
       end
     end
 
+    resources :vendors do
+      resources :w9_reviews, only: [ :index, :show, :new, :create ]
+    end
+
     resources :products do
       member do
         post :archive

@@ -22,6 +22,25 @@ class VendorNotificationsMailer < ApplicationMailer
     )
   end
 
+  def w9_approved(vendor)
+    @vendor = vendor
+
+    mail(
+      to: @vendor.email,
+      subject: "W9 Form Approved"
+    )
+  end
+
+  def w9_rejected(vendor, w9_review)
+    @vendor = vendor
+    @w9_review = w9_review
+
+    mail(
+      to: @vendor.email,
+      subject: "W9 Form Requires Attention"
+    )
+  end
+
   def w9_expiring_soon(vendor)
     @vendor = vendor
     @days_until_expiry = (vendor.w9_expiration_date - Date.current).to_i

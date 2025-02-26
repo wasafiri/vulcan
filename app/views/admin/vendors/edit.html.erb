@@ -1,0 +1,95 @@
+<div class="container mx-auto px-4 py-8">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Edit Vendor: <%= @vendor.business_name %></h1>
+    <div class="flex space-x-2">
+      <%= link_to "Back to Vendor", admin_vendor_path(@vendor), class: "btn btn-outline" %>
+    </div>
+  </div>
+
+  <div class="bg-white shadow overflow-hidden rounded-lg">
+    <div class="px-4 py-5 sm:px-6 bg-gray-50">
+      <h3 class="text-lg leading-6 font-medium text-gray-900">Vendor Information</h3>
+      <p class="mt-1 max-w-2xl text-sm text-gray-500">
+        Update vendor details
+      </p>
+    </div>
+    <div class="border-t border-gray-200 p-6">
+      <%= form_with(model: [:admin, @vendor], local: true, class: "space-y-6") do |f| %>
+        <% if @vendor.errors.any? %>
+          <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+            <div class="flex">
+              <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="ml-3">
+                <h3 class="text-sm font-medium text-red-800">
+                  <%= pluralize(@vendor.errors.count, "error") %> prohibited this vendor from being saved:
+                </h3>
+                <div class="mt-2 text-sm text-red-700">
+                  <ul class="list-disc pl-5 space-y-1">
+                    <% @vendor.errors.full_messages.each do |message| %>
+                      <li><%= message %></li>
+                    <% end %>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        <% end %>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label for="vendor_business_name" class="block text-sm font-medium text-gray-700">Business Name</label>
+            <div class="mt-1">
+              <%= f.text_field :business_name, class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" %>
+            </div>
+          </div>
+
+          <div>
+            <label for="vendor_business_tax_id" class="block text-sm font-medium text-gray-700">Business Tax ID</label>
+            <div class="mt-1">
+              <%= f.text_field :business_tax_id, class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" %>
+            </div>
+          </div>
+
+          <div>
+            <label for="vendor_email" class="block text-sm font-medium text-gray-700">Email</label>
+            <div class="mt-1">
+              <%= f.email_field :email, class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" %>
+            </div>
+          </div>
+
+          <div>
+            <label for="vendor_phone" class="block text-sm font-medium text-gray-700">Phone</label>
+            <div class="mt-1">
+              <%= f.telephone_field :phone, class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" %>
+            </div>
+          </div>
+
+          <div>
+            <label for="vendor_status" class="block text-sm font-medium text-gray-700">Vendor Status</label>
+            <div class="mt-1">
+              <%= f.select :status, Vendor.statuses.keys.map { |s| [s.titleize, s] }, {}, class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" %>
+            </div>
+          </div>
+
+          <div>
+            <label for="vendor_w9_status" class="block text-sm font-medium text-gray-700">W9 Status</label>
+            <div class="mt-1">
+              <%= f.select :w9_status, Vendor.w9_statuses.keys.map { |s| [s.titleize, s] }, {}, class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" %>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-5">
+          <div class="flex justify-end">
+            <%= link_to "Cancel", admin_vendor_path(@vendor), class: "btn btn-outline mr-3" %>
+            <%= f.submit "Update Vendor", class: "btn btn-primary" %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

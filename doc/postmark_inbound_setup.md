@@ -1,153 +1,167 @@
 # Postmark Inbound Email Setup Guide
 
-This guide provides detailed steps to configure Postmark for receiving inbound emails in your application.
+This guide provides detailed instructions for setting up Postmark to handle inbound emails for the application. It complements the general [Inbound Email Processing](./inbound_email_processing.md) documentation.
 
-## 1. Create or Access Your Postmark Account
+## Prerequisites
 
-1. Go to [Postmark](https://postmarkapp.com/) and sign in to your account or create a new one.
-2. If you don't already have a server set up, create a new server by clicking "Create Server" and following the prompts.
+- A Postmark account ([Sign up here](https://postmarkapp.com/sign-up) if you don't have one)
+- A verified domain in Postmark
+- Admin access to your DNS settings
 
-## 2. Set Up Inbound Email Processing
+## Step 1: Create a Server in Postmark
 
-### 2.1 Configure an Inbound Domain
+1. Log in to your Postmark account
+2. Click "Servers" in the top navigation
+3. Click "New Server"
+4. Enter a name for your server (e.g., "MAT Vulcan Inbound")
+5. Click "Create Server"
 
-1. In your Postmark dashboard, navigate to your server settings.
-2. Click on "Inbound" in the left sidebar.
-3. Under "Inbound Settings", click "Edit" next to "Inbound Domain".
-4. Enter the domain you want to use for receiving emails (e.g., `inbound.yourdomain.com`).
-5. Click "Save Changes".
+## Step 2: Set Up an Inbound Domain
 
-### 2.2 Set Up DNS Records
+1. In your server dashboard, click "Settings" in the left sidebar
+2. Click "Inbound" in the settings menu
+3. Under "Inbound Domain," click "Add Domain"
+4. Enter your inbound domain (e.g., `inbound.yourdomain.com`)
+5. Click "Add Domain"
 
-1. After setting up your inbound domain, Postmark will provide you with DNS records that need to be added to your domain's DNS configuration.
-2. Go to your domain registrar or DNS provider and add the MX records provided by Postmark.
-3. Typically, you'll need to add an MX record with priority 10 pointing to `inbound-smtp.postmarkapp.com`.
-4. Wait for DNS changes to propagate (this can take up to 24-48 hours, but often happens much faster).
+## Step 3: Configure DNS Records
 
-### 2.3 Configure Inbound Webhook
+Postmark will provide you with the necessary DNS records to set up your inbound domain. You'll need to add these records to your domain's DNS settings:
 
-1. In your Postmark dashboard, navigate back to the "Inbound" settings.
-2. Under "Webhook URL", enter the URL where Postmark should send incoming emails:
-   - For production: `https://actionmailbox:YOUR_INGRESS_PASSWORD@yourdomain.com/rails/action_mailbox/postmark/inbound_emails`
-   - For development with Ultrahook: `http://postmark.YOUR_USER.ultrahook.com/rails/action_mailbox/postmark/inbound_emails`
-3. Make sure to replace `YOUR_INGRESS_PASSWORD` with the password you set in your Rails credentials.
-4. **Important**: Check the box labeled "Include raw email content in JSON payload". This is required for Action Mailbox to work properly.
-5. Click "Save Changes".
+1. Add an MX record:
+   - Host: `inbound` (or whatever subdomain you chose)
+   - Value: `inbound-smtp.postmarkapp.com`
+   - Priority: `10`
 
-### 2.4 Set Up Inbound Email Addresses
+2. Add a TXT record (optional, but recommended for SPF):
+   - Host: `inbound` (or whatever subdomain you chose)
+   - Value: `v=spf1 include:spf.mtasv.net ~all`
 
-1. You can set up specific email addresses for different purposes:
-   - For proof submissions: `proof@inbound.yourdomain.com`
-   - For medical certifications: `medical-cert@inbound.yourdomain.com`
-2. These email addresses will be automatically created when emails are sent to them.
+3. Wait for DNS propagation (this can take up to 24-48 hours)
 
-### 2.5 Get Your Inbound Hash
+## Step 4: Configure Inbound Webhook
 
-1. In your Postmark dashboard, navigate to the "Inbound" settings.
-2. Look for the "Inbound Hash" or "Server Hash" value. This is a unique identifier for your server.
-3. Copy this hash value as you'll need it for your Rails application configuration.
+1. In your server dashboard, click "Settings" in the left sidebar
+2. Click "Inbound" in the settings menu
+3. Under "Webhook URL," enter your application's Action Mailbox endpoint:
+   ```
+   https://yourdomain.com/rails/action_mailbox/postmark/inbound_emails
+   ```
+4. **Important**: Check the box labeled "Include raw email content in JSON payload"
+5. Click "Save Changes"
 
-## 3. Configure Your Rails Application
+## Step 5: Configure Inbound Hash
 
-### 3.1 Add Credentials
+The inbound hash is used to route emails to the correct server in Postmark. You need to configure this in your Rails application:
 
-1. Open your Rails credentials file:
+1. Open the `config/initializers/action_mailbox.rb` file
+2. Add the following line:
+   ```ruby
+   Rails.application.config.postmark_inbound_email_hash = 'your_inbound_hash'
+   ```
+   Replace `your_inbound_hash` with the hash from your inbound email address (everything before the @ symbol).
+
+## Step 6: Set Up Authentication
+
+1. Generate a secure password for Action Mailbox:
+   ```bash
+   bin/rails secret | head -c 32
+   ```
+
+2. Add the password to your Rails credentials:
    ```bash
    bin/rails credentials:edit
    ```
 
-2. Add the following entries:
+3. Add the following to your credentials file:
    ```yaml
-   postmark:
-     inbound_email_hash: "your_inbound_hash_from_postmark"
-     api_token: "your_postmark_api_token"
-
    action_mailbox:
-     ingress_password: "your_strong_random_password"
+     ingress_password: your_generated_password
+     postmark_api_key: your_postmark_api_key
    ```
 
-3. Save and close the file.
+4. Save and close the credentials file
 
-### 3.2 Verify Configuration
+## Step 7: Configure Email Addresses
 
-1. Make sure the Action Mailbox initializer is properly configured:
-   ```ruby
-   # config/initializers/action_mailbox.rb
-   Rails.application.config.action_mailbox.ingress = :postmark
-   ```
+You'll need to set up email addresses for your inbound domain. These are the addresses that constituents and medical providers will send emails to:
 
-2. Ensure your production environment is configured to use Postmark for outgoing emails:
-   ```ruby
-   # config/application.rb or config/environments/production.rb
-   config.action_mailer.delivery_method = :postmark
-   config.action_mailer.postmark_settings = {
-     api_token: Rails.application.credentials.dig(:postmark, :api_token)
-   }
-   ```
+1. For proof submissions: `proof@inbound.yourdomain.com`
+2. For medical certifications: `medical-cert@inbound.yourdomain.com`
 
-## 4. Test Your Setup
+You can create these as wildcard addresses in Postmark, as all emails to your inbound domain will be processed by the webhook.
 
-### 4.1 Local Testing with Ultrahook
+## Step 8: Test the Setup
+
+### Using Ultrahook for Local Testing
 
 1. Install Ultrahook:
    ```bash
    gem install ultrahook
    ```
 
-2. Configure your Ultrahook API key:
+2. Register for an API key at [ultrahook.com](https://www.ultrahook.com)
+
+3. Add your API key to the configuration file:
    ```bash
    echo "api_key: YOUR_ULTRAHOOK_API_KEY" > ~/.ultrahook
    ```
 
-3. Start Ultrahook:
+4. Start Ultrahook to forward webhooks to your local server:
    ```bash
    ultrahook postmark 3000
    ```
 
-4. Update your Postmark webhook URL to the Ultrahook URL temporarily.
+5. Update the webhook URL in Postmark to your Ultrahook URL:
+   ```
+   http://postmark.YOUR_USERNAME.ultrahook.com/rails/action_mailbox/postmark/inbound_emails
+   ```
 
-### 4.2 Send a Test Email
+### Send a Test Email
 
-1. Send an email to your configured inbound email address (e.g., `proof@inbound.yourdomain.com`).
-2. Attach a test file to the email.
-3. Check your Rails logs to see if the email is received and processed.
-4. You can also check the Rails conductor at `http://localhost:3000/rails/conductor/action_mailbox/inbound_emails` to see if the email was received.
+1. Send an email to one of your configured addresses (e.g., `proof@inbound.yourdomain.com`)
+2. Include a subject line (e.g., "Income Proof Submission")
+3. Attach a PDF file
+4. Check your application logs to see if the email was processed
+5. Check the Action Mailbox dashboard at `/rails/conductor/action_mailbox/inbound_emails`
 
-### 4.3 Verify in Postmark
+## Step 9: Production Configuration
 
-1. In your Postmark dashboard, navigate to "Inbound".
-2. Click on "Messages" to see a list of received inbound emails.
-3. You should see your test email in the list.
-4. Click on the email to view details, including webhook delivery status.
+When deploying to production, make sure to:
 
-## 5. Production Deployment
-
-1. Deploy your Rails application with the updated code and configuration.
-2. Update the Postmark webhook URL to point to your production URL.
-3. Send a test email to verify that everything is working in production.
+1. Update the webhook URL in Postmark to your production URL
+2. Ensure your production environment has the correct credentials
+3. Set up proper monitoring for inbound email processing
 
 ## Troubleshooting
 
-### Email Not Received
+### Common Postmark-Specific Issues
 
-1. Check your domain's MX records to ensure they're correctly pointing to Postmark.
-2. Verify that the email address you're sending to matches your inbound domain.
-3. Check the Postmark dashboard to see if the email was received by Postmark.
+1. **Webhook not receiving emails**:
+   - Check that your DNS records are correctly configured
+   - Verify that your inbound domain is properly set up in Postmark
+   - Make sure the "Include raw email content" option is checked
 
-### Webhook Not Triggered
+2. **Authentication failures**:
+   - Verify that the ingress password in your Rails credentials matches the one used in the webhook URL
+   - Check that your Postmark API key is correctly set in your Rails credentials
 
-1. Check the Postmark dashboard to see if there were any webhook delivery failures.
-2. Verify that your webhook URL is correct and accessible.
-3. Ensure that "Include raw email content in JSON payload" is checked.
-4. Check your Rails logs for any errors related to Action Mailbox.
+3. **Email routing issues**:
+   - Confirm that the inbound hash in your Rails configuration matches the one in your Postmark inbound domain
+   - Verify that your application_mailbox.rb file has the correct routing rules
 
-### Authentication Issues
+### Postmark Logs
 
-1. Verify that the ingress password in your webhook URL matches the one in your Rails credentials.
-2. Check that the basic authentication is properly formatted in the URL.
+Postmark provides detailed logs for inbound email processing:
 
-### Processing Issues
+1. In your server dashboard, click "Activity" in the left sidebar
+2. Click "Inbound" to view inbound email logs
+3. Click on an individual email to see details about its processing
 
-1. Check your Rails logs for any errors related to mailbox processing.
-2. Verify that your mailbox routing is correctly configured.
-3. Ensure that the email sender is recognized as a constituent or medical provider in your system.
+These logs can be invaluable for troubleshooting issues with inbound email processing.
+
+## Additional Resources
+
+- [Postmark Inbound Documentation](https://postmarkapp.com/developer/user-guide/inbound)
+- [Rails Action Mailbox Documentation](https://guides.rubyonrails.org/action_mailbox_basics.html)
+- [Ultrahook Documentation](https://www.ultrahook.com/faq)

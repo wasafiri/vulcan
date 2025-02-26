@@ -1,4 +1,16 @@
 module ActionMailboxTestHelper
+  # Helper to create an inbound email without attachments
+  def create_inbound_email_from_mail(to:, from:, subject: "Test Email", body: "Test Body")
+    mail = Mail.new do
+      to to
+      from from
+      subject subject
+      body body
+    end
+
+    ActionMailbox::InboundEmail.create_and_extract_message_id!(mail.to_s)
+  end
+
   # Helper to create an inbound email with attachments
   def create_inbound_email_with_attachment(to:, from:, subject:, body:, attachment_path:, content_type:)
     file = File.read(attachment_path)

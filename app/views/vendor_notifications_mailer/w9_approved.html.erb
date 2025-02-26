@@ -1,0 +1,17 @@
+<%= render "shared/mailers/header" %>
+
+<h1>W9 Form Approved</h1>
+
+<p>Dear <%= @vendor.business_name %>,</p>
+
+<p>We are pleased to inform you that your W9 form has been reviewed and approved.</p>
+
+<%= render "shared/mailers/status_box", status: "Approved", color: "green" %>
+
+<p>Your vendor account is now fully activated, and you can begin processing vouchers through our system.</p>
+
+<p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+
+<p>Thank you for your partnership.</p>
+
+<%= render "shared/mailers/footer" %>

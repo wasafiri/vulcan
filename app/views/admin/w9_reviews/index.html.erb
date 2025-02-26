@@ -1,0 +1,67 @@
+<div class="container mx-auto px-4 py-8">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">W9 Review History for <%= @vendor.business_name %></h1>
+    <div class="flex space-x-2">
+      <%= link_to "Back to Vendor", admin_vendor_path(@vendor), class: "btn btn-outline" %>
+      <% if @vendor.w9_status_pending_review? && @vendor.w9_form.attached? %>
+        <%= link_to "Review W9", new_admin_vendor_w9_review_path(@vendor), class: "btn btn-primary" %>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="bg-white shadow overflow-hidden rounded-lg">
+    <div class="px-4 py-5 sm:px-6 bg-gray-50">
+      <h3 class="text-lg leading-6 font-medium text-gray-900">Review History</h3>
+      <p class="mt-1 max-w-2xl text-sm text-gray-500">
+        All W9 reviews for this vendor
+      </p>
+    </div>
+    <div class="border-t border-gray-200">
+      <% if @w9_reviews.any? %>
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reviewer</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <% @w9_reviews.each do |review| %>
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <%= review.reviewed_at.strftime("%B %d, %Y") %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="text-sm text-gray-900"><%= review.admin.email %></div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                    <%= review.status_approved? ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' %>">
+                    <%= review.status.titleize %>
+                  </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <% if review.status_rejected? %>
+                    <%= review.rejection_reason_code.to_s.titleize %>
+                  <% else %>
+                    -
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <%= link_to "View", admin_vendor_w9_review_path(@vendor, review), class: "text-indigo-600 hover:text-indigo-900" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% else %>
+        <div class="px-6 py-4 text-center text-sm text-gray-500">
+          No W9 reviews found for this vendor.
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,17 @@
+<%= render partial: 'shared/mailers/header.text' %>
+
+ERROR PROCESSING YOUR PROOF SUBMISSION
+
+Dear <%= @constituent.full_name %>,
+
+We encountered an issue while processing your recent proof submission via email.
+
+ERROR: <%= @message %>
+
+Please review the error message above and try again. If you continue to experience issues, you can also upload your proof directly through our online portal.
+
+If you need assistance, please contact our support team.
+
+Thank you for your understanding.
+
+<%= render partial: 'shared/mailers/footer.text' %>
