@@ -1,0 +1,8 @@
+Sample W9 Form
+Test Business Name
+123 Main Street
+City, State 12345
+EIN: 12-3456789
+
+This is a sample W9 form file for testing purposes.
+It simulates the content of a W9 form without being an actual PDF.
