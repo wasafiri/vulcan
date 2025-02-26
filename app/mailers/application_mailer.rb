@@ -24,7 +24,7 @@ class ApplicationMailer < ActionMailer::Base
 
   def set_common_variables
     @current_year = Time.current.year
-    @organization_name = "MDMAT Program"
+    @organization_name = "Maryland Accessible Telecommunications Program"
     @organization_email = "info@mdmat.org"
     @organization_website = "https://mdmat.org"
   end

@@ -20,13 +20,13 @@ We have reviewed your <%= @proof_review ? format_proof_type(@proof_review.proof_
 You have <%= @remaining_attempts %> <%= 'attempt'.pluralize(@remaining_attempts) %> remaining to submit your revised document.
 
 Please ensure all required documentation has been submitted for review. You can:
-* Visit your application page at <%= constituent_portal_application_url(@application, host: Rails.application.config.action_mailer.default_url_options[:host]) %> to upload new documentation
+* Visit your application page at <%= constituent_portal_application_path(@application, host: Rails.application.config.action_mailer.default_url_options[:host]) %> to upload new documentation
 * Reply to this email with your documentation attached
 <% elsif @reapply_date %>
 Please note that this was your final attempt to submit this document. Your application (ID: <%= @application.id %>) has been archived. You are welcome to start a new application after <%= format_date(@reapply_date) %>.
 <% else %>
 Please ensure all required documentation has been submitted for review. You can:
-* Visit your application page at <%= constituent_portal_application_url(@application, host: Rails.application.config.action_mailer.default_url_options[:host]) %> to upload new documentation
+* Visit your application page at <%= constituent_portal_application_path(@application, host: Rails.application.config.action_mailer.default_url_options[:host]) %> to upload new documentation
 * Reply to this email with your documentation attached
 <% end %>
 

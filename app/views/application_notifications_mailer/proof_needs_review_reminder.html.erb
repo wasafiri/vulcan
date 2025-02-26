@@ -42,7 +42,7 @@
 
 <p>You can access the admin dashboard to review all pending applications:</p>
 <p style="text-align: center;">
-  <a href="<%= admin_applications_url(host: @host_url) %>" style="display: inline-block; background-color: #3182ce; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Go to Admin Dashboard</a>
+  <a href="<%= admin_applications_path(host: @host_url) %>" style="display: inline-block; background-color: #3182ce; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Go to Admin Dashboard</a>
 </p>
 
 <%= render 'shared/mailers/footer', show_automated_message: true %>
