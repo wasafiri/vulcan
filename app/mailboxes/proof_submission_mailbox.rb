@@ -5,7 +5,81 @@ class ProofSubmissionMailbox < ApplicationMailbox
   before_processing :check_max_rejections
   before_processing :validate_attachments
 
+  def process
+    # Create an audit record for the submission
+    audit = create_audit_record
+
+    # Process each attachment
+    mail.attachments.each do |attachment|
+      # Determine proof type based on email subject or content
+      proof_type = determine_proof_type(mail.subject, mail.body.decoded)
+
+      # Attach the file to the application's proof
+      attach_proof(attachment, proof_type)
+    end
+
+    # Notify admin of new proof submission
+    notify_admin
+  end
+
   private
+
+  def create_audit_record
+    Event.create!(
+      user: constituent,
+      action: "proof_submission_received",
+      metadata: {
+        application_id: application.id,
+        inbound_email_id: inbound_email.id,
+        email_subject: mail.subject,
+        email_from: mail.from.first
+      }
+    )
+  end
+
+  def determine_proof_type(subject, body)
+    subject = subject.downcase
+    body = body.downcase
+
+    if subject.include?("income") || body.include?("income")
+      :income
+    elsif subject.include?("residency") || body.include?("residency") ||
+          subject.include?("address") || body.include?("address")
+      :residency
+    else
+      # Default to income if we can't determine
+      :income
+    end
+  end
+
+  def attach_proof(attachment, proof_type)
+    # Create a blob from the attachment
+    blob = ActiveStorage::Blob.create_and_upload!(
+      io: StringIO.new(attachment.body.decoded),
+      filename: attachment.filename,
+      content_type: attachment.content_type
+    )
+
+    # Attach the blob to the application's proof
+    case proof_type
+    when :income
+      application.income_proof.attach(blob)
+    when :residency
+      application.residency_proof.attach(blob)
+    end
+  end
+
+  def notify_admin
+    # Notify admin of new proof submission
+    Event.create!(
+      user: constituent,
+      action: "proof_submission_processed",
+      metadata: {
+        application_id: application.id,
+        inbound_email_id: inbound_email.id
+      }
+    )
+  end
 
   def ensure_constituent
     unless constituent
