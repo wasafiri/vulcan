@@ -1,0 +1,13 @@
+<div class="header">
+  <% if defined?(logo) && logo %>
+    <div class="logo">
+      <img src="<%= logo %>" alt="MDMAT Logo" width="150" height="auto">
+    </div>
+  <% end %>
+  
+  <h1><%= title %></h1>
+  
+  <% if defined?(subtitle) && subtitle.present? %>
+    <p class="subtitle"><%= subtitle %></p>
+  <% end %>
+</div>

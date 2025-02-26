@@ -1,0 +1,25 @@
+<%= render 'shared/mailers/header', title: "W9 Form Expiring Soon" %>
+
+<p>Dear <%= @vendor.business_name %>,</p>
+
+<%= render 'shared/mailers/status_box', status: :warning, title: "Action Required", message: "Your W9 form will expire in #{@days_until_expiry} days on #{format_date(@vendor.w9_expiration_date)}." %>
+
+<p>To ensure uninterrupted service and payment processing, please submit an updated W9 form before the expiration date.</p>
+
+<h3>How to Submit Your Updated W9:</h3>
+<ol>
+  <li>Download the current W9 form from the <a href="https://www.irs.gov/pub/irs-pdf/fw9.pdf">IRS website</a></li>
+  <li>Complete and sign the form</li>
+  <li>Log in to your vendor portal at <%= link_to "Vendor Portal", vendor_root_url %></li>
+  <li>Navigate to "Profile" and upload your new W9 form</li>
+</ol>
+
+<p>If you have already submitted an updated W9 form, please disregard this message.</p>
+
+<%= render 'shared/mailers/status_box', status: :info, title: "Important Note" do %>
+  <p>If your W9 form expires, we will be unable to process payments for any voucher transactions until a new form is submitted and approved.</p>
+<% end %>
+
+<p>If you have any questions or need assistance, please contact our vendor support team.</p>
+
+<%= render 'shared/mailers/footer' %>

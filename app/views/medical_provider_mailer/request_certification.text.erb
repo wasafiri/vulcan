@@ -1,0 +1,19 @@
+<%= render 'shared/mailers/header', title: "Disability Certification Request" %>
+
+Dear Healthcare Provider,
+
+==================================================
+ℹ CERTIFICATION REQUEST
+==================================================
+
+We are requesting disability certification for your patient, <%= @constituent.full_name %>.
+Please complete and return the attached certification form.
+
+PATIENT INFORMATION:
+- Name: <%= @constituent.full_name %>
+- Date of Birth: <%= format_date(@constituent.date_of_birth, :short) %>
+- Application ID: <%= @application.id %>
+
+Thank you for your assistance. Your prompt response will help ensure your patient receives the services they need.
+
+<%= render 'shared/mailers/footer' %>

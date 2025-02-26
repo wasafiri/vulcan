@@ -1,89 +1,48 @@
-<!-- app/views/application_notifications_mailer/proof_needs_review_reminder.html.erb -->
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8">
-    <title>Applications Awaiting Review</title>
-    <style>
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 20px 0;
-      }
-      th, td {
-        padding: 12px;
-        border: 1px solid #e5e7eb;
-        text-align: left;
-      }
-      th {
-        background-color: #f3f4f6;
-      }
-      tr:nth-child(even) {
-        background-color: #fafafa;
-      }
-      a.button {
-        display: inline-block;
-        padding: 10px 20px;
-        margin-top: 20px;
-        background-color: #4A90E2;
-        color: #ffffff;
-        text-decoration: none;
-        border-radius: 4px;
-      }
-      a.button:hover {
-        background-color: #357ABD;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>Applications Awaiting Review</h1>
+<%= render 'shared/mailers/header', title: "Applications Awaiting Review" %>
 
-    <p>Dear <%= @admin.first_name %>,</p>
+<p>Dear <%= @admin.first_name %>,</p>
 
-    <p>This is a reminder that the following applications have been waiting for proof review for 3 or more days:</p>
+<div style="background-color: #fffaf0; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #fbd38d;">
+  <h3 style="margin-top: 0; color: #c05621;">
+    <span aria-hidden="true">⚠</span>
+    Attention Required
+  </h3>
+  
+  <div style="color: #c05621;">
+    <p>There are <strong><%= @stale_reviews.size %></strong> applications that have been awaiting document review for more than 3 days.</p>
+  </div>
+</div>
 
-    <% if @stale_reviews.any? %>
-      <table>
-        <thead>
-          <tr>
-            <th>Application ID</th>
-            <th>Constituent</th>
-            <th>Waiting Since</th>
-            <th>Document Type</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% @stale_reviews.each do |application| %>
-            <tr>
-              <td><%= application.id %></td>
-              <td><%= application.user.full_name %></td>
-              <td>
-                <% if application.needs_review_since.present? %>
-                  <%= application.needs_review_since.strftime("%B %d, %Y") %>
-                <% else %>
-                  N/A
-                <% end %>
-              </td>
-              <td>
-                <% document_types = [] %>
-                <% document_types << "Income" if application.income_proof_status_not_reviewed? %>
-                <% document_types << "Residency" if application.residency_proof_status_not_reviewed? %>
-                <%= document_types.join(", ").presence || "N/A" %>
-              </td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-    <% else %>
-      <p>No applications are currently awaiting proof review.</p>
+<h3>Applications Requiring Attention</h3>
+
+<table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+  <thead>
+    <tr style="background-color: #f3f4f6;">
+      <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">Application ID</th>
+      <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">Applicant</th>
+      <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">Waiting Since</th>
+      <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @stale_reviews.each do |application| %>
+      <tr style="<%= cycle('background-color: #ffffff;', 'background-color: #f9fafb;') %>">
+        <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;"><%= application.id %></td>
+        <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;"><%= application.user.full_name %></td>
+        <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;"><%= application.needs_review_since.strftime("%B %d, %Y") %></td>
+        <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">
+          <a href="<%= admin_application_url(application, host: @host_url) %>" style="color: #3182ce; text-decoration: underline;">Review</a>
+        </td>
+      </tr>
     <% end %>
+  </tbody>
+</table>
 
-    <p>Please review these applications as soon as possible to ensure timely processing.</p>
+<p>Please review these applications as soon as possible to ensure timely processing for our applicants.</p>
 
-    <p>
-      <a href="<%= admin_applications_url %>" class="button">Review Applications</a>
-    </p>
+<p>You can access the admin dashboard to review all pending applications:</p>
+<p style="text-align: center;">
+  <a href="<%= admin_applications_url(host: @host_url) %>" style="display: inline-block; background-color: #3182ce; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Go to Admin Dashboard</a>
+</p>
 
-    <p>Best regards,<br>The MDMAT Team</p>
-  </body>
-</html>
+<%= render 'shared/mailers/footer', show_automated_message: true %>

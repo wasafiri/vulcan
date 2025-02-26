@@ -2,14 +2,17 @@ ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
 require "minitest/mock"
+require "mocha/minitest"
 require "capybara/rails"
 require "support/voucher_test_helper"
+require "support/mailer_test_helper"
 
 module ActiveSupport
   class TestCase
     include FactoryBot::Syntax::Methods
     include VoucherTestHelper
     include ActionMailer::TestHelper
+    include MailerTestHelper
 
     def assert_enqueued_email_with(mailer_class, method_name, args: nil)
       block_result = nil

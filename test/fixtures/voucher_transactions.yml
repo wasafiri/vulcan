@@ -1,0 +1,18 @@
+one:
+  voucher: one
+  vendor: vendor_raz
+  amount: 200.00
+  transaction_type: redemption
+  status: transaction_completed
+  processed_at: <%= 1.month.ago %>
+  reference_number: TXN-ABC123DEF456
+
+two:
+  voucher: fully_redeemed
+  vendor: vendor_raz
+  amount: 300.00
+  transaction_type: redemption
+  status: transaction_completed
+  processed_at: <%= 2.weeks.ago %>
+  reference_number: TXN-GHI789JKL012
+  invoice: one

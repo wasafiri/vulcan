@@ -1,17 +1,26 @@
-<h1>Disability Certification Request</h1>
+<%= render 'shared/mailers/header', title: "Disability Certification Request" %>
 
 <p>Dear Healthcare Provider,</p>
 
-<p>We are requesting disability certification for your patient, <%= @constituent.full_name %>.</p>
+<div style="background-color: #ebf4ff; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #c3dafe;">
+  <h3 style="margin-top: 0; color: #434190;">
+    <span aria-hidden="true">ℹ</span>
+    Certification Request
+  </h3>
+  
+  <div style="color: #434190;">
+    <p>We are requesting disability certification for your patient, <strong><%= @constituent.full_name %></strong>.</p>
+    <p>Please complete and return the attached certification form.</p>
+  </div>
+</div>
 
-<p>Please complete and return the attached certification form.</p>
-
-<p>Patient Information:</p>
+<h3>Patient Information:</h3>
 <ul>
-  <li>Name: <%= @constituent.full_name %></li>
-  <li>Date of Birth: <%= @constituent.date_of_birth %></li>
+  <li><strong>Name:</strong> <%= @constituent.full_name %></li>
+  <li><strong>Date of Birth:</strong> <%= format_date(@constituent.date_of_birth, :short) %></li>
+  <li><strong>Application ID:</strong> <%= @application.id %></li>
 </ul>
 
-<p>Thank you for your assistance.</p>
+<p>Thank you for your assistance. Your prompt response will help ensure your patient receives the services they need.</p>
 
-<p>MDMAT Team</p>
+<%= render 'shared/mailers/footer' %>

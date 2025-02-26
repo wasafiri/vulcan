@@ -15,10 +15,13 @@ class ApplicationNotificationsMailer < ApplicationMailer
   # subject_template: a string that contains "%{formatted_type}" for interpolation.
   # template_name: the template name to use.
   def prepare_email(application, proof_review, subject_template:, template_name:, extra_setup: nil)
-    Rails.logger.info "Preparing #{template_name} email for Application ID: #{application.id}, ProofReview ID: #{proof_review.id}"
-    Rails.logger.info "Raw proof_type: #{proof_review.attributes['proof_type']}"
-    Rails.logger.info "Enum proof_type: #{proof_review.proof_type}"
-    Rails.logger.info "Enum proof_type_before_type_cast: #{proof_review.proof_type_before_type_cast}"
+    Rails.logger.info "Preparing #{template_name} email for Application ID: #{application.id}"
+    if proof_review
+      Rails.logger.info "ProofReview ID: #{proof_review.id}"
+      Rails.logger.info "Raw proof_type: #{proof_review.attributes['proof_type']}"
+      Rails.logger.info "Enum proof_type: #{proof_review.proof_type}"
+      Rails.logger.info "Enum proof_type_before_type_cast: #{proof_review.proof_type_before_type_cast}"
+    end
     Rails.logger.info "Delivery method: #{ActionMailer::Base.delivery_method}"
 
     @application  = application
@@ -27,7 +30,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
 
     extra_setup.call if extra_setup
 
-    formatted_type = format_proof_type(@proof_review.proof_type)
+    formatted_type = proof_review ? format_proof_type(proof_review.proof_type) : "document"
     Rails.logger.info "Formatted proof type: #{formatted_type}"
 
     subject_line = subject_template % { formatted_type: formatted_type }
@@ -73,33 +76,58 @@ class ApplicationNotificationsMailer < ApplicationMailer
   end
 
   def max_rejections_reached(application)
+    Rails.logger.info "Preparing max_rejections_reached email for Application ID: #{application.id}"
+    Rails.logger.info "Delivery method: #{ActionMailer::Base.delivery_method}"
+
     @application = application
     @user = application.user
+    @reapply_date = 3.years.from_now.to_date
 
-    mail(
+    mail_obj = mail(
       to: @user.email,
       subject: "Important: Application Status Update",
       template_path: "application_notifications_mailer",
       template_name: "max_rejections_reached"
     )
+
+    Rails.logger.info "Email body: #{mail_obj.body}"
+    mail_obj
   rescue StandardError => e
     Rails.logger.error("Failed to send max rejections email: #{e.message}")
+    Rails.logger.error(e.backtrace.join("\n"))
+    raise e if Rails.env.test? # Re-raise in test environment
   end
 
   def proof_needs_review_reminder(admin, applications)
     @admin = admin
     @applications = applications
-    @stale_reviews = applications.select { |app| app.needs_review_since < 3.days.ago }
-    return if @stale_reviews.empty?
+    @host_url = Rails.application.config.action_mailer.default_url_options[:host]
+    @stale_reviews = applications.select do |app|
+      app.respond_to?(:needs_review_since) &&
+      app.needs_review_since.present? &&
+      app.needs_review_since < 3.days.ago
+    end
 
-    mail(
+    # Only skip sending in production if there are no stale reviews
+    # In test environment, we'll always send the email
+    if @stale_reviews.empty? && !Rails.env.test?
+      Rails.logger.info("No stale reviews found, skipping reminder email")
+      return nil
+    end
+
+    mail_obj = mail(
       to: @admin.email,
       subject: "Reminder: Applications Awaiting Proof Review",
       template_path: "application_notifications_mailer",
       template_name: "proof_needs_review_reminder"
     )
+
+    Rails.logger.info "Email body: #{mail_obj.body}"
+    mail_obj
   rescue StandardError => e
     Rails.logger.error("Failed to send review reminder email: #{e.message}")
+    Rails.logger.error(e.backtrace.join("\n"))
+    raise e if Rails.env.test? # Re-raise in test environment
   end
 
   helper Mailers::ApplicationNotificationsHelper

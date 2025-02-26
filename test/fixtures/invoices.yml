@@ -1,0 +1,18 @@
+one:
+  vendor: vendor_raz
+  start_date: <%= 2.months.ago.beginning_of_day %>
+  end_date: <%= 1.month.ago.end_of_day %>
+  total_amount: 300.00
+  invoice_number: INV-202501-0001
+  status: invoice_pending
+
+paid:
+  vendor: vendor_raz
+  start_date: <%= 4.months.ago.beginning_of_day %>
+  end_date: <%= 3.months.ago.end_of_day %>
+  total_amount: 450.00
+  invoice_number: INV-202412-0001
+  status: invoice_paid
+  gad_invoice_reference: GAD-2024-12345
+  approved_at: <%= 3.months.ago %>
+  payment_recorded_at: <%= 2.months.ago %>

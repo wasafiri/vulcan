@@ -1,26 +1,39 @@
-Hi <%= @evaluator.full_name %>,
+<%= render 'shared/mailers/header', title: "New Evaluation Assignment" %>
 
-You have been assigned a new evaluation for constituent <%= @constituent.full_name %>.
+<p>Hi <%= @evaluator.full_name %>,</p>
 
-Constituent Details:
-- Name: <%= @constituent.full_name %>
-- Address: <%= @constituent.physical_address_1 %>
-          <%= @constituent.physical_address_2 if @constituent.physical_address_2.present? %>
-          <%= "#{@constituent.city}, #{@constituent.state} #{@constituent.zip_code}" %>
-- Phone: <%= @constituent.phone %>
-- Email: <%= @constituent.email %>
+<div style="background-color: #ebf4ff; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #c3dafe;">
+  <h3 style="margin-top: 0; color: #434190;">
+    <span aria-hidden="true">ℹ</span>
+    New Assignment
+  </h3>
+  
+  <div style="color: #434190;">
+    <p>You have been assigned a new evaluation for constituent <%= @constituent.full_name %>.</p>
+  </div>
+</div>
 
-Disabilities:
-<% if @constituent.hearing_disability %>- Hearing<% end %>
-<% if @constituent.vision_disability %>- Vision<% end %>
-<% if @constituent.speech_disability %>- Speech<% end %>
-<% if @constituent.mobility_disability %>- Mobility<% end %>
-<% if @constituent.cognition_disability %>- Cognition<% end %>
+<h3>Constituent Details:</h3>
+<ul>
+  <li><strong>Name:</strong> <%= @constituent.full_name %></li>
+  <li><strong>Address:</strong> <%= format_address(@constituent.physical_address_1, @constituent.physical_address_2, @constituent.city, @constituent.state, @constituent.zip_code) %></li>
+  <li><strong>Phone:</strong> <%= format_phone(@constituent.phone) %></li>
+  <li><strong>Email:</strong> <%= @constituent.email %></li>
+</ul>
 
-You can view and update the evaluation here:
-<%= link_to "View Evaluation", evaluators_evaluation_path(@evaluation) %>
+<h3>Disabilities:</h3>
+<ul>
+  <% if @constituent.hearing_disability %><li>Hearing</li><% end %>
+  <% if @constituent.vision_disability %><li>Vision</li><% end %>
+  <% if @constituent.speech_disability %><li>Speech</li><% end %>
+  <% if @constituent.mobility_disability %><li>Mobility</li><% end %>
+  <% if @constituent.cognition_disability %><li>Cognition</li><% end %>
+</ul>
 
-Please begin the evaluation process by contacting the constituent to schedule an assessment.
+<p style="margin-top: 20px;">
+  <a href="<%= evaluators_evaluation_url(@evaluation) %>" style="display: inline-block; padding: 10px 20px; background-color: #3182ce; color: #ffffff; text-decoration: none; border-radius: 4px;">View Evaluation</a>
+</p>
 
-Best regards,
-The Admin Team
+<p>Please begin the evaluation process by contacting the constituent to schedule an assessment.</p>
+
+<%= render 'shared/mailers/footer' %>

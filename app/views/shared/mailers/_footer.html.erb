@@ -1,0 +1,10 @@
+<div class="footer">
+  <p>If you need assistance or have any questions, please don't hesitate to contact us at <%= mail_to "info@mdmat.org" %>.</p>
+  
+  <p>Best regards,<br>
+  The MDMAT Team</p>
+  
+  <% if defined?(show_automated_message) && show_automated_message %>
+    <p class="automated-message">This is an automated message. Please do not reply directly to this email.</p>
+  <% end %>
+</div>

@@ -1,11 +1,12 @@
 class EvaluatorMailer < ApplicationMailer
   def new_evaluation_assigned
     @evaluation = params[:evaluation]
+    @evaluator = @evaluation.evaluator
     @constituent = @evaluation.constituent
     @application = @evaluation.application
 
     mail(
-      to: @evaluation.evaluator.email,
+      to: @evaluator.email,
       subject: "New Evaluation Assigned - Application ##{@application.id}"
     )
   end

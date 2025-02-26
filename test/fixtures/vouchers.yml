@@ -1,0 +1,26 @@
+one:
+  application: approved_application
+  code: ABCD12345678
+  initial_value: 500.00
+  remaining_value: 300.00
+  status: active
+  issued_at: <%= 2.months.ago %>
+  last_used_at: <%= 1.month.ago %>
+
+expired:
+  application: approved_application
+  code: EFGH87654321
+  initial_value: 500.00
+  remaining_value: 500.00
+  status: expired
+  issued_at: <%= 13.months.ago %>
+
+fully_redeemed:
+  application: approved_application
+  code: IJKL98765432
+  initial_value: 300.00
+  remaining_value: 0.00
+  status: redeemed
+  issued_at: <%= 3.months.ago %>
+  last_used_at: <%= 2.weeks.ago %>
+  vendor: vendor_raz

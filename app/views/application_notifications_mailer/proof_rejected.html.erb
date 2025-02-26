@@ -1,71 +1,47 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8">
-    <title>Document Review Update</title>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        color: #333333;
-        line-height: 1.6;
-      }
-      h1 {
-        color: #2d3748;
-      }
-      .footer {
-        margin-top: 30px;
-        font-size: 0.9em;
-        color: #555555;
-      }
-      .status-box {
-        background: #fff5f5;
-        padding: 15px;
-        margin: 20px 0;
-        border-radius: 5px;
-        border-left: 4px solid #f56565;
-      }
-      .reason-box {
-        background: #f3f4f6;
-        padding: 15px;
-        margin: 20px 0;
-        border-radius: 5px;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>Document Review Update</h1>
+<%= render 'shared/mailers/header', title: "Document Review Update" %>
 
-    <p>Dear <%= @user.first_name %>,</p>
+<p>Dear <%= @user.first_name %>,</p>
 
-    <p>Thank you for submitting your application to MDMAT. We appreciate your interest in our services and look forward to assisting you.</p>
+<p>Thank you for submitting your application to <%= @organization_name %>. We appreciate your interest in our services and look forward to assisting you.</p>
 
-    <div class="status-box">
-      <p>We have reviewed your <%= format_proof_type(@proof_review.proof_type) %> documentation and need some additional information or clarification.</p>
-    </div>
+<div style="background-color: #fff5f5; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #feb2b2;">
+  <h3 style="margin-top: 0; color: #c53030;">
+    <span aria-hidden="true">✗</span>
+    Documentation Needs Revision
+  </h3>
+  
+  <div style="color: #c53030;">
+    <p>We have reviewed your <%= @proof_review ? format_proof_type(@proof_review.proof_type) : 'document' %> documentation and need some additional information or clarification.</p>
+  </div>
+</div>
 
-    <div class="reason-box">
-      <p><strong>Reason for Revision:</strong></p>
-      <p><%= @proof_review.rejection_reason %></p>
-    </div>
+<div style="background-color: #ebf4ff; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #c3dafe;">
+  <h3 style="margin-top: 0; color: #434190;">
+    <span aria-hidden="true">ℹ</span>
+    Reason for Revision
+  </h3>
+  
+  <div style="color: #434190;">
+    <p><%= @proof_review&.rejection_reason || "Please provide clearer or more complete documentation." %></p>
+  </div>
+</div>
 
-    <% if @remaining_attempts > 0 %>
-      <p>You have <strong><%= @remaining_attempts %> <%= 'attempt'.pluralize(@remaining_attempts) %></strong> remaining to submit your revised document.</p>
-      
-      <p>Please ensure all required documentation has been submitted for review. You can:</p>
-      <ul>
-        <li>Visit <%= link_to "your application page", constituent_portal_application_url(@application, host: Rails.application.config.action_mailer.default_url_options[:host]) %> to upload new documentation</li>
-        <li>Reply to this email with your documentation attached</li>
-      </ul>
-    <% else %>
-      <p>Please note that this was your final attempt to submit this document. Your application (ID: <%= @application.id %>) has been archived. You are welcome to start a new application after <strong><%= @reapply_date %></strong>.</p>
-    <% end %>
+<% if @remaining_attempts && @remaining_attempts > 0 %>
+  <p>You have <strong><%= @remaining_attempts %> <%= 'attempt'.pluralize(@remaining_attempts) %></strong> remaining to submit your revised document.</p>
+  
+  <p>Please ensure all required documentation has been submitted for review. You can:</p>
+  <ul>
+    <li>Visit <%= link_to "your application page", constituent_portal_application_url(@application, host: Rails.application.config.action_mailer.default_url_options[:host]) %> to upload new documentation</li>
+    <li>Reply to this email with your documentation attached</li>
+  </ul>
+<% elsif @reapply_date %>
+  <p>Please note that this was your final attempt to submit this document. Your application (ID: <%= @application.id %>) has been archived. You are welcome to start a new application after <strong><%= format_date(@reapply_date) %></strong>.</p>
+<% else %>
+  <p>Please ensure all required documentation has been submitted for review. You can:</p>
+  <ul>
+    <li>Visit <%= link_to "your application page", constituent_portal_application_url(@application, host: Rails.application.config.action_mailer.default_url_options[:host]) %> to upload new documentation</li>
+    <li>Reply to this email with your documentation attached</li>
+  </ul>
+<% end %>
 
-    <p>If you need assistance or have any questions, please don't hesitate to contact us at <%= mail_to "info@mdmat.org" %>.</p>
-
-    <p>Best regards,<br>The MDMAT Team</p>
-
-    <div class="footer">
-      <p>This is an automated message. Please do not reply directly to this email.</p>
-    </div>
-  </body>
-</html>
+<%= render 'shared/mailers/footer', show_automated_message: true %>

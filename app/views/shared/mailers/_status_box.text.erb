@@ -1,0 +1,34 @@
+<%
+  # Status box partial for text mailers
+  # Usage:
+  # <%= render 'shared/mailers/status_box', 
+  #      status: :success, # or :warning, :error, :info
+  #      title: "Optional Title",
+  #      message: "Your message here" %>
+  
+  # Set default title based on status if not provided
+  status = local_assigns.fetch(:status, :info).to_sym
+  title = local_assigns.fetch(:title, status.to_s.capitalize)
+  
+  # Define icon based on status
+  icon = case status
+         when :success then "✓"
+         when :warning then "!"
+         when :error then "✗"
+         else "i" # info
+         end
+%>
+
+<%= "=" * 50 %>
+<%= "[#{icon}] #{title.upcase}" %>
+<%= "=" * 50 %>
+
+<% if local_assigns[:message].present? %>
+<%= message %>
+<% end %>
+
+<% if content_for?(:status_box_content) %>
+<%= yield :status_box_content %>
+<% elsif block_given? %>
+<%= yield %>
+<% end %>

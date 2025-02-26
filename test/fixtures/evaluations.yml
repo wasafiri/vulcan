@@ -1,0 +1,19 @@
+one:
+  evaluator: evaluator_betsy
+  constituent: constituent_john
+  application: one
+  evaluation_type: initial
+  status: completed
+  evaluation_date: <%= Time.current %>
+  location: "123 Main St, Baltimore, MD"
+  needs: "Hearing assistance for phone calls and meetings"
+  attendees: <%= [{ name: "Jane Doe", relationship: "Caregiver" }].to_json %>
+  products_tried: <%= [{ product_id: 1, reaction: "Positive" }].to_json %>
+  notes: "Constituent would benefit from a hearing amplifier"
+
+pending:
+  evaluator: evaluator_betsy
+  constituent: constituent_jane
+  application: awaiting_medical_response_application
+  evaluation_type: initial
+  status: pending

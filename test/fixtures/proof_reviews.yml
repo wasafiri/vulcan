@@ -1,0 +1,21 @@
+income_approved:
+  application: one
+  admin: admin_david
+  proof_type: income
+  status: approved
+  reviewed_at: <%= Time.current %>
+  
+income_rejected:
+  application: one
+  admin: admin_david
+  proof_type: income
+  status: rejected
+  rejection_reason: "The document is not legible. Please resubmit a clearer copy."
+  reviewed_at: <%= Time.current %>
+
+residency_approved:
+  application: one
+  admin: admin_kevin
+  proof_type: residency
+  status: approved
+  reviewed_at: <%= 2.days.ago %>

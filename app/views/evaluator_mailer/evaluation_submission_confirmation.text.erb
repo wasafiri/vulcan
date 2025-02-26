@@ -1,0 +1,20 @@
+<%= render 'shared/mailers/header', title: "Evaluation Submission Confirmation" %>
+
+Dear <%= @constituent.first_name %>,
+
+==================================================
+✓ EVALUATION COMPLETED
+==================================================
+
+We are pleased to inform you that your evaluation has been completed and submitted.
+
+EVALUATION DETAILS:
+- Application ID: <%= @application.id %>
+- Evaluator: <%= @evaluation.evaluator.full_name %>
+- Submission Date: <%= format_date(@evaluation.updated_at) %>
+
+Our team will review the evaluation results and determine the next steps for your application. You will be notified of any updates or additional requirements.
+
+If you have any questions about the evaluation or your application status, please don't hesitate to contact us.
+
+<%= render 'shared/mailers/footer', show_automated_message: true %>
