@@ -31,7 +31,10 @@ production:
     timeout: 5000
   cache:
     <<: *primary_production
+    url: <%= ENV['DATABASE_URL'] %>
   queue:
     <<: *primary_production
+    url: <%= ENV['DATABASE_URL'] %>
   cable:
     <<: *primary_production
+    url: <%= ENV['DATABASE_URL'] %>
