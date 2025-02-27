@@ -68,10 +68,10 @@ class Constituent::ApplicationsController < ApplicationController
 
     if success
       if params[:submit_application]
-        redirect_to constituent_application_path(@application),
+        redirect_to constituent_portal_application_path(@application),
           notice: "Application submitted successfully!"
       else
-        redirect_to constituent_application_path(@application),
+        redirect_to constituent_portal_application_path(@application),
           notice: "Application saved as draft."
       end
     else
@@ -143,7 +143,7 @@ class Constituent::ApplicationsController < ApplicationController
       else
         "Application saved successfully."
       end
-      redirect_to constituent_application_path(@application), notice: notice
+      redirect_to constituent_portal_application_path(@application), notice: notice
     else
       Rails.logger.debug "Application errors: #{@application.errors.full_messages}"
       render :edit, status: :unprocessable_entity
@@ -151,7 +151,7 @@ class Constituent::ApplicationsController < ApplicationController
   end
 
   def verify
-    redirect_to constituent_application_path(@application) unless @application.draft?
+    redirect_to constituent_portal_application_path(@application) unless @application.draft?
   end
 
   def upload_documents
@@ -168,13 +168,13 @@ class Constituent::ApplicationsController < ApplicationController
       end
 
       if @application.save
-        redirect_to constituent_application_path(@application),
+        redirect_to constituent_portal_application_path(@application),
           notice: "Documents uploaded successfully."
       else
         render :edit, status: :unprocessable_entity
       end
     else
-      redirect_to constituent_application_path(@application),
+      redirect_to constituent_portal_application_path(@application),
         alert: "Please select documents to upload."
     end
   end
@@ -193,10 +193,10 @@ class Constituent::ApplicationsController < ApplicationController
         )
       end
 
-      redirect_to constituent_application_path(@application),
+      redirect_to constituent_portal_application_path(@application),
         notice: "Review requested successfully."
     else
-      redirect_to constituent_application_path(@application),
+      redirect_to constituent_portal_application_path(@application),
         alert: "Unable to request review at this time."
     end
   end
@@ -211,7 +211,7 @@ class Constituent::ApplicationsController < ApplicationController
 
     if @application.update(submission_params.merge(status: :in_progress))
       ApplicationNotificationsMailer.submission_confirmation(@application).deliver_now
-      redirect_to constituent_application_path(@application),
+      redirect_to constituent_portal_application_path(@application),
         notice: "Application submitted successfully!"
     else
       render :verify, status: :unprocessable_entity
@@ -246,7 +246,7 @@ class Constituent::ApplicationsController < ApplicationController
 
   def ensure_editable
     unless @application.draft?
-      redirect_to constituent_application_path(@application),
+      redirect_to constituent_portal_application_path(@application),
                   alert: "This application has already been submitted and cannot be edited."
     end
   end

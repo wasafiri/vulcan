@@ -10,7 +10,7 @@
       </div>
 
       <%= form_with(model: [:constituent, @application], 
-                    url: submit_constituent_application_path(@application),
+                    url: submit_constituent_portal_application_path(@application),
                     method: :patch,
                     local: true) do |f| %>
         

@@ -7,8 +7,8 @@ class ProofManageableTest < ActiveSupport::TestCase
   setup do
     @application = applications(:one)
     @user = users(:constituent_john)
-    @valid_pdf = fixture_file_upload("test/fixtures/files/valid.pdf", "application/pdf")
-    @large_pdf = fixture_file_upload("test/fixtures/files/valid.pdf", "application/pdf")
+    @valid_pdf = fixture_file_upload("test/fixtures/files/residency_proof.pdf", "application/pdf")
+    @large_pdf = fixture_file_upload("test/fixtures/files/large.pdf", "application/pdf")
     @invalid_type = fixture_file_upload("test/fixtures/files/invalid.exe", "application/x-msdownload")
   end
 

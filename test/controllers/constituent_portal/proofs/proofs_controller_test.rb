@@ -11,7 +11,7 @@ class ConstituentProofsSubmissionTest < ActionDispatch::IntegrationTest
   setup do
     @application = applications(:one) # Has rejected proofs from fixture
     @user = users(:constituent_john)
-    @valid_pdf = fixture_file_upload("test/fixtures/files/valid.pdf", "application/pdf")
+    @valid_pdf = fixture_file_upload("test/fixtures/files/medical_certification_valid.pdf", "application/pdf")
 
     # Use the sign_in helper from test_helper.rb
     sign_in(@user)

@@ -18,9 +18,9 @@
           <td><%= application.status.capitalize %></td>
           <td><%= application.submission_method.capitalize %></td>
           <td>
-            <%= link_to "View", constituent_application_path(application) %> |
+            <%= link_to "View", constituent_portal_application_path(application) %> |
             <% if application.draft? %>
-              <%= link_to "Edit", edit_constituent_application_path(application) %>
+              <%= link_to "Edit", edit_constituent_portal_application_path(application) %>
             <% else %>
               <!-- No edit link for submitted applications -->
               N/A
@@ -34,4 +34,4 @@
   <p>You have not submitted any applications yet.</p>
 <% end %>
 
-<%= link_to "New Application", new_constituent_application_path %>
+<%= link_to "New Application", new_constituent_portal_application_path %>

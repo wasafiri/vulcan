@@ -30,10 +30,10 @@ module Constituent
           track_submission
         end
 
-        redirect_to constituent_application_path(@application),
+        redirect_to constituent_portal_application_path(@application),
           notice: "Proof submitted successfully"
       rescue RateLimit::ExceededError
-        redirect_to constituent_application_path(@application),
+        redirect_to constituent_portal_application_path(@application),
           alert: "Please wait before submitting another proof"
       end
 
@@ -67,14 +67,14 @@ module Constituent
 
       def ensure_can_submit_proof
         unless @application.can_submit_proof?
-          redirect_to constituent_application_path(@application),
+          redirect_to constituent_portal_application_path(@application),
             alert: "Cannot submit proof at this time"
         end
       end
 
       def authorize_proof_access!
         unless valid_proof_type? && can_modify_proof?
-          redirect_to constituent_application_path(@application),
+          redirect_to constituent_portal_application_path(@application),
             alert: "Invalid proof type or status"
         end
       end

@@ -4,8 +4,8 @@ class ProofsTest < ApplicationSystemTestCase
   include ActiveJob::TestHelper
 
   setup do
-    @valid_income_proof = fixture_file_upload("test/fixtures/files/valid.pdf", "application/pdf")
-    @valid_residency_proof = fixture_file_upload("test/fixtures/files/valid.pdf", "application/pdf")
+    @valid_income_proof = fixture_file_upload("test/fixtures/files/placeholder_income_proof.pdf", "application/pdf")
+    @valid_residency_proof = fixture_file_upload("test/fixtures/files/placeholder_residency_proof.pdf", "application/pdf")
   end
 
   test "complete application flow with proof submission" do

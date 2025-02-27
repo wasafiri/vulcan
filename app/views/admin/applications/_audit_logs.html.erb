@@ -19,7 +19,24 @@
         </tr>
       </thead>
       <tbody class="bg-white divide-y divide-gray-200">
-        <% @audit_logs.each do |log| %>
+        <% 
+        # Filter out notification records that directly correspond to a proof review
+        # This prevents showing both the admin action and the notification as separate entries
+        filtered_logs = @audit_logs.reject do |log|
+          # Skip notification records if there's a matching proof review
+          log.is_a?(Notification) && 
+          log.action.in?(["proof_approved", "proof_rejected"]) && 
+          @audit_logs.any? do |pr_log|
+            pr_log.is_a?(ProofReview) && 
+            (log.created_at.to_i - pr_log.created_at.to_i).abs < 30 && # Within 30 seconds (either before or after)
+            ((pr_log.status == "approved" && log.action == "proof_approved") ||
+             (pr_log.status == "rejected" && log.action == "proof_rejected")) &&
+            pr_log.proof_type == log.metadata.try(:[], 'proof_type')
+          end
+        end
+        
+        filtered_logs.each do |log| 
+        %>
           <tr class="hover:bg-gray-50">
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
               <%= log.created_at.strftime("%B %d, %Y %I:%M %p") %>
@@ -129,7 +146,7 @@
             </td>
           </tr>
         <% end %>
-        <% if @audit_logs.empty? %>
+        <% if filtered_logs.empty? %>
           <tr>
             <td colspan="4" class="px-6 py-4 text-center text-gray-500">
               No activity has been recorded yet.
