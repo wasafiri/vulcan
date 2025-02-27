@@ -2,7 +2,7 @@
   "name": "app",
   "private": true,
   "engines": {
-    "node": "18.19.1",
+    "node": "22.14.0",
     "yarn": "1.22.22"
   },
   "devDependencies": {

@@ -29,15 +29,13 @@ production:
     url: <%= ENV['DATABASE_URL'] %>
     pool: 5
     timeout: 5000
+    schema_search_path: "public"
   cache:
     <<: *primary_production
-    database: mat_vulcan_production_cache
-    migrations_paths: db/cache_migrate
+    schema_search_path: "cache,public"
   queue:
     <<: *primary_production
-    database: mat_vulcan_production_queue
-    migrations_paths: db/queue_migrate
+    schema_search_path: "queue,public"
   cable:
     <<: *primary_production
-    database: mat_vulcan_production_cable
-    migrations_paths: db/cable_migrate
+    schema_search_path: "cable,public"
