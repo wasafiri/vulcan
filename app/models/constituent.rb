@@ -4,7 +4,7 @@ class Constituent < User
   has_many :appointments, foreign_key: :user_id
   has_many :evaluations, foreign_key: :constituent_id
   has_many :assigned_evaluators, through: :evaluations, source: :evaluator
-  validate :must_have_at_least_one_disability
+  # Removed unconditional validation: validate :must_have_at_least_one_disability
 
   # Scopes
   scope :needs_evaluation, -> { joins(:application).where(applications: { status: :approved }) }
@@ -53,6 +53,11 @@ class Constituent < User
 
   def active_application
     applications.active.order(application_date: :desc).first
+  end
+
+  # Public method to check if any disability is selected
+  def has_disability_selected?
+    hearing_disability || vision_disability || speech_disability || mobility_disability || cognition_disability
   end
 
   private

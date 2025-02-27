@@ -54,6 +54,7 @@ class Application < ApplicationRecord
   validates :guardian_relationship, presence: true, if: :is_guardian?
 
   validate :waiting_period_completed, on: :create
+  validate :constituent_must_have_disability, if: :validate_disability?
 
   # Callbacks
   after_update :schedule_admin_notifications, if: :needs_proof_review?
@@ -369,5 +370,20 @@ class Application < ApplicationRecord
 
   def is_guardian?
     user&.is_guardian == true
+  end
+
+  def constituent_must_have_disability
+    unless user.has_disability_selected?
+      errors.add(:base, "At least one disability must be selected before submitting an application.")
+    end
+  end
+
+  def validate_disability?
+    # Only validate when transitioning from draft to a submitted state
+    # or when already in a submitted state
+    return false if draft?
+    return true if status_changed? && status_was == "draft"
+    return true if submitted?
+    false
   end
 end
