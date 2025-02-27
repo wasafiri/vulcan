@@ -1,3 +1,4 @@
 if Rails.env.production?
-  Rails.application.config.solid_cache.table_name_prefix = "cache."
+  # Set table names individually for SolidCache models
+  SolidCache::Entry.table_name = "cache.entries"
 end
