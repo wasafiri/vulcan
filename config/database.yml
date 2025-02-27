@@ -29,13 +29,9 @@ production:
     url: <%= ENV['DATABASE_URL'] %>
     pool: 5
     timeout: 5000
-    schema_search_path: "public"
   cache:
     <<: *primary_production
-    schema_search_path: "cache,public"
   queue:
     <<: *primary_production
-    schema_search_path: "queue,public"
   cable:
     <<: *primary_production
-    schema_search_path: "cable,public"
