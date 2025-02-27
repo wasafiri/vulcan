@@ -11,7 +11,7 @@ development:
     timeout: 5000
   queue:
     <<: *primary
-    database: mat_vulcan_development  # Same database in development
+    database: mat_vulcan_development
 
 test:
   primary: &test
@@ -21,16 +21,14 @@ test:
     timeout: 5000
   queue:
     <<: *test
-    database: mat_vulcan_test  # Same database in test
+    database: mat_vulcan_test
 
 production:
   primary: &primary_production
     <<: *default
-    database: mat_vulcan_production
-    username: mat_vulcan
+    url: <%= ENV['DATABASE_URL'] %>
     pool: 5
     timeout: 5000
-    password: <%= ENV["MAT_VULCAN_DATABASE_PASSWORD"] %>
   cache:
     <<: *primary_production
     database: mat_vulcan_production_cache
