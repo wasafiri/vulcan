@@ -227,6 +227,56 @@ module ConstituentPortal
     end
   end
 
+  def request_training
+    @application = current_user.applications.find(params[:id])
+
+    # Check if the application is approved and eligible for training
+    unless @application.approved?
+      redirect_to constituent_portal_dashboard_path,
+        alert: "Only approved applications are eligible for training."
+      return
+    end
+
+    # Check if the constituent has remaining training sessions
+    max_training_sessions = Policy.get("max_training_sessions") || 3
+    if @application.training_sessions.count >= max_training_sessions
+      redirect_to constituent_portal_dashboard_path,
+        alert: "You have used all of your available training sessions."
+      return
+    end
+
+    # Create a notification for admins to schedule training
+    User.where(type: "Admin").find_each do |admin|
+      Notification.create!(
+        recipient: admin,
+        actor: current_user,
+        action: "training_requested",
+        notifiable: @application,
+        metadata: {
+          application_id: @application.id,
+          constituent_id: current_user.id,
+          constituent_name: current_user.full_name,
+          timestamp: Time.current.iso8601
+        }
+      )
+    end
+
+    # Create an activity record for the constituent
+    if defined?(Activity)
+      Activity.create!(
+        user: current_user,
+        description: "Requested training session",
+        metadata: {
+          application_id: @application.id,
+          timestamp: Time.current.iso8601
+        }
+      )
+    end
+
+    redirect_to constituent_portal_dashboard_path,
+      notice: "Training request submitted. An administrator will contact you to schedule your session."
+  end
+
   def fpl_thresholds
     # Get FPL thresholds from policies
     thresholds = {}

@@ -11,6 +11,21 @@ module ConstituentPortal
 
       # Set draft application (most recent draft application)
       @draft_application = @applications.where(status: :draft).first
+
+      # Get voucher information
+      @voucher = @active_application&.vouchers&.available&.first
+
+      # Calculate remaining waiting period
+      @waiting_period_months = calculate_waiting_period_months
+
+      # Get training sessions information
+      @training_sessions = @active_application&.training_sessions || []
+      @max_training_sessions = Policy.get("max_training_sessions") || 3
+      @remaining_training_sessions = @max_training_sessions - @training_sessions.count if @active_application
+
+      # Get upcoming appointments
+      @upcoming_appointments = current_user.appointments.where("scheduled_for > ?", Time.current).order(scheduled_for: :asc)
+      @upcoming_appointments_count = @upcoming_appointments.count
     end
 
     private
@@ -19,6 +34,20 @@ module ConstituentPortal
       unless current_user&.constituent?
         redirect_to root_path, alert: "Access denied"
       end
+    end
+
+    def calculate_waiting_period_months
+      return nil unless @active_application
+
+      waiting_period_years = Policy.get("waiting_period_years") || 3
+      waiting_period_end_date = @active_application.application_date + waiting_period_years.years
+
+      # Calculate months between now and waiting period end date
+      months_remaining = ((waiting_period_end_date.year - Time.current.year) * 12) +
+                         (waiting_period_end_date.month - Time.current.month)
+
+      # Return 0 if waiting period has passed
+      [ months_remaining, 0 ].max
     end
   end
 end

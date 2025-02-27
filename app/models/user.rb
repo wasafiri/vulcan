@@ -35,7 +35,6 @@ class User < ApplicationRecord
     dependent: :destroy
   has_many :applications, foreign_key: :user_id
   has_many :role_capabilities, dependent: :destroy
-  has_many :devices, dependent: :destroy
   has_many :activities, dependent: :destroy
 
   has_and_belongs_to_many :products,

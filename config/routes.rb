@@ -219,6 +219,7 @@ Rails.application.routes.draw do
         get :verify
         patch :submit
         post :resubmit_proof
+        post :request_training
         # Define the route with a custom name
         get "proofs/new/:proof_type", to: "proofs/proofs#new", as: :new_proof
         post "proofs/resubmit", to: "proofs/proofs#resubmit", as: :resubmit_proof_document
@@ -227,7 +228,11 @@ Rails.application.routes.draw do
     end
     resources :appointments, only: [ :index, :show ]
     resources :evaluations, only: [ :index, :show ]
-    resources :devices, only: [ :index, :show ]
+    resources :products, only: [ :index, :show ]
+
+    # Redirect old devices routes to products
+    get "/devices", to: redirect("/constituent_portal/products")
+    get "/devices/:id", to: redirect("/constituent_portal/products/%{id}")
   end
 
   namespace :webhooks do
