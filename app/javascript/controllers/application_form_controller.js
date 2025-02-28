@@ -76,8 +76,15 @@ export default class extends Controller {
     const householdSize = parseInt(this.householdSizeTarget.value) || 0;
     const annualIncome = parseFloat(this.annualIncomeTarget.value) || 0;
     
+    const warningElement = document.getElementById('income-threshold-warning');
+    const submitButton = document.querySelector('input[name="submit_application"]');
+    
+    // If there's not enough data to validate, hide the warning and enable the submit button
     if (householdSize < 1 || annualIncome < 1) {
-      return; // Not enough data to validate
+      warningElement.classList.add('hidden');
+      submitButton.disabled = false;
+      submitButton.classList.remove('opacity-50', 'cursor-not-allowed');
+      return;
     }
     
     // Get the base FPL amount for the household size (default to 8-person if larger)
@@ -85,9 +92,6 @@ export default class extends Controller {
     
     // Calculate the threshold (base FPL * modifier percentage)
     const threshold = baseFpl * (this.fplModifier / 100);
-    
-    const warningElement = document.getElementById('income-threshold-warning');
-    const submitButton = document.querySelector('input[name="submit_application"]');
     
     if (annualIncome > threshold) {
       // Income exceeds threshold - show warning and disable submit button
