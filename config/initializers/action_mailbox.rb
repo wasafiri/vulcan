@@ -11,7 +11,8 @@ end
 Rails.application.config.to_prepare do
   # Set the ingress password for Postmark
   if Rails.application.credentials.dig(:action_mailbox, :ingress_password).present?
-    ActionMailbox::Base.ingress_password =
+    # In Rails 8.0.1, the configuration method has changed
+    Rails.application.config.action_mailbox.ingress_password =
       Rails.application.credentials.dig(:action_mailbox, :ingress_password)
   end
 end
