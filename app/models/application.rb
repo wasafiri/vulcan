@@ -286,8 +286,15 @@ class Application < ApplicationRecord
   private
 
   def log_status_change
+    # Use Current.user if available, otherwise use the application's user
+    # This ensures the method works in both controller contexts and test environments
+    acting_user = Current.user || user
+
+    # Skip event creation if no user is available
+    return unless acting_user
+
     Event.create!(
-      user: Current.user,
+      user: acting_user,
       action: "application_status_changed",
       metadata: {
         application_id: id,

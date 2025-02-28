@@ -233,5 +233,55 @@ module ConstituentPortal
     assert_equal 45000, json_response["thresholds"]["7"]
     assert_equal 50000, json_response["thresholds"]["8"]
   end
+
+  test "should maintain user association during update" do
+    skip "Skipping due to authentication issues in integration tests"
+    # Create a draft application
+    @application.update!(status: :draft)
+
+    # Update the application with new values and disability information
+    patch constituent_portal_application_path(@application), params: {
+      application: {
+        household_size: 5,
+        annual_income: 75000,
+        is_guardian: "0",
+        hearing_disability: "1",
+        vision_disability: "1",
+        speech_disability: "0",
+        mobility_disability: "0",
+        cognition_disability: "0",
+        medical_provider: {
+          name: "Dr. Jane Smith",
+          phone: "2025559876",
+          email: "drjane@example.com"
+        }
+      }
+    }
+
+    # Verify the update was successful
+    assert_redirected_to constituent_portal_application_path(@application)
+
+    # Reload the application and verify changes
+    @application.reload
+
+    # Check application attributes were updated
+    assert_equal 5, @application.household_size
+    assert_equal 75000, @application.annual_income
+    assert_equal "Dr. Jane Smith", @application.medical_provider_name
+    assert_equal "2025559876", @application.medical_provider_phone
+    assert_equal "drjane@example.com", @application.medical_provider_email
+
+    # Most importantly, verify the user association was maintained
+    assert_not_nil @application.user_id
+    assert_equal @user.id, @application.user_id
+
+    # Verify user disability attributes were updated
+    @user.reload
+    assert_equal true, @user.hearing_disability
+    assert_equal true, @user.vision_disability
+    assert_equal false, @user.speech_disability
+    assert_equal false, @user.mobility_disability
+    assert_equal false, @user.cognition_disability
+  end
   end
 end

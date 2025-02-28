@@ -46,13 +46,29 @@ export default class extends Controller {
       <p>Applications with income above the threshold are not eligible for this program.</p>
     `;
     
-    // Insert warning after the errors div or at the beginning of the form
-    const errorsDiv = document.querySelector('.bg-red-50');
-    if (errorsDiv) {
-      errorsDiv.parentNode.insertBefore(warningElement, errorsDiv.nextSibling);
+    // Insert warning at the top of the form, similar to flash messages
+    const formContainer = document.querySelector('.form-container');
+    const formElement = document.querySelector('form');
+    
+    // Insert before the form, after the heading
+    if (formContainer && formElement) {
+      const heading = formContainer.querySelector('h1');
+      if (heading) {
+        // Insert after the heading and main-content div
+        const mainContent = document.getElementById('main-content');
+        if (mainContent) {
+          mainContent.parentNode.insertBefore(warningElement, mainContent.nextSibling);
+        } else {
+          // Fallback: insert after heading
+          heading.parentNode.insertBefore(warningElement, heading.nextSibling);
+        }
+      } else {
+        // Fallback: insert at the beginning of the form
+        formElement.insertBefore(warningElement, formElement.firstChild);
+      }
     } else {
-      const form = document.querySelector('form');
-      form.insertBefore(warningElement, form.firstChild);
+      // Fallback: insert at the beginning of the body
+      document.body.insertBefore(warningElement, document.body.firstChild);
     }
   }
   

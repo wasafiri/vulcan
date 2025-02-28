@@ -119,21 +119,44 @@ module ConstituentPortal
         cognition_disability: params[:application][:cognition_disability] == "1"
       }
 
+      # Store the user reference before transaction to ensure it's maintained
+      user = current_user
+
+      # Add debug logging
+      Rails.logger.debug "Before transaction - Application user_id: #{@application.user_id}"
+      Rails.logger.debug "Before transaction - Current user ID: #{user.id}"
+
       success = ActiveRecord::Base.transaction do
         begin
+          # Explicitly ensure user association is maintained
+          @application.user = user
+
+          # Assign other attributes
           @application.assign_attributes(application_attrs)
 
-          if update_user_attributes(user_attrs) && @application.save
-            # Handle status changes
+          # Update user attributes first
+          user_update_success = update_user_attributes(user_attrs)
+
+          # Verify user association is still intact
+          if @application.user_id.nil?
+            Rails.logger.error "User association lost after attribute assignment"
+            @application.user = user # Re-establish association if lost
+          end
+
+          if user_update_success && @application.save
+            # Handle status changes - use the object directly instead of update!
             if params[:submit_application] && @application.draft?
-              @application.update!(status: :in_progress)
+              @application.status = :in_progress
+              @application.save!
             end
             true
           else
+            Rails.logger.error "Failed to save application: #{@application.errors.full_messages.join(', ')}"
             false
           end
         rescue ActiveRecord::RecordInvalid => e
           Rails.logger.error "Transaction failed: #{e.message}"
+          Rails.logger.error "Application state: #{@application.attributes.inspect}"
           false
         end
       end
