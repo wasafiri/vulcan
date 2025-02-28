@@ -352,6 +352,8 @@ class Admin::ApplicationsController < Admin::BaseController
 
   def apply_filters(scope, filter)
     case filter
+    when "active"
+      scope.active
     when "in_progress"
       scope.where(status: :in_progress)
     when "approved"

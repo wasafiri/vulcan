@@ -56,14 +56,14 @@
       <h2 id="status-cards-heading" class="sr-only">Application Status Overview</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="bg-white rounded-lg shadow p-6">
-          <h3 id="in-progress-heading" class="text-lg font-medium text-gray-900">In Progress Applications</h3>
-          <p class="text-3xl font-bold text-indigo-600" aria-labelledby="in-progress-heading" aria-live="polite"><%= @open_applications_count || 0 %></p>
-          <p class="text-sm text-gray-500">Active but unapproved</p>
+          <h3 id="active-applications-heading" class="text-lg font-medium text-gray-900">Active Applications</h3>
+          <p class="text-3xl font-bold text-indigo-600" aria-labelledby="active-applications-heading" aria-live="polite"><%= @open_applications_count || 0 %></p>
+          <p class="text-sm text-gray-500">All active applications: submitted but unapproved</p>
           <div class="mt-2">
-            <%= link_to params[:filter] == 'in_progress' ? admin_applications_path : admin_applications_path(filter: 'in_progress'),
+            <%= link_to params[:filter] == 'active' ? admin_applications_path : admin_applications_path(filter: 'active'),
                 class: "inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                aria: { label: params[:filter] == 'in_progress' ? "View all applications" : "View only in progress applications" } do %>
-              <span><%= params[:filter] == 'in_progress' ? 'View All Applications' : 'View Only In Progress' %></span>
+                aria: { label: params[:filter] == 'active' ? "View all applications" : "View only active applications" } do %>
+              <span><%= params[:filter] == 'active' ? 'View All Applications' : 'View Only Active Applications' %></span>
               <svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
               </svg>
