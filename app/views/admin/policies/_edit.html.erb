@@ -27,6 +27,7 @@
         <!-- FPL Modifier -->
         <div class="mb-6">
           <% modifier_policy = @policies.find_by(key: 'fpl_modifier_percentage') %>
+          <%= render "create_missing_policy", policy: modifier_policy, key: 'fpl_modifier_percentage', default_value: 400 %>
           <% if modifier_policy %>
             <div class="flex items-center space-x-4">
               <%= hidden_field_tag "policies[#{modifier_policy.id}][id]", modifier_policy.id %>
@@ -66,13 +67,16 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
               <% (1..8).each do |size| %>
-                <% policy = @policies.find_by(key: "fpl_#{size}_person") %>
-                <% if policy %>
-                  <tr>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      <%= size %> <%= 'Person'.pluralize(size) %>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
+                <% policy_key = "fpl_#{size}_person" %>
+                <% policy = @policies.find_by(key: policy_key) %>
+                <% default_value = 15000 + (size - 1) * 5000 %>
+                <tr>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <%= size %> <%= 'Person'.pluralize(size) %>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <%= render "create_missing_policy", policy: policy, key: policy_key, default_value: default_value %>
+                    <% if policy %>
                       <%= hidden_field_tag "policies[#{policy.id}][id]", policy.id %>
                       <div class="relative rounded-md shadow-sm w-48">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -84,12 +88,16 @@
                             required: true,
                             min: 0 %>
                       </div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <% end %>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <% if policy && modifier_policy %>
                       <%= number_to_currency(policy.value * modifier_policy.value / 100) %>
-                    </td>
-                  </tr>
-                <% end %>
+                    <% else %>
+                      <span class="text-gray-400">Not available</span>
+                    <% end %>
+                  </td>
+                </tr>
               <% end %>
             </tbody>
           </table>
@@ -110,21 +118,27 @@
         <div class="grid grid-cols-1 gap-6">
           <!-- Time Period -->
           <div>
+            <% period_policy = @policies.find_by(key: 'proof_submission_rate_period') %>
+            <%= render "create_missing_policy", policy: period_policy, key: 'proof_submission_rate_period', default_value: 1 %>
             <%= render "rate_limit_input", 
-                policy: @policies.find_by(key: 'proof_submission_rate_period'),
+                policy: period_policy,
                 label: "Time Window (hours)" %>
           </div>
 
           <!-- Submission Limits -->
           <div class="grid grid-cols-2 gap-6">
             <div>
+              <% web_policy = @policies.find_by(key: 'proof_submission_rate_limit_web') %>
+              <%= render "create_missing_policy", policy: web_policy, key: 'proof_submission_rate_limit_web', default_value: 5 %>
               <%= render "rate_limit_input", 
-                  policy: @policies.find_by(key: 'proof_submission_rate_limit_web'),
+                  policy: web_policy,
                   label: "Portal Submissions" %>
             </div>
             <div>
+              <% email_policy = @policies.find_by(key: 'proof_submission_rate_limit_email') %>
+              <%= render "create_missing_policy", policy: email_policy, key: 'proof_submission_rate_limit_email', default_value: 10 %>
               <%= render "rate_limit_input", 
-                  policy: @policies.find_by(key: 'proof_submission_rate_limit_email'),
+                  policy: email_policy,
                   label: "Email Submissions" %>
             </div>
           </div>
@@ -155,13 +169,15 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
               <% ['hearing', 'vision', 'speech', 'mobility', 'cognition'].each do |disability_type| %>
-                <% policy = @policies.find_by(key: "voucher_value_#{disability_type}_disability") %>
-                <% if policy %>
-                  <tr>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      <%= disability_type.titleize %>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
+                <% policy_key = "voucher_value_#{disability_type}_disability" %>
+                <% policy = @policies.find_by(key: policy_key) %>
+                <tr>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <%= disability_type.titleize %>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <%= render "create_missing_policy", policy: policy, key: policy_key, default_value: 500 %>
+                    <% if policy %>
                       <%= hidden_field_tag "policies[#{policy.id}][id]", policy.id %>
                       <div class="relative rounded-md shadow-sm w-48">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -173,9 +189,9 @@
                             required: true,
                             min: 0 %>
                       </div>
-                    </td>
-                  </tr>
-                <% end %>
+                    <% end %>
+                  </td>
+                </tr>
               <% end %>
             </tbody>
           </table>
@@ -198,12 +214,14 @@
               <tbody class="bg-white divide-y divide-gray-200">
                 <% ['voucher_validity_period_months', 'voucher_minimum_redemption_amount'].each do |key| %>
                   <% policy = @policies.find_by(key: key) %>
-                  <% if policy %>
-                    <tr>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        <%= key.gsub('voucher_', '').humanize %>
-                      </td>
-                      <td class="px-6 py-4 whitespace-nowrap">
+                  <% default_value = key == 'voucher_validity_period_months' ? 6 : 10 %>
+                  <tr>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <%= key.gsub('voucher_', '').humanize %>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <%= render "create_missing_policy", policy: policy, key: key, default_value: default_value %>
+                      <% if policy %>
                         <%= hidden_field_tag "policies[#{policy.id}][id]", policy.id %>
                         <div class="relative rounded-md shadow-sm w-48">
                           <%= number_field_tag "policies[#{policy.id}][value]",
@@ -212,9 +230,9 @@
                               required: true,
                               min: 0 %>
                         </div>
-                      </td>
-                    </tr>
-                  <% end %>
+                      <% end %>
+                    </td>
+                  </tr>
                 <% end %>
               </tbody>
             </table>
@@ -225,6 +243,38 @@
       <!-- Other Policies Section -->
       <div class="p-6 border-t border-gray-200">
         <h2 class="text-lg font-medium text-gray-900 mb-4">Other System Policies</h2>
+        
+        <!-- Create New Policy Form -->
+        <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+          <h3 class="text-md font-medium text-blue-700 mb-2">Create New Policy</h3>
+          <p class="text-sm text-blue-700 mb-4">
+            If you need to create a policy that doesn't exist yet, you can use this form.
+          </p>
+          
+          <%= form_with model: Policy.new, url: admin_policies_path, class: "flex flex-wrap items-center gap-4" do |form| %>
+            <div>
+              <%= form.label :key, "Policy Key", class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= form.text_field :key, 
+                  class: "block w-64 rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+                  required: true,
+                  placeholder: "e.g., max_training_sessions" %>
+            </div>
+            
+            <div>
+              <%= form.label :value, "Value", class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= form.number_field :value, 
+                  class: "block w-32 rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+                  required: true,
+                  min: 0,
+                  placeholder: "e.g., 3" %>
+            </div>
+            
+            <div class="self-end">
+              <%= form.submit "Create Policy", 
+                  class: "px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+            </div>
+          <% end %>
+        </div>
         
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200">

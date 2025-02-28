@@ -25,6 +25,18 @@ class Admin::PoliciesController < ApplicationController
     )
   end
 
+  def create
+    @policy = Policy.new(create_policy_params)
+    @policy.updated_by = current_user
+
+    if @policy.save
+      redirect_to admin_policies_path, notice: "Policy '#{@policy.key}' created successfully."
+    else
+      flash[:alert] = "Failed to create policy: #{@policy.errors.full_messages.join(', ')}"
+      redirect_to admin_policies_path
+    end
+  end
+
   def update
     Policy.transaction do
       params[:policies].each do |_key, policy_params|
@@ -64,5 +76,9 @@ class Admin::PoliciesController < ApplicationController
 
   def policy_params
     params.require(:policies).permit!
+  end
+
+  def create_policy_params
+    params.require(:policy).permit(:key, :value)
   end
 end

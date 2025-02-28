@@ -3,7 +3,7 @@ require "test_helper"
 class Admin::PoliciesControllerTest < ActionDispatch::IntegrationTest
   def setup
     @admin = users(:admin_david)
-    @policy = create(:policy)
+    @policy = Policy.create!(key: "max_training_sessions", value: 3)
 
     @headers = {
       "HTTP_USER_AGENT" => "Rails Testing",
@@ -18,13 +18,13 @@ class Admin::PoliciesControllerTest < ActionDispatch::IntegrationTest
     follow_redirect!
   end
 
-  def test_should_get_edit
-    get edit_admin_policy_path
+  def test_should_get_index
+    get admin_policies_path
     assert_response :success
   end
 
   def test_should_update_policy
-    patch update_admin_policy_path, params: {
+    patch admin_policies_path, params: {
       policies: {
         "#{@policy.id}": {
           id: @policy.id,
@@ -34,5 +34,18 @@ class Admin::PoliciesControllerTest < ActionDispatch::IntegrationTest
     }
     assert_redirected_to admin_policies_path
     assert_equal "Policies updated successfully.", flash[:notice]
+  end
+
+  def test_should_create_policy
+    assert_difference("Policy.count") do
+      post admin_policies_path, params: {
+        policy: {
+          key: "new_test_policy",
+          value: "42"
+        }
+      }
+    end
+    assert_redirected_to admin_policies_path
+    assert_equal "Policy 'new_test_policy' created successfully.", flash[:notice]
   end
 end

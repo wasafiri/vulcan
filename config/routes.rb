@@ -67,7 +67,7 @@ Rails.application.routes.draw do
       post :resubmit, on: :collection
     end
 
-    resources :policies, only: [ :index, :show, :edit, :update ] do
+    resources :policies, only: [ :index, :show, :edit, :update, :create ] do
       collection do
         get :changes
         patch :update
