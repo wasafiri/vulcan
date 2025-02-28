@@ -60,6 +60,16 @@ FactoryBot.define do
           cognition_disability { true }
         end
 
+        trait :as_guardian do
+          is_guardian { true }
+          guardian_relationship { "Parent" }
+        end
+
+        trait :as_legal_guardian do
+          is_guardian { true }
+          guardian_relationship { "Legal Guardian" }
+        end
+
         trait :with_internet do
           home_internet_service { true }
         end

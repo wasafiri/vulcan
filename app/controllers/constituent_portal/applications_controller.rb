@@ -71,6 +71,19 @@ module ConstituentPortal
       end
 
       if success
+        # Log guardian relationship if applicable
+        if current_user.is_guardian? && @application.persisted?
+          Event.create!(
+            user: current_user,
+            action: "guardian_application_submitted",
+            metadata: {
+              application_id: @application.id,
+              guardian_relationship: current_user.guardian_relationship,
+              timestamp: Time.current.iso8601
+            }
+          )
+        end
+
         if params[:submit_application]
           redirect_to constituent_portal_application_path(@application),
             notice: "Application submitted successfully!"
@@ -162,6 +175,19 @@ module ConstituentPortal
       end
 
       if success
+        # Log guardian relationship if applicable
+        if current_user.is_guardian? && @application.persisted?
+          Event.create!(
+            user: current_user,
+            action: "guardian_application_updated",
+            metadata: {
+              application_id: @application.id,
+              guardian_relationship: current_user.guardian_relationship,
+              timestamp: Time.current.iso8601
+            }
+          )
+        end
+
         notice = if @application.status != original_status && @application.in_progress?
           "Application submitted successfully!"
         else

@@ -113,62 +113,70 @@ FactoryBot.define do
       end
     end
 
-  trait :in_progress_with_approved_proofs do
-    household_size { 4 }
-    annual_income  { 50_000 }
-    status { :in_progress }
-    income_proof_status { :approved }
-    residency_proof_status { :approved }
-    last_activity_at { Time.current }
+    trait :in_progress_with_approved_proofs do
+      household_size { 4 }
+      annual_income  { 50_000 }
+      status { :in_progress }
+      income_proof_status { :approved }
+      residency_proof_status { :approved }
+      last_activity_at { Time.current }
 
-    after(:build) do |application|
-      fixture_dir = Rails.root.join("test", "fixtures", "files")
-      FileUtils.mkdir_p(fixture_dir)
-      files = {
-        "approved_income_proof.pdf" => :income_proof,
-        "placeholder_residency_proof.pdf" => :residency_proof
-      }
-      files.each do |filename, proof_type|
-        file_path = fixture_dir.join(filename)
-        unless File.exist?(file_path)
-          File.write(file_path, "test content for #{filename}")
+      after(:build) do |application|
+        fixture_dir = Rails.root.join("test", "fixtures", "files")
+        FileUtils.mkdir_p(fixture_dir)
+        files = {
+          "approved_income_proof.pdf" => :income_proof,
+          "placeholder_residency_proof.pdf" => :residency_proof
+        }
+        files.each do |filename, proof_type|
+          file_path = fixture_dir.join(filename)
+          unless File.exist?(file_path)
+            File.write(file_path, "test content for #{filename}")
+          end
+          application.public_send(proof_type).attach(
+            io: File.open(file_path),
+            filename: filename,
+            content_type: "application/pdf"
+          )
         end
-        application.public_send(proof_type).attach(
-          io: File.open(file_path),
-          filename: filename,
-          content_type: "application/pdf"
-        )
       end
     end
-  end
 
-  trait :in_progress_with_pending_proofs do
-    household_size { 4 }
-    annual_income  { 50_000 }
-    status { :in_progress }
-    income_proof_status { :not_reviewed }
-    residency_proof_status { :not_reviewed }
-    last_activity_at { Time.current }
+    trait :in_progress_with_pending_proofs do
+      household_size { 4 }
+      annual_income  { 50_000 }
+      status { :in_progress }
+      income_proof_status { :not_reviewed }
+      residency_proof_status { :not_reviewed }
+      last_activity_at { Time.current }
 
-    after(:build) do |application|
-      fixture_dir = Rails.root.join("test", "fixtures", "files")
-      FileUtils.mkdir_p(fixture_dir)
-      files = {
-        "income_proof.pdf" => :income_proof,
-        "residency_proof.pdf" => :residency_proof
-      }
-      files.each do |filename, proof_type|
-        file_path = fixture_dir.join(filename)
-        unless File.exist?(file_path)
-          File.write(file_path, "test content for #{filename}")
+      after(:build) do |application|
+        fixture_dir = Rails.root.join("test", "fixtures", "files")
+        FileUtils.mkdir_p(fixture_dir)
+        files = {
+          "income_proof.pdf" => :income_proof,
+          "residency_proof.pdf" => :residency_proof
+        }
+        files.each do |filename, proof_type|
+          file_path = fixture_dir.join(filename)
+          unless File.exist?(file_path)
+            File.write(file_path, "test content for #{filename}")
+          end
+          application.public_send(proof_type).attach(
+            io: File.open(file_path),
+            filename: filename,
+            content_type: "application/pdf"
+          )
         end
-        application.public_send(proof_type).attach(
-          io: File.open(file_path),
-          filename: filename,
-          content_type: "application/pdf"
-        )
       end
     end
-  end
+
+    trait :submitted_by_guardian do
+      association :user, factory: [ :constituent, :as_guardian ], strategy: :create
+    end
+
+    trait :submitted_by_legal_guardian do
+      association :user, factory: [ :constituent, :as_legal_guardian ], strategy: :create
+    end
   end
 end
