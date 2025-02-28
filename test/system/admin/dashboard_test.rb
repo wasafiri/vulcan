@@ -121,4 +121,46 @@ class Admin::DashboardTest < ApplicationSystemTestCase
     # Verify the reports page title
     assert_selector "h1", text: "System Reports"
   end
+
+  test "admin action buttons are present and functional" do
+    visit admin_applications_path
+
+    # Verify all four admin action buttons are present
+    assert_selector "a", text: "Edit Policies"
+    assert_selector "a", text: "Manage Products"
+    assert_selector "a", text: "Upload Paper Application"
+    assert_selector "a", text: "View Reports"
+
+    # Test Edit Policies button
+    click_on "Edit Policies"
+    assert_current_path admin_policies_path
+    visit admin_applications_path
+
+    # Test Manage Products button
+    click_on "Manage Products"
+    assert_current_path admin_products_path
+    visit admin_applications_path
+
+    # Test Upload Paper Application button
+    click_on "Upload Paper Application"
+    assert_current_path new_admin_paper_application_path
+    visit admin_applications_path
+
+    # Test View Reports button (already tested in previous test, but included for completeness)
+    click_on "View Reports"
+    assert_current_path admin_reports_path
+  end
+
+  test "admin action buttons have appropriate accessibility attributes" do
+    visit admin_applications_path
+
+    # Check for proper aria labels on admin action buttons
+    assert_selector "a[aria-label='Edit system policies and settings']"
+    assert_selector "a[aria-label='Manage products catalog']"
+    assert_selector "a[aria-label='Upload a paper application']"
+    assert_selector "a[aria-label='View detailed system reports']"
+
+    # Verify buttons have adequate touch target size (min-h-[44px])
+    assert_selector "a.min-h-\\[44px\\]", count: 4
+  end
 end

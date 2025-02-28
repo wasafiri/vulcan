@@ -6,23 +6,48 @@
       Skip to main content
     </a>
     
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-3xl font-bold" id="page-title">
+    <%# Admin Header Section - Contains page title and primary action buttons %>
+    <div class="mb-6">
+      <h1 class="text-3xl font-bold mb-4" id="page-title">
         Admin Dashboard
       </h1>
       
-      <div class="flex space-x-4">
-        <%= link_to new_admin_paper_application_path,
-            class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-            aria: { label: "Upload a paper application" } do %>
-          <span>Upload Paper Application</span>
-        <% end %>
+      <%# 
+        Administrative Action Buttons
+        - These buttons provide access to key administrative functions
+        - Left group: System configuration (Policies, Products)
+        - Right group: Action buttons (Upload, Reports)
+        - Uses justify-between for visual separation with flex-wrap for responsiveness
+        - Touch-friendly sizing with adequate padding for all devices
+      %>
+      <div class="flex flex-wrap justify-between">
+        <div class="flex flex-wrap gap-4 mb-4 md:mb-0">
+          <%= link_to admin_policies_path,
+              class: "inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+              aria: { label: "Edit system policies and settings" } do %>
+            <span>Edit Policies</span>
+          <% end %>
+          
+          <%= link_to admin_products_path,
+              class: "inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+              aria: { label: "Manage products catalog" } do %>
+            <span>Manage Products</span>
+          <% end %>
+        </div>
         
-        <%= link_to admin_reports_path,
-            class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-            aria: { label: "View detailed system reports" } do %>
-          <span>View Reports</span>
-        <% end %>
+        <div class="flex flex-wrap gap-4">
+          <%= link_to new_admin_paper_application_path,
+              class: "inline-flex items-center px-4 py-2 min-h-[44px] border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+              aria: { label: "Upload a paper application" } do %>
+            <span>Upload Paper Application</span>
+          <% end %>
+          
+          <%= link_to admin_reports_path,
+              class: "inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+              aria: { label: "View detailed system reports" } do %>
+            <span>View Reports</span>
+          <% end %>
+        </div>
       </div>
     </div>
 
