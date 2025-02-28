@@ -2,7 +2,7 @@ class Admin::ApplicationsController < Admin::BaseController
   before_action :set_application, only: [
     :show, :edit, :update,
     :verify_income, :request_documents, :review_proof, :update_proof_status,
-    :approve, :reject, :assign_evaluator, :schedule_training, :complete_training,
+    :approve, :reject, :assign_evaluator, :assign_trainer, :schedule_training, :complete_training,
     :update_certification_status, :resend_medical_certification, :assign_voucher
   ]
 
@@ -278,6 +278,19 @@ class Admin::ApplicationsController < Admin::BaseController
     else
       redirect_to admin_application_path(@application),
         alert: "Failed to assign evaluator"
+    end
+  end
+
+  def assign_trainer
+    @application = Application.find(params[:id])
+    trainer = Trainer.find(params[:trainer_id])
+
+    if @application.assign_trainer!(trainer)
+      redirect_to admin_application_path(@application),
+        notice: "Trainer successfully assigned"
+    else
+      redirect_to admin_application_path(@application),
+        alert: "Failed to assign trainer"
     end
   end
 

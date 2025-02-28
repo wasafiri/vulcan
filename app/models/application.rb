@@ -206,6 +206,30 @@ class Application < ApplicationRecord
     false
   end
 
+  def assign_trainer!(trainer)
+    with_lock do
+      training_session = training_sessions.create!(
+        trainer: trainer,
+        status: :scheduled,
+        scheduled_for: 1.week.from_now # Default to 1 week from now, can be changed later
+      )
+
+      # Create system notification for the constituent
+      create_system_notification!(
+        recipient: user,
+        actor: Current.user,
+        action: "trainer_assigned"
+      )
+
+      # Send email notification to the trainer with constituent contact info
+      TrainingSessionNotificationsMailer.trainer_assigned(training_session).deliver_now
+    end
+    true
+  rescue ActiveRecord::RecordInvalid => e
+    Rails.logger.error "Failed to assign trainer: #{e.message}"
+    false
+  end
+
   # Certification management
   def update_certification!(certification:, status:, verified_by:, rejection_reason: nil)
     with_lock do

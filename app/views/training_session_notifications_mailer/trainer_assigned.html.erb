@@ -1,0 +1,37 @@
+<%= render 'shared/mailers/header', title: "New Training Assignment" %>
+
+<p>Hi <%= @trainer.full_name %>,</p>
+
+<div style="background-color: #ebf4ff; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #c3dafe;">
+  <h3 style="margin-top: 0; color: #434190;">
+    <span aria-hidden="true">ℹ</span>
+    New Assignment
+  </h3>
+  
+  <div style="color: #434190;">
+    <p>You have been assigned to provide training for constituent <%= @constituent.full_name %>.</p>
+  </div>
+</div>
+
+<h3>Constituent Details:</h3>
+<ul>
+  <li><strong>Name:</strong> <%= @constituent.full_name %></li>
+  <li><strong>Address:</strong> <%= format_address(@constituent.physical_address_1, @constituent.physical_address_2, @constituent.city, @constituent.state, @constituent.zip_code) %></li>
+  <li><strong>Phone:</strong> <%= format_phone(@constituent.phone) %></li>
+  <li><strong>Email:</strong> <%= @constituent.email %></li>
+</ul>
+
+<h3>Disabilities:</h3>
+<ul>
+  <% if @constituent.hearing_disability %><li>Hearing</li><% end %>
+  <% if @constituent.vision_disability %><li>Vision</li><% end %>
+  <% if @constituent.speech_disability %><li>Speech</li><% end %>
+  <% if @constituent.mobility_disability %><li>Mobility</li><% end %>
+  <% if @constituent.cognition_disability %><li>Cognition</li><% end %>
+</ul>
+
+<p>Please begin the training process by contacting the constituent to schedule a training session.</p>
+
+<p>A training session has been tentatively scheduled for <%= @training_session.scheduled_for.strftime("%B %d, %Y at %I:%M %p") %>, but you may reschedule this with the constituent as needed.</p>
+
+<%= render 'shared/mailers/footer' %>

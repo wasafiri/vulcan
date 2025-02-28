@@ -52,6 +52,18 @@ class User < ApplicationRecord
   # Status enum
   enum :status, { inactive: 0, active: 1, suspended: 2 }, default: :active
 
+  # Class methods for capabilities
+  def self.capable_types_for(capability)
+    case capability
+    when "can_train"
+      [ "Admin", "Trainer" ]
+    when "can_evaluate"
+      [ "Admin", "Evaluator" ]
+    else
+      []
+    end
+  end
+
   # Scopes
   scope :with_capability, ->(capability) {
     joins(:role_capabilities)

@@ -1,0 +1,31 @@
+<%= render 'shared/mailers/header', title: "Training Session Completed" %>
+
+<p>Hi <%= @constituent.full_name %>,</p>
+
+<div style="background-color: #e6fffa; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #81e6d9;">
+  <h3 style="margin-top: 0; color: #2c7a7b;">
+    <span aria-hidden="true">✓</span>
+    Training Session Completed
+  </h3>
+  
+  <div style="color: #2c7a7b;">
+    <p>Your training session with <%= @trainer.full_name %> has been completed successfully.</p>
+  </div>
+</div>
+
+<h3>Training Details:</h3>
+<ul>
+  <li><strong>Date Completed:</strong> <%= @training_session.completed_at.strftime("%B %d, %Y") %></li>
+  <li><strong>Trainer:</strong> <%= @trainer.full_name %></li>
+  <li><strong>Application ID:</strong> <%= @training_session.application.id %></li>
+</ul>
+
+<p>If you have any questions about your training or need additional assistance, please contact your trainer:</p>
+<ul>
+  <li><strong>Email:</strong> <%= @trainer.email %></li>
+  <li><strong>Phone:</strong> <%= format_phone(@trainer.phone) %></li>
+</ul>
+
+<p>Thank you for participating in the training session. We hope it was helpful and informative!</p>
+
+<%= render 'shared/mailers/footer' %>

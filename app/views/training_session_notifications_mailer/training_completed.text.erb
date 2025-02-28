@@ -1,0 +1,17 @@
+Training Session Completed
+
+Hi <%= @constituent.full_name %>,
+
+TRAINING SESSION COMPLETED
+Your training session with <%= @trainer.full_name %> has been completed successfully.
+
+Training Details:
+- Date Completed: <%= @training_session.completed_at.strftime("%B %d, %Y") %>
+- Trainer: <%= @trainer.full_name %>
+- Application ID: <%= @training_session.application.id %>
+
+If you have any questions about your training or need additional assistance, please contact your trainer:
+- Email: <%= @trainer.email %>
+- Phone: <%= format_phone(@trainer.phone) %>
+
+Thank you for participating in the training session. We hope it was helpful and informative!

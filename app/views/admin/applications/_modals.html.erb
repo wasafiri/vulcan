@@ -26,7 +26,7 @@
             </div>
           </div>
         <% end %>
-        <% if @application.income_proof.content_type.start_with?('application/pdf') %>
+        <% if @application.income_proof.attached? && @application.income_proof.content_type.start_with?('application/pdf') %>
           <%# 
             IMPORTANT: PDF Preview Fix
             
@@ -57,7 +57,7 @@
                   target: "_blank" %>
             </p>
           </iframe>
-        <% elsif @application.income_proof.content_type.start_with?('image') %>
+        <% elsif @application.income_proof.attached? && @application.income_proof.content_type.start_with?('image') %>
           <%= image_tag url_for(@application.income_proof), class: "max-w-full h-auto" %>
         <% end %>
         <div class="mt-4 flex space-x-4">
@@ -117,7 +117,7 @@
             </div>
           </div>
         <% end %>
-        <% if @application.residency_proof.content_type.start_with?('application/pdf') %>
+        <% if @application.residency_proof.attached? && @application.residency_proof.content_type.start_with?('application/pdf') %>
           <%# 
             IMPORTANT: PDF Preview Fix
             
@@ -148,7 +148,7 @@
                   target: "_blank" %>
             </p>
           </iframe>
-        <% elsif @application.residency_proof.content_type.start_with?('image') %>
+        <% elsif @application.residency_proof.attached? && @application.residency_proof.content_type.start_with?('image') %>
           <%= image_tag url_for(@application.residency_proof), class: "max-w-full h-auto" %>
         <% end %>
         <div class="mt-4 flex space-x-4">

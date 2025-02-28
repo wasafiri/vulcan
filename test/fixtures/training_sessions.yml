@@ -1,0 +1,30 @@
+# Training Sessions Fixtures
+
+one:
+  application: one
+  trainer: trainer_jane
+  status: scheduled
+  scheduled_for: <%= 1.week.from_now %>
+  notes: "Initial training session"
+
+two:
+  application: two
+  trainer: trainer_jane
+  status: completed
+  scheduled_for: <%= 2.days.ago %>
+  completed_at: <%= 1.day.ago %>
+  notes: "Completed training session"
+
+three:
+  application: approved_application
+  trainer: trainer_john
+  status: cancelled
+  scheduled_for: <%= 3.days.ago %>
+  notes: "Cancelled due to illness"
+
+four:
+  application: submitted_application
+  trainer: trainer_john
+  status: no_show
+  scheduled_for: <%= 4.days.ago %>
+  notes: "Constituent did not show up"

@@ -53,8 +53,10 @@
         </h2>
         <div class="mb-6">
           <% latest_evaluation = @application.latest_evaluation %>
+          
+          <!-- Evaluator Section -->
           <% if latest_evaluation.present? %>
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
               <div>
                 <h3 class="text-sm font-medium text-gray-500">Current Evaluator</h3>
                 <div class="mt-2 flex items-center space-x-2">
@@ -78,7 +80,7 @@
               <% end %>
             </div>
           <% else %>
-            <div>
+            <div class="mb-6">
               <h3 class="text-sm font-medium text-gray-500 mb-2">Assign Evaluator</h3>
               <div class="flex flex-wrap gap-3">
                 <% Evaluator.available.each do |evaluator| %>
@@ -92,6 +94,29 @@
               </div>
             </div>
           <% end %>
+          
+          <!-- Trainer Section - Always visible regardless of evaluator status -->
+          <div>
+            <h3 class="text-sm font-medium text-gray-500 mb-2">Assign Trainer</h3>
+            <div class="flex flex-wrap gap-3">
+              <% # Get trainers by type and by capability
+                 trainers_by_type = User.where(type: "Trainer", status: :active)
+                 trainers_by_capability = User.joins(:role_capabilities).where(role_capabilities: { capability: "can_train" }, status: :active)
+                 
+                 # Combine the two sets of trainers
+                 trainer_ids = trainers_by_type.pluck(:id) + trainers_by_capability.pluck(:id)
+                 trainers = User.where(id: trainer_ids.uniq)
+              %>
+              <% trainers.each do |trainer| %>
+                <%= button_to assign_trainer_admin_application_path(@application, trainer_id: trainer.id),
+                    method: :post,
+                    class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                    data: { confirm: "Are you sure you want to assign #{trainer.full_name} as trainer?" } do %>
+                  Assign <%= trainer.full_name %>
+                <% end %>
+              <% end %>
+            </div>
+          </div>
         </div>
         <% if latest_evaluation&.completed? %>
           <div>
@@ -121,23 +146,6 @@
           </div>
         <% end %>
       </section>
-      <div class="mt-6">
-        <h4 class="text-sm font-medium text-gray-500 mb-2">Schedule New Training Session</h4>
-        <div class="flex flex-wrap gap-3">
-          <% Trainer.available.each do |trainer| %>
-            <%= form_with(url: schedule_training_admin_application_path(@application), method: :post, local: true, class: "flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-2") do |f| %>
-              <%= hidden_field_tag :trainer_id, trainer.id %>
-              <%= f.date_field :scheduled_for,
-                  class: "rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 w-full md:w-auto",
-                  required: true,
-                  placeholder: "Select Date" %>
-              <%= f.submit "Schedule with #{trainer.full_name}",
-                  class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                  data: { confirm: "Schedule training session with #{trainer.full_name}?" } %>
-            <% end %>
-          <% end %>
-        </div>
-      </div>
     <% end %>
 
     <!-- Applicant Information Section -->

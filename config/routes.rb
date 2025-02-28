@@ -51,6 +51,7 @@ Rails.application.routes.draw do
         patch :approve
         patch :reject
         post :assign_evaluator
+        post :assign_trainer
         post :schedule_training
         post :complete_training
         patch :update_proof_status
