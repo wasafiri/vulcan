@@ -202,3 +202,21 @@ vendor_raz:
   locale: en
   email_verified: true
   status: approved
+
+# Trainer
+trainer_jane:
+  type: Trainer
+  email: jane.trainer@maryland.gov
+  first_name: Jane
+  last_name: Trainer
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0005
+  date_of_birth: <%= 40.years.ago.to_date %>
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+  status: active
+  availability_schedule:
+    monday: ["9:00", "17:00"]
+    wednesday: ["9:00", "17:00"]
+    friday: ["9:00", "17:00"]

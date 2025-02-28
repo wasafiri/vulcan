@@ -75,6 +75,7 @@ group :test do
   gem "capybara"
   gem "selenium-webdriver"
   gem "mocha", require: false
+  gem "rails-controller-testing"
 end
 
 # gems for authentication

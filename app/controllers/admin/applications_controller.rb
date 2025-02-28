@@ -13,6 +13,47 @@ class Admin::ApplicationsController < Admin::BaseController
     @open_applications_count = Application.active.count
     @pending_services_count = Application.where(status: :approved).count
 
+    # Data for Common Tasks section
+    income_proofs_pending = Application.joins(:income_proof_attachment)
+                                      .where(income_proof_status: "not_reviewed")
+    residency_proofs_pending = Application.joins(:residency_proof_attachment)
+                                         .where(residency_proof_status: "not_reviewed")
+    @proofs_needing_review_count = (income_proofs_pending.pluck(:id) + residency_proofs_pending.pluck(:id)).uniq.count
+
+    @medical_certs_to_review_count = Application.where(medical_certification_status: "received").count
+
+    # Count training request notifications
+    @training_requests_count = Notification.where(action: "training_requested")
+                                         .where(notifiable_type: "Application")
+                                         .distinct
+                                         .count
+
+    # Application Pipeline data for funnel chart
+    @draft_count = Application.where(status: "draft").count
+    @submitted_count = Application.where.not(status: "draft").count
+    @in_review_count = Application.where(status: [ "submitted", "in_review" ]).count
+    @approved_count = Application.where(status: "approved").count
+
+    @pipeline_chart_data = {
+      "Draft" => @draft_count,
+      "Submitted" => @submitted_count,
+      "In Review" => @in_review_count,
+      "Approved" => @approved_count
+    }
+
+    # Status Breakdown data for polar area chart
+    @draft_count = Application.where(status: "draft").count
+    @in_progress_count = Application.where(status: [ "submitted", "in_review" ]).count
+    @approved_count = Application.where(status: "approved").count
+    @rejected_count = Application.where(status: "rejected").count
+
+    @status_chart_data = {
+      "Draft" => @draft_count,
+      "In Progress" => @in_progress_count,
+      "Approved" => @approved_count,
+      "Rejected" => @rejected_count
+    }
+
     # Get base scope with includes
     scope = Application.includes(:user)
       .with_attached_income_proof
@@ -316,10 +357,18 @@ class Admin::ApplicationsController < Admin::BaseController
     when "approved"
       scope.where(status: :approved)
     when "proofs_needing_review"
-      scope.where(income_proof_status: 0)
-           .or(scope.where(residency_proof_status: 0))
+      income_pending_ids = scope.where(income_proof_status: "not_reviewed").pluck(:id)
+      residency_pending_ids = scope.where(residency_proof_status: "not_reviewed").pluck(:id)
+      scope.where(id: income_pending_ids + residency_pending_ids)
     when "awaiting_medical_response"
       scope.where(status: :awaiting_documents)
+    when "medical_certs_to_review"
+      scope.where(medical_certification_status: "received")
+    when "training_requests"
+      # Find applications with training_requested notifications
+      training_request_notifications = Notification.where(action: "training_requested")
+      application_ids = training_request_notifications.where(notifiable_type: "Application").pluck(:notifiable_id)
+      scope.where(id: application_ids)
     else
       scope
     end

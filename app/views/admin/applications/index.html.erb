@@ -1,429 +1,231 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<main class="container mx-auto px-4 py-8" role="main" data-controller="reports-toggle" id="admin-applications-main">
+<main class="container mx-auto px-4 py-8" role="main" id="main-content">
   <div class="max-w-7xl mx-auto">
-    <h1 class="text-3xl font-bold mb-6">
-      <%= params[:filter] == 'dashboard' ? 'Admin Dashboard' : 'Applications' %>
-    </h1>
+    <%# Skip to content link for keyboard users %>
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:p-4 focus:bg-white focus:z-50">
+      Skip to main content
+    </a>
+    
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold" id="page-title">
+        Admin Dashboard
+      </h1>
+      
+      <div class="flex space-x-4">
+        <%= link_to new_admin_paper_application_path,
+            class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+            aria: { label: "Upload a paper application" } do %>
+          <span>Upload Paper Application</span>
+        <% end %>
+        
+        <%= link_to admin_reports_path,
+            class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+            aria: { label: "View detailed system reports" } do %>
+          <span>View Reports</span>
+        <% end %>
+      </div>
+    </div>
 
     <%# Status Cards Section %>
-    <% if params[:filter] == 'dashboard' || controller_name == 'applications' %>
-      <%= render 'admin/shared/status_cards' %>
-    <% end %>
-    
-    <%# Reports Panel (hidden by default) %>
-    <div id="quick-reports-panel" class="hidden mb-8" data-reports-toggle-target="panel">
+    <section aria-labelledby="status-cards-heading" class="mb-6">
+      <h2 id="status-cards-heading" class="sr-only">Application Status Overview</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="bg-white rounded-lg shadow p-6">
-          <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-bold">System Reports</h2>
-            <button type="button" 
-                    data-action="reports-toggle#toggle" 
-                    class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    aria-label="Close system reports panel">
-              <svg class="h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          <h3 id="in-progress-heading" class="text-lg font-medium text-gray-900">In Progress Applications</h3>
+          <p class="text-3xl font-bold text-indigo-600" aria-labelledby="in-progress-heading" aria-live="polite"><%= @open_applications_count || 0 %></p>
+          <p class="text-sm text-gray-500">Active but unapproved</p>
+          <div class="mt-2">
+            <%= link_to params[:filter] == 'in_progress' ? admin_applications_path : admin_applications_path(filter: 'in_progress'),
+                class: "inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                aria: { label: params[:filter] == 'in_progress' ? "View all applications" : "View only in progress applications" } do %>
+              <span><%= params[:filter] == 'in_progress' ? 'View All Applications' : 'View Only In Progress' %></span>
+              <svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
               </svg>
-              <span class="ml-1">Close</span>
-            </button>
+            <% end %>
+          </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6">
+          <h3 id="approved-heading" class="text-lg font-medium text-gray-900">Approved</h3>
+          <p class="text-3xl font-bold text-indigo-600" aria-labelledby="approved-heading" aria-live="polite"><%= @pending_services_count || 0 %></p>
+          <p class="text-sm text-gray-500">Approved and awaiting services</p>
+          <div class="mt-2">
+            <%= link_to params[:filter] == 'approved' ? admin_applications_path : admin_applications_path(filter: 'approved'),
+                class: "inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                aria: { label: params[:filter] == 'approved' ? "View all applications" : "View only approved applications" } do %>
+              <span><%= params[:filter] == 'approved' ? 'View All Applications' : 'View Only Approved' %></span>
+              <svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <%# Common Tasks Section %>
+    <section aria-labelledby="common-tasks-heading" class="bg-white rounded-lg shadow p-4 mb-6">
+      <h2 id="common-tasks-heading" class="text-lg font-medium text-gray-900 mb-4">Common Tasks</h2>
+      <div class="flex flex-wrap gap-4">
+        <%= link_to admin_applications_path(filter: 'proofs_needing_review'),
+            class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 #{params[:filter] == 'proofs_needing_review' ? 'bg-gray-50' : ''}",
+            aria: { label: "View applications with proofs needing review" } do %>
+          <span>Proofs Needing Review (<%= @proofs_needing_review_count %>)</span>
+        <% end %>
+        
+        <%= link_to admin_applications_path(filter: 'medical_certs_to_review'),
+            class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 #{params[:filter] == 'medical_certs_to_review' ? 'bg-gray-50' : ''}",
+            aria: { label: "View applications with medical certifications to review" } do %>
+          <span>Medical Certs to Review (<%= @medical_certs_to_review_count %>)</span>
+        <% end %>
+        
+        <%= link_to admin_applications_path(filter: 'training_requests'),
+            class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 #{params[:filter] == 'training_requests' ? 'bg-gray-50' : ''}",
+            aria: { label: "View applications with training requests" } do %>
+          <span>Training Requests (<%= @training_requests_count %>)</span>
+        <% end %>
+      </div>
+    </section>
+
+    <%# Applications Section with Integrated Filters %>
+    <section aria-labelledby="applications-heading" class="bg-white rounded-lg shadow mb-6">
+      <h2 id="applications-heading" class="sr-only">Applications</h2>
+      <div class="p-4 border-b">
+        <h3 class="text-lg font-medium text-gray-900">Applications</h3>
+      </div>
+      
+      <div class="p-4 border-b">
+        <div class="flex flex-wrap items-center gap-4">
+          <div class="flex items-center gap-2">
+            <label for="status-filter" class="text-sm font-medium text-gray-700">Status:</label>
+            <select id="status-filter" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+              <option>All</option>
+              <option>Draft</option>
+              <option>Submitted</option>
+              <option>In Review</option>
+              <option>Approved</option>
+              <option>Rejected</option>
+            </select>
           </div>
           
-          <%# Applications Overview Section %>
-          <div class="mb-8">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Applications Overview</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div class="bg-gray-50 rounded p-4">
-                <h4 class="font-medium text-gray-700">Current Fiscal Year (<%= @current_fy %>-<%= @current_fy + 1 %>)</h4>
-                <dl class="mt-2 grid grid-cols-1 gap-x-4 gap-y-2">
-                  <div class="flex justify-between">
-                    <dt class="text-sm text-gray-500">Applications Submitted:</dt>
-                    <dd class="text-sm font-medium text-gray-900"><%= @current_fy_applications %></dd>
-                  </div>
-                  <div class="flex justify-between">
-                    <dt class="text-sm text-gray-500">Draft Applications:</dt>
-                    <dd class="text-sm font-medium text-gray-900"><%= @current_fy_draft_applications %></dd>
-                  </div>
-                </dl>
-                
-                <%# Current FY Applications Chart %>
-                <div class="mt-4" 
-                     data-controller="reports-chart" 
-                     data-reports-chart-current-data-value="<%= { 'Submitted' => @current_fy_applications, 'Draft' => @current_fy_draft_applications }.to_json %>"
-                     data-reports-chart-previous-data-value="<%= { 'Submitted' => 0, 'Draft' => 0 }.to_json %>"
-                     data-reports-chart-type-value="bar"
-                     data-reports-chart-compact-value="true"
-                     data-reports-chart-title-value="Current FY Applications">
-                  <div class="sr-only">
-                    Chart showing current fiscal year applications: <%= @current_fy_applications %> submitted and <%= @current_fy_draft_applications %> draft applications.
-                  </div>
-                </div>
-              </div>
-              
-              <div class="bg-gray-50 rounded p-4">
-                <h4 class="font-medium text-gray-700">Previous Fiscal Year (<%= @previous_fy %>-<%= @current_fy %>)</h4>
-                <dl class="mt-2 grid grid-cols-1 gap-x-4 gap-y-2">
-                  <div class="flex justify-between">
-                    <dt class="text-sm text-gray-500">Applications Submitted:</dt>
-                    <dd class="text-sm font-medium text-gray-900"><%= @previous_fy_applications %></dd>
-                  </div>
-                  <div class="flex justify-between">
-                    <dt class="text-sm text-gray-500">Draft Applications:</dt>
-                    <dd class="text-sm font-medium text-gray-900"><%= @previous_fy_draft_applications %></dd>
-                  </div>
-                </dl>
-                
-                <%# Previous FY Applications Chart %>
-                <div class="mt-4" 
-                     data-controller="reports-chart" 
-                     data-reports-chart-current-data-value="<%= { 'Submitted' => @previous_fy_applications, 'Draft' => @previous_fy_draft_applications }.to_json %>"
-                     data-reports-chart-previous-data-value="<%= { 'Submitted' => 0, 'Draft' => 0 }.to_json %>"
-                     data-reports-chart-type-value="bar"
-                     data-reports-chart-compact-value="true"
-                     data-reports-chart-title-value="Previous FY Applications">
-                  <div class="sr-only">
-                    Chart showing previous fiscal year applications: <%= @previous_fy_applications %> submitted and <%= @previous_fy_draft_applications %> draft applications.
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <%# Applications Comparison Chart %>
-            <div class="mt-4" 
-                 data-controller="reports-chart" 
-                 data-reports-chart-current-data-value="<%= @applications_chart_data[:current].to_json %>"
-                 data-reports-chart-previous-data-value="<%= @applications_chart_data[:previous].to_json %>"
-                 data-reports-chart-type-value="bar"
-                 data-reports-chart-title-value="Applications Comparison">
-              <div id="chart-description-applications" class="sr-only">
-                This chart compares the number of applications submitted and draft applications between the current fiscal year and the previous fiscal year.
-              </div>
-            </div>
+          <div class="flex items-center gap-2">
+            <label for="date-filter" class="text-sm font-medium text-gray-700">Date Range:</label>
+            <select id="date-filter" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+              <option>All Time</option>
+              <option>Current FY</option>
+              <option>Previous FY</option>
+              <option>Last 30 Days</option>
+              <option>Last 90 Days</option>
+            </select>
           </div>
           
-          <%# Voucher Statistics Section %>
-          <div class="mb-8">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Voucher Statistics</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div class="bg-gray-50 rounded p-4">
-                <h4 class="font-medium text-gray-700">Current Fiscal Year (<%= @current_fy %>-<%= @current_fy + 1 %>)</h4>
-                <dl class="mt-2 grid grid-cols-1 gap-x-4 gap-y-2">
-                  <div class="flex justify-between">
-                    <dt class="text-sm text-gray-500">Vouchers Issued:</dt>
-                    <dd class="text-sm font-medium text-gray-900"><%= @current_fy_vouchers %></dd>
-                  </div>
-                  <div class="flex justify-between">
-                    <dt class="text-sm text-gray-500">Unredeemed Vouchers:</dt>
-                    <dd class="text-sm font-medium text-gray-900"><%= @current_fy_unredeemed_vouchers %></dd>
-                  </div>
-                  <div class="flex justify-between">
-                    <dt class="text-sm text-gray-500">Total Value:</dt>
-                    <dd class="text-sm font-medium text-gray-900"><%= number_to_currency(@current_fy_voucher_value) %></dd>
-                  </div>
-                </dl>
-                
-                <%# Current FY Vouchers Chart %>
-                <div class="mt-4" 
-                     data-controller="reports-chart" 
-                     data-reports-chart-current-data-value="<%= { 'Issued' => @current_fy_vouchers, 'Unredeemed' => @current_fy_unredeemed_vouchers }.to_json %>"
-                     data-reports-chart-previous-data-value="<%= { 'Issued' => 0, 'Unredeemed' => 0 }.to_json %>"
-                     data-reports-chart-type-value="bar"
-                     data-reports-chart-compact-value="true"
-                     data-reports-chart-title-value="Current FY Vouchers">
-                  <div class="sr-only">
-                    Chart showing current fiscal year vouchers: <%= @current_fy_vouchers %> issued and <%= @current_fy_unredeemed_vouchers %> unredeemed vouchers.
-                  </div>
-                </div>
-              </div>
-              
-              <div class="bg-gray-50 rounded p-4">
-                <h4 class="font-medium text-gray-700">Previous Fiscal Year (<%= @previous_fy %>-<%= @current_fy %>)</h4>
-                <dl class="mt-2 grid grid-cols-1 gap-x-4 gap-y-2">
-                  <div class="flex justify-between">
-                    <dt class="text-sm text-gray-500">Vouchers Issued:</dt>
-                    <dd class="text-sm font-medium text-gray-900"><%= @previous_fy_vouchers %></dd>
-                  </div>
-                  <div class="flex justify-between">
-                    <dt class="text-sm text-gray-500">Unredeemed Vouchers:</dt>
-                    <dd class="text-sm font-medium text-gray-900"><%= @previous_fy_unredeemed_vouchers %></dd>
-                  </div>
-                  <div class="flex justify-between">
-                    <dt class="text-sm text-gray-500">Total Value:</dt>
-                    <dd class="text-sm font-medium text-gray-900"><%= number_to_currency(@previous_fy_voucher_value) %></dd>
-                  </div>
-                </dl>
-                
-                <%# Previous FY Vouchers Chart %>
-                <div class="mt-4" 
-                     data-controller="reports-chart" 
-                     data-reports-chart-current-data-value="<%= { 'Issued' => @previous_fy_vouchers, 'Unredeemed' => @previous_fy_unredeemed_vouchers }.to_json %>"
-                     data-reports-chart-previous-data-value="<%= { 'Issued' => 0, 'Unredeemed' => 0 }.to_json %>"
-                     data-reports-chart-type-value="bar"
-                     data-reports-chart-compact-value="true"
-                     data-reports-chart-title-value="Previous FY Vouchers">
-                  <div class="sr-only">
-                    Chart showing previous fiscal year vouchers: <%= @previous_fy_vouchers %> issued and <%= @previous_fy_unredeemed_vouchers %> unredeemed vouchers.
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <%# Vouchers Comparison Chart %>
-            <div class="mt-4" 
-                 data-controller="reports-chart" 
-                 data-reports-chart-current-data-value="<%= @vouchers_chart_data[:current].to_json %>"
-                 data-reports-chart-previous-data-value="<%= @vouchers_chart_data[:previous].to_json %>"
-                 data-reports-chart-type-value="bar"
-                 data-reports-chart-title-value="Voucher Statistics Comparison">
-              <div id="chart-description-vouchers" class="sr-only">
-                This chart compares voucher statistics between the current fiscal year and the previous fiscal year, including total vouchers issued and unredeemed vouchers.
-              </div>
-            </div>
-            
-            <%# Voucher Value Chart %>
-            <div class="mt-4 bg-gray-50 rounded p-4">
-              <h4 class="font-medium text-gray-700 mb-2">Voucher Value Comparison</h4>
-              <div class="flex justify-between mb-2">
-                <span class="text-sm text-gray-500">Current FY Total Value:</span>
-                <span class="text-sm font-medium text-gray-900"><%= number_to_currency(@current_fy_voucher_value) %></span>
-              </div>
-              <div class="flex justify-between mb-4">
-                <span class="text-sm text-gray-500">Previous FY Total Value:</span>
-                <span class="text-sm font-medium text-gray-900"><%= number_to_currency(@previous_fy_voucher_value) %></span>
-              </div>
-              
-              <div data-controller="reports-chart" 
-                   data-reports-chart-current-data-value="<%= { 'Total Value' => @current_fy_voucher_value.to_f }.to_json %>"
-                   data-reports-chart-previous-data-value="<%= { 'Total Value' => @previous_fy_voucher_value.to_f }.to_json %>"
-                   data-reports-chart-type-value="bar"
-                   data-reports-chart-y-axis-label-value="Value ($)"
-                   data-reports-chart-title-value="Voucher Value Comparison">
-                <div class="sr-only">
-                  Chart comparing voucher values: Current fiscal year: <%= number_to_currency(@current_fy_voucher_value) %>, Previous fiscal year: <%= number_to_currency(@previous_fy_voucher_value) %>.
-                </div>
+          <div class="flex items-center gap-2">
+            <label for="search-applications" class="sr-only">Search:</label>
+            <div class="relative rounded-md shadow-sm">
+              <input type="text" id="search-applications" placeholder="Search applications..." class="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-3 pr-10 py-2 sm:text-sm border-gray-300 rounded-md">
+              <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                </svg>
               </div>
             </div>
           </div>
           
-          <%# Services Overview Section %>
-          <div class="mb-8">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Services Overview</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div class="bg-gray-50 rounded p-4">
-                <h4 class="font-medium text-gray-700">Current Fiscal Year (<%= @current_fy %>-<%= @current_fy + 1 %>)</h4>
-                <dl class="mt-2 grid grid-cols-1 gap-x-4 gap-y-2">
-                  <div class="flex justify-between">
-                    <dt class="text-sm text-gray-500">Training Sessions:</dt>
-                    <dd class="text-sm font-medium text-gray-900"><%= @current_fy_trainings %></dd>
-                  </div>
-                  <div class="flex justify-between">
-                    <dt class="text-sm text-gray-500">Evaluation Sessions:</dt>
-                    <dd class="text-sm font-medium text-gray-900"><%= @current_fy_evaluations %></dd>
-                  </div>
-                </dl>
-                
-                <%# Current FY Services Chart %>
-                <div class="mt-4" 
-                     data-controller="reports-chart" 
-                     data-reports-chart-current-data-value="<%= { 'Training' => @current_fy_trainings, 'Evaluation' => @current_fy_evaluations }.to_json %>"
-                     data-reports-chart-previous-data-value="<%= { 'Training' => 0, 'Evaluation' => 0 }.to_json %>"
-                     data-reports-chart-type-value="bar"
-                     data-reports-chart-compact-value="true"
-                     data-reports-chart-title-value="Current FY Services">
-                  <div class="sr-only">
-                    Chart showing current fiscal year services: <%= @current_fy_trainings %> training sessions and <%= @current_fy_evaluations %> evaluation sessions.
-                  </div>
-                </div>
-              </div>
-              
-              <div class="bg-gray-50 rounded p-4">
-                <h4 class="font-medium text-gray-700">Previous Fiscal Year (<%= @previous_fy %>-<%= @current_fy %>)</h4>
-                <dl class="mt-2 grid grid-cols-1 gap-x-4 gap-y-2">
-                  <div class="flex justify-between">
-                    <dt class="text-sm text-gray-500">Training Sessions:</dt>
-                    <dd class="text-sm font-medium text-gray-900"><%= @previous_fy_trainings %></dd>
-                  </div>
-                  <div class="flex justify-between">
-                    <dt class="text-sm text-gray-500">Evaluation Sessions:</dt>
-                    <dd class="text-sm font-medium text-gray-900"><%= @previous_fy_evaluations %></dd>
-                  </div>
-                </dl>
-                
-                <%# Previous FY Services Chart %>
-                <div class="mt-4" 
-                     data-controller="reports-chart" 
-                     data-reports-chart-current-data-value="<%= { 'Training' => @previous_fy_trainings, 'Evaluation' => @previous_fy_evaluations }.to_json %>"
-                     data-reports-chart-previous-data-value="<%= { 'Training' => 0, 'Evaluation' => 0 }.to_json %>"
-                     data-reports-chart-type-value="bar"
-                     data-reports-chart-compact-value="true"
-                     data-reports-chart-title-value="Previous FY Services">
-                  <div class="sr-only">
-                    Chart showing previous fiscal year services: <%= @previous_fy_trainings %> training sessions and <%= @previous_fy_evaluations %> evaluation sessions.
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <%# Services Comparison Chart - Radar Chart %>
-            <div class="mt-4 bg-gray-50 rounded p-4">
-              <h4 class="font-medium text-gray-700 mb-2">Services Comparison</h4>
-              <div class="flex flex-wrap justify-between mb-4">
-                <div class="flex items-center mr-4">
-                  <span class="inline-block w-3 h-3 bg-indigo-600 rounded-full mr-1"></span>
-                  <span class="text-sm text-gray-700">Current FY</span>
-                </div>
-                <div class="flex items-center">
-                  <span class="inline-block w-3 h-3 bg-gray-400 rounded-full mr-1"></span>
-                  <span class="text-sm text-gray-700">Previous FY</span>
-                </div>
-              </div>
-              
-              <div data-controller="reports-chart" 
-                   data-reports-chart-current-data-value="<%= @services_chart_data[:current].to_json %>"
-                   data-reports-chart-previous-data-value="<%= @services_chart_data[:previous].to_json %>"
-                   data-reports-chart-type-value="radar"
-                   data-reports-chart-title-value="Services Comparison">
-                <div id="chart-description-services" class="sr-only">
-                  This radar chart compares the number of training sessions and evaluation sessions between the current fiscal year and the previous fiscal year.
-                </div>
-              </div>
+          <button type="button" class="ml-auto inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            Clear Filters
+          </button>
+        </div>
+      </div>
+      
+      <div class="overflow-x-auto">
+        <% if @applications.present? %>
+          <%= render partial: 'applications_table', locals: { applications: @applications } %>
+        <% else %>
+          <div class="p-6 text-center">
+            <p class="text-gray-500">No applications found</p>
+          </div>
+        <% end %>
+      </div>
+      
+      <%# Pagination %>
+      <% if @pagy && @pagy.pages > 1 %>
+        <div class="px-4 py-3 border-t">
+          <%== pagy_nav(@pagy) %>
+        </div>
+      <% end %>
+    </section>
+    
+    <%# Charts Section - Moved below applications section %>
+    <section aria-labelledby="charts-heading" class="mb-6">
+      <h2 id="charts-heading" class="sr-only">Application Charts</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white rounded-lg shadow p-6">
+          <h3 id="pipeline-heading" class="text-lg font-medium text-gray-900 mb-4">FY<%= @current_fiscal_year.to_s[-2..-1] %> Application Pipeline</h3>
+          <div class="h-64" 
+               data-controller="reports-chart" 
+               data-reports-chart-current-data-value="<%= @pipeline_chart_data.to_json %>"
+               data-reports-chart-previous-data-value="<%= {}.to_json %>"
+               data-reports-chart-type-value="bar"
+               data-reports-chart-title-value="Application Pipeline">
+            <div class="sr-only" aria-labelledby="pipeline-heading">
+              Chart showing application pipeline: <%= @submitted_count %> submitted, <%= @in_review_count %> in review, and <%= @approved_count %> approved applications.
             </div>
           </div>
-          
-          <%# Vendor Activity Section %>
-          <div class="mb-8">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Vendor Activity</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div class="bg-gray-50 rounded p-4">
-                <h4 class="font-medium text-gray-700 mb-2">Vendor Activity Summary</h4>
-                <dl class="mt-2 grid grid-cols-1 gap-x-4 gap-y-2">
-                  <div class="flex justify-between">
-                    <dt class="text-sm text-gray-500">Active Vendors (All Time):</dt>
-                    <dd class="text-sm font-medium text-gray-900"><%= @active_vendors %></dd>
-                  </div>
-                  <div class="flex justify-between">
-                    <dt class="text-sm text-gray-500">Active Vendors (Last Month):</dt>
-                    <dd class="text-sm font-medium text-gray-900"><%= @recent_active_vendors %></dd>
-                  </div>
-                </dl>
-                
-                <%# Vendor Activity Pie Chart %>
-                <div class="mt-4" 
-                     data-controller="reports-chart" 
-                     data-reports-chart-current-data-value="<%= { 'Recent' => @recent_active_vendors, 'Other' => (@active_vendors - @recent_active_vendors) }.to_json %>"
-                     data-reports-chart-previous-data-value="<%= { 'Recent' => 0, 'Other' => 0 }.to_json %>"
-                     data-reports-chart-type-value="pie"
-                     data-reports-chart-compact-value="true"
-                     data-reports-chart-title-value="Vendor Activity">
-                  <div class="sr-only">
-                    Pie chart showing vendor activity: <%= @recent_active_vendors %> vendors active in the last month out of <%= @active_vendors %> total active vendors.
-                  </div>
-                </div>
-              </div>
-              
-              <div class="bg-gray-50 rounded p-4">
-                <h4 class="font-medium text-gray-700 mb-2">Vendor Activity Details</h4>
-                <p class="text-sm text-gray-500 mb-4">
-                  <%= @recent_active_vendors %> out of <%= @active_vendors %> vendors (<%= number_to_percentage((@recent_active_vendors.to_f / @active_vendors) * 100, precision: 1) unless @active_vendors.zero? %>) have been active in the last month.
-                </p>
-                
-                <div class="flex flex-col space-y-2">
-                  <div class="flex items-center">
-                    <span class="inline-block w-3 h-3 bg-indigo-600 rounded-full mr-2"></span>
-                    <span class="text-sm text-gray-700">Recently Active Vendors: <%= @recent_active_vendors %></span>
-                  </div>
-                  <div class="flex items-center">
-                    <span class="inline-block w-3 h-3 bg-gray-400 rounded-full mr-2"></span>
-                    <span class="text-sm text-gray-700">Other Active Vendors: <%= @active_vendors - @recent_active_vendors %></span>
-                  </div>
-                </div>
-              </div>
+          <div class="mt-4 grid grid-cols-4 gap-4 text-center">
+            <div>
+              <p class="text-sm font-medium text-gray-500">Draft</p>
+              <p class="text-xs text-gray-500">Started, Not Submitted</p>
+              <p class="text-lg font-bold"><%= @draft_count %></p>
             </div>
-          </div>
-          
-          <%# MFR Data Section %>
-          <div class="mb-4 p-4 border-2 border-indigo-200 rounded-lg bg-indigo-50">
-            <h3 class="text-lg font-medium text-indigo-900 mb-4">MFR Data</h3>
-            <p class="text-sm text-indigo-700 mb-4">Data from the most recently concluded full fiscal year (<%= @previous_fy %>-<%= @current_fy %>)</p>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div class="bg-white rounded p-4">
-                <h4 class="font-medium text-gray-700 mb-2">MFR Summary</h4>
-                <dl class="mt-2 grid grid-cols-1 gap-x-4 gap-y-2">
-                  <div class="flex justify-between">
-                    <dt class="text-sm text-gray-500">Applications Approved:</dt>
-                    <dd class="text-sm font-medium text-gray-900"><%= @mfr_applications_approved %></dd>
-                  </div>
-                  <div class="flex justify-between">
-                    <dt class="text-sm text-gray-500">Vouchers Issued:</dt>
-                    <dd class="text-sm font-medium text-gray-900"><%= @mfr_vouchers_issued %></dd>
-                  </div>
-                </dl>
-              </div>
-              
-              <div class="bg-white rounded p-4">
-                <h4 class="font-medium text-gray-700 mb-2">MFR Reporting Period</h4>
-                <p class="text-sm text-gray-500">
-                  This data represents the full fiscal year from July 1, <%= @previous_fy %> to June 30, <%= @current_fy %>.
-                </p>
-                <p class="text-sm text-gray-500 mt-2">
-                  <strong>Note:</strong> MFR data is used for official reporting purposes and represents the most recently concluded fiscal year.
-                </p>
-              </div>
+            <div>
+              <p class="text-sm font-medium text-gray-500">Submitted</p>
+              <p class="text-lg font-bold"><%= @submitted_count %></p>
             </div>
-            
-            <%# MFR Chart - Horizontal Bar Chart %>
-            <div class="mt-4 bg-white rounded p-4" 
-                 data-controller="reports-chart" 
-                 data-reports-chart-current-data-value="<%= @mfr_chart_data[:current].to_json %>"
-                 data-reports-chart-previous-data-value="<%= @mfr_chart_data[:previous].to_json %>"
-                 data-reports-chart-type-value="horizontalBar"
-                 data-reports-chart-title-value="MFR Data">
-              <div id="chart-description-mfr" class="sr-only">
-                This horizontal bar chart shows the number of applications approved and vouchers issued during the previous fiscal year for MFR reporting purposes.
-              </div>
+            <div>
+              <p class="text-sm font-medium text-gray-500">In Review</p>
+              <p class="text-lg font-bold"><%= @in_review_count %></p>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-500">Approved</p>
+              <p class="text-lg font-bold"><%= @approved_count %></p>
             </div>
           </div>
         </div>
-    </div>
-
-    <%# Filter Controls %>
-    <div class="flex flex-wrap justify-between mb-4">
-      <div class="flex space-x-4 mb-2 md:mb-0">
-        <%= link_to admin_applications_path(sort: 'status', direction: toggle_direction('status')),
-            class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-            aria: { label: "Sort applications by status" } do %>
-          <span>Sort by Status</span>
-        <% end %>
-
-        <%= link_to admin_applications_path(sort: 'application_date', direction: toggle_direction('application_date')),
-            class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-            aria: { label: "Sort applications by date" } do %>
-          <span>Sort by Date</span>
-        <% end %>
+        
+        <div class="bg-white rounded-lg shadow p-6">
+          <h3 id="status-breakdown-heading" class="text-lg font-medium text-gray-900 mb-2">Status Breakdown</h3>
+          <p class="text-sm text-gray-500 mb-4">Current FY Application Breakdown</p>
+          <div class="h-64" 
+               data-controller="reports-chart" 
+               data-reports-chart-current-data-value="<%= @status_chart_data.to_json %>"
+               data-reports-chart-previous-data-value="<%= {}.to_json %>"
+               data-reports-chart-type-value="polarArea"
+               data-reports-chart-title-value="Status Breakdown">
+            <div class="sr-only" aria-labelledby="status-breakdown-heading">
+              Chart showing status breakdown: <%= @draft_count %> draft, <%= @in_progress_count %> in progress, <%= @approved_count %> approved, and <%= @rejected_count %> rejected applications.
+            </div>
+          </div>
+          <div class="mt-4 grid grid-cols-2 gap-4">
+            <div class="flex justify-between">
+              <span class="text-sm font-medium text-gray-500">Draft:</span>
+              <span class="text-sm font-bold"><%= @draft_count %> (<%= number_to_percentage((@draft_count.to_f / (@draft_count + @in_progress_count + @approved_count + @rejected_count)) * 100, precision: 1) unless (@draft_count + @in_progress_count + @approved_count + @rejected_count).zero? %>)</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-sm font-medium text-gray-500">In Progress:</span>
+              <span class="text-sm font-bold"><%= @in_progress_count %> (<%= number_to_percentage((@in_progress_count.to_f / (@draft_count + @in_progress_count + @approved_count + @rejected_count)) * 100, precision: 1) unless (@draft_count + @in_progress_count + @approved_count + @rejected_count).zero? %>)</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-sm font-medium text-gray-500">Approved:</span>
+              <span class="text-sm font-bold"><%= @approved_count %> (<%= number_to_percentage((@approved_count.to_f / (@draft_count + @in_progress_count + @approved_count + @rejected_count)) * 100, precision: 1) unless (@draft_count + @in_progress_count + @approved_count + @rejected_count).zero? %>)</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-sm font-medium text-gray-500">Rejected:</span>
+              <span class="text-sm font-bold"><%= @rejected_count %> (<%= number_to_percentage((@rejected_count.to_f / (@draft_count + @in_progress_count + @approved_count + @rejected_count)) * 100, precision: 1) unless (@draft_count + @in_progress_count + @approved_count + @rejected_count).zero? %>)</span>
+            </div>
+          </div>
+        </div>
       </div>
-
-      <div class="flex space-x-4 mb-2 md:mb-0">
-        <% if params[:filter].present? %>
-          <%= link_to "View All Applications", admin_applications_path,
-              class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
-        <% end %>
-
-        <%= link_to "Proofs Needing Review", admin_applications_path(filter: "proofs_needing_review"),
-            class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 #{params[:filter] == 'proofs_needing_review' ? 'bg-gray-50' : ''}" %>
-
-        <%= link_to "Awaiting Medical Response", admin_applications_path(filter: "awaiting_medical_response"),
-            class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 #{params[:filter] == 'awaiting_medical_response' ? 'bg-gray-50' : ''}" %>
-      </div>
-    </div>
-
-    <%# Applications Table %>
-    <% if @applications.present? %>
-      <%= render partial: 'applications_table', locals: { applications: @applications } %>
-    <% else %>
-      <div class="bg-white rounded-lg shadow p-6 text-center">
-        <p class="text-gray-500">No applications found</p>
-      </div>
-    <% end %>
-
-    <%# Pagination %>
-    <%== pagy_nav(@pagy) if @pagy && @pagy.pages > 1 %>
+    </section>
   </div>
 </main>
