@@ -18,6 +18,7 @@ class ProofReview < ApplicationRecord
   # Callbacks
   before_validation :set_reviewed_at, on: :create
   after_commit :handle_post_review_actions, on: :create
+  after_commit :check_all_proofs_approved, on: :create, if: -> { status_approved? }
 
   # Scopes
   scope :recent, -> { order(created_at: :desc) }
@@ -126,5 +127,24 @@ class ProofReview < ApplicationRecord
     Rails.logger.error "Failed to process max rejections: #{e.message}"
     errors.add(:base, "Failed to process rejection limits")
     raise ActiveRecord::Rollback
+  end
+
+  def check_all_proofs_approved
+    # Reload the application to ensure we have the latest status
+    application.reload
+
+    # Check if all proofs are approved and certification not already requested
+    if application.all_proofs_approved? && !application.medical_certification_status_requested?
+      Rails.logger.info "All proofs approved for Application ID: #{application.id}, sending medical provider email"
+
+      # Update certification status and send email
+      application.with_lock do
+        application.update!(medical_certification_status: :requested)
+        # Use deliver_later to enqueue a job
+        MedicalProviderMailer.request_certification(application).deliver_later
+      end
+    end
+  rescue StandardError => e
+    Rails.logger.error "Failed to process all proofs approved: #{e.message}\n#{e.backtrace.join("\n")}"
   end
 end

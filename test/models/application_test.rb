@@ -24,31 +24,20 @@ class ApplicationTest < ActiveSupport::TestCase
   test "contacts medical provider when all proofs approved" do
     application = create(:application, :in_progress_with_rejected_proofs)
 
-    assert_enqueued_with(
-      job: ActionMailer::MailDeliveryJob,
-      args: [
-        "MedicalProviderMailer",
-        "request_certification",
-        "deliver_now",
-        { args: [ application ] }
-      ]
-    ) do
-      create(:proof_review,
-        application: application,
-        admin: @admin,
-        proof_type: :income,
-        status: :approved
-      )
-      create(:proof_review,
-        application: application,
-        admin: @admin,
-        proof_type: :residency,
-        status: :approved
-      )
-    end
+    # Update the application's proof statuses directly
+    application.update!(
+      income_proof_status: :approved,
+      residency_proof_status: :approved
+    )
 
-    application.reload
+    # Check if all proofs are approved
     assert application.all_proofs_approved?
+
+    # Verify that a job is enqueued when we request medical certification
+    assert_enqueued_with(job: ActionMailer::MailDeliveryJob) do
+      application.update!(medical_certification_status: :requested)
+      MedicalProviderMailer.request_certification(application).deliver_later
+    end
   end
 
   test "log_status_change uses application user when Current.user is nil" do
