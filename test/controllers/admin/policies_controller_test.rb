@@ -21,6 +21,25 @@ class Admin::PoliciesControllerTest < ActionDispatch::IntegrationTest
   def test_should_get_index
     get admin_policies_path
     assert_response :success
+    assert_select "h1", text: "System Policies"
+    assert_select "form[action='/admin/policies'][method='post']" do
+      assert_select "input[name='_method'][value='patch']"
+    end
+  end
+
+  def test_should_get_edit
+    get edit_admin_policy_path(@policy)
+    assert_response :success
+    assert_select "h1", text: "Edit System Policies"
+    assert_select "form[action='/admin/policies'][method='post']" do
+      assert_select "input[name='_method'][value='patch']"
+    end
+  end
+
+  def test_should_get_changes
+    get changes_admin_policies_path
+    assert_response :success
+    assert_select "h1", text: "Policy Change History"
   end
 
   def test_should_update_policy
