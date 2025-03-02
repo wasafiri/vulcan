@@ -172,26 +172,34 @@
       <dl class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <dt class="text-sm font-medium text-gray-500">Full Name</dt>
-          <dd class="mt-1 text-sm text-gray-900"><%= @application.user.full_name %></dd>
+          <dd class="mt-1 text-sm text-gray-900"><%= @application.user&.full_name || "Unknown User" %></dd>
         </div>
         <div>
           <dt class="text-sm font-medium text-gray-500">Email</dt>
           <dd class="mt-1 text-sm text-gray-900">
-            <%= mail_to @application.user.email, class: "text-indigo-600 hover:text-indigo-500" %>
+            <% if @application.user&.email.present? %>
+              <%= mail_to @application.user.email, class: "text-indigo-600 hover:text-indigo-500" %>
+            <% else %>
+              No email provided
+            <% end %>
           </dd>
         </div>
         <div>
           <dt class="text-sm font-medium text-gray-500">Phone</dt>
-          <dd class="mt-1 text-sm text-gray-900"><%= @application.user.phone || "Not provided" %></dd>
+          <dd class="mt-1 text-sm text-gray-900"><%= @application.user&.phone || "Not provided" %></dd>
         </div>
         <div>
           <dt class="text-sm font-medium text-gray-500">Address</dt>
           <dd class="mt-1 text-sm text-gray-900">
-            <%= @application.user.physical_address_1 %><br>
-            <% if @application.user.physical_address_2.present? %>
-              <%= @application.user.physical_address_2 %><br>
+            <% if @application.user.present? %>
+              <%= @application.user.physical_address_1 %><br>
+              <% if @application.user.physical_address_2.present? %>
+                <%= @application.user.physical_address_2 %><br>
+              <% end %>
+              <%= "#{@application.user.city}, #{@application.user.state} #{@application.user.zip_code}" %>
+            <% else %>
+              No address provided
             <% end %>
-            <%= "#{@application.user.city}, #{@application.user.state} #{@application.user.zip_code}" %>
           </dd>
         </div>
       </dl>
@@ -277,7 +285,7 @@
             <span class="text-sm text-gray-500">
               Verified <%= time_ago_in_words(@application.medical_certification_verified_at) %> ago
               <% if @application.medical_certification_verified_by %>
-                by <%= @application.medical_certification_verified_by.full_name %>
+                by <%= @application.medical_certification_verified_by&.full_name || "Unknown User" %>
               <% end %>
             </span>
           <% end %>

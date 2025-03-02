@@ -4,6 +4,7 @@ module ConstituentPortal
     before_action :require_constituent!, except: [ :fpl_thresholds ]
     before_action :set_application, only: [ :show, :edit, :update, :verify, :submit ]
     before_action :ensure_editable, only: [ :edit, :update ]
+    before_action :cast_boolean_params, only: [ :create, :update ]
 
     def index
       @applications = current_user.applications.order(created_at: :desc)
@@ -23,6 +24,9 @@ module ConstituentPortal
       @application.status = params[:submit_application] ? :in_progress : :draft
       @application.application_date = Time.current
       @application.submission_method = :online
+
+      # Set application_type to "new" by default if not specified
+      @application.application_type ||= :new
 
       # Handle medical provider info - check both possible locations
       if params[:medical_provider].present?
@@ -485,9 +489,9 @@ module ConstituentPortal
     end
 
     def update_user_attributes(attrs)
-      Rails.logger.debug "Updating user attributes: #{attrs.inspect}"
-      Rails.logger.debug "Current user class: #{current_user.class}"
-      Rails.logger.debug "Current user attributes: #{current_user.attributes.keys}"
+      log_debug("Updating user attributes: #{attrs.inspect}")
+      log_debug("Current user class: #{current_user.class}")
+      log_debug("Current user attributes: #{current_user.attributes.keys}")
 
       # Process boolean values properly
       processed_attrs = {}
@@ -508,7 +512,7 @@ module ConstituentPortal
       processed_attrs[:cognition_disability] = ActiveModel::Type::Boolean.new.cast(attrs[:cognition_disability])
 
       # Log the processed attributes for debugging
-      Rails.logger.debug "Processed attributes: #{processed_attrs.inspect}"
+      log_debug("Processed attributes: #{processed_attrs.inspect}")
 
       # Update the user with the processed attributes
       result = current_user.update(processed_attrs)
@@ -521,11 +525,33 @@ module ConstituentPortal
 
       # Verify the user's disability status after update
       if result
-        Rails.logger.debug "User disability status after update: hearing=#{current_user.hearing_disability}, vision=#{current_user.vision_disability}, speech=#{current_user.speech_disability}, mobility=#{current_user.mobility_disability}, cognition=#{current_user.cognition_disability}"
-        Rails.logger.debug "User has_disability_selected? returns: #{current_user.has_disability_selected?}"
+        log_debug("User disability status after update: hearing=#{current_user.hearing_disability}, vision=#{current_user.vision_disability}, speech=#{current_user.speech_disability}, mobility=#{current_user.mobility_disability}, cognition=#{current_user.cognition_disability}")
+        log_debug("User has_disability_selected? returns: #{current_user.has_disability_selected?}")
       end
 
       result
+    end
+
+    # Cast boolean parameters to proper boolean values
+    def cast_boolean_params
+      return unless params[:application]
+
+      # Handle self_certify_disability
+      if params[:application][:self_certify_disability]
+        value = params[:application][:self_certify_disability]
+        # If it's an array, take the last value
+        value = value.last if value.is_a?(Array)
+        params[:application][:self_certify_disability] = ActiveModel::Type::Boolean.new.cast(value)
+        log_debug("self_certify_disability after casting: #{params[:application][:self_certify_disability].inspect}")
+      end
+
+      # Handle other boolean parameters as needed
+      # Example: params[:application][:other_boolean_field]
+    end
+
+    # Conditionally log debug messages based on environment
+    def log_debug(message)
+      Rails.logger.debug(message) if Rails.env.development? || Rails.env.test?
     end
   end
 end

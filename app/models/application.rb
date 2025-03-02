@@ -285,7 +285,7 @@ class Application < ApplicationRecord
 
   def constituent_full_name
     # Checking if user exists and has both names to avoid nil errors
-    return "#{user.first_name} #{user.last_name}".strip if user&.first_name || user&.last_name
+    return "#{user&.first_name} #{user&.last_name}".strip if user&.first_name || user&.last_name
     "Unknown Constituent"
   end
 
@@ -327,6 +327,9 @@ class Application < ApplicationRecord
         timestamp: Time.current.iso8601
       }
     )
+  rescue => e
+    Rails.logger.error "Failed to log status change for application #{id}: #{e.message}"
+    # Don't raise the error, just log it
   end
 
   def schedule_admin_notifications
@@ -334,15 +337,15 @@ class Application < ApplicationRecord
   end
 
   def determine_evaluation_type
-    user.evaluations.exists? ? :follow_up : :initial
+    user&.evaluations&.exists? ? :follow_up : :initial
   end
 
   def waiting_period_completed
     return unless user
     return if new_record?
 
-    last_application = user.applications.where.not(id: id)
-      .order(application_date: :desc).first
+    last_application = user&.applications&.where&.not(id: id)
+      &.order(application_date: :desc)&.first
     return unless last_application
 
     waiting_period = Policy.get("waiting_period_years") || 3
@@ -357,6 +360,9 @@ class Application < ApplicationRecord
   end
 
   def notify_admins_of_new_proofs
+    # Return early if user is nil
+    return unless user
+
     # Fetch only the admin IDs, ensuring STI compatibility
     admin_ids = User.where(type: Admin.name).pluck(:id)
 
@@ -404,7 +410,7 @@ class Application < ApplicationRecord
   end
 
   def constituent_must_have_disability
-    unless user.has_disability_selected?
+    unless user&.has_disability_selected?
       errors.add(:base, "At least one disability must be selected before submitting an application.")
     end
   end

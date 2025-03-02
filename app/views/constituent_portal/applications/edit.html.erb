@@ -115,8 +115,10 @@
          
          <div class="flex items-start">
            <%= f.check_box :self_certify_disability,
-               class: "mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
-               "aria-describedby": "disability-certification-description" %>
+               { 
+                 class: "mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
+                 "aria-describedby": "disability-certification-description"
+               }, "1", "0" %>
            <%= f.label :self_certify_disability,
                "I certify that I have a disability that affects my ability to access telecommunications services",
                class: "ml-2 block text-sm text-gray-700" %>

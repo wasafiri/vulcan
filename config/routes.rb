@@ -1,4 +1,8 @@
 Rails.application.routes.draw do
+  # Test routes (only in test environment)
+  if Rails.env.test?
+    get "test/auth_status", to: "test#auth_status"
+  end
   root to: "home#index"
 
   # Static pages

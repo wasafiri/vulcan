@@ -46,13 +46,13 @@
             <%= application.application_date.strftime("%m/%d/%Y") %>
           </td>
           <td class="px-4 py-2 text-sm text-gray-900">
-            <%= application.user.full_name %>
+            <%= application.user&.full_name || "Unknown User" %>
           </td>
           <td class="px-4 py-2 text-sm text-gray-900 hidden sm:table-cell">
-            <%= application.user.phone %>
+            <%= application.user&.phone || "No phone" %>
           </td>
           <td class="px-4 py-2 text-sm text-gray-900">
-            <%= application.user.email %>
+            <%= application.user&.email || "No email" %>
           </td>
           <td class="px-4 py-2 text-sm text-gray-900">
             <%= application_status_badge(application) %>
@@ -91,7 +91,7 @@
             <%= link_to "View Application",
                 admin_application_path(application),
                 class: "text-indigo-600 hover:text-indigo-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                aria: { label: "View details for #{application.user.full_name}" } %>
+                aria: { label: "View details for #{application.user&.full_name || 'Unknown User'}" } %>
           </td>
         </tr>
       <% end %>
