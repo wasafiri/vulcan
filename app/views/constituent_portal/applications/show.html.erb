@@ -18,6 +18,35 @@
     </div>
 
     <div class="mb-4">
+      <h2 class="text-xl font-semibold mb-2">Guardian Information</h2>
+      <p><strong>Guardian Application:</strong> <%= @application.user.is_guardian? ? "Yes" : "No" %></p>
+      <% if @application.user.is_guardian? %>
+        <p><strong>Guardian Relationship:</strong> <%= @application.user.guardian_relationship %></p>
+      <% end %>
+    </div>
+
+    <div class="mb-4">
+      <h2 class="text-xl font-semibold mb-2">Disability Information</h2>
+      <p><strong>Self-Certified Disability:</strong> <%= @application.self_certify_disability ? "Yes" : "No" %></p>
+      
+      <% if @application.user.has_disability_selected? %>
+        <p><strong>Disability Types:</strong> 
+          <% 
+            disability_types = []
+            disability_types << "Hearing" if @application.user.hearing_disability
+            disability_types << "Vision" if @application.user.vision_disability
+            disability_types << "Speech" if @application.user.speech_disability
+            disability_types << "Mobility" if @application.user.mobility_disability
+            disability_types << "Cognition" if @application.user.cognition_disability
+          %>
+          <%= disability_types.join(", ") %>
+        </p>
+      <% else %>
+        <p><strong>Disability Types:</strong> None selected</p>
+      <% end %>
+    </div>
+
+    <div class="mb-4">
       <h2 class="text-xl font-semibold mb-2">Medical Provider Information</h2>
       <% if @application.medical_provider_name.present? %>
         <p><strong>Name:</strong> <%= @application.medical_provider_name %></p>

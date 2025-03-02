@@ -1,20 +1,10 @@
-// Entry point for the build script in your package.json
-import "@hotwired/turbo-rails"
-import * as ActiveStorage from "@rails/activestorage"
-import Chart from "chart.js/auto"
-import "./controllers"
-import "./controllers/debug_helper"
-
-// Make Chart.js available globally
-window.Chart = Chart
-
-// Set a global timeout for password visibility (for testing purposes)
-window.passwordVisibilityTimeout = 5000;
-
-// Define the global togglePasswordVisibility function
-window.togglePasswordVisibility = function(button, timeout = 5000) {
-  console.log("Global togglePasswordVisibility called", button);
-  
+/**
+ * Toggles the visibility of a password field
+ * 
+ * @param {HTMLElement} button - The button element that was clicked
+ * @param {number} timeout - Timeout in milliseconds before hiding password again (0 to disable)
+ */
+function togglePasswordVisibility(button, timeout = 5000) {
   // Find the password field and status element
   const container = button.closest('.relative');
   const passwordField = container.querySelector('input[type="password"], input[type="text"]');
@@ -25,13 +15,9 @@ window.togglePasswordVisibility = function(button, timeout = 5000) {
     return;
   }
   
-  console.log("Password field found:", passwordField);
-  
   // Determine current and new visibility state
   const isVisible = passwordField.type === 'text';
   const newVisibility = !isVisible;
-  
-  console.log("Toggling visibility to:", newVisibility ? "visible" : "hidden");
   
   // Toggle the type
   passwordField.type = newVisibility ? 'text' : 'password';
@@ -58,7 +44,6 @@ window.togglePasswordVisibility = function(button, timeout = 5000) {
   // Security: Auto-hide after timeout if enabled
   if (newVisibility && timeout > 0) {
     button._visibilityTimeout = setTimeout(() => {
-      console.log("Auto-hiding password after timeout");
       passwordField.type = 'password';
       button.setAttribute('aria-pressed', 'false');
       button.setAttribute('aria-label', 'Show password');
@@ -73,9 +58,7 @@ window.togglePasswordVisibility = function(button, timeout = 5000) {
       button._visibilityTimeout = null;
     }, timeout);
   }
-};
+}
 
-// Log when application.js is loaded
-console.log("Application.js loaded - password visibility is handled by global function");
-
-ActiveStorage.start()
+// Export the function for use in other files
+export { togglePasswordVisibility };

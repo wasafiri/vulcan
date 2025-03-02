@@ -95,8 +95,26 @@
             </div>
           <% end %>
           
-          <!-- Trainer Section - Always visible regardless of evaluator status -->
-          <div>
+          <!-- Trainer Section -->
+          <div class="mb-6">
+            <% if @application.training_sessions.scheduled.exists? %>
+              <!-- Display assigned trainer information -->
+              <div class="mb-4">
+                <h3 class="text-sm font-medium text-gray-500">Current Trainer</h3>
+                <div class="mt-2 flex items-center space-x-2">
+                  <% latest_training = @application.training_sessions.scheduled.order(created_at: :desc).first %>
+                  <span class="text-sm text-gray-900">Trainer: <%= latest_training.trainer.full_name %></span>
+                  <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                    Scheduled
+                  </span>
+                </div>
+                <p class="text-sm text-gray-500 mt-1">
+                  Scheduled for: <%= latest_training.scheduled_for.strftime("%B %d, %Y at %I:%M %p") %>
+                </p>
+              </div>
+            <% end %>
+            
+            <!-- Assign Trainer buttons -->
             <h3 class="text-sm font-medium text-gray-500 mb-2">Assign Trainer</h3>
             <div class="flex flex-wrap gap-3">
               <% # Get trainers by type and by capability

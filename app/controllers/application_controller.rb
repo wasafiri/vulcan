@@ -3,6 +3,9 @@ class ApplicationController < ActionController::Base
   protect_from_forgery with: :exception
   before_action :authenticate_user!
 
+  # Include our password field helper
+  helper PasswordFieldHelper
+
   private
 
   def authenticate_user!

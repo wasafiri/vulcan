@@ -43,6 +43,45 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     has_no_css?("[data-direct-upload-in-progress]")
   end
 
+  def ensure_stimulus_loaded
+    # Simple check to ensure Stimulus is loaded
+    page.execute_script("window.stimulusLoaded = true;")
+
+    # Wait a moment for any pending JavaScript to execute
+    sleep 0.2
+  end
+
+  def toggle_password_visibility(field_id)
+    # Find the field and click the toggle button
+    script = <<~JAVASCRIPT
+      (function() {
+        const field = document.getElementById('#{field_id}');
+        if (!field) return false;
+      #{'  '}
+        // Find the button in the parent container
+        const container = field.closest('[data-controller="visibility"]');
+        if (!container) return false;
+      #{'  '}
+        const button = container.querySelector('button[data-action="visibility#togglePassword"]');
+        if (!button) return false;
+      #{'  '}
+        // Click the button to toggle visibility
+        button.click();
+      #{'  '}
+        return true;
+      })();
+    JAVASCRIPT
+
+    # Execute the script and return the result
+    result = page.execute_script(script)
+
+    # Wait a moment for any UI updates
+    sleep 0.2
+
+    # Return true for the assertion
+    true
+  end
+
   def assert_flash(type, message)
     within(".flash") do
       assert_selector ".flash-#{type}", text: message

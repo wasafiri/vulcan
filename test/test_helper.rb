@@ -6,6 +6,7 @@ require "mocha/minitest"
 require "capybara/rails"
 require "support/voucher_test_helper"
 require "support/mailer_test_helper"
+require "support/notification_delivery_stub"
 
 module ActiveSupport
   class TestCase

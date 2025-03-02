@@ -33,24 +33,31 @@ module ConstituentPortal
           medical_provider_email: params[:medical_provider][:email]
         )
       elsif params.dig(:application, :medical_provider).present?
+        medical_provider_attrs = params[:application][:medical_provider].permit(
+          :name, :phone, :fax, :email
+        )
         @application.assign_attributes(
-          medical_provider_name: params[:application][:medical_provider][:name],
-          medical_provider_phone: params[:application][:medical_provider][:phone],
-          medical_provider_fax: params[:application][:medical_provider][:fax],
-          medical_provider_email: params[:application][:medical_provider][:email]
+          medical_provider_name: medical_provider_attrs[:name],
+          medical_provider_phone: medical_provider_attrs[:phone],
+          medical_provider_fax: medical_provider_attrs[:fax],
+          medical_provider_email: medical_provider_attrs[:email]
         )
       end
 
       # Extract user attributes
       user_attrs = {
-        is_guardian: params[:application][:is_guardian] == "1",
+        is_guardian: params[:application][:is_guardian] == "1" || params[:application][:is_guardian] == true,
         guardian_relationship: params[:application][:guardian_relationship],
-        hearing_disability: params[:application][:hearing_disability] == "1",
-        vision_disability: params[:application][:vision_disability] == "1",
-        speech_disability: params[:application][:speech_disability] == "1",
-        mobility_disability: params[:application][:mobility_disability] == "1",
-        cognition_disability: params[:application][:cognition_disability] == "1"
+        hearing_disability: params[:application][:hearing_disability] == "1" || params[:application][:hearing_disability] == true,
+        vision_disability: params[:application][:vision_disability] == "1" || params[:application][:vision_disability] == true,
+        speech_disability: params[:application][:speech_disability] == "1" || params[:application][:speech_disability] == true,
+        mobility_disability: params[:application][:mobility_disability] == "1" || params[:application][:mobility_disability] == true,
+        cognition_disability: params[:application][:cognition_disability] == "1" || params[:application][:cognition_disability] == true
       }
+
+      # Debug logging for guardian attributes
+      Rails.logger.debug "Guardian checkbox value: #{params[:application][:is_guardian].inspect}"
+      Rails.logger.debug "Guardian relationship value: #{params[:application][:guardian_relationship].inspect}"
 
       Rails.logger.debug "Application attributes before save: #{@application.attributes.inspect}"
       Rails.logger.debug "Medical provider params: #{params[:medical_provider].inspect}"
@@ -92,6 +99,13 @@ module ConstituentPortal
             notice: "Application saved as draft."
         end
       else
+        # Create a medical_provider object for the form when validation fails
+        @medical_provider = OpenStruct.new(
+          name: params.dig(:medical_provider, :name) || params.dig(:application, :medical_provider, :name),
+          phone: params.dig(:medical_provider, :phone) || params.dig(:application, :medical_provider, :phone),
+          fax: params.dig(:medical_provider, :fax) || params.dig(:application, :medical_provider, :fax),
+          email: params.dig(:medical_provider, :email) || params.dig(:application, :medical_provider, :email)
+        )
         render :new, status: :unprocessable_entity
       end
     end
@@ -103,12 +117,29 @@ module ConstituentPortal
       # Track original status for change detection
       original_status = @application.status
 
+      # Clean annual income and prepare application attributes
+      application_attrs = filtered_application_params.merge(
+        annual_income: params[:application][:annual_income]&.gsub(/[^\d.]/, "")
+      )
+
       # Handle medical provider attributes
       if params[:application][:medical_provider].present?
         medical_provider_attrs = params[:application][:medical_provider].permit(
           :name, :phone, :fax, :email
         )
-        @application.assign_attributes(
+
+        # Debug logging for medical provider attributes
+        Rails.logger.debug "Medical provider params: #{params[:application][:medical_provider].inspect}"
+        Rails.logger.debug "Medical provider attrs after permit: #{medical_provider_attrs.inspect}"
+
+        # Directly assign medical provider attributes to the application
+        @application.medical_provider_name = medical_provider_attrs[:name]
+        @application.medical_provider_phone = medical_provider_attrs[:phone]
+        @application.medical_provider_fax = medical_provider_attrs[:fax]
+        @application.medical_provider_email = medical_provider_attrs[:email]
+
+        # Also merge into application_attrs for completeness
+        application_attrs.merge!(
           medical_provider_name: medical_provider_attrs[:name],
           medical_provider_phone: medical_provider_attrs[:phone],
           medical_provider_fax: medical_provider_attrs[:fax],
@@ -116,21 +147,20 @@ module ConstituentPortal
         )
       end
 
-      # Clean annual income and prepare application attributes
-      application_attrs = filtered_application_params.merge(
-        annual_income: params[:application][:annual_income]&.gsub(/[^\d.]/, "")
-      )
-
       # Extract user attributes
       user_attrs = {
-        is_guardian: params[:application][:is_guardian] == "1",
+        is_guardian: params[:application][:is_guardian] == "1" || params[:application][:is_guardian] == true,
         guardian_relationship: params[:application][:guardian_relationship],
-        hearing_disability: params[:application][:hearing_disability] == "1",
-        vision_disability: params[:application][:vision_disability] == "1",
-        speech_disability: params[:application][:speech_disability] == "1",
-        mobility_disability: params[:application][:mobility_disability] == "1",
-        cognition_disability: params[:application][:cognition_disability] == "1"
+        hearing_disability: params[:application][:hearing_disability] == "1" || params[:application][:hearing_disability] == true,
+        vision_disability: params[:application][:vision_disability] == "1" || params[:application][:vision_disability] == true,
+        speech_disability: params[:application][:speech_disability] == "1" || params[:application][:speech_disability] == true,
+        mobility_disability: params[:application][:mobility_disability] == "1" || params[:application][:mobility_disability] == true,
+        cognition_disability: params[:application][:cognition_disability] == "1" || params[:application][:cognition_disability] == true
       }
+
+      # Debug logging for guardian attributes
+      Rails.logger.debug "Update - Guardian checkbox value: #{params[:application][:is_guardian].inspect}"
+      Rails.logger.debug "Update - Guardian relationship value: #{params[:application][:guardian_relationship].inspect}"
 
       # Store the user reference before transaction to ensure it's maintained
       user = current_user
@@ -196,6 +226,15 @@ module ConstituentPortal
         redirect_to constituent_portal_application_path(@application), notice: notice
       else
         Rails.logger.debug "Application errors: #{@application.errors.full_messages}"
+
+        # Create a medical_provider object for the form when validation fails
+        @medical_provider = OpenStruct.new(
+          name: params.dig(:application, :medical_provider, :name) || @application.medical_provider_name,
+          phone: params.dig(:application, :medical_provider, :phone) || @application.medical_provider_phone,
+          fax: params.dig(:application, :medical_provider, :fax) || @application.medical_provider_fax,
+          email: params.dig(:application, :medical_provider, :email) || @application.medical_provider_email
+        )
+
         render :edit, status: :unprocessable_entity
       end
     end
@@ -264,81 +303,81 @@ module ConstituentPortal
       end
     end
 
-  def resubmit_proof
-    @application = current_user.applications.find(params[:id])
+    def resubmit_proof
+      @application = current_user.applications.find(params[:id])
 
-    if @application.resubmit_proof!
-      redirect_to constituent_portal_application_path(@application),
-        notice: "Proof resubmitted successfully"
-    else
-      redirect_to constituent_portal_application_path(@application),
-        alert: "Failed to resubmit proof"
+      if @application.resubmit_proof!
+        redirect_to constituent_portal_application_path(@application),
+          notice: "Proof resubmitted successfully"
+      else
+        redirect_to constituent_portal_application_path(@application),
+          alert: "Failed to resubmit proof"
+      end
     end
-  end
 
-  def request_training
-    @application = current_user.applications.find(params[:id])
+    def request_training
+      @application = current_user.applications.find(params[:id])
 
-    # Check if the application is approved and eligible for training
-    unless @application.approved?
+      # Check if the application is approved and eligible for training
+      unless @application.approved?
+        redirect_to constituent_portal_dashboard_path,
+          alert: "Only approved applications are eligible for training."
+        return
+      end
+
+      # Check if the constituent has remaining training sessions
+      max_training_sessions = Policy.get("max_training_sessions") || 3
+      if @application.training_sessions.count >= max_training_sessions
+        redirect_to constituent_portal_dashboard_path,
+          alert: "You have used all of your available training sessions."
+        return
+      end
+
+      # Create a notification for admins to schedule training
+      User.where(type: "Admin").find_each do |admin|
+        Notification.create!(
+          recipient: admin,
+          actor: current_user,
+          action: "training_requested",
+          notifiable: @application,
+          metadata: {
+            application_id: @application.id,
+            constituent_id: current_user.id,
+            constituent_name: current_user.full_name,
+            timestamp: Time.current.iso8601
+          }
+        )
+      end
+
+      # Create an activity record for the constituent
+      if defined?(Activity)
+        Activity.create!(
+          user: current_user,
+          description: "Requested training session",
+          metadata: {
+            application_id: @application.id,
+            timestamp: Time.current.iso8601
+          }
+        )
+      end
+
       redirect_to constituent_portal_dashboard_path,
-        alert: "Only approved applications are eligible for training."
-      return
+        notice: "Training request submitted. An administrator will contact you to schedule your session."
     end
 
-    # Check if the constituent has remaining training sessions
-    max_training_sessions = Policy.get("max_training_sessions") || 3
-    if @application.training_sessions.count >= max_training_sessions
-      redirect_to constituent_portal_dashboard_path,
-        alert: "You have used all of your available training sessions."
-      return
+    def fpl_thresholds
+      # Get FPL thresholds from policies
+      thresholds = {}
+      (1..8).each do |size|
+        policy = Policy.find_by(key: "fpl_#{size}_person")
+        thresholds[size.to_s] = policy&.value.to_i
+      end
+
+      # Get FPL modifier percentage
+      modifier = Policy.find_by(key: "fpl_modifier_percentage")&.value.to_i || 400
+
+      render json: { thresholds: thresholds, modifier: modifier }
     end
-
-    # Create a notification for admins to schedule training
-    User.where(type: "Admin").find_each do |admin|
-      Notification.create!(
-        recipient: admin,
-        actor: current_user,
-        action: "training_requested",
-        notifiable: @application,
-        metadata: {
-          application_id: @application.id,
-          constituent_id: current_user.id,
-          constituent_name: current_user.full_name,
-          timestamp: Time.current.iso8601
-        }
-      )
-    end
-
-    # Create an activity record for the constituent
-    if defined?(Activity)
-      Activity.create!(
-        user: current_user,
-        description: "Requested training session",
-        metadata: {
-          application_id: @application.id,
-          timestamp: Time.current.iso8601
-        }
-      )
-    end
-
-    redirect_to constituent_portal_dashboard_path,
-      notice: "Training request submitted. An administrator will contact you to schedule your session."
-  end
-
-  def fpl_thresholds
-    # Get FPL thresholds from policies
-    thresholds = {}
-    (1..8).each do |size|
-      policy = Policy.find_by(key: "fpl_#{size}_person")
-      thresholds[size.to_s] = policy&.value.to_i
-    end
-
-    # Get FPL modifier percentage
-    modifier = Policy.find_by(key: "fpl_modifier_percentage")&.value.to_i || 400
-
-    render json: { thresholds: thresholds, modifier: modifier }
-  end
 
     private
 
@@ -450,36 +489,40 @@ module ConstituentPortal
       Rails.logger.debug "Current user class: #{current_user.class}"
       Rails.logger.debug "Current user attributes: #{current_user.attributes.keys}"
 
-      # Try update first
-      result = current_user.update(
-        is_guardian: attrs[:is_guardian],
-        guardian_relationship: attrs[:guardian_relationship],
-        hearing_disability: attrs[:hearing_disability],
-        vision_disability: attrs[:vision_disability],
-        speech_disability: attrs[:speech_disability],
-        mobility_disability: attrs[:mobility_disability],
-        cognition_disability: attrs[:cognition_disability]
-      )
+      # Process boolean values properly
+      processed_attrs = {}
 
-      # If update fails, add detailed error logging
+      # Handle is_guardian explicitly
+      processed_attrs[:is_guardian] = attrs[:is_guardian] == true || attrs[:is_guardian] == "1"
+
+      # Only set guardian_relationship if is_guardian is true
+      if processed_attrs[:is_guardian]
+        processed_attrs[:guardian_relationship] = attrs[:guardian_relationship]
+      end
+
+      # Process disability attributes
+      processed_attrs[:hearing_disability] = ActiveModel::Type::Boolean.new.cast(attrs[:hearing_disability])
+      processed_attrs[:vision_disability] = ActiveModel::Type::Boolean.new.cast(attrs[:vision_disability])
+      processed_attrs[:speech_disability] = ActiveModel::Type::Boolean.new.cast(attrs[:speech_disability])
+      processed_attrs[:mobility_disability] = ActiveModel::Type::Boolean.new.cast(attrs[:mobility_disability])
+      processed_attrs[:cognition_disability] = ActiveModel::Type::Boolean.new.cast(attrs[:cognition_disability])
+
+      # Log the processed attributes for debugging
+      Rails.logger.debug "Processed attributes: #{processed_attrs.inspect}"
+
+      # Update the user with the processed attributes
+      result = current_user.update(processed_attrs)
+
+      # Log any errors
       unless result
         Rails.logger.error "Update failed."
         Rails.logger.error "Current user errors: #{current_user.errors.full_messages}"
-
-        # Fall back to update_columns
-        result = current_user.update_columns(
-          is_guardian: ActiveModel::Type::Boolean.new.cast(attrs[:is_guardian]),
-          guardian_relationship: attrs[:guardian_relationship],
-          hearing_disability: ActiveModel::Type::Boolean.new.cast(attrs[:hearing_disability]),
-          vision_disability: ActiveModel::Type::Boolean.new.cast(attrs[:vision_disability]),
-          speech_disability: ActiveModel::Type::Boolean.new.cast(attrs[:speech_disability]),
-          mobility_disability: ActiveModel::Type::Boolean.new.cast(attrs[:mobility_disability]),
-          cognition_disability: ActiveModel::Type::Boolean.new.cast(attrs[:cognition_disability])
-        )
       end
 
-      unless result
-        Rails.logger.error "Failed to update user attributes: #{current_user.errors.full_messages}"
+      # Verify the user's disability status after update
+      if result
+        Rails.logger.debug "User disability status after update: hearing=#{current_user.hearing_disability}, vision=#{current_user.vision_disability}, speech=#{current_user.speech_disability}, mobility=#{current_user.mobility_disability}, cognition=#{current_user.cognition_disability}"
+        Rails.logger.debug "User has_disability_selected? returns: #{current_user.has_disability_selected?}"
       end
 
       result

@@ -1,3 +1,4 @@
+<% require 'ostruct' %>
 <section aria-labelledby="medical-info-heading" class="space-y-4 p-4 bg-gray-50 rounded">
   <h2 id="medical-info-heading" class="text-lg font-medium text-gray-900">Medical Professional Information</h2>
   
@@ -22,7 +23,15 @@
     </ul>
   </div>
 
-  <%= fields_for :medical_provider do |mp| %>
+  <% # Use @medical_provider if available, otherwise fall back to application attributes %>
+  <% medical_provider_obj = @medical_provider || OpenStruct.new(
+       name: form.object.medical_provider_name,
+       phone: form.object.medical_provider_phone,
+       fax: form.object.medical_provider_fax,
+       email: form.object.medical_provider_email
+     ) %>
+  
+  <%= form.fields_for :medical_provider, medical_provider_obj do |mp| %>
     <div class="space-y-4">
       <div>
         <%= mp.label :name, "Name", class: "block text-sm font-medium text-gray-700" %>

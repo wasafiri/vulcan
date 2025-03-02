@@ -165,8 +165,140 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
   end
 
   test "preserves form data when validation fails" do
-    skip "This test needs to be updated to match the actual application UI"
-    # This test verifies that form data is preserved when validation fails
-    # It's currently skipped because we need to update it to match the actual application UI
+    visit new_constituent_portal_application_path
+
+    # Fill in required fields
+    check "I certify that I am a resident of Maryland"
+    fill_in "Household Size", with: 3
+    fill_in "Annual Income", with: 60000
+    check "I certify that I have a disability that affects my ability to access telecommunications services"
+    check "Hearing"
+    check "Vision"
+
+    # Fill in medical provider info
+    within "section[aria-labelledby='medical-info-heading']" do
+      fill_in "Name", with: "Dr. Jane Smith"
+      fill_in "Phone", with: "2025551234"
+      fill_in "Email", with: "drsmith@example.com"
+    end
+
+    # Intentionally leave a required field blank to cause validation failure
+    within "section[aria-labelledby='medical-info-heading']" do
+      fill_in "Name", with: ""
+    end
+
+    # Submit the form
+    find('input[name="submit_application"]').click
+
+    # Verify the form is still displayed (validation failed)
+    assert_selector "h1", text: "New Application"
+
+    # Verify form data is preserved
+    assert_checked_field "I certify that I am a resident of Maryland"
+    assert_field "Household Size", with: "3"
+    assert_field "Annual Income", with: "60000"
+    assert_checked_field "I certify that I have a disability that affects my ability to access telecommunications services"
+    assert_checked_field "Hearing"
+    assert_checked_field "Vision"
+
+    # Verify medical provider info is preserved (except the intentionally blanked field)
+    within "section[aria-labelledby='medical-info-heading']" do
+      assert_field "Phone", with: "2025551234"
+      assert_field "Email", with: "drsmith@example.com"
+    end
+  end
+
+  test "saves all form fields when clicking Save Application" do
+    visit new_constituent_portal_application_path
+
+    # Fill in all form fields
+    # Residency
+    check "I certify that I am a resident of Maryland"
+
+    # Household information
+    fill_in "Household Size", with: "4"
+    fill_in "Annual Income", with: "60000"
+
+    # Guardian information
+    check "I am applying on behalf of someone under 18"
+    select "Parent", from: "Relationship to Applicant"
+
+    # Disability information
+    check "I certify that I have a disability that affects my ability to access telecommunications services"
+    check "Hearing"
+    check "Vision"
+    check "Mobility"
+
+    # Medical provider information
+    within "section[aria-labelledby='medical-info-heading']" do
+      fill_in "Name", with: "Dr. Robert Johnson"
+      fill_in "Phone", with: "4105551234"
+      fill_in "Fax", with: "4105555678"
+      fill_in "Email", with: "dr.johnson@example.com"
+    end
+
+    # Upload documents (if the test environment supports it)
+    attach_file "Proof of Residency", @valid_image, make_visible: true
+    attach_file "Income Verification", @valid_pdf, make_visible: true
+
+    # Save the application
+    click_button "Save Application"
+
+    # Verify success message
+    assert_text "Application saved as draft"
+
+    # Get the newly created application
+    application = Application.last
+
+    # Verify application fields were saved in the database
+    assert_equal "draft", application.status
+    assert application.maryland_resident
+    assert_equal 4, application.household_size
+    assert_equal 60000, application.annual_income.to_i
+    assert application.self_certify_disability
+
+    # Verify medical provider info was saved
+    assert_equal "Dr. Robert Johnson", application.medical_provider_name
+    assert_equal "4105551234", application.medical_provider_phone
+    assert_equal "4105555678", application.medical_provider_fax
+    assert_equal "dr.johnson@example.com", application.medical_provider_email
+
+    # Verify user attributes were updated
+    user = application.user.reload
+    assert user.is_guardian
+    assert_equal "Parent", user.guardian_relationship
+    assert user.hearing_disability
+    assert user.vision_disability
+    assert_not user.speech_disability
+    assert user.mobility_disability
+    assert_not user.cognition_disability
+
+    # Verify file attachments
+    assert application.residency_proof.attached?
+    assert application.income_proof.attached?
+
+    # Navigate to edit page to verify all fields were saved in the UI
+    visit edit_constituent_portal_application_path(application)
+
+    # Verify all fields have the values we entered
+    assert_checked_field "I certify that I am a resident of Maryland"
+    assert_field "Household Size", with: "4"
+    assert_field "Annual Income", with: "60000"
+    assert_checked_field "I am applying on behalf of someone under 18"
+    assert_select "Relationship to Applicant", selected: "Parent"
+    assert_checked_field "I certify that I have a disability that affects my ability to access telecommunications services"
+    assert_checked_field "Hearing"
+    assert_checked_field "Vision"
+    assert_checked_field "Mobility"
+    assert_not_checked_field "Speech"
+    assert_not_checked_field "Cognition"
+
+    # Verify medical provider info
+    within "section[aria-labelledby='medical-info-heading']" do
+      assert_field "Name", with: "Dr. Robert Johnson"
+      assert_field "Phone", with: "4105551234"
+      assert_field "Fax", with: "4105555678"
+      assert_field "Email", with: "dr.johnson@example.com"
+    end
   end
 end

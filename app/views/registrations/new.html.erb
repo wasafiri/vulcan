@@ -12,8 +12,7 @@
                  url: sign_up_path, 
                  local: true, 
                  class: "space-y-6",
-                 aria: { labelledby: "signup-heading" },
-                 data: { controller: "visibility" } do |form| %>
+                 aria: { labelledby: "signup-heading" } do |form| %>
 
      <div class="space-y-1">
        <%= form.label :first_name, "First Name", class: "block text-sm font-medium text-gray-700" %>
@@ -76,68 +75,40 @@
        <% end %>
      </div>
 
-     <div class="space-y-1">
-       <%= form.label :password, "Password", class: "block text-sm font-medium text-gray-700" %>
-       <div class="relative">
-         <%= form.password_field :password, 
-             class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-             required: true,
-             minlength: 6,
-             data: { visibility_target: "field" },
-             aria: {
-               required: "true",
-               invalid: @user.errors[:password].any?,
-               errormessage: "password-error"
-             } %>
-         <button type="button"
-                 data-action="visibility#toggle"
-                 aria-label="Toggle password visibility"
-                 aria-pressed="false"
-                 class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-           <svg class="h-5 w-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-             <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-             <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-           </svg>
-         </button>
-       </div>
-       <p class="text-xs text-gray-500">Minimum 6 characters</p>
-       <% if @user.errors[:password].any? %>
-         <p id="password-error" class="mt-1 text-sm text-red-600">
-           <%= @user.errors[:password].join(", ") %>
-         </p>
-       <% end %>
-     </div>
+     <%= password_field_with_toggle(form, :password, 
+         label: "Password",
+         hint: "Minimum 6 characters",
+         html_options: {
+           minlength: 6,
+           aria: {
+             required: "true",
+             invalid: @user.errors[:password].any?,
+             errormessage: "password-error"
+           }
+         }
+     ) %>
+     <% if @user.errors[:password].any? %>
+       <p id="password-error" class="mt-1 text-sm text-red-600">
+         <%= @user.errors[:password].join(", ") %>
+       </p>
+     <% end %>
 
-     <div class="space-y-1">
-       <%= form.label :password_confirmation, "Confirm Password", class: "block text-sm font-medium text-gray-700" %>
-       <div class="relative">
-         <%= form.password_field :password_confirmation, 
-             class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-             required: true,
-             minlength: 6,
-             data: { visibility_target: "field-confirmation" },
-             aria: {
-               required: "true",
-               invalid: @user.errors[:password_confirmation].any?,
-               errormessage: "password-confirmation-error"
-             } %>
-         <button type="button"
-                 data-action="visibility#toggle"
-                 aria-label="Toggle password visibility"
-                 aria-pressed="false" 
-                 class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-           <svg class="h-5 w-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-             <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-             <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-           </svg>
-         </button>
-       </div>
-       <% if @user.errors[:password_confirmation].any? %>
-         <p id="password-confirmation-error" class="mt-1 text-sm text-red-600">
-           <%= @user.errors[:password_confirmation].join(", ") %>
-         </p>
-       <% end %>
-     </div>
+     <%= password_field_with_toggle(form, :password_confirmation, 
+         label: "Confirm Password",
+         html_options: {
+           minlength: 6,
+           aria: {
+             required: "true",
+             invalid: @user.errors[:password_confirmation].any?,
+             errormessage: "password-confirmation-error"
+           }
+         }
+     ) %>
+     <% if @user.errors[:password_confirmation].any? %>
+       <p id="password-confirmation-error" class="mt-1 text-sm text-red-600">
+         <%= @user.errors[:password_confirmation].join(", ") %>
+       </p>
+     <% end %>
 
       <div class="space-y-1">
         <%= form.label :phone, "Phone Number", class: "block text-sm font-medium text-gray-700" %>

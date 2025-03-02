@@ -10,6 +10,7 @@ import PaperApplicationController from "./paper_application_controller"
 import ApplicationFormController from "./application_form_controller"
 import ReportsToggleController from "./reports_toggle_controller"
 import ReportsChartController from "./reports_chart_controller"
+import VisibilityController from "./visibility_controller"
 
 application.register("role-select", RoleSelectController)
 application.register("modal", ModalController)
@@ -22,3 +23,4 @@ application.register("paper-application", PaperApplicationController)
 application.register("application-form", ApplicationFormController)
 application.register("reports-toggle", ReportsToggleController)
 application.register("reports-chart", ReportsChartController)
+application.register("visibility", VisibilityController)

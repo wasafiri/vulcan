@@ -34,5 +34,6 @@ module NotificationDeliveryStub
   end
 end
 
-# Patch TrainingSession for testing
+# Patch TrainingSession and Application for testing
 TrainingSession.include(NotificationDeliveryStub) if defined?(TrainingSession)
+Application.include(NotificationDeliveryStub) if defined?(Application)
