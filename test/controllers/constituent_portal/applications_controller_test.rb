@@ -10,46 +10,53 @@ module ConstituentPortal
       @valid_pdf = fixture_file_upload("test/fixtures/files/income_proof.pdf", "application/pdf")
       @valid_image = fixture_file_upload("test/fixtures/files/residency_proof.pdf", "application/pdf")
 
-      # Create a session directly for the test
-      @session = @user.sessions.create!(
-        user_agent: "Rails Testing",
-        ip_address: "127.0.0.1"
-      )
-
-      # Set the session token in the cookies
-      cookies[:session_token] = @session.session_token
+      # We don't sign in the user for most tests to verify authentication requirements
+      # Tests that need an authenticated user will call sign_in(@user) explicitly
     end
 
-  test "should get index" do
-    # Enable debugging for this test
-    ENV["DEBUG_AUTH"] = "true"
+  # Test that the checkbox handling works correctly
+  test "should handle array values for self_certify_disability" do
+    # Sign in the user
+    sign_in(@user)
 
-    get constituent_portal_applications_path
+    # Simulate a form submission with an array value for self_certify_disability
+    post constituent_portal_applications_path, params: {
+      application: {
+        maryland_resident: true,
+        household_size: 3,
+        annual_income: 50000,
+        self_certify_disability: checkbox_params(true), # Use our helper to simulate a checked checkbox
+        hearing_disability: true
+      },
+      medical_provider: {
+        name: "Dr. Smith",
+        phone: "2025551234",
+        email: "drsmith@example.com"
+      },
+      save_draft: "Save Application"
+    }
 
-    # Check if we're redirected to sign in
-    assert_redirected_to sign_in_path
+    # Check that the application was created
+    assert_response :redirect
 
-    # Follow the redirect
-    follow_redirect!
+    # Get the newly created application
+    application = Application.last
 
-    # Check if the sign-in page is displayed
-    assert_select "h1", "Sign In"
-
-    # Reset debug flag
-    ENV["DEBUG_AUTH"] = nil
+    # Verify that self_certify_disability was correctly cast to true
+    assert_equal true, application.self_certify_disability
   end
 
+  # Test that the new application page loads correctly
   test "should get new" do
-    get new_constituent_portal_application_path
+    # Sign in the user first
+    sign_in(@user)
 
-    # Check if we're redirected to sign in
-    assert_redirected_to sign_in_path
+    # Then try to access the new application page
+    get new_constituent_portal_application_path, headers: default_headers
 
-    # Follow the redirect
-    follow_redirect!
-
-    # Check if the sign-in page is displayed
-    assert_select "h1", "Sign In"
+    # Verify the page loaded successfully
+    assert_response :success
+    assert_select "h1", "New Application"
   end
 
   test "should create application as draft" do
@@ -111,45 +118,48 @@ module ConstituentPortal
     assert_equal "not_reviewed", application.residency_proof_status
   end
 
+  # Test that the application show page loads correctly
   test "should show application" do
-    get constituent_portal_application_path(@application)
+    # Sign in the user first
+    sign_in(@user)
 
-    # Check if we're redirected to sign in
-    assert_redirected_to sign_in_path
+    # Then try to access the application show page
+    get constituent_portal_application_path(@application), headers: default_headers
 
-    # Follow the redirect
-    follow_redirect!
-
-    # Check if the sign-in page is displayed
-    assert_select "h1", "Sign In"
+    # Verify the page loaded successfully
+    assert_response :success
+    assert_select "h1", /Application ##{@application.id}/
   end
 
+  # Test that the edit page loads correctly for draft applications
   test "should get edit for draft application" do
+    # Set the application to draft status
     @application.update!(status: :draft)
-    get edit_constituent_portal_application_path(@application)
 
-    # Check if we're redirected to sign in
-    assert_redirected_to sign_in_path
+    # Sign in the user first
+    sign_in(@user)
 
-    # Follow the redirect
-    follow_redirect!
+    # Then try to access the edit page
+    get edit_constituent_portal_application_path(@application), headers: default_headers
 
-    # Check if the sign-in page is displayed
-    assert_select "h1", "Sign In"
+    # Verify the page loaded successfully
+    assert_response :success
   end
 
+  # Test that users can't edit submitted applications
   test "should not get edit for submitted application" do
+    # Set the application to in_progress status (submitted)
     @application.update!(status: :in_progress)
-    get edit_constituent_portal_application_path(@application)
 
-    # Check if we're redirected to sign in
-    assert_redirected_to sign_in_path
+    # Sign in the user first
+    sign_in(@user)
 
-    # Follow the redirect
-    follow_redirect!
+    # Try to edit a submitted application
+    get edit_constituent_portal_application_path(@application), headers: default_headers
 
-    # Check if the sign-in page is displayed
-    assert_select "h1", "Sign In"
+    # Should be redirected to application page with an alert
+    assert_redirected_to constituent_portal_application_path(@application)
+    assert_flash_message(:alert, "This application has already been submitted and cannot be edited.")
   end
 
   test "should update draft application" do

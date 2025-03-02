@@ -14,7 +14,7 @@ module ConstituentPortal
           maryland_resident: true,
           household_size: 3,
           annual_income: 50000,
-          self_certify_disability: [ "0", "1" ], # Simulate the array that Rails sends
+          self_certify_disability: checkbox_params(true), # Use our helper to simulate a checked checkbox
           hearing_disability: true
         },
         medical_provider: {

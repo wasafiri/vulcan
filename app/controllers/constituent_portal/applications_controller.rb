@@ -533,20 +533,52 @@ module ConstituentPortal
     end
 
     # Cast boolean parameters to proper boolean values
+    #
+    # When a checkbox is checked in a Rails form, the browser sends both "0" and "1" values
+    # in an array (e.g., ["0", "1"]). This is because Rails generates a hidden field with value "0"
+    # followed by the actual checkbox with value "1". When the checkbox is checked, both values
+    # are submitted. When unchecked, only the hidden field's "0" value is submitted.
+    #
+    # This method handles this behavior by:
+    # 1. Checking if the parameter is an array
+    # 2. If it is, taking the last value (which will be "1" if checked)
+    # 3. Casting the value to a proper boolean using ActiveModel::Type::Boolean
+    #
+    # @return [void]
     def cast_boolean_params
       return unless params[:application]
 
-      # Handle self_certify_disability
-      if params[:application][:self_certify_disability]
-        value = params[:application][:self_certify_disability]
-        # If it's an array, take the last value
-        value = value.last if value.is_a?(Array)
-        params[:application][:self_certify_disability] = ActiveModel::Type::Boolean.new.cast(value)
-        log_debug("self_certify_disability after casting: #{params[:application][:self_certify_disability].inspect}")
-      end
+      # List of all boolean fields in the application form
+      boolean_fields = [
+        :self_certify_disability,
+        :hearing_disability,
+        :vision_disability,
+        :speech_disability,
+        :mobility_disability,
+        :cognition_disability,
+        :is_guardian,
+        :maryland_resident,
+        :terms_accepted,
+        :information_verified,
+        :medical_release_authorized
+      ]
 
-      # Handle other boolean parameters as needed
-      # Example: params[:application][:other_boolean_field]
+      # Process each boolean field
+      boolean_fields.each do |field|
+        next unless params[:application][field]
+
+        value = params[:application][field]
+
+        # If the value is an array (which happens when a checkbox is checked),
+        # take the last value (which will be "1" for a checked box)
+        value = value.last if value.is_a?(Array)
+
+        # Cast the value to a proper boolean
+        params[:application][field] = ActiveModel::Type::Boolean.new.cast(value)
+
+        # Log the result for debugging
+        log_debug("#{field} after casting: #{params[:application][field].inspect}")
+      end
     end
 
     # Conditionally log debug messages based on environment

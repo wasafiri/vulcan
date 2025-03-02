@@ -7,6 +7,9 @@ require "capybara/rails"
 require "support/voucher_test_helper"
 require "support/mailer_test_helper"
 require "support/notification_delivery_stub"
+require "support/authentication_test_helper"
+require "support/flash_test_helper"
+require "support/form_test_helper"
 
 module ActiveSupport
   class TestCase
@@ -14,6 +17,9 @@ module ActiveSupport
     include VoucherTestHelper
     include ActionMailer::TestHelper
     include MailerTestHelper
+    include AuthenticationTestHelper
+    include FlashTestHelper
+    include FormTestHelper
 
     def assert_enqueued_email_with(mailer_class, method_name, args: nil)
       block_result = nil
@@ -35,34 +41,52 @@ module ActiveSupport
     end
 
     # Add more helper methods to be used by all tests here...
+    # Sign in a user for testing purposes
+    # This method works in both controller and integration tests by delegating to
+    # the more specific helper methods in AuthenticationTestHelper
+    #
+    # @param user [User] The user to sign in
+    # @return [User] The signed-in user (for method chaining)
     def sign_in(user)
-      if respond_to?(:post)
-        # Integration test
-        post sign_in_path, params: {
-          email: user.email, password: "password123"
-        }
-        debug_auth_state("After integration test sign_in")
-
-        # For integration tests, we need to follow redirects and ensure we're logged in
-        follow_redirect! if response.redirect?
-
-        # Verify the session was created
-        session_record = Session.find_by(user_id: user.id)
-        if session_record
-          # Manually set the cookie for integration tests
-          cookies[:session_token] = session_record.session_token
-        else
-          Rails.logger.warn "WARNING: No session record found for user #{user.email} after sign_in attempt"
-        end
+      # If we have the enhanced helper available, use it
+      if respond_to?(:sign_in_with_headers)
+        sign_in_with_headers(user)
       else
-        # Controller/Model test
-        session = user.sessions.create!(
-          user_agent: "Rails Testing",
-          ip_address: "127.0.0.1"
-        )
-        cookies[:session_token] = session.session_token
-        debug_auth_state("After controller test sign_in")
+        # Fallback implementation for backward compatibility
+        Rails.logger.debug "Using fallback sign_in implementation for user: #{user.email}"
+
+        if respond_to?(:post)
+          # Integration test - go through the sign in flow
+          post sign_in_path, params: { email: user.email, password: "password123" }
+          follow_redirect! if response.redirect?
+
+          # Set the cookie
+          session_record = Session.find_by(user_id: user.id)
+          if session_record
+            if respond_to?(:set_auth_cookie)
+              set_auth_cookie(session_record.session_token)
+            else
+              # Direct cookie manipulation as last resort
+              cookies[:session_token] = session_record.session_token
+              Rails.logger.debug "WARNING: Using direct cookie manipulation in sign_in"
+            end
+          end
+        else
+          # Controller test - create session directly
+          session = user.sessions.create!(user_agent: "Rails Testing", ip_address: "127.0.0.1")
+
+          # Set the cookie
+          if respond_to?(:set_auth_cookie)
+            set_auth_cookie(session.session_token)
+          else
+            # Direct cookie manipulation as last resort
+            cookies[:session_token] = session.session_token
+            Rails.logger.debug "WARNING: Using direct cookie manipulation in sign_in"
+          end
+        end
       end
+
+      user # Return the user for method chaining
     end
 
     # Helper method for debugging authentication state
@@ -115,13 +139,26 @@ module ActiveSupport
       assert_flash(type, message)
     end
 
+    # Sign out the current user
     def sign_out
+      Rails.logger.debug "Signing out user"
+
       if respond_to?(:delete)
         # Integration test
         delete sign_out_path
+        follow_redirect! if response.redirect?
       else
-        # Controller/Model test
-        cookies.delete(:session_token)
+        # Controller/Model test - use the helper if available
+        if respond_to?(:sign_out_with_headers)
+          sign_out_with_headers
+        else
+          # Direct fallback if helper not available
+          if cookies.respond_to?(:signed) && cookies.signed.respond_to?(:delete)
+            cookies.signed.delete(:session_token)
+          else
+            cookies.delete(:session_token)
+          end
+        end
       end
     end
 

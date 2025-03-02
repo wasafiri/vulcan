@@ -9,25 +9,18 @@ class Admin::ScannedProofsControllerTest < ActionDispatch::IntegrationTest
       "application/pdf"
     )
 
-    # Use the updated sign_in helper which includes headers
-    @headers = {
-      "HTTP_USER_AGENT" => "Rails Testing",
-      "REMOTE_ADDR" => "127.0.0.1"
-    }
+    # Use our enhanced sign_in helper
+    sign_in_with_headers(@admin)
 
-    post sign_in_path,
-      params: { email: @admin.email, password: "password123" },
-      headers: @headers
-
-    assert_response :redirect
-    follow_redirect!
+    # Verify authentication was successful
+    assert_authenticated(@admin)
   end
 
   def test_rejects_invalid_proof_types
     get new_admin_application_scanned_proof_path(@application, proof_type: "invalid"),
-      headers: @headers
+      headers: default_headers
     assert_redirected_to admin_application_path(@application)
-    assert_equal "Invalid proof type", flash[:alert]
+    assert_flash_message(:alert, "Invalid proof type")
   end
 
   def test_creates_proof_with_valid_parameters
@@ -37,27 +30,27 @@ class Admin::ScannedProofsControllerTest < ActionDispatch::IntegrationTest
           proof_type: "income",
           file: @file
         },
-        headers: @headers
+        headers: default_headers
     end
 
     assert_redirected_to admin_application_path(@application)
-    assert_match(/successfully uploaded/, flash[:notice])
+    assert_flash_message_matches(:notice, /successfully uploaded/)
     assert @application.reload.income_proof.attached?
   end
 
   def test_handles_missing_files
     post admin_application_scanned_proofs_path(@application),
       params: { proof_type: "income" },
-      headers: @headers
+      headers: default_headers
     assert_redirected_to new_admin_application_scanned_proof_path(@application)
-    assert_equal "Please select a file to upload", flash[:alert]
+    assert_flash_message(:alert, "Please select a file to upload")
   end
 
   def test_requires_authentication
-    delete sign_out_path, headers: @headers
+    sign_out_with_headers
     get new_admin_application_scanned_proof_path(@application, proof_type: "income"),
-      headers: @headers
+      headers: default_headers
     assert_redirected_to sign_in_path
-    assert_equal "Please sign in to continue", flash[:alert]
+    assert_flash_message(:alert, "Please sign in to continue")
   end
 end
