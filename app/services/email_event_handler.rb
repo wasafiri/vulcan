@@ -1,17 +1,17 @@
 class EmailEventHandler
   def initialize(params)
     @params = params
-    @event = params[:event]
+    @event_type = params[:event]
   end
 
   def process
-    case @event[:type]
+    case @event_type
     when "bounce"
       handle_bounce
     when "complaint"
       handle_complaint
     else
-      Rails.logger.warn("Unhandled email event type: #{@event[:type]}")
+      Rails.logger.warn("Unhandled email event type: #{@event_type}")
       false
     end
   rescue StandardError => e
@@ -26,10 +26,22 @@ class EmailEventHandler
     provider_email = find_provider_email
     return false unless provider_email
 
+    bounce_data = @params[:bounce] || {}
+
     provider_email.mark_as_bounced!(
-      bounce_type: @event[:bounce_type],
-      diagnostics: @event[:diagnostics]
+      bounce_type: bounce_data[:type],
+      diagnostics: bounce_data[:diagnostics]
     )
+
+    # Create an audit event
+    Event.create!(
+      action: "email_bounced",
+      metadata: {
+        provider_email_id: provider_email.id,
+        bounce_type: bounce_data[:type]
+      }
+    )
+
     true
   end
 
@@ -45,6 +57,6 @@ class EmailEventHandler
   end
 
   def find_provider_email
-    MedicalProviderEmail.find_by(email: @event[:email])
+    MedicalProviderEmail.find_by(email: @params[:email])
   end
 end

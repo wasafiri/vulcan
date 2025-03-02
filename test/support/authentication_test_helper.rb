@@ -27,16 +27,16 @@ module AuthenticationTestHelper
   def set_auth_cookie(session_token)
     auth_debug("Setting auth cookie with token: #{session_token}")
 
-    # In production and most test environments, we use signed cookies
-    # Some test environments may not support signed cookies, so we provide a fallback
+    # Always set both signed and unsigned cookies to ensure compatibility
+    # with both the controller's current_user method and the test environment
     if cookies.respond_to?(:signed) && cookies.signed.respond_to?(:[]=)
       cookies.signed[:session_token] = { value: session_token, httponly: true }
-      auth_debug("Used signed cookies")
-    else
-      # Fallback for environments where signed cookies aren't available
-      cookies[:session_token] = session_token
-      auth_debug("Used unsigned cookies (fallback)")
+      auth_debug("Set signed cookie")
     end
+
+    # Also set the unsigned cookie for tests that don't support signed cookies
+    cookies[:session_token] = session_token
+    auth_debug("Set unsigned cookie")
   end
 
   # Enhanced sign_in method that works consistently across all test types
@@ -131,14 +131,15 @@ module AuthenticationTestHelper
   def remove_auth_cookie
     auth_debug("Removing auth cookie")
 
-    # Use the same logic as set_auth_cookie for consistency
+    # Always remove both signed and unsigned cookies to ensure consistency
     if cookies.respond_to?(:signed) && cookies.signed.respond_to?(:delete)
       cookies.signed.delete(:session_token)
       auth_debug("Removed signed cookie")
-    else
-      cookies.delete(:session_token)
-      auth_debug("Removed unsigned cookie (fallback)")
     end
+
+    # Also remove the unsigned cookie
+    cookies.delete(:session_token)
+    auth_debug("Removed unsigned cookie")
   end
 
   # Centralized debug logging for authentication
@@ -147,5 +148,25 @@ module AuthenticationTestHelper
   def auth_debug(message)
     return unless ENV["DEBUG_AUTH"] == "true"
     Rails.logger.debug "[AUTH DEBUG] #{message}"
+  end
+
+  # Enhanced authentication helper that abstracts away all the complexity
+  # This is the preferred method for authenticating users in tests
+  # @param user [User] The user to authenticate (defaults to @user if defined)
+  # @return [Hash] Default headers for method chaining
+  def authenticate_user!(user = nil)
+    user ||= @user if defined?(@user)
+    raise "No user provided for authentication" unless user
+
+    auth_debug("Authenticating user: #{user.email} with authenticate_user!")
+
+    # Sign in the user
+    sign_in(user)
+
+    # Verify authentication was successful
+    debug_auth_state("Authentication verification") if respond_to?(:debug_auth_state)
+
+    # Return headers for method chaining if needed
+    default_headers
   end
 end

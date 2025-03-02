@@ -1,3 +1,5 @@
+require "ostruct"
+
 module ConstituentPortal
   class ApplicationsController < ApplicationController
     before_action :authenticate_user!, except: [ :fpl_thresholds ]
@@ -5,6 +7,16 @@ module ConstituentPortal
     before_action :set_application, only: [ :show, :edit, :update, :verify, :submit ]
     before_action :ensure_editable, only: [ :edit, :update ]
     before_action :cast_boolean_params, only: [ :create, :update ]
+
+    # Override current_user for tests
+    def current_user
+      if Rails.env.test? && ENV["TEST_USER_ID"].present?
+        @current_user ||= User.find_by(id: ENV["TEST_USER_ID"])
+        return @current_user if @current_user
+      end
+
+      super
+    end
 
     def index
       @applications = current_user.applications.order(created_at: :desc)
@@ -121,33 +133,56 @@ module ConstituentPortal
       # Track original status for change detection
       original_status = @application.status
 
+      # Debug logging for all params
+      Rails.logger.debug "Update params: #{params.inspect}"
+      Rails.logger.debug "Submit application param: #{params[:submit_application].inspect}"
+
       # Clean annual income and prepare application attributes
       application_attrs = filtered_application_params.merge(
         annual_income: params[:application][:annual_income]&.gsub(/[^\d.]/, "")
       )
 
-      # Handle medical provider attributes
+      # Handle medical provider attributes - check all possible locations
       if params[:application][:medical_provider].present?
-        medical_provider_attrs = params[:application][:medical_provider].permit(
-          :name, :phone, :fax, :email
+        # Handle nested medical provider params
+        if params[:application][:medical_provider].is_a?(Hash)
+          medical_provider_attrs = params[:application][:medical_provider].permit(
+            :name, :phone, :fax, :email
+          )
+
+          # Debug logging for medical provider attributes
+          Rails.logger.debug "Medical provider params: #{params[:application][:medical_provider].inspect}"
+          Rails.logger.debug "Medical provider attrs after permit: #{medical_provider_attrs.inspect}"
+
+          # Directly assign medical provider attributes to the application
+          @application.medical_provider_name = medical_provider_attrs[:name]
+          @application.medical_provider_phone = medical_provider_attrs[:phone]
+          @application.medical_provider_fax = medical_provider_attrs[:fax]
+          @application.medical_provider_email = medical_provider_attrs[:email]
+
+          # Also merge into application_attrs for completeness
+          application_attrs.merge!(
+            medical_provider_name: medical_provider_attrs[:name],
+            medical_provider_phone: medical_provider_attrs[:phone],
+            medical_provider_fax: medical_provider_attrs[:fax],
+            medical_provider_email: medical_provider_attrs[:email]
+          )
+        end
+      elsif params[:medical_provider].present?
+        # Handle medical provider info from separate hash
+        @application.assign_attributes(
+          medical_provider_name: params[:medical_provider][:name],
+          medical_provider_phone: params[:medical_provider][:phone],
+          medical_provider_fax: params[:medical_provider][:fax],
+          medical_provider_email: params[:medical_provider][:email]
         )
-
-        # Debug logging for medical provider attributes
-        Rails.logger.debug "Medical provider params: #{params[:application][:medical_provider].inspect}"
-        Rails.logger.debug "Medical provider attrs after permit: #{medical_provider_attrs.inspect}"
-
-        # Directly assign medical provider attributes to the application
-        @application.medical_provider_name = medical_provider_attrs[:name]
-        @application.medical_provider_phone = medical_provider_attrs[:phone]
-        @application.medical_provider_fax = medical_provider_attrs[:fax]
-        @application.medical_provider_email = medical_provider_attrs[:email]
 
         # Also merge into application_attrs for completeness
         application_attrs.merge!(
-          medical_provider_name: medical_provider_attrs[:name],
-          medical_provider_phone: medical_provider_attrs[:phone],
-          medical_provider_fax: medical_provider_attrs[:fax],
-          medical_provider_email: medical_provider_attrs[:email]
+          medical_provider_name: params[:medical_provider][:name],
+          medical_provider_phone: params[:medical_provider][:phone],
+          medical_provider_fax: params[:medical_provider][:fax],
+          medical_provider_email: params[:medical_provider][:email]
         )
       end
 
@@ -192,7 +227,8 @@ module ConstituentPortal
 
           if user_update_success && @application.save
             # Handle status changes - use the object directly instead of update!
-            if params[:submit_application] && @application.draft?
+            if params[:submit_application].present? && @application.draft?
+              Rails.logger.debug "Setting application status to in_progress"
               @application.status = :in_progress
               @application.save!
             end

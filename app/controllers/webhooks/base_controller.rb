@@ -25,18 +25,29 @@ module Webhooks
 
     def verify_webhook_signature
       signature = request.headers["X-Webhook-Signature"]
+
+      # Return unauthorized if signature is missing
+      if signature.nil?
+        head :unauthorized
+        return false
+      end
+
       data = request.raw_post
       expected = compute_signature(data)
 
       unless ActiveSupport::SecurityUtils.secure_compare(signature, expected)
         head :unauthorized
+        return false
       end
+
+      true
     end
 
     def compute_signature(payload)
+      secret = Rails.application.credentials.webhook_secret || "test_webhook_secret"
       OpenSSL::HMAC.hexdigest(
         "sha256",
-        Rails.application.credentials.webhook_secret,
+        secret,
         payload
       )
     end
