@@ -156,12 +156,15 @@ class Admin::PaperApplicationsController < Admin::BaseController
       # Only create a proof review record if the proof is attached
       # This prevents the validation error when rejecting a proof that wasn't provided
       if params[:income_proof].present? || !Rails.env.production?
+        income_rejection_reason = params[:income_proof_rejection_reason]
+        income_rejection_notes = params[:income_proof_rejection_notes]
+
         @income_proof_review = application.proof_reviews.build(
           admin: current_user || User.system_user,
           proof_type: :income,
           status: :rejected,
-          rejection_reason: params[:income_proof_rejection_reason],
-          notes: params[:income_proof_rejection_notes],
+          rejection_reason: income_rejection_reason,
+          notes: income_rejection_notes,
           submission_method: :paper,
           reviewed_at: Time.current
         )
@@ -193,12 +196,15 @@ class Admin::PaperApplicationsController < Admin::BaseController
       # Only create a proof review record if the proof is attached
       # This prevents the validation error when rejecting a proof that wasn't provided
       if params[:residency_proof].present? || !Rails.env.production?
+        residency_rejection_reason = params[:residency_proof_rejection_reason]
+        residency_rejection_notes = params[:residency_proof_rejection_notes]
+
         @residency_proof_review = application.proof_reviews.build(
           admin: current_user || User.system_user,
           proof_type: :residency,
           status: :rejected,
-          rejection_reason: params[:residency_proof_rejection_reason],
-          notes: params[:residency_proof_rejection_notes],
+          rejection_reason: residency_rejection_reason,
+          notes: residency_rejection_notes,
           submission_method: :paper,
           reviewed_at: Time.current
         )
