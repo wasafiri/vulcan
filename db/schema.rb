@@ -602,7 +602,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_02_023644) do
   add_foreign_key "application_status_changes", "users"
   add_foreign_key "applications", "users"
   add_foreign_key "applications", "users", column: "income_verified_by_id"
-  add_foreign_key "applications", "users", column: "medical_certification_verified_by_id"
   add_foreign_key "applications", "users", column: "trainer_id"
   add_foreign_key "appointments", "users"
   add_foreign_key "appointments", "users", column: "evaluator_id"

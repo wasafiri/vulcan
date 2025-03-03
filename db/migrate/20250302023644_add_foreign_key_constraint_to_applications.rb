@@ -30,11 +30,20 @@ class AddForeignKeyConstraintToApplications < ActiveRecord::Migration[8.0]
       raise "Cannot add foreign key constraint: orphaned applications exist. Please fix them manually."
     end
 
-    # Add the foreign key constraint
-    add_foreign_key :applications, :users, on_delete: :restrict
+    # Check if the foreign key already exists
+    if !foreign_key_exists?(:applications, :users)
+      # Only add the foreign key if it doesn't exist
+      add_foreign_key :applications, :users, on_delete: :restrict
+    else
+      puts "Foreign key from applications to users already exists. Skipping creation."
+    end
   end
 
   def down
-    remove_foreign_key :applications, :users
+    if foreign_key_exists?(:applications, :users)
+      remove_foreign_key :applications, :users
+    else
+      puts "Foreign key from applications to users does not exist. Skipping removal."
+    end
   end
 end
