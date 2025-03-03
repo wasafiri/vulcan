@@ -11,14 +11,14 @@ class ProofReview < ApplicationRecord
   # Validations
   validates :proof_type, :status, :reviewed_at, presence: true
   validates :rejection_reason, presence: true, if: :status_rejected?
-  validate :admin_must_be_admin_type, unless: -> { Rails.env.test? }
-  validate :application_must_be_active, unless: -> { Rails.env.test? }
-  validate :proof_must_be_attached, unless: -> { Rails.env.test? }
+  validate :admin_must_be_admin_type
+  validate :application_must_be_active
+  validate :proof_must_be_attached, if: :should_validate_proof_attachment?
 
   # Callbacks
   before_validation :set_reviewed_at, on: :create
-  after_commit :handle_post_review_actions, on: :create, unless: -> { Rails.env.test? }
-  after_commit :check_all_proofs_approved, on: :create, if: -> { status_approved? && !Rails.env.test? }
+  after_commit :handle_post_review_actions, on: :create
+  after_commit :check_all_proofs_approved, on: :create, if: :status_approved?
 
   # Scopes
   scope :recent, -> { order(created_at: :desc) }
@@ -38,6 +38,24 @@ class ProofReview < ApplicationRecord
 
   def application_must_be_active
     errors.add(:application, "cannot be reviewed when archived") if application&.archived?
+  end
+
+  def should_validate_proof_attachment?
+    # Only validate proof attachment in production or when explicitly testing this validation
+    return false if Rails.env.test? && ENV["VALIDATE_PROOF_ATTACHMENTS"] != "true"
+
+    # Always validate in production
+    return true if Rails.env.production?
+
+    # In other environments, validate based on the proof type and status
+    # For example, we might want to validate for approved proofs but not for rejected ones
+    return true if status_approved?
+
+    # For rejected proofs, we might want to be more lenient in development/test
+    return false if status_rejected? && (Rails.env.development? || Rails.env.test?)
+
+    # Default to validating
+    true
   end
 
   def proof_must_be_attached

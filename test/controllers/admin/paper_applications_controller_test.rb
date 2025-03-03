@@ -17,6 +17,17 @@ class Admin::PaperApplicationsControllerTest < ActionDispatch::IntegrationTest
     Policy.find_or_create_by(key: "fpl_1_person").update(value: 15000)
     Policy.find_or_create_by(key: "fpl_2_person").update(value: 20000)
     Policy.find_or_create_by(key: "fpl_modifier_percentage").update(value: 400)
+
+    # Ensure test files exist
+    fixture_dir = Rails.root.join("test", "fixtures", "files")
+    FileUtils.mkdir_p(fixture_dir)
+
+    [ "test_proof.pdf", "test_income_proof.pdf", "test_residency_proof.pdf" ].each do |filename|
+      file_path = fixture_dir.join(filename)
+      unless File.exist?(file_path)
+        File.write(file_path, "test content for #{filename}")
+      end
+    end
   end
 
   test "should get new" do
