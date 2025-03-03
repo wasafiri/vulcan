@@ -6,7 +6,7 @@ class ProofReview < ApplicationRecord
   # Enums (using the original syntax to avoid argument errors)
   enum :proof_type, { income: 0, residency: 1 }, prefix: true
   enum :status, { approved: 0, rejected: 1 }, prefix: true
-  enum :submission_method, { web: 0, email: 1, scanned: 2 }, prefix: true
+  enum :submission_method, { web: 0, email: 1, scanned: 2, paper: 3 }, prefix: true
 
   # Validations
   validates :proof_type, :status, :reviewed_at, presence: true
