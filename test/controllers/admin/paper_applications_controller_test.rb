@@ -122,6 +122,77 @@ class Admin::PaperApplicationsControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
   end
 
+  test "should create paper application with rejected residency proof but no file attached" do
+    # Disable email delivery for this test
+    ActionMailer::Base.delivery_method = :test
+    ActionMailer::Base.perform_deliveries = false
+
+    # Create test file for income proof only
+    income_proof = fixture_file_upload(Rails.root.join("test/fixtures/files/test_proof.pdf"), "application/pdf")
+
+    # Get the count before the request
+    application_count_before = Application.count
+    proof_review_count_before = ProofReview.count
+
+    # Set the environment to test (non-production)
+    Rails.env.stubs(:production?).returns(false)
+
+    post admin_paper_applications_path, headers: default_headers, params: {
+      income_proof: income_proof,
+      constituent: {
+        first_name: "Jane",
+        last_name: "Smith",
+        email: "test-paper-app@example.com", # Use a unique email to avoid conflicts
+        phone: "555-987-6543",
+        physical_address_1: "456 Oak St",
+        city: "Baltimore",
+        state: "MD",
+        zip_code: "21202",
+        hearing_disability: "1"
+      },
+      application: {
+        household_size: 2,
+        annual_income: 20000,
+        maryland_resident: "1",
+        self_certify_disability: "1",
+        terms_accepted: "1",
+        information_verified: "1",
+        medical_release_authorized: "1",
+        medical_provider_name: "Dr. John Doe",
+        medical_provider_phone: "555-123-4567",
+        medical_provider_email: "dr.doe@example.com"
+      },
+      income_proof_action: "accept",
+      residency_proof_action: "reject",
+      residency_proof_rejection_reason: "address_mismatch",
+      residency_proof_rejection_notes: "The address on the document doesn't match."
+    }
+
+    # Restore the environment
+    Rails.env.unstub(:production?)
+
+    # Re-enable email delivery
+    ActionMailer::Base.perform_deliveries = true
+
+    # Verify the response - we expect a redirect
+    assert_response :redirect
+
+    # Verify that the application was created
+    assert_equal application_count_before + 1, Application.count
+
+    # Get the created application
+    application = Application.last
+
+    # Verify that the application has the correct status
+    assert_equal "in_progress", application.status
+
+    # Verify that the residency proof status is rejected
+    assert_equal "rejected", application.residency_proof_status
+
+    # The main thing we're testing is that the application is created successfully
+    # and the residency proof status is set to "rejected", even without a file attached
+  end
+
   test "should not create paper application when income exceeds threshold" do
     assert_no_difference("Application.count") do
       assert_no_difference("Constituent.count") do

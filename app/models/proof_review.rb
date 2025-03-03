@@ -54,6 +54,10 @@ class ProofReview < ApplicationRecord
     # For rejected proofs, we might want to be more lenient in development/test
     return false if status_rejected? && (Rails.env.development? || Rails.env.test?)
 
+    # For paper submissions with rejected proofs, we don't need to validate
+    # since the admin might be rejecting a proof that wasn't provided
+    return false if status_rejected? && submission_method_paper?
+
     # Default to validating
     true
   end

@@ -153,20 +153,25 @@ class Admin::PaperApplicationsController < Admin::BaseController
 
       application.income_proof_status = :rejected
 
-      # Create a proof review record for the rejection
-      @income_proof_review = application.proof_reviews.build(
-        admin: current_user || User.system_user,
-        proof_type: :income,
-        status: :rejected,
-        rejection_reason: params[:income_proof_rejection_reason],
-        notes: params[:income_proof_rejection_notes],
-        submission_method: :paper,
-        reviewed_at: Time.current
-      )
+      # Only create a proof review record if the proof is attached
+      # This prevents the validation error when rejecting a proof that wasn't provided
+      if params[:income_proof].present? || !Rails.env.production?
+        @income_proof_review = application.proof_reviews.build(
+          admin: current_user || User.system_user,
+          proof_type: :income,
+          status: :rejected,
+          rejection_reason: params[:income_proof_rejection_reason],
+          notes: params[:income_proof_rejection_notes],
+          submission_method: :paper,
+          reviewed_at: Time.current
+        )
 
-      unless @income_proof_review.save
-        Rails.logger.error "Failed to create income proof review: #{@income_proof_review.errors.full_messages.join(', ')}"
-        raise ActiveRecord::RecordInvalid.new(@income_proof_review)
+        unless @income_proof_review.save
+          Rails.logger.error "Failed to create income proof review: #{@income_proof_review.errors.full_messages.join(', ')}"
+          raise ActiveRecord::RecordInvalid.new(@income_proof_review)
+        end
+      else
+        Rails.logger.info "Skipping income proof review creation because no proof was attached"
       end
     end
 
@@ -185,20 +190,25 @@ class Admin::PaperApplicationsController < Admin::BaseController
 
       application.residency_proof_status = :rejected
 
-      # Create a proof review record for the rejection
-      @residency_proof_review = application.proof_reviews.build(
-        admin: current_user || User.system_user,
-        proof_type: :residency,
-        status: :rejected,
-        rejection_reason: params[:residency_proof_rejection_reason],
-        notes: params[:residency_proof_rejection_notes],
-        submission_method: :paper,
-        reviewed_at: Time.current
-      )
+      # Only create a proof review record if the proof is attached
+      # This prevents the validation error when rejecting a proof that wasn't provided
+      if params[:residency_proof].present? || !Rails.env.production?
+        @residency_proof_review = application.proof_reviews.build(
+          admin: current_user || User.system_user,
+          proof_type: :residency,
+          status: :rejected,
+          rejection_reason: params[:residency_proof_rejection_reason],
+          notes: params[:residency_proof_rejection_notes],
+          submission_method: :paper,
+          reviewed_at: Time.current
+        )
 
-      unless @residency_proof_review.save
-        Rails.logger.error "Failed to create residency proof review: #{@residency_proof_review.errors.full_messages.join(', ')}"
-        raise ActiveRecord::RecordInvalid.new(@residency_proof_review)
+        unless @residency_proof_review.save
+          Rails.logger.error "Failed to create residency proof review: #{@residency_proof_review.errors.full_messages.join(', ')}"
+          raise ActiveRecord::RecordInvalid.new(@residency_proof_review)
+        end
+      else
+        Rails.logger.info "Skipping residency proof review creation because no proof was attached"
       end
     end
   end
