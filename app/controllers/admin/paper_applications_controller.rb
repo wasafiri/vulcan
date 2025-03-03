@@ -146,10 +146,28 @@ class Admin::PaperApplicationsController < Admin::BaseController
         application.income_proof_status = :approved
       end
     when "reject"
+      # Always attach the proof if provided, even if rejecting it
+      if params[:income_proof].present?
+        application.income_proof.attach(params[:income_proof])
+      end
+
       application.income_proof_status = :rejected
-      # Store rejection reason for notification
-      application.income_proof_rejection_reason = params[:income_proof_rejection_reason]
-      application.income_proof_rejection_notes = params[:income_proof_rejection_notes]
+
+      # Create a proof review record for the rejection
+      @income_proof_review = application.proof_reviews.build(
+        admin: current_user || User.system_user,
+        proof_type: :income,
+        status: :rejected,
+        rejection_reason: params[:income_proof_rejection_reason],
+        notes: params[:income_proof_rejection_notes],
+        submission_method: :paper,
+        reviewed_at: Time.current
+      )
+
+      unless @income_proof_review.save
+        Rails.logger.error "Failed to create income proof review: #{@income_proof_review.errors.full_messages.join(', ')}"
+        raise ActiveRecord::RecordInvalid.new(@income_proof_review)
+      end
     end
 
     # Handle residency proof (similar logic)
@@ -160,30 +178,44 @@ class Admin::PaperApplicationsController < Admin::BaseController
         application.residency_proof_status = :approved
       end
     when "reject"
+      # Always attach the proof if provided, even if rejecting it
+      if params[:residency_proof].present?
+        application.residency_proof.attach(params[:residency_proof])
+      end
+
       application.residency_proof_status = :rejected
-      # Store rejection reason for notification
-      application.residency_proof_rejection_reason = params[:residency_proof_rejection_reason]
-      application.residency_proof_rejection_notes = params[:residency_proof_rejection_notes]
+
+      # Create a proof review record for the rejection
+      @residency_proof_review = application.proof_reviews.build(
+        admin: current_user || User.system_user,
+        proof_type: :residency,
+        status: :rejected,
+        rejection_reason: params[:residency_proof_rejection_reason],
+        notes: params[:residency_proof_rejection_notes],
+        submission_method: :paper,
+        reviewed_at: Time.current
+      )
+
+      unless @residency_proof_review.save
+        Rails.logger.error "Failed to create residency proof review: #{@residency_proof_review.errors.full_messages.join(', ')}"
+        raise ActiveRecord::RecordInvalid.new(@residency_proof_review)
+      end
     end
   end
 
   def send_proof_rejection_notifications(application)
     # Send email notifications for rejected proofs
-    if application.income_proof_status_rejected?
+    if application.income_proof_status_rejected? && @income_proof_review.present?
       ApplicationNotificationsMailer.proof_rejected(
         application,
-        "income",
-        application.income_proof_rejection_reason,
-        application.income_proof_rejection_notes
+        @income_proof_review
       ).deliver_later
     end
 
-    if application.residency_proof_status_rejected?
+    if application.residency_proof_status_rejected? && @residency_proof_review.present?
       ApplicationNotificationsMailer.proof_rejected(
         application,
-        "residency",
-        application.residency_proof_rejection_reason,
-        application.residency_proof_rejection_notes
+        @residency_proof_review
       ).deliver_later
     end
   end
