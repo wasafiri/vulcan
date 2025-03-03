@@ -5,7 +5,7 @@ class CreateSolidQueueFailedExecutions < ActiveRecord::Migration[8.0]
       t.references :process, foreign_key: { to_table: :solid_queue_processes, on_delete: :nullify }
       t.text :error
       t.text :backtrace
-      t.datetime :failed_at, null: false
+      t.datetime :failed_at, null: false, default: -> { 'CURRENT_TIMESTAMP' }
       t.timestamps
 
       t.index :failed_at
