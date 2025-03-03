@@ -4,7 +4,7 @@ class Applications::ProofReviewer
     @admin = admin
   end
 
-  def review(proof_type:, status:, rejection_reason: nil)
+  def review(proof_type:, status:, rejection_reason: nil, notes: nil)
     Rails.logger.info "Starting review with proof_type: #{proof_type.inspect}, status: #{status.inspect}"
 
     # Store the string values we'll need for application status
@@ -20,7 +20,8 @@ class Applications::ProofReviewer
         admin: @admin,
         proof_type: @proof_type_key,
         status: @status_key,
-        rejection_reason: rejection_reason
+        rejection_reason: rejection_reason,
+        notes: notes
       )
       Rails.logger.info "Created ProofReview ID: #{@proof_review.id}, status: #{@proof_review.status}, proof_type: #{@proof_review.proof_type}"
 

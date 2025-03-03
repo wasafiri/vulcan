@@ -161,7 +161,8 @@ class Admin::ApplicationsController < Admin::BaseController
       reviewer.review(
         proof_type: params[:proof_type],
         status: params[:status],
-        rejection_reason: params[:rejection_reason]
+        rejection_reason: params[:rejection_reason],
+        notes: params[:notes]
       )
 
       Rails.logger.info "Proof review completed successfully"

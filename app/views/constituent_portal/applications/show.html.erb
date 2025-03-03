@@ -118,6 +118,22 @@
       </div>
     </div>
 
+    <% if @application.application_notes.public_notes.any? %>
+    <div class="mb-4">
+      <h2 class="text-xl font-semibold mb-2">Notes from MAT Staff</h2>
+      <div class="space-y-4">
+        <% @application.application_notes.public_notes.recent_first.each do |note| %>
+          <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <p class="text-gray-800"><%= note.content %></p>
+            <p class="text-xs text-gray-500 mt-2">
+              Added by <%= note.admin.full_name %> on <%= note.created_at.strftime("%B %d, %Y at %I:%M %p") %>
+            </p>
+          </div>
+        <% end %>
+      </div>
+    </div>
+    <% end %>
+
     <div class="mb-4">
       <h2 class="text-xl font-semibold mb-2">Actions</h2>
       <%= link_to "See your MAT Dashboard", constituent_portal_dashboard_path, class: "bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600" %>

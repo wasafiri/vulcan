@@ -15,6 +15,7 @@ class Application < ApplicationRecord
   has_many :status_changes, class_name: "ApplicationStatusChange"
   has_many :proof_submission_audits, dependent: :destroy
   has_many :vouchers, dependent: :restrict_with_error
+  has_many :application_notes, dependent: :destroy
   has_one_attached :medical_certification
   belongs_to :medical_certification_verified_by,
     class_name: "User",

@@ -343,6 +343,18 @@
                 placeholder: "Please provide a detailed explanation...",
                 data: { rejection_form_target: "reasonField" } %>
           </div>
+          
+          <div class="mt-4">
+            <%= f.label :notes, "Additional Notes to Constituent", class: "block text-sm font-medium text-gray-700" %>
+            <%= f.text_area :notes,
+                rows: 4,
+                class: "mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+                placeholder: "Additional instructions or information for the constituent...",
+                data: { rejection_form_target: "notesField" } %>
+            <p class="mt-1 text-xs text-gray-500">
+              These notes will be included in the rejection email sent to the constituent.
+            </p>
+          </div>
           <div class="flex justify-end space-x-3">
             <button type="button" 
                     data-action="click->modal#close"

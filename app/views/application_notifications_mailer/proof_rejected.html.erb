@@ -26,6 +26,19 @@
   </div>
 </div>
 
+<% if @proof_review&.notes.present? %>
+  <div style="background-color: #f3f4f6; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #9ca3af;">
+    <h3 style="margin-top: 0; color: #4b5563;">
+      <span aria-hidden="true">📝</span>
+      Additional Instructions
+    </h3>
+    
+    <div style="color: #4b5563;">
+      <p><%= @proof_review.notes %></p>
+    </div>
+  </div>
+<% end %>
+
 <% if @remaining_attempts && @remaining_attempts > 0 %>
   <p>You have <strong><%= @remaining_attempts %> <%= 'attempt'.pluralize(@remaining_attempts) %></strong> remaining to submit your revised document.</p>
   

@@ -14,11 +14,7 @@ class Admin::BaseController < ApplicationController
   end
 
   def set_current_attributes
-    if Rails.env.test? && current_user.nil?
-      # In test environment, use system user if current_user is nil
-      Current.set(request, User.system_user)
-    else
-      Current.set(request, current_user)
-    end
+    # Always use the current_user, even in test environment
+    Current.set(request, current_user)
   end
 end

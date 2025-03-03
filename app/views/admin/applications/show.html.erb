@@ -368,6 +368,63 @@
       <%= render "voucher_details" %>
     <% end %>
 
+    <!-- Admin Notes Section -->
+    <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="notes-title">
+      <h2 id="notes-title" class="text-xl font-semibold text-gray-900 mb-4">Admin Notes</h2>
+      
+      <!-- Note Form -->
+      <div class="mb-6 border-b border-gray-200 pb-6">
+        <%= form_with model: [:admin, @application, ApplicationNote.new], local: true, class: "space-y-4" do |f| %>
+          <div>
+            <%= f.label :content, "Add a Note", class: "block text-sm font-medium text-gray-700" %>
+            <%= f.text_area :content, rows: 3, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm", placeholder: "Enter your note here..." %>
+          </div>
+          
+          <div class="flex items-center">
+            <%= f.check_box :internal_only, checked: true, class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" %>
+            <%= f.label :internal_only, "Internal only (not visible to constituent)", class: "ml-2 block text-sm text-gray-900" %>
+          </div>
+          
+          <div class="flex justify-end">
+            <%= f.submit "Add Note", class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+          </div>
+        <% end %>
+      </div>
+      
+      <!-- Notes List -->
+      <div>
+        <% if @application.application_notes.any? %>
+          <ul class="space-y-4">
+            <% @application.application_notes.recent_first.each do |note| %>
+              <li class="bg-gray-50 p-4 rounded-md">
+                <div class="flex justify-between items-start">
+                  <div class="flex-1">
+                    <p class="text-sm text-gray-900"><%= note.content %></p>
+                    <div class="mt-2 flex items-center text-xs text-gray-500">
+                      <span><%= note.admin.full_name %></span>
+                      <span class="mx-1">•</span>
+                      <span><%= note.created_at.strftime("%B %d, %Y at %I:%M %p") %></span>
+                      <% if note.internal_only %>
+                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                          Internal Only
+                        </span>
+                      <% else %>
+                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                          Visible to Constituent
+                        </span>
+                      <% end %>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            <% end %>
+          </ul>
+        <% else %>
+          <p class="text-sm text-gray-500">No notes have been added yet.</p>
+        <% end %>
+      </div>
+    </section>
+
     <!-- Audit Logs Section -->
     <%= render "audit_logs" %>
   </div>

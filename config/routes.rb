@@ -62,6 +62,8 @@ Rails.application.routes.draw do
         patch :update_certification_status
         post :resend_medical_certification
       end
+
+      resources :notes, only: [ :create ], controller: "application_notes"
     end
 
     resources :constituents_dashboard, only: [ :index, :show ]

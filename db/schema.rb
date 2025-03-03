@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_03_02_023644) do
+ActiveRecord::Schema[8.0].define(version: 2025_03_03_195021) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -54,6 +54,17 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_02_023644) do
     t.bigint "blob_id", null: false
     t.string "variation_digest", null: false
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  end
+
+  create_table "application_notes", force: :cascade do |t|
+    t.bigint "application_id", null: false
+    t.bigint "admin_id", null: false
+    t.text "content", null: false
+    t.boolean "internal_only", default: true
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["admin_id"], name: "index_application_notes_on_admin_id"
+    t.index ["application_id"], name: "index_application_notes_on_application_id"
   end
 
   create_table "application_status_changes", force: :cascade do |t|
@@ -289,6 +300,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_02_023644) do
     t.datetime "reviewed_at", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.text "notes"
     t.index ["admin_id", "created_at"], name: "index_proof_reviews_on_admin_id_and_created_at"
     t.index ["admin_id"], name: "index_proof_reviews_on_admin_id"
     t.index ["application_id", "proof_type", "created_at"], name: "idx_on_application_id_proof_type_created_at_4b8ffa7c5f"
@@ -598,6 +610,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_02_023644) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "application_notes", "applications"
+  add_foreign_key "application_notes", "users", column: "admin_id"
   add_foreign_key "application_status_changes", "applications"
   add_foreign_key "application_status_changes", "users"
   add_foreign_key "applications", "users"
