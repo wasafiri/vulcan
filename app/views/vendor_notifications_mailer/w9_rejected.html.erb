@@ -1,12 +1,10 @@
-<%= render "shared/mailers/header" %>
-
-<h1>W9 Form Requires Attention</h1>
+<%= render "shared/mailers/header", title: "W9 Form Requires Attention" %>
 
 <p>Dear <%= @vendor.business_name %>,</p>
 
 <p>We have reviewed your submitted W9 form and found that it requires some corrections before we can proceed.</p>
 
-<%= render "shared/mailers/status_box", status: "Action Required", color: "red" %>
+<%= render "shared/mailers/status_box", status: :error, title: "Action Required" %>
 
 <h2>Reason for Rejection</h2>
 

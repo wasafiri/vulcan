@@ -30,15 +30,16 @@ FactoryBot.define do
       status { :suspended }
     end
 
-    trait :with_w9 do
-      after(:create) do |vendor|
-        vendor.w9_form.attach(
-          io: File.open(Rails.root.join("test/fixtures/files/sample_w9.txt")),
-          filename: "w9.txt",
-          content_type: "text/plain"
-        )
-      end
+  trait :with_w9 do
+    after(:create) do |vendor|
+      vendor.w9_form.attach(
+        io: File.open(Rails.root.join("test/fixtures/files/sample_w9.pdf")),
+        filename: "w9.pdf",
+        content_type: "application/pdf"
+      )
+      vendor.update(w9_status: :pending_review)
     end
+  end
 
     trait :with_transactions do
       transient do

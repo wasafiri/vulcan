@@ -18,7 +18,37 @@
       <div class="border-t border-gray-200 p-4">
         <% if @w9_form.attached? %>
           <div class="w-full h-[600px] overflow-hidden">
-            <iframe src="<%= rails_blob_path(@w9_form, disposition: 'inline') %>" class="w-full h-full"></iframe>
+            <%# 
+              IMPORTANT: PDF Preview Fix
+              
+              Setting both src and data-original-src attributes is critical for PDF previews to work correctly.
+              Previous implementations only set data-original-src and relied on JavaScript to set the src,
+              but this was unreliable and often resulted in blank PDF previews.
+              
+              The current implementation:
+              1. Sets the src attribute directly in the HTML
+              2. Also keeps data-original-src for the modal controller to use
+              3. Uses data-turbo="false" to prevent Turbo from interfering with the iframe
+              
+              DO NOT REMOVE the src attribute or change this implementation without thorough testing.
+              Changes here have repeatedly broken PDF previews in the past.
+            %>
+            <iframe 
+              src="<%= url_for(@w9_form) %>"
+              data-original-src="<%= url_for(@w9_form) %>" 
+              type="application/pdf" 
+              width="100%" 
+              height="600px"
+              class="w-full h-full"
+              data-turbo="false"
+              allow="fullscreen">
+              <p class="text-gray-500">
+                It appears your browser cannot display this PDF inline. 
+                <%= link_to "Click here to download the PDF", rails_blob_path(@w9_form, disposition: :attachment), 
+                    class: "text-indigo-600 hover:text-indigo-500",
+                    target: "_blank" %>
+              </p>
+            </iframe>
           </div>
           <div class="mt-4 flex justify-center">
             <%= link_to "Open in New Tab", rails_blob_path(@w9_form, disposition: "inline"), target: "_blank", class: "btn btn-outline" %>
@@ -124,7 +154,7 @@
           <div class="pt-5">
             <div class="flex justify-end">
               <%= link_to "Cancel", admin_vendor_path(@vendor), class: "btn btn-outline mr-3" %>
-              <%= f.submit "Submit Review", class: "btn btn-primary" %>
+              <%= f.submit "Submit Review", class: "btn btn-primary", data: { disable_with: "Processing..." } %>
             </div>
           </div>
         <% end %>
@@ -137,6 +167,9 @@
   document.addEventListener('DOMContentLoaded', function() {
     const statusRadios = document.querySelectorAll('input[name="w9_review[status]"]');
     const rejectionReasonDiv = document.querySelector('.rejection-reason');
+    const form = document.querySelector('form');
+    const rejectionReasonCodeRadios = document.querySelectorAll('input[name="w9_review[rejection_reason_code]"]');
+    const rejectionReasonTextarea = document.getElementById('w9_review_rejection_reason');
     
     function toggleRejectionReason() {
       const isRejected = document.getElementById('w9_review_status_rejected').checked;
@@ -144,8 +177,38 @@
         rejectionReasonDiv.classList.remove('hidden');
       } else {
         rejectionReasonDiv.classList.add('hidden');
+        // Clear rejection reason fields when not rejected
+        rejectionReasonCodeRadios.forEach(radio => {
+          radio.checked = false;
+        });
+        if (rejectionReasonTextarea) {
+          rejectionReasonTextarea.value = '';
+        }
       }
     }
+    
+    // Add form submission validation
+    form.addEventListener('submit', function(event) {
+      const isRejected = document.getElementById('w9_review_status_rejected').checked;
+      
+      if (isRejected) {
+        // Check if a rejection reason code is selected
+        let reasonCodeSelected = false;
+        rejectionReasonCodeRadios.forEach(radio => {
+          if (radio.checked) {
+            reasonCodeSelected = true;
+          }
+        });
+        
+        // Check if rejection reason text is provided
+        const reasonText = rejectionReasonTextarea ? rejectionReasonTextarea.value.trim() : '';
+        
+        if (!reasonCodeSelected || reasonText === '') {
+          event.preventDefault();
+          alert('Please select a rejection reason and provide a detailed explanation.');
+        }
+      }
+    });
     
     statusRadios.forEach(radio => {
       radio.addEventListener('change', toggleRejectionReason);

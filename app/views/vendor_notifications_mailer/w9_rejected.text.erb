@@ -1,12 +1,10 @@
-<%= render "shared/mailers/header.text" %>
-
-W9 Form Requires Attention
+<%= render partial: "shared/mailers/header", formats: [:text], locals: { title: "W9 Form Requires Attention" } %>
 
 Dear <%= @vendor.business_name %>,
 
 We have reviewed your submitted W9 form and found that it requires some corrections before we can proceed.
 
-STATUS: ACTION REQUIRED
+<%= render partial: "shared/mailers/status_box", formats: [:text], locals: { status: :error, title: "Action Required" } %>
 
 Reason for Rejection:
 <% if @w9_review.rejection_reason_code_address_mismatch? %>
@@ -31,4 +29,4 @@ If you have any questions or need assistance, please don't hesitate to contact o
 
 Thank you for your cooperation.
 
-<%= render "shared/mailers/footer.text" %>
+<%= render partial: "shared/mailers/footer", formats: [:text] %>

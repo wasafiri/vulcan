@@ -36,6 +36,9 @@ class Admin::W9ReviewsController < ApplicationController
       redirect_to admin_vendor_path(@vendor),
         notice: "W9 review completed successfully"
     else
+      # Set @w9_form for the view when rendering :new after validation failure
+      @w9_form = @vendor.w9_form
+
       render :new, status: :unprocessable_entity,
         alert: "W9 review failed to save"
     end

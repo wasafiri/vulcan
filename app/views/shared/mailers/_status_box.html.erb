@@ -1,46 +1,51 @@
-<%
-  # Status box partial for mailers
-  # Usage:
-  # <%= render 'shared/mailers/status_box', 
-  #      status: :success, # or :warning, :error, :info
-  #      title: "Optional Title",
-  #      message: "Your message here" %>
-  
-  # Set default title based on status if not provided
-  status = local_assigns.fetch(:status, :info).to_sym
-  title = local_assigns.fetch(:title, status.to_s.capitalize)
-  
+<%# Status box partial for mailers %>
+<%# Usage: %>
+<%# <%= render 'shared/mailers/status_box',  %>
+<%#      status: :success, # or :warning, :error, :info %>
+<%#      title: "Optional Title", %>
+<%#      message: "Your message here" %> %>
+
+<% status = local_assigns.fetch(:status, :info).to_sym %>
+<% title = local_assigns.fetch(:title, status.to_s.capitalize) %>
+
+<% 
   # Define background color based on status
   bg_color = case status
-             when :success then "#ebf8ff"
-             when :warning then "#fffaf0"
-             when :error then "#fff5f5"
-             else "#ebf4ff" # info
-             end
-             
+    when :success then "#ebf8ff"
+    when :warning then "#fffaf0"
+    when :error then "#fff5f5"
+    else "#ebf4ff" # info
+  end
+%>
+
+<% 
   # Define border color based on status
   border_color = case status
-                 when :success then "#90cdf4"
-                 when :warning then "#fbd38d"
-                 when :error then "#feb2b2"
-                 else "#c3dafe" # info
-                 end
-                 
+    when :success then "#90cdf4"
+    when :warning then "#fbd38d"
+    when :error then "#feb2b2"
+    else "#c3dafe" # info
+  end
+%>
+
+<% 
   # Define text color based on status
   text_color = case status
-               when :success then "#2b6cb0"
-               when :warning then "#c05621"
-               when :error then "#c53030"
-               else "#434190" # info
-               end
-               
+    when :success then "#2b6cb0"
+    when :warning then "#c05621"
+    when :error then "#c53030"
+    else "#434190" # info
+  end
+%>
+
+<% 
   # Define icon based on status
   icon = case status
-         when :success then "✓"
-         when :warning then "⚠"
-         when :error then "✗"
-         else "ℹ" # info
-         end
+    when :success then "✓"
+    when :warning then "⚠"
+    when :error then "✗"
+    else "ℹ" # info
+  end
 %>
 
 <div class="status-box" style="background-color: <%= bg_color %>; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid <%= border_color %>;">

@@ -1,12 +1,10 @@
-<%= render "shared/mailers/header.text" %>
-
-W9 Form Approved
+<%= render partial: "shared/mailers/header", formats: [:text], locals: { title: "W9 Form Approved" } %>
 
 Dear <%= @vendor.business_name %>,
 
 We are pleased to inform you that your W9 form has been reviewed and approved.
 
-STATUS: APPROVED
+<%= render partial: "shared/mailers/status_box", formats: [:text], locals: { status: :success, title: "Approved" } %>
 
 Your vendor account is now fully activated, and you can begin processing vouchers through our system.
 
@@ -14,4 +12,4 @@ If you have any questions or need assistance, please don't hesitate to contact o
 
 Thank you for your partnership.
 
-<%= render "shared/mailers/footer.text" %>
+<%= render partial: "shared/mailers/footer", formats: [:text] %>

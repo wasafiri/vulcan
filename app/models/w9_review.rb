@@ -17,6 +17,7 @@ class W9Review < ApplicationRecord
   validates :rejection_reason_code, presence: true, if: :status_rejected?
   validate :admin_must_be_admin_type
   validate :vendor_must_be_vendor_type
+  validate :validate_rejection_fields
 
   # Callbacks
   before_validation :set_reviewed_at, on: :create
@@ -107,5 +108,21 @@ class W9Review < ApplicationRecord
     Rails.logger.error "Failed to process max rejections: #{e.message}"
     errors.add(:base, "Failed to process rejection limits")
     raise ActiveRecord::Rollback
+  end
+
+  def validate_rejection_fields
+    if status_rejected?
+      if rejection_reason.blank?
+        errors.add(:rejection_reason, "must be provided when rejecting a W9")
+      end
+
+      if rejection_reason_code.blank?
+        errors.add(:rejection_reason_code, "must be selected when rejecting a W9")
+      end
+    else
+      # Clear rejection fields if status is not rejected
+      self.rejection_reason = nil
+      self.rejection_reason_code = nil
+    end
   end
 end
