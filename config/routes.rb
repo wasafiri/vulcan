@@ -183,34 +183,15 @@ Rails.application.routes.draw do
     resources :invoices, only: [ :index, :show ]
   end
 
-  # Original constituent namespace (will be deprecated)
-  # Direct routing to new controllers instead of redirects
-  get "/constituent/applications/:id/proofs/resubmit", to: "constituent_portal/proofs/proofs#new"
-  post "/constituent/applications/:id/proofs/resubmit", to: "constituent_portal/proofs/proofs#resubmit"
-  # Keep these redirects for now
+  # Redirects from old constituent namespace to new constituent_portal namespace
+  get "/constituent/applications/:id/proofs/resubmit", to: redirect("/constituent_portal/applications/%{id}/proofs/new/income")
+  post "/constituent/applications/:id/proofs/resubmit", to: redirect("/constituent_portal/applications/%{id}/proofs/resubmit")
   get "/constituent/applications/:id", to: redirect("/constituent_portal/applications/%{id}")
   get "/constituent/dashboard", to: redirect("/constituent_portal/dashboard")
-
-  namespace :constituent do
-    resource :dashboard, only: [ :show ]
-    resources :applications do
-      member do
-        patch :upload_documents
-        post :request_review
-        get :verify
-        patch :submit
-        post :resubmit_proof
-        namespace :proofs do
-          get "new/:proof_type", to: "proofs#new", as: :new_proof
-          post "resubmit", to: "proofs#resubmit"
-          post "direct_upload", to: "proofs#direct_upload", as: :direct_upload_proof
-        end
-      end
-    end
-    resources :appointments, only: [ :index, :show ]
-    resources :evaluations, only: [ :index, :show ]
-    resources :devices, only: [ :index, :show ]
-  end
+  get "/constituent/applications", to: redirect("/constituent_portal/applications")
+  get "/constituent/appointments", to: redirect("/constituent_portal/appointments")
+  get "/constituent/evaluations", to: redirect("/constituent_portal/evaluations")
+  get "/constituent/devices", to: redirect("/constituent_portal/products")
 
   # New constituent_portal namespace (replacing constituent)
   namespace :constituent_portal do

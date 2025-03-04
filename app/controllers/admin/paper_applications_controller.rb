@@ -160,7 +160,7 @@ class Admin::PaperApplicationsController < Admin::BaseController
         income_rejection_notes = params[:income_proof_rejection_notes]
 
         @income_proof_review = application.proof_reviews.build(
-          admin: current_user || User.system_user,
+          admin: current_user.presence || User.system_user,
           proof_type: :income,
           status: :rejected,
           rejection_reason: income_rejection_reason,
@@ -200,7 +200,7 @@ class Admin::PaperApplicationsController < Admin::BaseController
         residency_rejection_notes = params[:residency_proof_rejection_notes]
 
         @residency_proof_review = application.proof_reviews.build(
-          admin: current_user || User.system_user,
+          admin: current_user.presence || User.system_user,
           proof_type: :residency,
           status: :rejected,
           rejection_reason: residency_rejection_reason,

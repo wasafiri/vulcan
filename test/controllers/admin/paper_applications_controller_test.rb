@@ -137,6 +137,9 @@ class Admin::PaperApplicationsControllerTest < ActionDispatch::IntegrationTest
     # Set the environment to test (non-production)
     Rails.env.stubs(:production?).returns(false)
 
+    # Ensure system_user returns a valid admin
+    User.stubs(:system_user).returns(@admin)
+
     post admin_paper_applications_path, headers: default_headers, params: {
       income_proof: income_proof,
       constituent: {
@@ -302,6 +305,22 @@ class Admin::PaperApplicationsControllerTest < ActionDispatch::IntegrationTest
     assert_match "Rejection notification has been sent", flash[:notice]
   end
 
+  test "should send rejection letter notification" do
+    post send_rejection_notification_admin_paper_applications_path, headers: default_headers, params: {
+      first_name: "John",
+      last_name: "Doe",
+      email: "john.doe@example.com",
+      phone: "555-123-4567",
+      household_size: "2",
+      annual_income: "100000",
+      notification_method: "letter",
+      additional_notes: "Income exceeds threshold"
+    }
+
+    assert_redirected_to admin_applications_path
+    assert_match "Rejection letter has been queued for printing", flash[:notice]
+  end
+
   test "should not enqueue jobs when transaction fails" do
     # Mock ProofReview.save to fail
     ProofReview.any_instance.stubs(:save).returns(false)
@@ -373,6 +392,9 @@ class Admin::PaperApplicationsControllerTest < ActionDispatch::IntegrationTest
     # Set the environment to test (non-production)
     Rails.env.stubs(:production?).returns(false)
 
+    # Ensure system_user returns a valid admin
+    User.stubs(:system_user).returns(@admin)
+
     # Verify that the controller correctly handles the rejection reason
     post admin_paper_applications_path, headers: default_headers, params: {
       income_proof: income_proof,
@@ -424,5 +446,46 @@ class Admin::PaperApplicationsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "rejected", proof_review.status
     assert_equal "incomplete_documentation", proof_review.rejection_reason
     assert_equal "Missing required information", proof_review.notes
+  end
+
+  test "should handle application save failure" do
+    # Mock Application.save to fail
+    Application.any_instance.stubs(:save).returns(false)
+    Application.any_instance.stubs(:errors).returns(
+      ActiveModel::Errors.new(Application.new).tap { |e| e.add(:base, "Mocked application error") }
+    )
+
+    # Ensure system_user returns a valid admin
+    User.stubs(:system_user).returns(@admin)
+
+    assert_no_difference("Application.count") do
+      post admin_paper_applications_path, headers: default_headers, params: {
+        constituent: {
+          first_name: "Test",
+          last_name: "User",
+          email: "test-app-save-failure@example.com",
+          phone: "555-123-4567",
+          physical_address_1: "123 Main St",
+          city: "Baltimore",
+          state: "MD",
+          zip_code: "21201",
+          hearing_disability: "1"
+        },
+        application: {
+          household_size: 2,
+          annual_income: 20000,
+          maryland_resident: "1",
+          self_certify_disability: "1",
+          terms_accepted: "1",
+          information_verified: "1",
+          medical_release_authorized: "1",
+          medical_provider_name: "Dr. Test",
+          medical_provider_phone: "555-987-6543",
+          medical_provider_email: "dr.test@example.com"
+        }
+      }
+    end
+
+    assert_response :unprocessable_entity
   end
 end
