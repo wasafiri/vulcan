@@ -17,4 +17,4 @@ Log in at: <%= @login_url %>
 
 If you have any questions or need assistance, please contact our support team.
 
-<%= render partial: "shared/mailers/footer.text" %>
+<%= render partial: "shared/mailers/footer.text", locals: { show_automated_message: true } %>

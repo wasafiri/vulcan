@@ -1,4 +1,4 @@
-<%= render 'shared/mailers/header', title: "Document Review Update" %>
+<%= render partial: 'shared/mailers/header.text', locals: { title: "Document Review Update" } %>
 
 Dear <%= @user.first_name %>,
 
@@ -30,4 +30,4 @@ Please ensure all required documentation has been submitted for review. You can:
 * Reply to this email with your documentation attached
 <% end %>
 
-<%= render 'shared/mailers/footer', show_automated_message: true %>
+<%= render partial: 'shared/mailers/footer.text', locals: { show_automated_message: true } %>
