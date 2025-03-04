@@ -1,6 +1,5 @@
-<%= render partial: "shared/mailers/header" %>
+<%= render partial: "shared/mailers/header", locals: { title: "Your MAT Application Account" } %>
 
-<h1>Your MAT Application Account</h1>
 
 <p>Dear <%= @constituent.first_name %>,</p>
 

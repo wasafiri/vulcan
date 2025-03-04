@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_03_03_201204) do
+ActiveRecord::Schema[8.0].define(version: 2025_03_03_222506) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -296,7 +296,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_03_201204) do
     t.integer "proof_type", null: false
     t.integer "status", null: false
     t.text "rejection_reason"
-    t.string "submission_method"
+    t.integer "submission_method"
     t.datetime "reviewed_at", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -366,6 +366,19 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_03_201204) do
     t.datetime "created_at", null: false
     t.index ["job_id"], name: "index_solid_queue_claimed_executions_on_job_id", unique: true
     t.index ["process_id", "job_id"], name: "index_solid_queue_claimed_executions_on_process_id_and_job_id"
+  end
+
+  create_table "solid_queue_failed_executions", force: :cascade do |t|
+    t.bigint "job_id", null: false
+    t.bigint "process_id"
+    t.text "error"
+    t.text "backtrace"
+    t.datetime "failed_at", default: -> { "CURRENT_TIMESTAMP" }, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["failed_at"], name: "index_solid_queue_failed_executions_on_failed_at"
+    t.index ["job_id"], name: "index_solid_queue_failed_executions_on_job_id"
+    t.index ["process_id"], name: "index_solid_queue_failed_executions_on_process_id"
   end
 
   create_table "solid_queue_jobs", force: :cascade do |t|
@@ -637,6 +650,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_03_201204) do
   add_foreign_key "sessions", "users"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "solid_queue_failed_executions", "solid_queue_processes", column: "process_id", on_delete: :nullify
   add_foreign_key "solid_queue_ready_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_recurring_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_scheduled_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

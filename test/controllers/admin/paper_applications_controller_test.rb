@@ -365,4 +365,64 @@ class Admin::PaperApplicationsControllerTest < ActionDispatch::IntegrationTest
       job.perform_now
     end
   end
+
+  test "should handle proof rejection without setting properties directly on application" do
+    # Create test file for income proof
+    income_proof = fixture_file_upload(Rails.root.join("test/fixtures/files/test_proof.pdf"), "application/pdf")
+
+    # Set the environment to test (non-production)
+    Rails.env.stubs(:production?).returns(false)
+
+    # Verify that the controller correctly handles the rejection reason
+    post admin_paper_applications_path, headers: default_headers, params: {
+      income_proof: income_proof,
+      constituent: {
+        first_name: "Test",
+        last_name: "User",
+        email: "test-rejection@example.com",
+        phone: "555-123-4567",
+        physical_address_1: "123 Main St",
+        city: "Baltimore",
+        state: "MD",
+        zip_code: "21201",
+        hearing_disability: "1"
+      },
+      application: {
+        household_size: 2,
+        annual_income: 20000,
+        maryland_resident: "1",
+        self_certify_disability: "1",
+        terms_accepted: "1",
+        information_verified: "1",
+        medical_release_authorized: "1",
+        medical_provider_name: "Dr. Test",
+        medical_provider_phone: "555-987-6543",
+        medical_provider_email: "dr.test@example.com"
+      },
+      income_proof_action: "reject",
+      income_proof_rejection_reason: "incomplete_documentation",
+      income_proof_rejection_notes: "Missing required information"
+    }
+
+    # Restore the environment
+    Rails.env.unstub(:production?)
+
+    # Verify the response
+    assert_response :redirect
+
+    # Get the created application
+    application = Application.find_by(user: Constituent.find_by(email: "test-rejection@example.com"))
+    assert_not_nil application
+
+    # Verify that the income proof status is rejected
+    assert_equal "rejected", application.income_proof_status
+
+    # Verify that a proof review was created with the correct rejection reason
+    proof_review = application.proof_reviews.last
+    assert_not_nil proof_review
+    assert_equal "income", proof_review.proof_type
+    assert_equal "rejected", proof_review.status
+    assert_equal "incomplete_documentation", proof_review.rejection_reason
+    assert_equal "Missing required information", proof_review.notes
+  end
 end

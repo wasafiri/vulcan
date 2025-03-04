@@ -114,6 +114,17 @@ class Admin::ApplicationsControllerTest < ActionDispatch::IntegrationTest
     assert_application_row(@application)
   end
 
+  def test_show_page_loads_with_application_notes_form
+    get admin_application_path(@application)
+    assert_response :success
+
+    # Verify the application notes form is present
+    assert_select "form[action=?]", admin_application_notes_path(@application)
+    assert_select "textarea[name='application_note[content]']"
+    assert_select "input[name='application_note[internal_only]']"
+    assert_select "input[type=submit][value='Add Note']"
+  end
+
   def teardown
     Current.reset
   end
