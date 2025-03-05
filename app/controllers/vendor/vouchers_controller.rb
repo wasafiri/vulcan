@@ -18,8 +18,6 @@ class Vendor::VouchersController < Vendor::BaseController
     end
   end
 
-  private
-
   def check_redeem_conditions
     return 'Invalid voucher code' unless @voucher.present?
 
