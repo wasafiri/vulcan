@@ -1,11 +1,12 @@
-require_relative "boot"
-require "rails/all"
+require_relative 'boot'
+require 'rails/all'
 
 # Require the gems listed in Gemfile
 Bundler.require(*Rails.groups)
 
-# define the MatVulcan module and Application class
+# define the MatVulcan
 module MatVulcan
+  # define the Application class
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.0
@@ -17,10 +18,10 @@ module MatVulcan
 
     # Factory_bot configuration
     config.generators do |g|
-      g.factory_bot dir: "test/factories"
+      g.factory_bot dir: 'test/factories'
       g.factory_bot suffix: false
       g.test_framework :minitest
-      g.fixture_replacement :factory_bot, dir: "test/factories"
+      g.fixture_replacement :factory_bot, dir: 'test/factories'
     end
   end
 end
