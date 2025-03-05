@@ -127,6 +127,11 @@ class Voucher < ApplicationRecord
     super(value.try(:round, 2))
   end
 
+  # Override to_param to return the voucher code
+  def to_param
+    code
+  end
+
   private
 
   def send_assigned_notification

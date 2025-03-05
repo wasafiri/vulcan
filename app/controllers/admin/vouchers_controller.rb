@@ -5,18 +5,16 @@ class Admin::VouchersController < Admin::BaseController
   before_action :require_admin!
 
   def index
-    scope = Voucher.includes(:vendor, :application)
-      .order(created_at: :desc)
-
-    scope = apply_filters(scope)
+    scope = Voucher.where(status: :active)
+                   .includes(:vendor, :application)
+                   .order(created_at: :desc)
     @pagy, @vouchers = pagy(scope, items: 25)
 
     respond_to do |format|
       format.html
       format.csv do
         send_data generate_csv(@vouchers),
-          filename: "vouchers-#{Time.current.strftime("%Y%m%d")}.csv",
-          type: "text/csv"
+          filename: "vouchers-#{Time.current.strftime("%Y%m%d")}.csv", type: "text/csv"
       end
     end
   end
@@ -54,7 +52,7 @@ class Admin::VouchersController < Admin::BaseController
   private
 
   def set_voucher
-    @voucher = Voucher.find(params[:id])
+    @voucher = Voucher.find_by(code: params[:code]) || Voucher.find_by(id: params[:id])
   end
 
   def voucher_params

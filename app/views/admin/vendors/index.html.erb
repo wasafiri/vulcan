@@ -38,18 +38,18 @@
               <div class="text-sm text-gray-900"><%= vendor.business_tax_id %></div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
-              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                <%= vendor.vendor_approved? ? 'bg-green-100 text-green-800' : 
-                    vendor.vendor_pending? ? 'bg-yellow-100 text-yellow-800' : 
+              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                <%= vendor.vendor_approved? ? 'bg-green-100 text-green-800' :
+                    vendor.vendor_pending? ? 'bg-yellow-100 text-yellow-800' :
                     'bg-red-100 text-red-800' %>">
                 <%= vendor.status.titleize %>
               </span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
-              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                <%= vendor.w9_status_approved? ? 'bg-green-100 text-green-800' : 
-                    vendor.w9_status_pending_review? ? 'bg-yellow-100 text-yellow-800' : 
-                    vendor.w9_status_rejected? ? 'bg-red-100 text-red-800' : 
+              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                <%= vendor.w9_status_approved? ? 'bg-green-100 text-green-800' :
+                    vendor.w9_status_pending_review? ? 'bg-yellow-100 text-yellow-800' :
+                    vendor.w9_status_rejected? ? 'bg-red-100 text-red-800' :
                     'bg-gray-100 text-gray-800' %>">
                 <%= vendor.w9_status.to_s.titleize %>
               </span>
