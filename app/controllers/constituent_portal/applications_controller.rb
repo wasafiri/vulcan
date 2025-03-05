@@ -2,11 +2,11 @@ require "ostruct"
 
 module ConstituentPortal
   class ApplicationsController < ApplicationController
-    before_action :authenticate_user!, except: [ :fpl_thresholds ]
-    before_action :require_constituent!, except: [ :fpl_thresholds ]
-    before_action :set_application, only: [ :show, :edit, :update, :verify, :submit ]
-    before_action :ensure_editable, only: [ :edit, :update ]
-    before_action :cast_boolean_params, only: [ :create, :update ]
+    before_action :authenticate_user!, except: [:fpl_thresholds]
+    before_action :require_constituent!, except: [:fpl_thresholds]
+    before_action :set_application, only: [:show, :edit, :update, :verify, :submit]
+    before_action :ensure_editable, only: [:edit, :update]
+    before_action :cast_boolean_params, only: [:create, :update]
 
     # Override current_user for tests
     def current_user
@@ -14,7 +14,6 @@ module ConstituentPortal
         @current_user ||= User.find_by(id: ENV["TEST_USER_ID"])
         return @current_user if @current_user
       end
-
       super
     end
 
@@ -22,68 +21,31 @@ module ConstituentPortal
       @applications = current_user.applications.order(created_at: :desc)
     end
 
-    def show
-    end
+    def show; end
 
     def new
       @application = current_user.applications.new
     end
 
     def create
+      # Build the application with merged parameters.
       @application = current_user.applications.new(filtered_application_params)
+      set_initial_application_attributes(@application)
+      user_attrs = extract_user_attributes(params)
 
-      # Set initial application attributes
-      @application.status = params[:submit_application] ? :in_progress : :draft
-      @application.application_date = Time.current
-      @application.submission_method = :online
-
-      # Set application_type to "new" by default if not specified
-      @application.application_type ||= :new
-
-      # Handle medical provider info - check both possible locations
-      if params[:medical_provider].present?
-        @application.assign_attributes(
-          medical_provider_name: params[:medical_provider][:name],
-          medical_provider_phone: params[:medical_provider][:phone],
-          medical_provider_fax: params[:medical_provider][:fax],
-          medical_provider_email: params[:medical_provider][:email]
-        )
-      elsif params.dig(:application, :medical_provider).present?
-        medical_provider_attrs = params[:application][:medical_provider].permit(
-          :name, :phone, :fax, :email
-        )
-        @application.assign_attributes(
-          medical_provider_name: medical_provider_attrs[:name],
-          medical_provider_phone: medical_provider_attrs[:phone],
-          medical_provider_fax: medical_provider_attrs[:fax],
-          medical_provider_email: medical_provider_attrs[:email]
-        )
-      end
-
-      # Extract user attributes
-      user_attrs = {
-        is_guardian: params[:application][:is_guardian] == "1" || params[:application][:is_guardian] == true,
-        guardian_relationship: params[:application][:guardian_relationship],
-        hearing_disability: params[:application][:hearing_disability] == "1" || params[:application][:hearing_disability] == true,
-        vision_disability: params[:application][:vision_disability] == "1" || params[:application][:vision_disability] == true,
-        speech_disability: params[:application][:speech_disability] == "1" || params[:application][:speech_disability] == true,
-        mobility_disability: params[:application][:mobility_disability] == "1" || params[:application][:mobility_disability] == true,
-        cognition_disability: params[:application][:cognition_disability] == "1" || params[:application][:cognition_disability] == true
-      }
-
-      # Debug logging for guardian attributes
-      Rails.logger.debug "Guardian checkbox value: #{params[:application][:is_guardian].inspect}"
-      Rails.logger.debug "Guardian relationship value: #{params[:application][:guardian_relationship].inspect}"
-
-      Rails.logger.debug "Application attributes before save: #{@application.attributes.inspect}"
-      Rails.logger.debug "Medical provider params: #{params[:medical_provider].inspect}"
-      Rails.logger.debug "Application valid? #{@application.valid?}"
-      Rails.logger.debug "Application errors: #{@application.errors.full_messages}" if @application.invalid?
+      debug_application_info(@application, params)
 
       success = ActiveRecord::Base.transaction do
-        if @application.valid? && update_user_attributes(user_attrs)
-          @application.save!
-          true
+        if update_user_attributes(user_attrs)
+          # Force reload the associated user so validations see the updated values.
+          @application.user = current_user.reload
+          if @application.valid?
+            @application.save!
+            true
+          else
+            @application.errors.merge!(current_user.errors)
+            false
+          end
         else
           @application.errors.merge!(current_user.errors)
           false
@@ -94,99 +56,29 @@ module ConstituentPortal
       end
 
       if success
-        # Log guardian relationship if applicable
-        if current_user.is_guardian? && @application.persisted?
-          Event.create!(
-            user: current_user,
-            action: "guardian_application_submitted",
-            metadata: {
-              application_id: @application.id,
-              guardian_relationship: current_user.guardian_relationship,
-              timestamp: Time.current.iso8601
-            }
-          )
-        end
-
-        if params[:submit_application]
-          redirect_to constituent_portal_application_path(@application),
-            notice: "Application submitted successfully!"
-        else
-          redirect_to constituent_portal_application_path(@application),
-            notice: "Application saved as draft."
-        end
+        log_guardian_event if current_user.is_guardian? && @application.persisted?
+        redirect_to_app(@application)
       else
-        # Create a medical_provider object for the form when validation fails
-        @medical_provider = OpenStruct.new(
-          name: params.dig(:medical_provider, :name) || params.dig(:application, :medical_provider, :name),
-          phone: params.dig(:medical_provider, :phone) || params.dig(:application, :medical_provider, :phone),
-          fax: params.dig(:medical_provider, :fax) || params.dig(:application, :medical_provider, :fax),
-          email: params.dig(:medical_provider, :email) || params.dig(:application, :medical_provider, :email)
-        )
+        build_medical_provider_for_form
         render :new, status: :unprocessable_entity
       end
     end
 
-    def edit
-    end
+    def edit; end
 
     def update
-      # Track original status for change detection
       original_status = @application.status
 
-      # Debug logging for all params
       Rails.logger.debug "Update params: #{params.inspect}"
       Rails.logger.debug "Submit application param: #{params[:submit_application].inspect}"
 
-      # Clean annual income and prepare application attributes
+      # Prepare application attributes using filtered_application_params.
       application_attrs = filtered_application_params.merge(
         annual_income: params[:application][:annual_income]&.gsub(/[^\d.]/, "")
       )
 
-      # Handle medical provider attributes - check all possible locations
-      if params[:application][:medical_provider].present?
-        # Handle nested medical provider params
-        if params[:application][:medical_provider].is_a?(Hash)
-          medical_provider_attrs = params[:application][:medical_provider].permit(
-            :name, :phone, :fax, :email
-          )
+      # (No separate handling for medical provider keys is needed anymore.)
 
-          # Debug logging for medical provider attributes
-          Rails.logger.debug "Medical provider params: #{params[:application][:medical_provider].inspect}"
-          Rails.logger.debug "Medical provider attrs after permit: #{medical_provider_attrs.inspect}"
-
-          # Directly assign medical provider attributes to the application
-          @application.medical_provider_name = medical_provider_attrs[:name]
-          @application.medical_provider_phone = medical_provider_attrs[:phone]
-          @application.medical_provider_fax = medical_provider_attrs[:fax]
-          @application.medical_provider_email = medical_provider_attrs[:email]
-
-          # Also merge into application_attrs for completeness
-          application_attrs.merge!(
-            medical_provider_name: medical_provider_attrs[:name],
-            medical_provider_phone: medical_provider_attrs[:phone],
-            medical_provider_fax: medical_provider_attrs[:fax],
-            medical_provider_email: medical_provider_attrs[:email]
-          )
-        end
-      elsif params[:medical_provider].present?
-        # Handle medical provider info from separate hash
-        @application.assign_attributes(
-          medical_provider_name: params[:medical_provider][:name],
-          medical_provider_phone: params[:medical_provider][:phone],
-          medical_provider_fax: params[:medical_provider][:fax],
-          medical_provider_email: params[:medical_provider][:email]
-        )
-
-        # Also merge into application_attrs for completeness
-        application_attrs.merge!(
-          medical_provider_name: params[:medical_provider][:name],
-          medical_provider_phone: params[:medical_provider][:phone],
-          medical_provider_fax: params[:medical_provider][:fax],
-          medical_provider_email: params[:medical_provider][:email]
-        )
-      end
-
-      # Extract user attributes
       user_attrs = {
         is_guardian: params[:application][:is_guardian] == "1" || params[:application][:is_guardian] == true,
         guardian_relationship: params[:application][:guardian_relationship],
@@ -197,36 +89,26 @@ module ConstituentPortal
         cognition_disability: params[:application][:cognition_disability] == "1" || params[:application][:cognition_disability] == true
       }
 
-      # Debug logging for guardian attributes
       Rails.logger.debug "Update - Guardian checkbox value: #{params[:application][:is_guardian].inspect}"
       Rails.logger.debug "Update - Guardian relationship value: #{params[:application][:guardian_relationship].inspect}"
 
-      # Store the user reference before transaction to ensure it's maintained
       user = current_user
-
-      # Add debug logging
       Rails.logger.debug "Before transaction - Application user_id: #{@application.user_id}"
       Rails.logger.debug "Before transaction - Current user ID: #{user.id}"
 
       success = ActiveRecord::Base.transaction do
         begin
-          # Explicitly ensure user association is maintained
           @application.user = user
-
-          # Assign other attributes
           @application.assign_attributes(application_attrs)
 
-          # Update user attributes first
           user_update_success = update_user_attributes(user_attrs)
 
-          # Verify user association is still intact
           if @application.user_id.nil?
             Rails.logger.error "User association lost after attribute assignment"
-            @application.user = user # Re-establish association if lost
+            @application.user = user
           end
 
           if user_update_success && @application.save
-            # Handle status changes - use the object directly instead of update!
             if params[:submit_application].present? && @application.draft?
               Rails.logger.debug "Setting application status to in_progress"
               @application.status = :in_progress
@@ -245,7 +127,6 @@ module ConstituentPortal
       end
 
       if success
-        # Log guardian relationship if applicable
         if current_user.is_guardian? && @application.persisted?
           Event.create!(
             user: current_user,
@@ -259,29 +140,25 @@ module ConstituentPortal
         end
 
         notice = if @application.status != original_status && @application.in_progress?
-          "Application submitted successfully!"
-        else
-          "Application saved successfully."
-        end
+                   "Application submitted successfully!"
+                 else
+                   "Application saved successfully."
+                 end
         redirect_to constituent_portal_application_path(@application), notice: notice
       else
         Rails.logger.debug "Application errors: #{@application.errors.full_messages}"
-
-        # Create a medical_provider object for the form when validation fails
         @medical_provider = OpenStruct.new(
           name: params.dig(:application, :medical_provider, :name) || @application.medical_provider_name,
           phone: params.dig(:application, :medical_provider, :phone) || @application.medical_provider_phone,
           fax: params.dig(:application, :medical_provider, :fax) || @application.medical_provider_fax,
           email: params.dig(:application, :medical_provider, :email) || @application.medical_provider_email
         )
-
         render :edit, status: :unprocessable_entity
       end
     end
 
     def upload_documents
       @application = current_user.applications.find(params[:id])
-
       if params[:documents].present?
         params[:documents].each do |document_type, file|
           case document_type
@@ -294,21 +171,19 @@ module ConstituentPortal
 
         if @application.save
           redirect_to constituent_portal_application_path(@application),
-            notice: "Documents uploaded successfully."
+                      notice: "Documents uploaded successfully."
         else
           render :edit, status: :unprocessable_entity
         end
       else
         redirect_to constituent_portal_application_path(@application),
-          alert: "Please select documents to upload."
+                    alert: "Please select documents to upload."
       end
     end
 
     def request_review
       @application = current_user.applications.find(params[:id])
-
       if @application.update(needs_review_since: Time.current)
-        # Notify admins about the review request
         User.where(type: "Admin").find_each do |admin|
           Notification.create!(
             recipient: admin,
@@ -317,12 +192,11 @@ module ConstituentPortal
             notifiable: @application
           )
         end
-
         redirect_to constituent_portal_application_path(@application),
-          notice: "Review requested successfully."
+                    notice: "Review requested successfully."
       else
         redirect_to constituent_portal_application_path(@application),
-          alert: "Unable to request review at this time."
+                    alert: "Unable to request review at this time."
       end
     end
 
@@ -333,11 +207,10 @@ module ConstituentPortal
 
     def submit
       @application = current_user.applications.find(params[:id])
-
       if @application.update(submission_params.merge(status: :in_progress))
         ApplicationNotificationsMailer.submission_confirmation(@application).deliver_now
         redirect_to constituent_portal_application_path(@application),
-          notice: "Application submitted successfully!"
+                    notice: "Application submitted successfully!"
       else
         render :verify, status: :unprocessable_entity
       end
@@ -345,35 +218,30 @@ module ConstituentPortal
 
     def resubmit_proof
       @application = current_user.applications.find(params[:id])
-
       if @application.resubmit_proof!
         redirect_to constituent_portal_application_path(@application),
-          notice: "Proof resubmitted successfully"
+                    notice: "Proof resubmitted successfully"
       else
         redirect_to constituent_portal_application_path(@application),
-          alert: "Failed to resubmit proof"
+                    alert: "Failed to resubmit proof"
       end
     end
 
     def request_training
       @application = current_user.applications.find(params[:id])
-
-      # Check if the application is approved and eligible for training
       unless @application.approved?
         redirect_to constituent_portal_dashboard_path,
-          alert: "Only approved applications are eligible for training."
+                    alert: "Only approved applications are eligible for training."
         return
       end
 
-      # Check if the constituent has remaining training sessions
       max_training_sessions = Policy.get("max_training_sessions") || 3
       if @application.training_sessions.count >= max_training_sessions
         redirect_to constituent_portal_dashboard_path,
-          alert: "You have used all of your available training sessions."
+                    alert: "You have used all of your available training sessions."
         return
       end
 
-      # Create a notification for admins to schedule training
       User.where(type: "Admin").find_each do |admin|
         Notification.create!(
           recipient: admin,
@@ -389,37 +257,84 @@ module ConstituentPortal
         )
       end
 
-      # Create an activity record for the constituent
-      if defined?(Activity)
-        Activity.create!(
-          user: current_user,
-          description: "Requested training session",
-          metadata: {
-            application_id: @application.id,
-            timestamp: Time.current.iso8601
-          }
-        )
-      end
+      Activity.create!(
+        user: current_user,
+        description: "Requested training session",
+        metadata: {
+          application_id: @application.id,
+          timestamp: Time.current.iso8601
+        }
+      ) if defined?(Activity)
 
       redirect_to constituent_portal_dashboard_path,
-        notice: "Training request submitted. An administrator will contact you to schedule your session."
+                  notice: "Training request submitted. An administrator will contact you to schedule your session."
     end
 
     def fpl_thresholds
-      # Get FPL thresholds from policies
       thresholds = {}
       (1..8).each do |size|
         policy = Policy.find_by(key: "fpl_#{size}_person")
         thresholds[size.to_s] = policy&.value.to_i
       end
-
-      # Get FPL modifier percentage
       modifier = Policy.find_by(key: "fpl_modifier_percentage")&.value.to_i || 400
-
       render json: { thresholds: thresholds, modifier: modifier }
     end
 
     private
+
+    def set_initial_application_attributes(app)
+      app.status = params[:submit_application] ? :in_progress : :draft
+      app.application_date = Time.current
+      app.submission_method = :online
+      app.application_type ||= :new
+    end
+
+    def extract_user_attributes(p)
+      {
+        is_guardian: p[:application][:is_guardian] == "1" || p[:application][:is_guardian] == true,
+        guardian_relationship: p[:application][:guardian_relationship],
+        hearing_disability: p[:application][:hearing_disability] == "1" || p[:application][:hearing_disability] == true,
+        vision_disability: p[:application][:vision_disability] == "1" || p[:application][:vision_disability] == true,
+        speech_disability: p[:application][:speech_disability] == "1" || p[:application][:speech_disability] == true,
+        mobility_disability: p[:application][:mobility_disability] == "1" || p[:application][:mobility_disability] == true,
+        cognition_disability: p[:application][:cognition_disability] == "1" || p[:application][:cognition_disability] == true
+      }
+    end
+
+    def debug_application_info(app, p)
+      Rails.logger.debug "Guardian checkbox value: #{p[:application][:is_guardian].inspect}"
+      Rails.logger.debug "Guardian relationship value: #{p[:application][:guardian_relationship].inspect}"
+      Rails.logger.debug "Application attributes before save: #{app.attributes.inspect}"
+      Rails.logger.debug "Medical provider attributes: #{p.dig(:application, :medical_provider_attributes).inspect}"
+      Rails.logger.debug "Application valid? #{app.valid?}"
+      Rails.logger.debug "Application errors: #{app.errors.full_messages}" if app.invalid?
+    end
+
+    def log_guardian_event
+      Event.create!(
+        user: current_user,
+        action: "guardian_application_submitted",
+        metadata: {
+          application_id: @application.id,
+          guardian_relationship: current_user.guardian_relationship,
+          timestamp: Time.current.iso8601
+        }
+      )
+    end
+
+    def redirect_to_app(app)
+      notice = params[:submit_application] ? "Application submitted successfully!" : "Application saved as draft."
+      redirect_to constituent_portal_application_path(app), notice: notice
+    end
+
+    def build_medical_provider_for_form
+      @medical_provider = OpenStruct.new(
+        name: params.dig(:medical_provider, :name) || params.dig(:application, :medical_provider, :name),
+        phone: params.dig(:medical_provider, :phone) || params.dig(:application, :medical_provider, :phone),
+        fax: params.dig(:medical_provider, :fax) || params.dig(:application, :medical_provider, :fax),
+        email: params.dig(:medical_provider, :email) || params.dig(:application, :medical_provider, :email)
+      )
+    end
 
     def filtered_application_params
       application_params.except(
@@ -455,7 +370,7 @@ module ConstituentPortal
     end
 
     def application_params
-      params.require(:application).permit(
+      base_params = params.require(:application).permit(
         :application_type,
         :submission_method,
         :maryland_resident,
@@ -464,27 +379,26 @@ module ConstituentPortal
         :self_certify_disability,
         :residency_proof,
         :income_proof,
-        :medical_provider_name,
-        :medical_provider_phone,
-        :medical_provider_fax,
-        :medical_provider_email,
         :income_details,
         :residency_details,
-
-        # Added verification fields
         :terms_accepted,
         :information_verified,
         :medical_release_authorized,
-
-        # These will be moved to user_params
         :is_guardian,
         :guardian_relationship,
         :hearing_disability,
         :vision_disability,
         :speech_disability,
         :mobility_disability,
-        :cognition_disability
+        :cognition_disability,
+        medical_provider_attributes: [:name, :phone, :fax, :email]
       )
+      if base_params[:medical_provider_attributes].present?
+        mp = base_params.delete(:medical_provider_attributes)
+        base_params.merge(mp.transform_keys { |key| "medical_provider_#{key}" })
+      else
+        base_params
+      end
     end
 
     def user_params
@@ -508,14 +422,13 @@ module ConstituentPortal
     end
 
     def medical_provider_params
-      return {} unless params[:medical_provider]
-
-      params.require(:medical_provider).permit(
-        :name,
-        :phone,
-        :fax,
-        :email
-      ).transform_keys { |key| "medical_provider_#{key}" }
+      if params.dig(:application, :medical_provider_attributes).present?
+        params[:application].require(:medical_provider_attributes)
+              .permit(:name, :phone, :fax, :email)
+              .transform_keys { |key| "medical_provider_#{key}" }
+      else
+        {}
+      end
     end
 
     def require_constituent!
@@ -529,62 +442,31 @@ module ConstituentPortal
       log_debug("Current user class: #{current_user.class}")
       log_debug("Current user attributes: #{current_user.attributes.keys}")
 
-      # Process boolean values properly
       processed_attrs = {}
+      processed_attrs[:is_guardian] = ActiveModel::Type::Boolean.new.cast(attrs[:is_guardian])
+      processed_attrs[:guardian_relationship] = attrs[:guardian_relationship] if processed_attrs[:is_guardian]
 
-      # Handle is_guardian explicitly
-      processed_attrs[:is_guardian] = attrs[:is_guardian] == true || attrs[:is_guardian] == "1"
-
-      # Only set guardian_relationship if is_guardian is true
-      if processed_attrs[:is_guardian]
-        processed_attrs[:guardian_relationship] = attrs[:guardian_relationship]
+      %i[hearing_disability vision_disability speech_disability mobility_disability cognition_disability].each do |attr|
+        processed_attrs[attr] = ActiveModel::Type::Boolean.new.cast(attrs[attr])
       end
 
-      # Process disability attributes
-      processed_attrs[:hearing_disability] = ActiveModel::Type::Boolean.new.cast(attrs[:hearing_disability])
-      processed_attrs[:vision_disability] = ActiveModel::Type::Boolean.new.cast(attrs[:vision_disability])
-      processed_attrs[:speech_disability] = ActiveModel::Type::Boolean.new.cast(attrs[:speech_disability])
-      processed_attrs[:mobility_disability] = ActiveModel::Type::Boolean.new.cast(attrs[:mobility_disability])
-      processed_attrs[:cognition_disability] = ActiveModel::Type::Boolean.new.cast(attrs[:cognition_disability])
-
-      # Log the processed attributes for debugging
       log_debug("Processed attributes: #{processed_attrs.inspect}")
 
-      # Update the user with the processed attributes
-      result = current_user.update(processed_attrs)
-
-      # Log any errors
-      unless result
-        Rails.logger.error "Update failed."
-        Rails.logger.error "Current user errors: #{current_user.errors.full_messages}"
-      end
-
-      # Verify the user's disability status after update
-      if result
-        log_debug("User disability status after update: hearing=#{current_user.hearing_disability}, vision=#{current_user.vision_disability}, speech=#{current_user.speech_disability}, mobility=#{current_user.mobility_disability}, cognition=#{current_user.cognition_disability}")
+      begin
+        current_user.update_columns(processed_attrs)
+        current_user.reload
+        log_debug("User disability status after update: hearing=#{current_user.hearing_disability}, vision=#{current_user.vision_disability}, " \
+                  "speech=#{current_user.speech_disability}, mobility=#{current_user.mobility_disability}, cognition=#{current_user.cognition_disability}")
         log_debug("User has_disability_selected? returns: #{current_user.has_disability_selected?}")
+        true
+      rescue => e
+        Rails.logger.error("Update failed: #{e.message}")
+        false
       end
-
-      result
     end
 
-    # Cast boolean parameters to proper boolean values
-    #
-    # When a checkbox is checked in a Rails form, the browser sends both "0" and "1" values
-    # in an array (e.g., ["0", "1"]). This is because Rails generates a hidden field with value "0"
-    # followed by the actual checkbox with value "1". When the checkbox is checked, both values
-    # are submitted. When unchecked, only the hidden field's "0" value is submitted.
-    #
-    # This method handles this behavior by:
-    # 1. Checking if the parameter is an array
-    # 2. If it is, taking the last value (which will be "1" if checked)
-    # 3. Casting the value to a proper boolean using ActiveModel::Type::Boolean
-    #
-    # @return [void]
     def cast_boolean_params
       return unless params[:application]
-
-      # List of all boolean fields in the application form
       boolean_fields = [
         :self_certify_disability,
         :hearing_disability,
@@ -598,26 +480,15 @@ module ConstituentPortal
         :information_verified,
         :medical_release_authorized
       ]
-
-      # Process each boolean field
       boolean_fields.each do |field|
         next unless params[:application][field]
-
         value = params[:application][field]
-
-        # If the value is an array (which happens when a checkbox is checked),
-        # take the last value (which will be "1" for a checked box)
         value = value.last if value.is_a?(Array)
-
-        # Cast the value to a proper boolean
         params[:application][field] = ActiveModel::Type::Boolean.new.cast(value)
-
-        # Log the result for debugging
         log_debug("#{field} after casting: #{params[:application][field].inspect}")
       end
     end
 
-    # Conditionally log debug messages based on environment
     def log_debug(message)
       Rails.logger.debug(message) if Rails.env.development? || Rails.env.test?
     end

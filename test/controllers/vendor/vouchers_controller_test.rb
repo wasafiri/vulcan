@@ -23,6 +23,10 @@ class Vendor::VouchersControllerTest < ActionDispatch::IntegrationTest
       w9_status: "approved"
     )
 
+    # Add w9_form to vendor to pass validation for can_process_vouchers?
+    attachment = fixture_file_upload("test/fixtures/files/sample_w9.pdf", "application/pdf")
+    @vendor.w9_form.attach(attachment)
+
     @constituent = User.create!(
       first_name: "Jane",
       last_name: "Smith",
@@ -121,10 +125,6 @@ class Vendor::VouchersControllerTest < ActionDispatch::IntegrationTest
     # Mock Policy.voucher_minimum_redemption_amount
     Policy.stubs(:voucher_minimum_redemption_amount).returns(10.0)
 
-    # Add w9_form to vendor to pass validation for can_process_vouchers?
-    attachment = fixture_file_upload("test/fixtures/files/sample_w9.pdf", "application/pdf")
-    @vendor.w9_form.attach(attachment)
-
     redemption_amount = 50.0
     product_ids = [ @product1.id ]
     product_quantities = { @product1.id.to_s => "1" }
@@ -149,10 +149,6 @@ class Vendor::VouchersControllerTest < ActionDispatch::IntegrationTest
   test "process_redemption correctly extracts product data" do
     # Mock Policy.voucher_minimum_redemption_amount
     Policy.stubs(:voucher_minimum_redemption_amount).returns(10.0)
-
-    # Add w9_form to vendor to pass validation for can_process_vouchers?
-    attachment = fixture_file_upload("test/fixtures/files/sample_w9.pdf", "application/pdf")
-    @vendor.w9_form.attach(attachment)
 
     redemption_amount = 60.0
     product_ids = [ @product1.id, @product2.id ]
@@ -189,10 +185,6 @@ class Vendor::VouchersControllerTest < ActionDispatch::IntegrationTest
     # Mock Policy.voucher_minimum_redemption_amount
     Policy.stubs(:voucher_minimum_redemption_amount).returns(10.0)
 
-    # Add w9_form to vendor to pass validation for can_process_vouchers?
-    attachment = fixture_file_upload("test/fixtures/files/sample_w9.pdf", "application/pdf")
-    @vendor.w9_form.attach(attachment)
-
     redemption_amount = 25.0
     product_ids = [ @product1.id ]
     product_quantities = { @product1.id.to_s => "1" }
@@ -215,10 +207,6 @@ class Vendor::VouchersControllerTest < ActionDispatch::IntegrationTest
     # Mock Policy.voucher_minimum_redemption_amount
     Policy.stubs(:voucher_minimum_redemption_amount).returns(10.0)
 
-    # Add w9_form to vendor to pass validation for can_process_vouchers?
-    attachment = fixture_file_upload("test/fixtures/files/sample_w9.pdf", "application/pdf")
-    @vendor.w9_form.attach(attachment)
-
     redemption_amount = 30.0
 
     post process_redemption_vendor_voucher_path(@voucher.code), params: {
@@ -238,10 +226,6 @@ class Vendor::VouchersControllerTest < ActionDispatch::IntegrationTest
   test "process_redemption fails when amount exceeds voucher balance" do
     # Mock Policy.voucher_minimum_redemption_amount
     Policy.stubs(:voucher_minimum_redemption_amount).returns(10.0)
-
-    # Add w9_form to vendor to pass validation for can_process_vouchers?
-    attachment = fixture_file_upload("test/fixtures/files/sample_w9.pdf", "application/pdf")
-    @vendor.w9_form.attach(attachment)
 
     redemption_amount = 150.0 # Greater than voucher balance
     product_ids = [ @product1.id ]

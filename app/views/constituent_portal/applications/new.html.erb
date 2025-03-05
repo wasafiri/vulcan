@@ -11,12 +11,12 @@
         </div>
       <% end %>
 
-      <%= form_with(model: [:constituent_portal, @application], 
-        local: true, 
-        class: "space-y-6",
-        "aria-labelledby": "form-title",
-        data: { controller: "application-form" }) do |form| %>
-        
+      <%= form_with(model: [:constituent_portal, @application],
+          local: true,
+          class: "space-y-6",
+          "aria-labelledby": "form-title",
+          data: { controller: "application-form" }) do |form| %>
+
         <% if @application.errors.any? %>
           <div class="bg-red-50 p-4 rounded mb-6" role="alert" aria-atomic="true">
             <h2 class="text-red-700 font-medium">
@@ -45,9 +45,9 @@
           </div>
         </div>
 
+        <!-- Residency Verification Section (Required) -->
         <div class="space-y-4 p-4 bg-gray-50 rounded">
           <h2 class="text-lg font-medium text-gray-900">Residency Verification</h2>
-          
           <div class="flex items-start">
             <%= form.check_box :maryland_resident,
                 class: "mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
@@ -61,7 +61,6 @@
         <!-- Household Information Section -->
         <fieldset class="space-y-6">
           <legend class="text-lg font-medium text-gray-900">Household Information</legend>
-          
           <div>
             <%= form.label :household_size, "Household Size", class: "block text-sm font-medium text-gray-700" %>
             <div class="mt-1">
@@ -105,7 +104,6 @@
         <!-- Guardian Information Section -->
         <section aria-labelledby="guardian-section-title" class="space-y-4 p-4 bg-gray-50 rounded">
           <h2 id="guardian-section-title" class="text-lg font-medium text-gray-900">Guardian Information</h2>
-          
           <div class="flex items-start">
             <%= form.check_box :is_guardian,
                 class: "mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
@@ -113,8 +111,9 @@
             <%= form.label :is_guardian, "I am applying on behalf of someone under 18",
                 class: "ml-2 block text-sm text-gray-700" %>
           </div>
-          <p id="guardian-description" class="text-sm text-gray-700">Check this box if you are a parent or legal guardian applying on behalf of a minor</p>
-
+          <p id="guardian-description" class="text-sm text-gray-700">
+            Check this box if you are a parent or legal guardian applying on behalf of a minor
+          </p>
           <div class="guardian-fields" data-controller="guardian">
             <%= form.label :guardian_relationship, "Relationship to Applicant",
                 class: "block text-sm font-medium text-gray-700" %>
@@ -123,14 +122,15 @@
                 { include_blank: "Select Relationship" },
                 { class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500",
                   "aria-describedby": "relationship-hint" } %>
-            <p id="relationship-hint" class="mt-1 text-sm text-gray-700">Select your relationship to the applicant if you are applying on behalf of a minor</p>
+            <p id="relationship-hint" class="mt-1 text-sm text-gray-700">
+              Select your relationship to the applicant if you are applying on behalf of a minor
+            </p>
           </div>
         </section>
 
         <!-- Disability Section -->
         <section aria-labelledby="disability-section-title" class="space-y-4 p-4 bg-gray-50 rounded">
           <h2 id="disability-section-title" class="text-lg font-medium text-gray-900">Disability Information</h2>
-          
           <div class="flex items-start">
             <%= form.check_box :self_certify_disability,
                 { 
@@ -144,10 +144,8 @@
           <p id="disability-certification-description" class="text-sm text-gray-700">
             If you have a disability, please self-certify by checking the box above.
           </p>
-
           <fieldset class="space-y-2">
             <legend class="text-sm text-gray-700 font-medium">Select at least one disability that applies to you:</legend>
-            
             <div class="grid sm:grid-cols-2 gap-4">
               <% disabilities = [:hearing, :vision, :speech, :mobility, :cognition] %>
               <% disabilities.each do |disability| %>
@@ -167,13 +165,14 @@
           </fieldset>
         </section>
 
-        <!-- Medical Provider Information -->
-        <%= render "medical_provider_form", form: form %>
+        <!-- Medical Provider Information (Nested Attributes) -->
+        <%= form.fields_for :medical_provider_attributes do |mp| %>
+          <%= render "medical_provider_form", form: mp %>
+        <% end %>
 
         <!-- Document Upload Section -->
         <section aria-labelledby="documents-section-title" class="space-y-4 p-4 bg-gray-50 rounded">
           <h2 id="documents-section-title" class="text-lg font-medium text-gray-900">Required Documentation</h2>
-
           <div class="space-y-4">
             <div>
               <%= form.label :residency_proof, "Proof of Residency",
