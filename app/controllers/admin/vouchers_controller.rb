@@ -22,7 +22,7 @@ class Admin::VouchersController < Admin::BaseController
   end
 
   def show
-    @transactions = @voucher.voucher_transactions
+    @transactions = @voucher.transactions
       .includes(:vendor)
       .order(processed_at: :desc)
 
@@ -113,7 +113,7 @@ class Admin::VouchersController < Admin::BaseController
           voucher.vendor&.business_name,
           voucher.created_at.strftime("%Y-%m-%d %H:%M:%S"),
           voucher.expiration_date&.strftime("%Y-%m-%d"),
-          voucher.voucher_transactions.last&.processed_at&.strftime("%Y-%m-%d %H:%M:%S")
+          voucher.transactions.last&.processed_at&.strftime("%Y-%m-%d %H:%M:%S")
         ]
       end
     end

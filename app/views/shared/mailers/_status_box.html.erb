@@ -3,7 +3,7 @@
 <%# <%= render 'shared/mailers/status_box',  %>
 <%#      status: :success, # or :warning, :error, :info %>
 <%#      title: "Optional Title", %>
-<%#      message: "Your message here" %> %>
+<%#      message: "Your message here" %>
 
 <% status = local_assigns.fetch(:status, :info).to_sym %>
 <% title = local_assigns.fetch(:title, status.to_s.capitalize) %>

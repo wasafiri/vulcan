@@ -1,0 +1,49 @@
+<% if @application.products.any? %>
+  <div class="mt-4">
+    <h4 class="text-sm font-medium text-gray-500">Purchased Products</h4>
+    <div class="mt-2 flow-root">
+      <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+        <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+          <table class="min-w-full divide-y divide-gray-300">
+            <thead>
+              <tr>
+                <th scope="col" class="py-2 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">Product</th>
+                <th scope="col" class="px-3 py-2 text-left text-sm font-semibold text-gray-900">Manufacturer</th>
+                <th scope="col" class="px-3 py-2 text-left text-sm font-semibold text-gray-900">Model</th>
+                <th scope="col" class="px-3 py-2 text-left text-sm font-semibold text-gray-900">Device Type</th>
+                <th scope="col" class="px-3 py-2 text-left text-sm font-semibold text-gray-900">Purchase Date</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+              <% @application.products.distinct.each do |product| %>
+                <% # Find the most recent transaction for this product %>
+                <% transaction = VoucherTransaction.joins(:voucher_transaction_products)
+                     .where(voucher_transaction_products: { product_id: product.id })
+                     .where(voucher_id: @application.vouchers.pluck(:id))
+                     .order(processed_at: :desc)
+                     .first %>
+                <tr>
+                  <td class="whitespace-nowrap py-2 pl-4 pr-3 text-sm text-gray-900">
+                    <%= product.name %>
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-2 text-sm text-gray-900">
+                    <%= product.manufacturer %>
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-2 text-sm text-gray-900">
+                    <%= product.model_number %>
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-2 text-sm text-gray-900">
+                    <%= product.device_types.first if product.device_types.present? %>
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-2 text-sm text-gray-900">
+                    <%= transaction&.processed_at&.strftime("%Y-%m-%d") || "Unknown" %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>

@@ -5,6 +5,7 @@ class Admin::ApplicationsController < Admin::BaseController
     :approve, :reject, :assign_evaluator, :assign_trainer, :schedule_training, :complete_training,
     :update_certification_status, :resend_medical_certification, :assign_voucher
   ]
+  before_action :load_audit_logs, only: [:show, :approve, :reject]
 
   def index
     @current_fiscal_year = fiscal_year
@@ -77,34 +78,6 @@ class Admin::ApplicationsController < Admin::BaseController
       .with_attached_residency_proof
       .with_attached_medical_certification
       .find(params[:id])
-
-    # Fetch all audit logs and combine them
-    proof_reviews = @application.proof_reviews.includes(admin: :role_capabilities).order(created_at: :desc)
-    status_changes = @application.status_changes.includes(user: :role_capabilities).order(created_at: :desc)
-    notifications = Notification.includes(actor: :role_capabilities)
-      .where(notifiable: @application)
-      .where(
-      action: %w[
-        medical_certification_requested
-        medical_certification_received
-        medical_certification_approved
-        medical_certification_rejected
-        review_requested
-        documents_requested
-        proof_approved
-        proof_rejected
-      ]
-    ).order(created_at: :desc)
-
-    # Include voucher-related events
-    voucher_events = Event.where(
-      action: [ "voucher_assigned", "voucher_redeemed", "voucher_expired", "voucher_cancelled" ],
-      metadata: { application_id: @application.id }
-    ).includes(:user).order(created_at: :desc)
-
-    @audit_logs = (proof_reviews + status_changes + notifications + voucher_events)
-      .sort_by(&:created_at)
-      .reverse
   end
 
   def edit
@@ -363,6 +336,38 @@ class Admin::ApplicationsController < Admin::BaseController
   end
 
   private
+
+  def load_audit_logs
+    return unless @application
+
+    # Fetch all audit logs and combine them
+    proof_reviews = @application.proof_reviews.includes(admin: :role_capabilities).order(created_at: :desc)
+    status_changes = @application.status_changes.includes(user: :role_capabilities).order(created_at: :desc)
+    notifications = Notification.includes(actor: :role_capabilities)
+      .where(notifiable: @application)
+      .where(
+      action: %w[
+        medical_certification_requested
+        medical_certification_received
+        medical_certification_approved
+        medical_certification_rejected
+        review_requested
+        documents_requested
+        proof_approved
+        proof_rejected
+      ]
+    ).order(created_at: :desc)
+
+    # Include voucher-related events
+    voucher_events = Event.where(
+      action: [ "voucher_assigned", "voucher_redeemed", "voucher_expired", "voucher_cancelled" ],
+      metadata: { application_id: @application.id }
+    ).includes(:user).order(created_at: :desc)
+
+    @audit_logs = (proof_reviews + status_changes + notifications + voucher_events)
+      .sort_by(&:created_at)
+      .reverse
+  end
 
   def apply_filters(scope, filter)
     case filter

@@ -2,7 +2,7 @@
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-2xl font-bold">Review W9 Form</h1>
     <div class="flex space-x-2">
-      <%= link_to "Back to Vendor", admin_vendor_path(@vendor), class: "btn btn-outline" %>
+      <%= link_to "Back to Vendor", admin_vendor_path(@vendor), class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
     </div>
   </div>
 
@@ -18,21 +18,7 @@
       <div class="border-t border-gray-200 p-4">
         <% if @w9_form.attached? %>
           <div class="w-full h-[600px] overflow-hidden">
-            <%# 
-              IMPORTANT: PDF Preview Fix
-              
-              Setting both src and data-original-src attributes is critical for PDF previews to work correctly.
-              Previous implementations only set data-original-src and relied on JavaScript to set the src,
-              but this was unreliable and often resulted in blank PDF previews.
-              
-              The current implementation:
-              1. Sets the src attribute directly in the HTML
-              2. Also keeps data-original-src for the modal controller to use
-              3. Uses data-turbo="false" to prevent Turbo from interfering with the iframe
-              
-              DO NOT REMOVE the src attribute or change this implementation without thorough testing.
-              Changes here have repeatedly broken PDF previews in the past.
-            %>
+            <%# PDF Preview Implementation %>
             <iframe 
               src="<%= url_for(@w9_form) %>"
               data-original-src="<%= url_for(@w9_form) %>" 
@@ -51,7 +37,7 @@
             </iframe>
           </div>
           <div class="mt-4 flex justify-center">
-            <%= link_to "Open in New Tab", rails_blob_path(@w9_form, disposition: "inline"), target: "_blank", class: "btn btn-outline" %>
+            <%= link_to "Open in New Tab", rails_blob_path(@w9_form, disposition: "inline"), target: "_blank", class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
           </div>
         <% else %>
           <div class="flex items-center justify-center h-[600px] bg-gray-100">
@@ -66,11 +52,11 @@
       <div class="px-4 py-5 sm:px-6 bg-gray-50">
         <h3 class="text-lg leading-6 font-medium text-gray-900">Review Decision</h3>
         <p class="mt-1 max-w-2xl text-sm text-gray-500">
-          Please review the W9 form and make a decision
+          Please review the W9 form and choose your decision.
         </p>
       </div>
       <div class="border-t border-gray-200 p-4">
-        <%= form_with(model: [@vendor, @w9_review], url: admin_vendor_w9_reviews_path(@vendor), local: true, class: "space-y-6") do |f| %>
+        <%= form_with(model: [@vendor, @w9_review], url: admin_vendor_w9_reviews_path(@vendor), local: true, class: "space-y-6", id: "review-form") do |f| %>
           <% if @w9_review.errors.any? %>
             <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
               <div class="flex">
@@ -95,24 +81,9 @@
             </div>
           <% end %>
 
-          <div>
-            <label class="block text-sm font-medium text-gray-700">Decision</label>
-            <div class="mt-2 space-y-4">
-              <div class="flex items-center">
-                <%= f.radio_button :status, :approved, class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300" %>
-                <label for="w9_review_status_approved" class="ml-3 block text-sm font-medium text-gray-700">
-                  Approve
-                </label>
-              </div>
-              <div class="flex items-center">
-                <%= f.radio_button :status, :rejected, class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300" %>
-                <label for="w9_review_status_rejected" class="ml-3 block text-sm font-medium text-gray-700">
-                  Reject
-                </label>
-              </div>
-            </div>
-          </div>
+          <%= f.hidden_field :status, id: "w9_review_status" %>
 
+          <!-- Rejection Reason (only applicable if rejecting) -->
           <div class="rejection-reason hidden">
             <div>
               <label class="block text-sm font-medium text-gray-700">Rejection Reason</label>
@@ -143,7 +114,7 @@
                 Detailed Explanation
               </label>
               <div class="mt-1">
-                <%= f.text_area :rejection_reason, rows: 4, class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" %>
+                <%= f.text_area :rejection_reason, rows: 4, class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md", id: "w9_review_rejection_reason" %>
               </div>
               <p class="mt-2 text-sm text-gray-500">
                 Please provide a detailed explanation of why the W9 form is being rejected. This will be sent to the vendor.
@@ -153,8 +124,13 @@
 
           <div class="pt-5">
             <div class="flex justify-end">
-              <%= link_to "Cancel", admin_vendor_path(@vendor), class: "btn btn-outline mr-3" %>
-              <%= f.submit "Submit Review", class: "btn btn-primary", data: { disable_with: "Processing..." } %>
+              <%= link_to "Cancel", admin_vendor_path(@vendor), class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 mr-3" %>
+              <button type="button" id="approve-btn" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                Approve
+              </button>
+              <button type="button" id="reject-btn" class="ml-2 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                Reject
+              </button>
             </div>
           </div>
         <% end %>
@@ -165,56 +141,41 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    const statusRadios = document.querySelectorAll('input[name="w9_review[status]"]');
+    const approveBtn = document.getElementById('approve-btn');
+    const rejectBtn = document.getElementById('reject-btn');
+    const reviewForm = document.getElementById('review-form');
+    const statusField = document.getElementById('w9_review_status');
     const rejectionReasonDiv = document.querySelector('.rejection-reason');
-    const form = document.querySelector('form');
     const rejectionReasonCodeRadios = document.querySelectorAll('input[name="w9_review[rejection_reason_code]"]');
     const rejectionReasonTextarea = document.getElementById('w9_review_rejection_reason');
-    
-    function toggleRejectionReason() {
-      const isRejected = document.getElementById('w9_review_status_rejected').checked;
-      if (isRejected) {
+
+    approveBtn.addEventListener('click', function() {
+      statusField.value = 'approved';
+      reviewForm.submit();
+    });
+
+    rejectBtn.addEventListener('click', function() {
+      // If rejection fields are not visible, show them and change button text
+      if (rejectionReasonDiv.classList.contains('hidden')) {
         rejectionReasonDiv.classList.remove('hidden');
+        rejectBtn.textContent = 'Confirm Reject';
+        // Optionally, focus the first radio button
+        const firstRadio = rejectionReasonDiv.querySelector('input[type="radio"]');
+        if (firstRadio) { firstRadio.focus(); }
       } else {
-        rejectionReasonDiv.classList.add('hidden');
-        // Clear rejection reason fields when not rejected
-        rejectionReasonCodeRadios.forEach(radio => {
-          radio.checked = false;
-        });
-        if (rejectionReasonTextarea) {
-          rejectionReasonTextarea.value = '';
-        }
-      }
-    }
-    
-    // Add form submission validation
-    form.addEventListener('submit', function(event) {
-      const isRejected = document.getElementById('w9_review_status_rejected').checked;
-      
-      if (isRejected) {
-        // Check if a rejection reason code is selected
+        // Validate rejection fields
         let reasonCodeSelected = false;
         rejectionReasonCodeRadios.forEach(radio => {
-          if (radio.checked) {
-            reasonCodeSelected = true;
-          }
+          if (radio.checked) { reasonCodeSelected = true; }
         });
-        
-        // Check if rejection reason text is provided
         const reasonText = rejectionReasonTextarea ? rejectionReasonTextarea.value.trim() : '';
-        
         if (!reasonCodeSelected || reasonText === '') {
-          event.preventDefault();
           alert('Please select a rejection reason and provide a detailed explanation.');
+        } else {
+          statusField.value = 'rejected';
+          reviewForm.submit();
         }
       }
     });
-    
-    statusRadios.forEach(radio => {
-      radio.addEventListener('change', toggleRejectionReason);
-    });
-    
-    // Initial state
-    toggleRejectionReason();
   });
 </script>

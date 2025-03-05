@@ -2,148 +2,154 @@
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-2xl font-bold"><%= @vendor.business_name %></h1>
     <div class="flex space-x-2">
-      <%= link_to "Back to Vendors", admin_vendors_path, class: "btn btn-outline" %>
-      <%= link_to "Edit", edit_admin_vendor_path(@vendor), class: "btn btn-primary" %>
+      <%= link_to admin_vendors_path,
+          class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+          aria: { label: "Return to vendors list" } do %>
+        <span>Back to Vendors</span>
+      <% end %>
+      <%= link_to edit_admin_vendor_path(@vendor),
+          class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+          aria: { label: "Edit vendor" } do %>
+        <span>Edit</span>
+      <% end %>
     </div>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-    <!-- Vendor Information -->
-    <div class="bg-white shadow overflow-hidden rounded-lg col-span-2">
-      <div class="px-4 py-5 sm:px-6 bg-gray-50">
-        <h3 class="text-lg leading-6 font-medium text-gray-900">Vendor Information</h3>
-      </div>
-      <div class="border-t border-gray-200">
-        <dl>
-          <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-            <dt class="text-sm font-medium text-gray-500">Business Name</dt>
-            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2"><%= @vendor.business_name %></dd>
-          </div>
-          <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-            <dt class="text-sm font-medium text-gray-500">Business Tax ID</dt>
-            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2"><%= @vendor.business_tax_id %></dd>
-          </div>
-          <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-            <dt class="text-sm font-medium text-gray-500">Email</dt>
-            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2"><%= @vendor.email %></dd>
-          </div>
-          <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-            <dt class="text-sm font-medium text-gray-500">Phone</dt>
-            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2"><%= @vendor.phone || "Not provided" %></dd>
-          </div>
-          <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-            <dt class="text-sm font-medium text-gray-500">Status</dt>
-            <dd class="mt-1 text-sm sm:mt-0 sm:col-span-2">
-              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                <%= @vendor.vendor_approved? ? 'bg-green-100 text-green-800' : 
-                    @vendor.vendor_pending? ? 'bg-yellow-100 text-yellow-800' : 
-                    'bg-red-100 text-red-800' %>">
-                <%= @vendor.status.titleize %>
-              </span>
-            </dd>
-          </div>
-          <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-            <dt class="text-sm font-medium text-gray-500">W9 Status</dt>
-            <dd class="mt-1 text-sm sm:mt-0 sm:col-span-2">
-              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                <%= @vendor.w9_status_approved? ? 'bg-green-100 text-green-800' : 
-                    @vendor.w9_status_pending_review? ? 'bg-yellow-100 text-yellow-800' : 
-                    @vendor.w9_status_rejected? ? 'bg-red-100 text-red-800' : 
-                    'bg-gray-100 text-gray-800' %>">
-                <%= @vendor.w9_status.to_s.titleize %>
-              </span>
-              <% if @vendor.w9_status_pending_review? && @vendor.w9_form.attached? %>
-                <%= link_to "Review W9", new_admin_vendor_w9_review_path(@vendor), class: "ml-3 text-sm text-indigo-600 hover:text-indigo-900" %>
-              <% end %>
-            </dd>
-          </div>
-          <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-            <dt class="text-sm font-medium text-gray-500">W9 Form</dt>
-            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-              <% if @vendor.w9_form.attached? %>
-                <div class="flex items-center">
-                  <svg class="h-5 w-5 text-gray-400 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
-                  <%= link_to "View W9 Form", rails_blob_path(@vendor.w9_form, disposition: "inline"), target: "_blank", class: "text-indigo-600 hover:text-indigo-900" %>
-                </div>
-              <% else %>
-                <span class="text-red-500">No W9 form uploaded</span>
-              <% end %>
-            </dd>
-          </div>
-          <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-            <dt class="text-sm font-medium text-gray-500">Terms Accepted</dt>
-            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-              <% if @vendor.terms_accepted_at.present? %>
-                <%= @vendor.terms_accepted_at.strftime("%B %d, %Y") %>
-              <% else %>
-                <span class="text-red-500">Not accepted</span>
-              <% end %>
-            </dd>
-          </div>
-        </dl>
-      </div>
+  <!-- Vendor Information Section -->
+  <div class="bg-white shadow overflow-hidden rounded-lg mb-6">
+    <div class="px-4 py-5 sm:px-6 bg-gray-50">
+      <h3 class="text-lg leading-6 font-medium text-gray-900">Vendor Information</h3>
     </div>
+    <div class="border-t border-gray-200">
+      <dl>
+        <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+          <dt class="text-sm font-medium text-gray-500">Business Name</dt>
+          <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2"><%= @vendor.business_name %></dd>
+        </div>
+        <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+          <dt class="text-sm font-medium text-gray-500">Business Tax ID</dt>
+          <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2"><%= @vendor.business_tax_id %></dd>
+        </div>
+        <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+          <dt class="text-sm font-medium text-gray-500">Email</dt>
+          <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2"><%= @vendor.email %></dd>
+        </div>
+        <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+          <dt class="text-sm font-medium text-gray-500">Phone</dt>
+          <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2"><%= @vendor.phone || "Not provided" %></dd>
+        </div>
+        <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+          <dt class="text-sm font-medium text-gray-500">Status</dt>
+          <dd class="mt-1 text-sm sm:mt-0 sm:col-span-2">
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+              <%= @vendor.vendor_approved? ? 'bg-green-100 text-green-800' : 
+                  @vendor.vendor_pending? ? 'bg-yellow-100 text-yellow-800' : 
+                  'bg-red-100 text-red-800' %>">
+              <%= @vendor.status.titleize %>
+            </span>
+          </dd>
+        </div>
+        <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+          <dt class="text-sm font-medium text-gray-500">W9 Status</dt>
+          <dd class="mt-1 text-sm sm:mt-0 sm:col-span-2">
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+              <%= @vendor.w9_status_approved? ? 'bg-green-100 text-green-800' : 
+                  @vendor.w9_status_pending_review? ? 'bg-yellow-100 text-yellow-800' : 
+                  @vendor.w9_status_rejected? ? 'bg-red-100 text-red-800' : 
+                  'bg-gray-100 text-gray-800' %>">
+              <%= @vendor.w9_status.to_s.titleize %>
+            </span>
+            <% if @vendor.w9_status_pending_review? && @vendor.w9_form.attached? %>
+              <%= link_to "Review W9", new_admin_vendor_w9_review_path(@vendor), class: "ml-3 text-sm text-indigo-600 hover:text-indigo-900" %>
+            <% end %>
+          </dd>
+        </div>
+        <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+          <dt class="text-sm font-medium text-gray-500">W9 Form</dt>
+          <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+            <% if @vendor.w9_form.attached? %>
+              <div class="flex items-center">
+                <svg class="h-5 w-5 text-gray-400 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                <%= link_to "View W9 Form", rails_blob_path(@vendor.w9_form, disposition: "inline"), target: "_blank", class: "text-indigo-600 hover:text-indigo-900" %>
+              </div>
+            <% else %>
+              <span class="text-red-500">No W9 form uploaded</span>
+            <% end %>
+          </dd>
+        </div>
+        <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+          <dt class="text-sm font-medium text-gray-500">Terms Accepted</dt>
+          <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+            <% if @vendor.terms_accepted_at.present? %>
+              <%= @vendor.terms_accepted_at.strftime("%B %d, %Y") %>
+            <% else %>
+              <span class="text-red-500">Not accepted</span>
+            <% end %>
+          </dd>
+        </div>
+      </dl>
+    </div>
+  </div>
 
-    <!-- W9 Review History -->
-    <div class="bg-white shadow overflow-hidden rounded-lg">
-      <div class="px-4 py-5 sm:px-6 bg-gray-50">
-        <h3 class="text-lg leading-6 font-medium text-gray-900">W9 Review History</h3>
-      </div>
-      <div class="border-t border-gray-200 p-4">
-        <% if @w9_reviews.any? %>
-          <div class="flow-root">
-            <ul role="list" class="-mb-8">
-              <% @w9_reviews.each_with_index do |review, index| %>
-                <li>
-                  <div class="relative pb-8">
-                    <% if index < @w9_reviews.size - 1 %>
-                      <span class="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
-                    <% end %>
-                    <div class="relative flex space-x-3">
+  <!-- W9 Review History Section -->
+  <div class="bg-white shadow overflow-hidden rounded-lg">
+    <div class="px-4 py-5 sm:px-6 bg-gray-50">
+      <h3 class="text-lg leading-6 font-medium text-gray-900">W9 Review History</h3>
+    </div>
+    <div class="border-t border-gray-200 p-4">
+      <% if @w9_reviews.any? %>
+        <div class="flow-root">
+          <ul role="list" class="-mb-8">
+            <% @w9_reviews.each_with_index do |review, index| %>
+              <li>
+                <div class="relative pb-8">
+                  <% if index < @w9_reviews.size - 1 %>
+                    <span class="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+                  <% end %>
+                  <div class="relative flex space-x-3">
+                    <div>
+                      <span class="h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white 
+                        <%= review.status_approved? ? 'bg-green-500' : 'bg-red-500' %>">
+                        <% if review.status_approved? %>
+                          <svg class="h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                          </svg>
+                        <% else %>
+                          <svg class="h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                          </svg>
+                        <% end %>
+                      </span>
+                    </div>
+                    <div class="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
                       <div>
-                        <span class="h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white 
-                          <%= review.status_approved? ? 'bg-green-500' : 'bg-red-500' %>">
-                          <% if review.status_approved? %>
-                            <svg class="h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                            </svg>
-                          <% else %>
-                            <svg class="h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                            </svg>
-                          <% end %>
-                        </span>
-                      </div>
-                      <div class="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
-                        <div>
-                          <p class="text-sm text-gray-500">
-                            <span class="font-medium text-gray-900">
-                              <%= review.status.titleize %>
-                            </span>
-                            by <%= review.admin.email %>
+                        <p class="text-sm text-gray-500">
+                          <span class="font-medium text-gray-900">
+                            <%= review.status.titleize %>
+                          </span>
+                          by <%= review.admin.email %>
+                        </p>
+                        <% if review.status_rejected? && review.rejection_reason.present? %>
+                          <p class="mt-1 text-sm text-gray-700">
+                            <strong><%= review.rejection_reason_code.to_s.titleize %>:</strong> <%= review.rejection_reason %>
                           </p>
-                          <% if review.status_rejected? && review.rejection_reason.present? %>
-                            <p class="mt-1 text-sm text-gray-700">
-                              <strong><%= review.rejection_reason_code.to_s.titleize %>:</strong> <%= review.rejection_reason %>
-                            </p>
-                          <% end %>
-                        </div>
-                        <div class="text-right text-sm whitespace-nowrap text-gray-500">
-                          <%= review.reviewed_at.strftime("%b %d, %Y") %>
-                        </div>
+                        <% end %>
+                      </div>
+                      <div class="text-right text-sm whitespace-nowrap text-gray-500">
+                        <%= review.reviewed_at.strftime("%b %d, %Y") %>
                       </div>
                     </div>
                   </div>
-                </li>
-              <% end %>
-            </ul>
-          </div>
-        <% else %>
-          <p class="text-sm text-gray-500">No W9 reviews yet.</p>
-        <% end %>
-      </div>
+                </div>
+              </li>
+            <% end %>
+          </ul>
+        </div>
+      <% else %>
+        <p class="text-sm text-gray-500">No W9 reviews yet.</p>
+      <% end %>
     </div>
   </div>
 </div>

@@ -28,6 +28,15 @@ Rails.application.routes.draw do
   resource :profile, only: [ :edit, :update ], controller: "users"
   get "up", to: "rails/health#show", as: :rails_health_check
 
+  # Action Mailbox routes
+  namespace :rails do
+    namespace :action_mailbox do
+      namespace :postmark do
+        resources :inbound_emails, only: [:create]
+      end
+    end
+  end
+
   namespace :admin do
     root to: "applications#index"
 
@@ -175,6 +184,12 @@ Rails.application.routes.draw do
       collection do
         get :check_voucher
         get :verify
+      end
+    end
+    resources :vouchers, only: [ :index ], param: :code do
+      member do
+        get :redeem
+        post :process_redemption
       end
     end
     resources :transactions, only: [ :index ] do

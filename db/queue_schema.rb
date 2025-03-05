@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_03_03_222506) do
+ActiveRecord::Schema[8.0].define(version: 2025_03_04_201617) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -132,6 +132,13 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_03_222506) do
     t.index ["total_rejections"], name: "index_applications_on_total_rejections"
     t.index ["trainer_id"], name: "index_applications_on_trainer_id"
     t.index ["user_id"], name: "index_applications_on_user_id"
+  end
+
+  create_table "applications_products", id: false, force: :cascade do |t|
+    t.bigint "application_id", null: false
+    t.bigint "product_id", null: false
+    t.index ["application_id", "product_id"], name: "index_applications_products_on_application_id_and_product_id"
+    t.index ["product_id", "application_id"], name: "index_applications_products_on_product_id_and_application_id"
   end
 
   create_table "appointments", force: :cascade do |t|
@@ -562,6 +569,17 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_03_222506) do
     t.index ["w9_status"], name: "index_users_on_w9_status", where: "((type)::text = 'Vendor'::text)"
   end
 
+  create_table "voucher_transaction_products", force: :cascade do |t|
+    t.bigint "voucher_transaction_id", null: false
+    t.bigint "product_id", null: false
+    t.integer "quantity", default: 1, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["product_id"], name: "index_voucher_transaction_products_on_product_id"
+    t.index ["voucher_transaction_id", "product_id"], name: "idx_on_voucher_txn_product"
+    t.index ["voucher_transaction_id"], name: "index_voucher_transaction_products_on_voucher_transaction_id"
+  end
+
   create_table "voucher_transactions", force: :cascade do |t|
     t.bigint "voucher_id", null: false
     t.bigint "vendor_id", null: false
@@ -662,6 +680,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_03_222506) do
   add_foreign_key "users", "users", column: "income_verified_by_id"
   add_foreign_key "users", "users", column: "medical_provider_id"
   add_foreign_key "users", "users", column: "recipient_id"
+  add_foreign_key "voucher_transaction_products", "products"
+  add_foreign_key "voucher_transaction_products", "voucher_transactions"
   add_foreign_key "voucher_transactions", "invoices"
   add_foreign_key "voucher_transactions", "users", column: "vendor_id"
   add_foreign_key "voucher_transactions", "vouchers"

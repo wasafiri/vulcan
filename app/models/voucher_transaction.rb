@@ -3,6 +3,9 @@ class VoucherTransaction < ApplicationRecord
   belongs_to :vendor, class_name: "User"
   belongs_to :invoice, optional: true
 
+  has_many :voucher_transaction_products, dependent: :destroy
+  has_many :products, through: :voucher_transaction_products
+
   validates :amount, presence: true,
     numericality: { greater_than: 0 }
   validates :reference_number, presence: true, uniqueness: true

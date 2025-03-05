@@ -16,20 +16,18 @@ class Voucher < ApplicationRecord
   after_update :log_status_change, if: -> { saved_change_to_status? && respond_to?(:events) }
 
   enum :status, {
-    issued: 0,      # Initial state when voucher is created
-    active: 1,      # When voucher is ready to be used
+    active: 0,      # Initial state when voucher is created and ready to be used
     redeemed: 2,    # When voucher has been fully used
     expired: 3,     # When voucher has passed its expiration date
     cancelled: 4    # When voucher has been cancelled by admin
-  }, default: :issued, prefix: :voucher
+  }, default: :active, prefix: :voucher
 
-  scope :available, -> { where(status: [ :issued, :active ]) }
+  scope :available, -> { where(status: :active) }
   scope :for_vendor, ->(vendor_id) { where(vendor_id: vendor_id) }
   scope :not_invoiced, -> { where(invoice_id: nil) }
-  scope :pending_activation, -> { where(status: :issued) }
   scope :expiring_soon, -> {
     expiration_threshold = 7.days
-    where(status: [ :issued, :active ])
+    where(status: :active)
       .where(
         "issued_at + (INTERVAL '1 month' * ?) - CURRENT_TIMESTAMP <= INTERVAL '? days'",
         Policy.get("voucher_validity_period_months"),
@@ -63,7 +61,7 @@ class Voucher < ApplicationRecord
     true
   end
 
-  def redeem!(amount, vendor)
+  def redeem!(amount, vendor, product_data = nil)
     return false unless can_redeem?(amount)
 
     transaction do
@@ -76,6 +74,20 @@ class Voucher < ApplicationRecord
         processed_at: Time.current,
         reference_number: generate_reference_number
       )
+
+      # Associate products with the transaction
+      if product_data.present?
+        product_data.each do |product_id, quantity|
+          product = Product.find(product_id)
+          txn.voucher_transaction_products.create!(
+            product: product,
+            quantity: quantity.to_i
+          )
+
+          # Associate products with the application
+          application.products << product unless application.products.include?(product)
+        end
+      end
 
       # Update remaining value and vendor
       self.remaining_value -= amount
@@ -104,7 +116,7 @@ class Voucher < ApplicationRecord
   end
 
   def can_cancel?
-    voucher_issued? || voucher_active?
+    voucher_active?
   end
 
   def initial_value=(value)
@@ -113,16 +125,6 @@ class Voucher < ApplicationRecord
 
   def remaining_value=(value)
     super(value.try(:round, 2))
-  end
-
-  def activate_if_valid!
-    return if voucher_active? || voucher_redeemed? || voucher_cancelled?
-
-    if expired?
-      update!(status: :expired)
-    else
-      update!(status: :active)
-    end
   end
 
   private

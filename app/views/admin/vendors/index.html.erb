@@ -1,18 +1,17 @@
 <div class="container mx-auto px-4 py-8">
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-2xl font-bold">Vendors</h1>
-    <div class="flex space-x-2">
-      <div class="dropdown">
-        <button class="btn btn-outline dropdown-toggle" type="button" id="filterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-          Filter by W9 Status
-        </button>
-        <ul class="dropdown-menu" aria-labelledby="filterDropdown">
-          <li><%= link_to "All", admin_vendors_path, class: "dropdown-item" %></li>
-          <li><%= link_to "Not Submitted", admin_vendors_path(w9_status: :not_submitted), class: "dropdown-item" %></li>
-          <li><%= link_to "Pending Review", admin_vendors_path(w9_status: :pending_review), class: "dropdown-item" %></li>
-          <li><%= link_to "Approved", admin_vendors_path(w9_status: :approved), class: "dropdown-item" %></li>
-          <li><%= link_to "Rejected", admin_vendors_path(w9_status: :rejected), class: "dropdown-item" %></li>
-        </ul>
+  </div>
+
+  <div class="p-4 border-b mb-6">
+    <div class="flex flex-wrap items-center gap-4">
+      <div class="flex items-center gap-2">
+        <label class="text-sm font-medium text-gray-700">W9 Status:</label>
+        <%= link_to "All", admin_vendors_path, class: "inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50" %>
+        <%= link_to "Not Submitted", admin_vendors_path(w9_status: :not_submitted), class: "inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50" %>
+        <%= link_to "Pending Review", admin_vendors_path(w9_status: :pending_review), class: "inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50" %>
+        <%= link_to "Approved", admin_vendors_path(w9_status: :approved), class: "inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50" %>
+        <%= link_to "Rejected", admin_vendors_path(w9_status: :rejected), class: "inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50" %>
       </div>
     </div>
   </div>
