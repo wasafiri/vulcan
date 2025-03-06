@@ -10,11 +10,6 @@
       <p><strong>Application Date:</strong> <%= @application.application_date&.strftime("%B %d, %Y") || "Not specified" %></p>
       <p><strong>Household Size:</strong> <%= @application.household_size || "Not specified" %></p>
       <p><strong>Annual Income:</strong> <%= number_to_currency(@application.annual_income) if @application.annual_income %></p>
-      <p><strong>Income Verification Status:</strong> <%= @application.income_proof_status&.titleize || "Not specified" %></p>
-      <p><strong>Income Verified At:</strong> <%= @application.income_verified_at&.strftime("%B %d, %Y") || "Not verified" %></p>
-      <p><strong>Income Verified By:</strong> <%= @application.income_verified_by&.full_name || "Not verified" %></p>
-      <p><strong>Income Details:</strong> <%= @application.income_details.presence || "None provided" %></p>
-      <p><strong>Residency Details:</strong> <%= @application.residency_details.presence || "None provided" %></p>
     </div>
 
     <div class="mb-4">
