@@ -370,7 +370,8 @@ class Admin::ApplicationsController < Admin::BaseController
   end
 
   def apply_filters(scope, filter)
-    case filter
+    # First apply any filter from params[:filter] (from the filter links)
+    scope = case filter
     when "active"
       scope.active
     when "in_progress"
@@ -393,6 +394,45 @@ class Admin::ApplicationsController < Admin::BaseController
     else
       scope
     end
+    
+    # Then apply additional filters from the form
+    
+    # Apply status filter if present
+    scope = scope.where(status: params[:status]) if params[:status].present?
+    
+    # Apply date range filter if present
+    if params[:date_range].present?
+      case params[:date_range]
+      when "current_fy"
+        # Filter by current fiscal year
+        current_fy_start = Date.new(fiscal_year, 7, 1)
+        current_fy_end = Date.new(fiscal_year + 1, 6, 30)
+        scope = scope.where(created_at: current_fy_start..current_fy_end)
+      when "previous_fy"
+        # Filter by previous fiscal year
+        previous_fy_start = Date.new(fiscal_year - 1, 7, 1)
+        previous_fy_end = Date.new(fiscal_year, 6, 30)
+        scope = scope.where(created_at: previous_fy_start..previous_fy_end)
+      when "last_30"
+        # Filter by last 30 days
+        scope = scope.where("created_at >= ?", 30.days.ago)
+      when "last_90"
+        # Filter by last 90 days
+        scope = scope.where("created_at >= ?", 90.days.ago)
+      end
+    end
+    
+    # Apply search filter if present
+    if params[:q].present?
+      search_term = "%#{params[:q]}%"
+      # Join with users table to search on user fields
+      scope = scope.joins(:user).where(
+        "applications.id::text ILIKE ? OR users.first_name ILIKE ? OR users.last_name ILIKE ? OR users.email ILIKE ?", 
+        search_term, search_term, search_term, search_term
+      )
+    end
+    
+    scope
   end
 
   def sort_column
