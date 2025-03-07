@@ -9,7 +9,7 @@ class Admin::PaperApplicationsController < Admin::BaseController
   def create
     ActiveRecord::Base.transaction do
       # Check if constituent already has an active application
-      if existing_constituent = find_existing_constituent(constituent_params)
+      if (existing_constituent = find_existing_constituent(constituent_params))
         if existing_constituent.active_application?
           flash[:alert] = "This constituent already has an active application."
           return render :new, status: :unprocessable_entity

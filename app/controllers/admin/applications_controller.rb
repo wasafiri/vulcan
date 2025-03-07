@@ -16,9 +16,9 @@ class Admin::ApplicationsController < Admin::BaseController
 
     # Data for Common Tasks section
     income_proofs_pending = Application.joins(:income_proof_attachment)
-                                      .where(income_proof_status: "not_reviewed")
+                                       .where(income_proof_status: "not_reviewed")
     residency_proofs_pending = Application.joins(:residency_proof_attachment)
-                                         .where(residency_proof_status: "not_reviewed")
+                                          .where(residency_proof_status: "not_reviewed")
     @proofs_needing_review_count = (income_proofs_pending.pluck(:id) + residency_proofs_pending.pluck(:id)).uniq.count
 
     @medical_certs_to_review_count = Application.where(medical_certification_status: "received").count
@@ -57,9 +57,9 @@ class Admin::ApplicationsController < Admin::BaseController
 
     # Get base scope with includes
     scope = Application.includes(:user)
-      .with_attached_income_proof
-      .with_attached_residency_proof
-      .where.not(status: [ :rejected, :archived ])
+                       .with_attached_income_proof
+                       .with_attached_residency_proof
+                       .where.not(status: [:rejected, :archived])
 
     scope = apply_filters(scope, params[:filter])
 
@@ -75,13 +75,12 @@ class Admin::ApplicationsController < Admin::BaseController
       :evaluations,
       :training_sessions
     ).with_attached_income_proof
-      .with_attached_residency_proof
-      .with_attached_medical_certification
-      .find(params[:id])
+                              .with_attached_residency_proof
+                              .with_attached_medical_certification
+                              .find(params[:id])
   end
 
-  def edit
-  end
+  def edit; end
 
   def update
     if @application.update(application_params)
@@ -372,34 +371,32 @@ class Admin::ApplicationsController < Admin::BaseController
   def apply_filters(scope, filter)
     # First apply any filter from params[:filter] (from the filter links)
     scope = case filter
-    when "active"
-      scope.active
-    when "in_progress"
-      scope.where(status: :in_progress)
-    when "approved"
-      scope.where(status: :approved)
-    when "proofs_needing_review"
-      income_pending_ids = scope.where(income_proof_status: "not_reviewed").pluck(:id)
-      residency_pending_ids = scope.where(residency_proof_status: "not_reviewed").pluck(:id)
-      scope.where(id: income_pending_ids + residency_pending_ids)
-    when "awaiting_medical_response"
-      scope.where(status: :awaiting_documents)
-    when "medical_certs_to_review"
-      scope.where(medical_certification_status: "received")
-    when "training_requests"
-      # Find applications with training_requested notifications
-      training_request_notifications = Notification.where(action: "training_requested")
-      application_ids = training_request_notifications.where(notifiable_type: "Application").pluck(:notifiable_id)
-      scope.where(id: application_ids)
-    else
-      scope
-    end
-    
-    # Then apply additional filters from the form
-    
+            when "active"
+              scope.active
+            when "in_progress"
+              scope.where(status: :in_progress)
+            when "approved"
+              scope.where(status: :approved)
+            when "proofs_needing_review"
+              income_pending_ids = scope.where(income_proof_status: "not_reviewed").pluck(:id)
+              residency_pending_ids = scope.where(residency_proof_status: "not_reviewed").pluck(:id)
+              scope.where(id: income_pending_ids + residency_pending_ids)
+            when "awaiting_medical_response"
+              scope.where(status: :awaiting_documents)
+            when "medical_certs_to_review"
+              scope.where(medical_certification_status: "received")
+            when "training_requests"
+            # Find applications with training_requested notifications
+              training_request_notifications = Notification.where(action: "training_requested")
+              application_ids = training_request_notifications.where(notifiable_type: "Application").pluck(:notifiable_id)
+              scope.where(id: application_ids)
+            else
+              scope
+            end
+
     # Apply status filter if present
     scope = scope.where(status: params[:status]) if params[:status].present?
-    
+
     # Apply date range filter if present
     if params[:date_range].present?
       case params[:date_range]
@@ -421,7 +418,7 @@ class Admin::ApplicationsController < Admin::BaseController
         scope = scope.where("created_at >= ?", 90.days.ago)
       end
     end
-    
+
     # Apply search filter if present
     if params[:q].present?
       search_term = "%#{params[:q]}%"
@@ -431,7 +428,6 @@ class Admin::ApplicationsController < Admin::BaseController
         search_term, search_term, search_term, search_term
       )
     end
-    
     scope
   end
 
@@ -543,8 +539,8 @@ class Admin::ApplicationsController < Admin::BaseController
     # Vendor activity
     @active_vendors = Vendor.joins(:voucher_transactions).distinct.count
     @recent_active_vendors = Vendor.joins(:voucher_transactions)
-                                  .where("voucher_transactions.created_at >= ?", 1.month.ago)
-                                  .distinct.count
+                                   .where("voucher_transactions.created_at >= ?", 1.month.ago)
+                                   .distinct.count
 
     # MFR Data (previous full fiscal year)
     @mfr_applications_approved = Application.where(created_at: @previous_fy_start..@previous_fy_end, status: :approved).count
