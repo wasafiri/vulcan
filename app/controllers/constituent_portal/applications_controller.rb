@@ -21,7 +21,12 @@ module ConstituentPortal
       @applications = current_user.applications.order(created_at: :desc)
     end
 
-    def show; end
+    def show
+      @certification_requests = Notification.where(
+        notifiable: @application, 
+        action: "medical_certification_requested"
+      ).order(created_at: :desc)
+    end
 
     def new
       @application = current_user.applications.new

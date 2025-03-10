@@ -124,6 +124,71 @@ class Admin::ApplicationsControllerTest < ActionDispatch::IntegrationTest
     assert_select "input[name='application_note[internal_only]']"
     assert_select "input[type=submit][value='Add Note']"
   end
+  
+  def test_resend_medical_certification
+    # Setup application with medical provider email
+    @application.update(medical_provider_email: "provider@example.com")
+    
+    assert_enqueued_with(job: MedicalCertificationEmailJob) do
+      post resend_medical_certification_admin_application_path(@application)
+    end
+
+    @application.reload
+    assert_equal "requested", @application.medical_certification_status
+    assert_equal 1, @application.medical_certification_request_count
+    assert_redirected_to admin_application_path(@application)
+    assert_equal "Certification request sent successfully.", flash[:notice]
+  end
+
+  def test_resend_medical_certification_creates_notification
+    # Setup application with medical provider email
+    @application.update(medical_provider_email: "provider@example.com")
+    
+    assert_difference 'Notification.count' do
+      post resend_medical_certification_admin_application_path(@application)
+    end
+
+    notification = Notification.last
+    assert_equal "medical_certification_requested", notification.action
+    assert_equal @application.user, notification.recipient
+    assert_equal @admin, notification.actor
+    
+    # Check that metadata contains the timestamp and request count
+    assert notification.metadata.present?
+    assert notification.metadata.key?("timestamp")
+    assert_equal 1, notification.metadata["request_count"]
+  end
+
+  def test_resend_medical_certification_without_provider_email
+    # Setup application without medical provider email
+    @application.update(medical_provider_email: nil)
+    
+    post resend_medical_certification_admin_application_path(@application)
+    
+    assert_redirected_to admin_application_path(@application)
+    assert_match /Failed to process certification request/, flash[:alert]
+    
+    # Verify the job was not enqueued
+    assert_no_enqueued_jobs only: MedicalCertificationEmailJob
+  end
+
+  def test_resend_medical_certification_increments_count
+    # Setup application with existing request count
+    @application.update(
+      medical_provider_email: "provider@example.com",
+      medical_certification_status: "requested",
+      medical_certification_request_count: 1
+    )
+    
+    post resend_medical_certification_admin_application_path(@application)
+    
+    @application.reload
+    assert_equal 2, @application.medical_certification_request_count
+    
+    # Check notification has the correct count
+    notification = Notification.last
+    assert_equal 2, notification.metadata["request_count"]
+  end
 
   def teardown
     Current.reset

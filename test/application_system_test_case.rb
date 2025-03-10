@@ -1,13 +1,34 @@
 require "test_helper"
+require "support/system_test_helpers"
 
 class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   include VoucherTestHelper
+  include SystemTestHelpers
 
-  driven_by :headless_chrome
+  # Use the stable Chrome driver defined in capybara_config.rb
+  driven_by :ultra_stable_chrome
 
   def setup
+    # Kill any orphaned Chrome processes before starting (Mac only)
+    if RUBY_PLATFORM =~ /darwin/
+      system("pkill -f '(chrome)?(--headless)' || true")
+    end
+    
+    # Reset the Capybara session before each test
+    Capybara.reset_sessions!
+    
+    # Set up the test with the standard Rails setup
     super
     @routes = Rails.application.routes
+    
+    # Set longer default wait time for finding elements
+    Capybara.default_max_wait_time = 5
+    
+    # Log test start for debugging
+    puts "Starting test: #{self.class.name}##{self.method_name}"
+    
+    # Ensure alerts are properly handled
+    page.driver.browser.switch_to.alert.accept rescue nil
   end
 
   def sign_in(user)
@@ -19,11 +40,58 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   end
 
   def teardown
-    super
-    # Clear any uploaded files
-    FileUtils.rm_rf(ActiveStorage::Blob.service.root)
-    # Clear any emails
-    ActionMailer::Base.deliveries.clear
+    begin
+      puts "Tearing down test: #{self.class.name}##{self.method_name}"
+      
+      # First dismiss any alerts that might be open
+      if page.driver.browser.respond_to?(:switch_to)
+        begin
+          page.driver.browser.switch_to.alert.accept
+        rescue => e
+          # Ignore errors if no alert is present
+        end
+      end
+      
+      # Instead of closing windows, quit the driver completely
+      if page.driver.respond_to?(:quit)
+        begin
+          # This is a cleaner approach than resetting sessions
+          page.driver.quit
+        rescue => e
+          puts "Failed to quit driver: #{e.message}"
+          
+          # If quit fails, try to at least clear the session
+          Capybara.reset_sessions! rescue nil
+          
+          # Last resort - kill chrome processes (Mac only)
+          if RUBY_PLATFORM =~ /darwin/
+            system("pkill -f '(chrome)?(--headless)' || true")
+          end
+        end
+      else
+        # Fallback to the standard session reset if quit not available
+        Capybara.reset_sessions! rescue nil
+      end
+      
+      # Clear any uploaded files
+      FileUtils.rm_rf(ActiveStorage::Blob.service.root) rescue nil
+      
+      # Clear any emails
+      ActionMailer::Base.deliveries.clear rescue nil
+      
+      # Clean up jobs
+      clear_enqueued_jobs rescue nil
+      clear_performed_jobs rescue nil
+      
+    rescue => e
+      puts "Error in teardown: #{e.message}"
+      puts e.backtrace.join("\n")
+    ensure
+      # Reset Capybara configuration to defaults for next test
+      Capybara.default_max_wait_time = 2
+      
+      super # Always call super at the end to ensure parent teardown runs
+    end
   end
 
   # System test helpers

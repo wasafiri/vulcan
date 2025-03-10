@@ -10,6 +10,7 @@ require "support/notification_delivery_stub"
 require "support/authentication_test_helper"
 require "support/flash_test_helper"
 require "support/form_test_helper"
+require "support/capybara_config"
 
 # Load test-specific controllers and routes for webhooks
 require_relative "controllers/webhooks/test_base_controller"

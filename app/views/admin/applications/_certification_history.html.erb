@@ -4,8 +4,8 @@
   ).order(created_at: :desc) 
 %>
 
-<% if certification_requests.any? %>
-  <div class="mt-2 pl-4 border-l-2 border-gray-200">
+<div class="certification-history mt-2 pl-4 border-l-2 border-gray-200">
+  <% if certification_requests.any? %>
     <% certification_requests.each_with_index do |request, index| %>
       <% 
         # Get timestamp from metadata if available, otherwise use notification created_at
@@ -20,22 +20,24 @@
           timestamp = request.created_at
         end
       %>
+      <div class="request-item mb-2">
+        <p class="text-sm text-gray-600 mb-1">
+          Request <%= certification_requests.size - index %> sent on 
+          <%= timestamp.strftime("%B %d, %Y at %I:%M %p") %>
+          <% if index == 0 %>
+            <span class="text-xs text-gray-500">(most recent)</span>
+          <% end %>
+        </p>
+      </div>
+    <% end %>
+  <% else %>
+    <div class="request-item mb-2">
       <p class="text-sm text-gray-600 mb-1">
-        Request <%= certification_requests.size - index %> sent on 
-        <%= timestamp.strftime("%B %d, %Y at %I:%M %p") %>
-        <% if index == 0 %>
-          <span class="text-xs text-gray-500">(most recent)</span>
+        <span class="text-yellow-500">Note:</span> No detailed request history available.
+        <% if @application.medical_certification_requested_at.present? %>
+          Last request sent on <%= @application.medical_certification_requested_at.strftime("%B %d, %Y at %I:%M %p") %>
         <% end %>
       </p>
-    <% end %>
-  </div>
-<% else %>
-  <div class="mt-2 pl-4 border-l-2 border-gray-200">
-    <p class="text-sm text-gray-600 mb-1">
-      <span class="text-yellow-500">Note:</span> No detailed request history available.
-      <% if @application.medical_certification_requested_at.present? %>
-        Last request sent on <%= @application.medical_certification_requested_at.strftime("%B %d, %Y at %I:%M %p") %>
-      <% end %>
-    </p>
-  </div>
-<% end %>
+    </div>
+  <% end %>
+</div>
