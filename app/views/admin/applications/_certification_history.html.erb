@@ -1,0 +1,41 @@
+<% certification_requests = Notification.where(
+    notifiable: @application, 
+    action: "medical_certification_requested"
+  ).order(created_at: :desc) 
+%>
+
+<% if certification_requests.any? %>
+  <div class="mt-2 pl-4 border-l-2 border-gray-200">
+    <% certification_requests.each_with_index do |request, index| %>
+      <% 
+        # Get timestamp from metadata if available, otherwise use notification created_at
+        timestamp = nil
+        if request.metadata.present? && request.metadata.is_a?(Hash) && request.metadata['timestamp'].present?
+          begin
+            timestamp = Time.parse(request.metadata['timestamp'])
+          rescue
+            timestamp = request.created_at
+          end
+        else
+          timestamp = request.created_at
+        end
+      %>
+      <p class="text-sm text-gray-600 mb-1">
+        Request <%= certification_requests.size - index %> sent on 
+        <%= timestamp.strftime("%B %d, %Y at %I:%M %p") %>
+        <% if index == 0 %>
+          <span class="text-xs text-gray-500">(most recent)</span>
+        <% end %>
+      </p>
+    <% end %>
+  </div>
+<% else %>
+  <div class="mt-2 pl-4 border-l-2 border-gray-200">
+    <p class="text-sm text-gray-600 mb-1">
+      <span class="text-yellow-500">Note:</span> No detailed request history available.
+      <% if @application.medical_certification_requested_at.present? %>
+        Last request sent on <%= @application.medical_certification_requested_at.strftime("%B %d, %Y at %I:%M %p") %>
+      <% end %>
+    </p>
+  </div>
+<% end %>

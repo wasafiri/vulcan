@@ -312,24 +312,7 @@
             </p>
             
             <!-- Request History -->
-            <div class="mt-2 pl-4 border-l-2 border-gray-200">
-              <% request_count = @application.medical_certification_request_count || 0 %>
-              <% if request_count > 0 %>
-                <% if request_count > 1 %>
-                  <p class="text-sm text-gray-600 mb-1">
-                    Request 1 sent on <%= (@application.medical_certification_requested_at.present? ? @application.medical_certification_requested_at - 1.day : Time.current - 1.day).strftime("%B %d, %Y at %I:%M %p") %>
-                  </p>
-                <% end %>
-                <p class="text-sm text-gray-600 mb-1">
-                  Request <%= request_count %> sent on 
-                  <% if @application.medical_certification_requested_at.present? %>
-                    <%= @application.medical_certification_requested_at.strftime("%B %d, %Y at %I:%M %p") %>
-                  <% else %>
-                    <%= Time.current.strftime("%B %d, %Y at %I:%M %p") %>
-                  <% end %>
-                </p>
-              <% end %>
-            </div>
+            <%= render "certification_history" %>
             
             <!-- Resend Button -->
             <% request_count = @application.medical_certification_request_count || 0 %>

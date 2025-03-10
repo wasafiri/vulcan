@@ -312,27 +312,18 @@ class Admin::ApplicationsController < Admin::BaseController
   end
 
   def resend_medical_certification
-    # Send the certification request email
-    MedicalProviderMailer.request_certification(@application).deliver_now
+    service = Applications::MedicalCertificationService.new(
+      application: @application,
+      actor: current_user
+    )
 
-    # Update the certification requested date and increment the count
-    @application.transaction do
-      @application.update!(
-        medical_certification_requested_at: Time.current,
-        medical_certification_status: :requested
-      )
-      @application.increment!(:medical_certification_request_count)
-
-      # Create notification for audit logging
-      Notification.create!(
-        recipient: @application.user,
-        actor: current_user,
-        action: "medical_certification_requested",
-        notifiable: @application
-      )
+    if service.request_certification
+      redirect_to admin_application_path(@application),
+        notice: "Certification request sent successfully."
+    else
+      redirect_to admin_application_path(@application),
+        alert: "Failed to process certification request: #{service.errors.join(", ")}"
     end
-
-    redirect_to admin_application_path(@application), notice: "Certification request resent."
   end
 
   def assign_voucher
