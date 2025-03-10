@@ -1,5 +1,8 @@
 --
-Maryland Accessible Telecommunications Program
-info@mdmat.org
-https://mdmat.org
-<%= Time.current.year %> All Rights Reserved
+MDMAT Program
+Email: info@mdmat.org
+Website: https://mdmat.org
+
+<% if defined?(show_automated_message) && show_automated_message %>
+This is an automated message. Please do not reply directly to this email.
+<% end %>

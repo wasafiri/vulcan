@@ -70,6 +70,7 @@ class User < ApplicationRecord
       .where(role_capabilities: { capability: capability })
       .or(where(type: capable_types_for(capability)))
   }
+  scope :admins, -> { where(type: "Admin") }
   scope :vendors, -> { where(type: "Vendor") }
   scope :ordered_by_name, -> { order(:first_name) }
   scope :locked, -> { where.not(locked_at: nil) }

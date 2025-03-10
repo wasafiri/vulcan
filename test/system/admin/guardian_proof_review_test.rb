@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-module Admin
+module AdminTests
   class GuardianProofReviewTest < ApplicationSystemTestCase
     setup do
       @admin = users(:admin_david)

@@ -34,22 +34,48 @@ module MailerHelper
     colors[status] || colors[:info]
   end
   # Format a date consistently across all mailers
-  # @param date [Date, Time, DateTime] The date to format
+  # @param date [Date, Time, DateTime, String] The date to format
   # @param format [Symbol] The format to use (:short, :long, :full)
   # @return [String] The formatted date
   def format_date(date, format = :long)
     return "" if date.nil?
-
-    case format
-    when :short
-      date.strftime("%m/%d/%Y")
-    when :long
-      date.strftime("%B %d, %Y")
-    when :full
-      date.strftime("%B %d, %Y at %I:%M %p")
-    else
-      date.strftime("%B %d, %Y")
+    
+    # Handle string dates more carefully
+    if date.is_a?(String)
+      begin
+        # Try parsing with Time first if it has time information
+        if date.include?(':')
+          date = Time.parse(date)
+        else
+          date = Date.parse(date)
+        end
+      rescue ArgumentError, TypeError
+        # If we can't parse it as a date, return it as is
+        return date
+      end
     end
+
+    # Now ensure we can call strftime on the date object
+    return date.to_s unless date.respond_to?(:strftime)
+
+    # Ensure date is properly formatted
+    formatted_date = begin
+      case format
+      when :short
+        date.strftime("%m/%d/%Y")
+      when :long
+        date.strftime("%B %d %Y")
+      when :full
+        date.strftime("%B %d %Y at %I:%M %p")
+      else
+        date.strftime("%B %d %Y")
+      end
+    rescue => e
+      Rails.logger.error("Error formatting date: #{e.message} for date: #{date.inspect}")
+      date.to_s
+    end
+
+    formatted_date
   end
 
   # Format a currency value consistently across all mailers

@@ -66,7 +66,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
       template_name: "proof_rejected",
       extra_setup: -> {
         @remaining_attempts = 8 - @application.total_rejections
-        @reapply_date = 3.years.from_now.to_date.strftime("%B %d, %Y")
+        @reapply_date = 3.years.from_now.to_date
       }
     )
   rescue StandardError => e

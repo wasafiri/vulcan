@@ -3,7 +3,10 @@ import { Controller } from "@hotwired/stimulus"
 // Declare targets for type safety and better structure
 export default class extends Controller {
   static targets = [ "container", "overlay" ]
-  static values = { id: String }
+  static values = { 
+    id: String,
+    preserveScroll: { type: Boolean, default: false }  // New value to track if we should preserve scroll
+  }
 
   connect() {
     // Ensure modal is hidden on connect
@@ -115,17 +118,67 @@ export default class extends Controller {
   close(event) {
     event?.preventDefault()
     
-    // If we're in a specific modal (from event), close that one
+    // Mark modals as closed first
     const modalElement = event?.currentTarget?.closest('[data-modal-target="container"]')
     if (modalElement) {
+      console.log("Closing specific modal via event")
       modalElement.classList.add("hidden")
-      document.body.classList.remove("overflow-hidden")
-      return
+    } else {
+      console.log("Closing default modal")
+      this.containerTarget.classList.add("hidden")
     }
     
-    // Default behavior
-    this.containerTarget.classList.add("hidden")
-    document.body.classList.remove("overflow-hidden")
+    // Check if any modals are still visible
+    const anyVisibleModals = document.querySelectorAll('[data-modal-target="container"]:not(.hidden)').length > 0;
+    console.log("Any visible modals:", anyVisibleModals)
+    
+    // Only remove overflow-hidden if we're not preserving scroll AND no other modals are visible
+    if (!this.preserveScrollValue && !anyVisibleModals) {
+      console.log("Removing overflow-hidden from body")
+      document.body.classList.remove("overflow-hidden")
+    } else {
+      console.log("Not removing overflow-hidden. preserveScroll:", this.preserveScrollValue)
+    }
+  }
+  
+  // New method to handle form submissions that might open new windows
+  handleFormSubmission(event) {
+    const form = event.target
+    const opensNewWindow = form.dataset.opensNewWindow === 'true'
+    
+    if (opensNewWindow) {
+      // Set preserveScroll to true to maintain overflow-hidden when modal closes
+      this.preserveScrollValue = true
+      
+      // Add a visibility change listener to restore scroll when tab focus returns
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+          // First close any open modals
+          document.querySelectorAll('[data-modal-target="container"]').forEach(modal => {
+            modal.classList.add('hidden');
+          });
+          
+          // Then clean up
+          this.cleanup()
+        }
+      }, { once: true }) // Only run this once
+    } else {
+      // Normal form submission, no need to preserve scroll
+      this.preserveScrollValue = false
+    }
+  }
+  
+  // New method to clean up scrolling when returning from letter_opener
+  cleanup() {
+    console.log("Cleaning up modal scroll state")
+    this.preserveScrollValue = false
+    
+    // Make sure we remove the overflow-hidden class
+    // and do it with a slight delay to ensure any pending processes complete
+    setTimeout(() => {
+      document.body.classList.remove("overflow-hidden")
+      console.log("Body scroll restored, overflow-hidden removed")
+    }, 100)
   }
 
   handleKeydown(event) {
@@ -143,14 +196,16 @@ export default class extends Controller {
   handleSubmit(event) {
     const form = event.target
     const isValid = form.checkValidity()
+    const opensNewWindow = form.dataset.opensNewWindow === 'true'
 
     if (!isValid) {
       event.preventDefault()
       // Show validation messages
       form.reportValidity()
-    } else {
-      // Close modal after successful submission
+    } else if (!opensNewWindow) {
+      // Only close modal directly if it doesn't open a new window
       this.close()
     }
+    // If it opens a new window, handleFormSubmission will be called separately
   }
 }

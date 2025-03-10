@@ -1,4 +1,6 @@
 class Admin::ApplicationsController < Admin::BaseController
+  include ActionView::Helpers::TagHelper
+  include ActionView::Helpers::JavaScriptHelper
   before_action :set_application, only: [
     :show, :edit, :update,
     :verify_income, :request_documents, :review_proof, :update_proof_status,
@@ -73,11 +75,19 @@ class Admin::ApplicationsController < Admin::BaseController
     @application = Application.includes(
       :user,
       :evaluations,
-      :training_sessions
+      :training_sessions,
+      proof_reviews: :admin,
+      proof_submission_audits: :user
     ).with_attached_income_proof
-                              .with_attached_residency_proof
-                              .with_attached_medical_certification
-                              .find(params[:id])
+      .with_attached_residency_proof
+      .with_attached_medical_certification
+      .find(params[:id])
+      
+    # Preload and structure proof history data
+    @proof_histories = {
+      income: load_proof_history(:income),
+      residency: load_proof_history(:residency)
+    }
   end
 
   def edit; end
@@ -154,6 +164,12 @@ class Admin::ApplicationsController < Admin::BaseController
             .with_attached_residency_proof
             .with_attached_medical_certification
             .find(params[:id])
+          
+          # Load proof histories for partials
+          @proof_histories = {
+            income: load_proof_history(:income),
+            residency: load_proof_history(:residency)
+          }
 
           proof_reviews = @application.proof_reviews.includes(admin: :role_capabilities).order(created_at: :desc)
           status_changes = @application.status_changes.includes(user: :role_capabilities).order(created_at: :desc)
@@ -198,6 +214,40 @@ class Admin::ApplicationsController < Admin::BaseController
             turbo_stream.update("audit-logs", partial: "audit_logs"),
             turbo_stream.update("modals", partial: "modals")
           ])
+          
+          # Add JavaScript to handle letter_opener return
+          streams << turbo_stream.append_all("body", 
+            tag.script(<<-JS.html_safe, type: "text/javascript")
+              // When this tab becomes visible again (after letter_opener is closed)
+              document.addEventListener("visibilitychange", function() {
+                if (!document.hidden) {
+                  // First remove any open modals
+                  document.querySelectorAll('[data-modal-target="container"]').forEach(modal => {
+                    modal.classList.add('hidden');
+                  });
+                  
+                  // Then restore scrolling
+                  document.body.classList.remove("overflow-hidden");
+                  
+                  // Also trigger cleanup on any modal controllers
+                  const controllers = document.querySelectorAll("[data-controller~='modal']");
+                  controllers.forEach((element) => {
+                    if (element.hasAttribute("data-modal-preserve-scroll-value")) {
+                      try {
+                        const controller = window.Stimulus.getControllerForElementAndIdentifier(element, "modal");
+                        if (controller && typeof controller.cleanup === "function") {
+                          controller.cleanup();
+                          console.log("Modal cleanup triggered on visibility change");
+                        }
+                      } catch(e) {
+                        console.error("Error cleaning up modal:", e);
+                      }
+                    }
+                  });
+                }
+              }, { once: true });
+            JS
+          )
 
           render turbo_stream: streams
         }
@@ -337,6 +387,25 @@ class Admin::ApplicationsController < Admin::BaseController
   end
 
   private
+
+  def load_proof_history(type)
+    begin
+      {
+        reviews: @application.proof_reviews
+          .select { |r| r.proof_type.to_sym == type.to_sym }
+          .sort_by(&:reviewed_at)
+          .reverse,
+        audits: @application.proof_submission_audits
+          .select { |a| a.proof_type.to_sym == type.to_sym }
+          .sort_by(&:created_at)
+          .reverse
+      }
+    rescue StandardError => e
+      Rails.logger.error "Failed to load #{type} proof history: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      { reviews: [], audits: [], error: true }
+    end
+  end
 
   def load_audit_logs
     return unless @application
