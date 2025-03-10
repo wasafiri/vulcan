@@ -286,16 +286,52 @@
           </div>
         <% elsif @application.medical_certification_status == 'requested' || @application.medical_certification_status == 'not_requested' %>
           <div class="mt-4 space-y-4">
-            <p class="text-sm text-gray-600">
-              Certification requested on 
-              <% if @application.medical_certification_requested_at.present? %>
-                <%= @application.medical_certification_requested_at.strftime("%B %d, %Y at %I:%M %p") %>
-              <% else %>
-                (date not recorded)
-              <% end %>
-              – (<%= pluralize(@application.medical_certification_request_count || 0, "request") %> sent)
+            <!-- Medical Professional Information -->
+            <% if @application.medical_provider_name.present? %>
+              <div class="mb-3">
+                <p class="text-sm font-medium text-gray-900"><%= @application.medical_provider_name %></p>
+                <p class="text-sm text-gray-600">
+                  <% if @application.medical_provider_phone.present? %>
+                    Phone: <%= @application.medical_provider_phone %>
+                  <% end %>
+                  <% if @application.respond_to?(:medical_provider_fax) && @application.medical_provider_fax.present? %>
+                    <% if @application.medical_provider_phone.present? %> / <% end %>
+                    Fax: <%= @application.medical_provider_fax %>
+                  <% end %>
+                  <% if @application.medical_provider_email.present? %>
+                    <br>Email: <%= @application.medical_provider_email %>
+                  <% end %>
+                </p>
+              </div>
+            <% end %>
+            
+            <!-- Certification Status -->
+            <p class="text-sm text-gray-700 font-medium">
+              Disability Certification Form Requested 
+              (<%= pluralize(@application.medical_certification_request_count || 0, "request") %> sent)
             </p>
             
+            <!-- Request History -->
+            <div class="mt-2 pl-4 border-l-2 border-gray-200">
+              <% request_count = @application.medical_certification_request_count || 0 %>
+              <% if request_count > 0 %>
+                <% if request_count > 1 %>
+                  <p class="text-sm text-gray-600 mb-1">
+                    Request 1 sent on <%= (@application.medical_certification_requested_at.present? ? @application.medical_certification_requested_at - 1.day : Time.current - 1.day).strftime("%B %d, %Y at %I:%M %p") %>
+                  </p>
+                <% end %>
+                <p class="text-sm text-gray-600 mb-1">
+                  Request <%= request_count %> sent on 
+                  <% if @application.medical_certification_requested_at.present? %>
+                    <%= @application.medical_certification_requested_at.strftime("%B %d, %Y at %I:%M %p") %>
+                  <% else %>
+                    <%= Time.current.strftime("%B %d, %Y at %I:%M %p") %>
+                  <% end %>
+                </p>
+              <% end %>
+            </div>
+            
+            <!-- Resend Button -->
             <% request_count = @application.medical_certification_request_count || 0 %>
             <% button_text = request_count.zero? ? "Send Request" : "Resend Request" %>
             <%= button_to resend_medical_certification_admin_application_path(@application),

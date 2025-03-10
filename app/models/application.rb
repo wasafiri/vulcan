@@ -251,6 +251,27 @@ class Application < ApplicationRecord
       end
 
       update!(attrs)
+      
+      # Create notification for audit logging
+      action = case status
+               when "accepted" then "medical_certification_approved"
+               when "rejected" then "medical_certification_rejected"
+               when "received" then "medical_certification_received"
+               else nil
+               end
+      
+      if action
+        metadata = {}
+        metadata["reason"] = rejection_reason if rejection_reason.present?
+        
+        Notification.create!(
+          recipient: user,
+          actor: verified_by,
+          action: action,
+          notifiable: self,
+          metadata: metadata
+        )
+      end
     end
     true
   rescue ActiveRecord::RecordInvalid => e
@@ -307,6 +328,11 @@ class Application < ApplicationRecord
 
   def medical_provider_name
     self[:medical_provider_name]
+  end
+
+  def medical_certification_requested?
+    medical_certification_requested_at.present? || 
+    medical_certification_status.in?(["requested", "received", "accepted", "rejected"])
   end
 
   private
