@@ -93,45 +93,49 @@ module ActiveSupport
     # @return [User] The signed-in user (for method chaining)
     def sign_in(user)
       # Set the TEST_USER_ID environment variable to override authentication
+      # This is the most reliable way to authenticate in tests
       ENV["TEST_USER_ID"] = user.id.to_s
       puts "TEST AUTH: Setting TEST_USER_ID=#{user.id} for user: #{user.email}" if ENV["DEBUG_AUTH"] == "true"
-
-      # Also use the traditional cookie-based approach as a fallback
-      # If we have the enhanced helper available, use it
-      if respond_to?(:sign_in_with_headers)
-        sign_in_with_headers(user)
+      
+      # Create a fresh session for this user to ensure consistent state
+      test_session = user.sessions.create!(
+        user_agent: "Rails Testing", 
+        ip_address: "127.0.0.1",
+        created_at: Time.current
+      )
+      
+      puts "TEST AUTH: Created test session: #{test_session.id}, token: #{test_session.session_token}" if ENV["DEBUG_AUTH"] == "true"
+      
+      # Set both signed and unsigned cookies for maximum compatibility
+      if respond_to?(:cookies)
+        # Set unsigned cookie
+        cookies[:session_token] = test_session.session_token
+        
+        # Set signed cookie if possible
+        if cookies.respond_to?(:signed) && cookies.signed.respond_to?(:[]=)
+          cookies.signed[:session_token] = { value: test_session.session_token, httponly: true }
+          puts "TEST AUTH: Set signed cookie" if ENV["DEBUG_AUTH"] == "true"
+        end
+        
+        puts "TEST AUTH: Set cookies for user #{user.email}" if ENV["DEBUG_AUTH"] == "true"
       else
-        # Fallback implementation for backward compatibility
-        puts "TEST AUTH: Using fallback sign_in implementation for user: #{user.email}" if ENV["DEBUG_AUTH"] == "true"
-
-        if respond_to?(:post)
-          # Integration test - go through the sign in flow
-          post sign_in_path, params: { email: user.email, password: "password123" }
-          follow_redirect! if response.redirect?
-
-          # Set the cookie
-          session_record = Session.find_by(user_id: user.id)
-          if session_record
-            if respond_to?(:set_auth_cookie)
-              set_auth_cookie(session_record.session_token)
-            else
-              # Direct cookie manipulation as last resort
-              cookies[:session_token] = session_record.session_token
-              puts "TEST AUTH: Using direct cookie manipulation in sign_in" if ENV["DEBUG_AUTH"] == "true"
-            end
-          end
+        puts "TEST AUTH: No cookies method available, relying on TEST_USER_ID" if ENV["DEBUG_AUTH"] == "true"
+      end
+      
+      # For integration tests, authenticate via the sign-in flow as well
+      if respond_to?(:post)
+        post sign_in_path, params: { email: user.email, password: "password123" }
+        follow_redirect! if response.redirect?
+        puts "TEST AUTH: Posted to sign_in_path for #{user.email}" if ENV["DEBUG_AUTH"] == "true"
+      end
+      
+      # Verify current_user is set correctly if we can
+      if defined?(@controller) && @controller.respond_to?(:current_user, true)
+        current_user = @controller.send(:current_user)
+        if current_user
+          puts "TEST AUTH: current_user is set to #{current_user.email}" if ENV["DEBUG_AUTH"] == "true"
         else
-          # Controller test - create session directly
-          session = user.sessions.create!(user_agent: "Rails Testing", ip_address: "127.0.0.1")
-
-          # Set the cookie
-          if respond_to?(:set_auth_cookie)
-            set_auth_cookie(session.session_token)
-          else
-            # Direct cookie manipulation as last resort
-            cookies[:session_token] = session.session_token
-            puts "TEST AUTH: Using direct cookie manipulation in sign_in" if ENV["DEBUG_AUTH"] == "true"
-          end
+          puts "TEST AUTH: WARNING - current_user is nil after sign_in!" if ENV["DEBUG_AUTH"] == "true"
         end
       end
 

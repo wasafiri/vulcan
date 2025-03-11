@@ -215,33 +215,60 @@ class Admin::ApplicationsController < Admin::BaseController
             turbo_stream.update("modals", partial: "modals")
           ])
           
-          # Add JavaScript to handle letter_opener return
+          # Add JavaScript to immediately clean up modals and handle letter_opener return
           streams << turbo_stream.append_all("body", 
             tag.script(<<-JS.html_safe, type: "text/javascript")
-              // When this tab becomes visible again (after letter_opener is closed)
+              // Immediate cleanup (run right away)
+              (function() {
+                console.log("Executing immediate modal cleanup");
+                // Remove overflow-hidden class
+                document.body.classList.remove("overflow-hidden");
+                
+                // Hide all modals
+                document.querySelectorAll('[data-modal-target="container"]').forEach(modal => {
+                  modal.classList.add('hidden');
+                  console.log("Hidden modal:", modal.id || 'unnamed modal');
+                });
+                
+                // Trigger cleanup on modal controllers
+                const controllers = document.querySelectorAll("[data-controller~='modal']");
+                controllers.forEach((element) => {
+                  try {
+                    const controller = window.Stimulus.getControllerForElementAndIdentifier(element, "modal");
+                    if (controller && typeof controller.cleanup === "function") {
+                      controller.cleanup();
+                      console.log("Modal cleanup triggered immediately after proof review");
+                    }
+                  } catch(e) {
+                    console.error("Error cleaning up modal:", e);
+                  }
+                });
+              })();
+              
+              // Also handle when this tab becomes visible again (after letter_opener is closed)
               document.addEventListener("visibilitychange", function() {
                 if (!document.hidden) {
-                  // First remove any open modals
+                  console.log("Page became visible again - cleaning up modals");
+                  // Hide all modals
                   document.querySelectorAll('[data-modal-target="container"]').forEach(modal => {
                     modal.classList.add('hidden');
+                    console.log("Hidden modal on visibility change:", modal.id || 'unnamed modal');
                   });
                   
-                  // Then restore scrolling
+                  // Remove overflow-hidden
                   document.body.classList.remove("overflow-hidden");
                   
-                  // Also trigger cleanup on any modal controllers
+                  // Trigger cleanup on modal controllers
                   const controllers = document.querySelectorAll("[data-controller~='modal']");
                   controllers.forEach((element) => {
-                    if (element.hasAttribute("data-modal-preserve-scroll-value")) {
-                      try {
-                        const controller = window.Stimulus.getControllerForElementAndIdentifier(element, "modal");
-                        if (controller && typeof controller.cleanup === "function") {
-                          controller.cleanup();
-                          console.log("Modal cleanup triggered on visibility change");
-                        }
-                      } catch(e) {
-                        console.error("Error cleaning up modal:", e);
+                    try {
+                      const controller = window.Stimulus.getControllerForElementAndIdentifier(element, "modal");
+                      if (controller && typeof controller.cleanup === "function") {
+                        controller.cleanup();
+                        console.log("Modal cleanup triggered on visibility change");
                       }
+                    } catch(e) {
+                      console.error("Error cleaning up modal:", e);
                     }
                   });
                 }

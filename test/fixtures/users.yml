@@ -166,7 +166,7 @@ constituent_rex:
   city: Baltimore
   state: MD
   zip_code: "21203"
-  hearing_disability: false
+  hearing_disability: true
   timezone: "Eastern Time (US & Canada)"
   locale: en
   email_verified: true

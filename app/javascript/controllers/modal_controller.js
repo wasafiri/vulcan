@@ -9,16 +9,22 @@ export default class extends Controller {
   }
 
   connect() {
+    console.log('Modal controller connected with ID:', this.element.id)
+    console.debug('Modal controller targets:', this.targets)
+    
     // Ensure modal is hidden on connect
     this.close()
 
     // Handle escape key
     this._handleKeydown = this.handleKeydown.bind(this)
     document.addEventListener("keydown", this._handleKeydown)
+    
+    console.log('Modal controller initialization complete')
   }
 
   disconnect() {
     document.removeEventListener("keydown", this._handleKeydown)
+    this.cleanup()
   }
 
   open(event) {
@@ -83,12 +89,30 @@ export default class extends Controller {
     console.log('Loading iframes in element:', element)
     const iframes = element.querySelectorAll('iframe[data-original-src]')
     console.log('Found iframes with data-original-src:', iframes.length)
+    
+    if (iframes.length === 0) {
+      console.log('No iframes found with data-original-src attribute')
+      return
+    }
+    
     iframes.forEach(iframe => {
+      // Check if the iframe has already been loaded
+      const isLoaded = iframe.getAttribute('data-pdf-loaded') === 'true'
+      if (isLoaded) {
+        console.log('Iframe already loaded, skipping:', iframe.src)
+        return
+      }
+      
       const originalSrc = iframe.getAttribute('data-original-src')
       console.log('Original src:', originalSrc)
       
-      // Always set the src attribute, even if it's already set
-      if (originalSrc) {
+      // Verify we have a valid originalSrc
+      if (!originalSrc) {
+        console.error('Empty data-original-src attribute on iframe, cannot load PDF')
+        return
+      }
+      
+      try {
         console.log('Setting iframe src to:', originalSrc)
         
         // First clear the src attribute
@@ -100,17 +124,37 @@ export default class extends Controller {
         // Set the src attribute
         iframe.src = originalSrc
         
+        // Mark as loading
+        iframe.setAttribute('data-pdf-loading', 'true')
+        
         // Add a load event listener to check if the iframe loaded correctly
         iframe.addEventListener('load', () => {
           console.log('Iframe loaded successfully:', iframe.src)
+          // Mark as successfully loaded
+          iframe.setAttribute('data-pdf-loaded', 'true')
+          iframe.removeAttribute('data-pdf-loading')
         })
         
         // Add an error event listener to check if there was an error loading the iframe
         iframe.addEventListener('error', (e) => {
           console.error('Error loading iframe:', e)
+          iframe.removeAttribute('data-pdf-loading')
+          
+          // Try to provide more helpful error information
+          const errorContainer = document.createElement('div')
+          errorContainer.className = 'p-4 bg-red-50 border border-red-100 rounded my-2'
+          errorContainer.innerHTML = `
+            <p class="text-red-800 font-medium">Error loading PDF</p>
+            <p class="text-red-600 text-sm">There was a problem loading the PDF. Try opening it directly: 
+              <a href="${originalSrc}" target="_blank" class="underline">Open PDF</a>
+            </p>
+          `
+          
+          // Insert the error message before the iframe
+          iframe.parentNode.insertBefore(errorContainer, iframe)
         })
-      } else {
-        console.log('Not setting iframe src because originalSrc is empty')
+      } catch (err) {
+        console.error('Exception while setting up PDF iframe:', err)
       }
     })
   }
@@ -168,17 +212,22 @@ export default class extends Controller {
     }
   }
   
-  // New method to clean up scrolling when returning from letter_opener
+  // Enhanced method to clean up scrolling and modal state
   cleanup() {
     console.log("Cleaning up modal scroll state")
+    
+    // Reset scroll preservation flag regardless of current value
     this.preserveScrollValue = false
     
-    // Make sure we remove the overflow-hidden class
-    // and do it with a slight delay to ensure any pending processes complete
-    setTimeout(() => {
-      document.body.classList.remove("overflow-hidden")
-      console.log("Body scroll restored, overflow-hidden removed")
-    }, 100)
+    // Immediately remove overflow-hidden class
+    document.body.classList.remove("overflow-hidden")
+    console.log("Body scroll restored, overflow-hidden removed")
+    
+    // Ensure all modals are hidden
+    document.querySelectorAll('[data-modal-target="container"]').forEach(modal => {
+      modal.classList.add('hidden')
+      console.log("Hidden modal:", modal.id || 'unnamed modal')
+    })
   }
 
   handleKeydown(event) {

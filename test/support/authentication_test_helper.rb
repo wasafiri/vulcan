@@ -165,6 +165,23 @@ module AuthenticationTestHelper
 
     # Verify authentication was successful
     debug_auth_state("Authentication verification") if respond_to?(:debug_auth_state)
+    
+    # For integration tests, verify we're not redirected to sign in
+    if defined?(response) && response.present?
+      if response.redirect? && response.location.include?("sign_in") 
+        fail "Expected to be authenticated as #{user.email}, but was redirected to sign in"
+      end
+    end
+    
+    # For controller tests, verify current_user is set correctly
+    if defined?(@controller) && @controller.respond_to?(:current_user, true)
+      actual_user = @controller.send(:current_user)
+      if actual_user.nil?
+        fail "Expected to be authenticated as #{user.email}, but current_user is nil"
+      elsif actual_user.id != user.id
+        fail "Expected to be authenticated as #{user.email}, but was authenticated as #{actual_user.email}"
+      end
+    end
 
     # Return headers for method chaining if needed
     default_headers

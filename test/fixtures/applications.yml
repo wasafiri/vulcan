@@ -118,7 +118,7 @@ new_user_application:
   maryland_resident: true
   annual_income: "55000"
   household_size: 2
-  self_certify_disability: false
+  self_certify_disability: true
   medical_provider_name: "New Health Clinic"
   medical_provider_phone: "555-222-3333"
   medical_provider_email: "info@newhealthclinic.com"

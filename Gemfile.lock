@@ -76,9 +76,9 @@ GEM
       public_suffix (>= 2.0.2, < 7.0)
     ast (2.4.2)
     authentication-zero (4.0.3)
-    aws-eventstream (1.3.1)
-    aws-partitions (1.1060.0)
-    aws-sdk-core (3.220.0)
+    aws-eventstream (1.3.2)
+    aws-partitions (1.1064.0)
+    aws-sdk-core (3.220.1)
       aws-eventstream (~> 1, >= 1.3.0)
       aws-partitions (~> 1, >= 1.992.0)
       aws-sigv4 (~> 1.9)
@@ -221,6 +221,10 @@ GEM
     mocha (2.7.1)
       ruby2_keywords (>= 0.0.5)
     msgpack (1.8.0)
+    mupdf (1.0.4)
+      bigdecimal
+      open3
+      zeitwerk
     net-imap (0.5.6)
       date
       net-protocol
@@ -250,8 +254,9 @@ GEM
     nokogiri (1.18.3-x86_64-linux-gnu)
       racc (~> 1.4)
     observer (0.1.2)
+    open3 (0.2.1)
     ostruct (0.6.1)
-    pagy (9.3.3)
+    pagy (9.3.4)
     parallel (1.26.3)
     parser (3.3.7.1)
       ast (~> 2.4.1)
@@ -283,7 +288,7 @@ GEM
       nio4r (~> 2.0)
     raabro (1.4.0)
     racc (1.8.1)
-    rack (3.1.11)
+    rack (3.1.12)
     rack-session (2.1.0)
       base64 (>= 0.1.0)
       rack (>= 3.0.0)
@@ -406,11 +411,11 @@ GEM
       railties (>= 6.0.0)
     stringio (3.1.5)
     thor (1.3.2)
-    thruster (0.1.11)
-    thruster (0.1.11-aarch64-linux)
-    thruster (0.1.11-arm64-darwin)
-    thruster (0.1.11-x86_64-darwin)
-    thruster (0.1.11-x86_64-linux)
+    thruster (0.1.12)
+    thruster (0.1.12-aarch64-linux)
+    thruster (0.1.12-arm64-darwin)
+    thruster (0.1.12-x86_64-darwin)
+    thruster (0.1.12-x86_64-linux)
     tilt (2.6.0)
     timeout (0.4.3)
     ttfunk (1.8.0)
@@ -472,6 +477,7 @@ DEPENDENCIES
   letter_opener
   minitest-rails (~> 8.0.0)
   mocha
+  mupdf (~> 1.0)
   pagy
   pg (~> 1.5, >= 1.5.9)
   postmark-rails (~> 0.22.1)

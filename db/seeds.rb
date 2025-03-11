@@ -119,36 +119,113 @@ unless Rails.env.production?
       # Attaching Files to Applications
       # ------------------------------
       puts "\nAttaching files to applications..."
+      
+      # First, process approved proofs in a separate transaction 
+      # to ensure consistent state regardless of other applications
+      puts "\nProcessing Rex Canine's application specifically..."
+      rex_app = Application.joins(:user).where(users: { first_name: 'Rex', last_name: 'Canine' }).first
+      
+      if rex_app
+        puts "Found Rex's application ##{rex_app.id}"
+        puts "  Current status - Income: #{rex_app.income_proof_status}, Residency: #{rex_app.residency_proof_status}"
+        puts "  Initial state - Income attached: #{rex_app.income_proof.attached?}, Residency attached: #{rex_app.residency_proof.attached?}"
+        
+        # Handle Rex's income proof
+        if rex_app.income_proof_status == "approved" && !rex_app.income_proof.attached?
+          ActiveRecord::Base.transaction do
+            begin
+              income_file_path = Rails.root.join('test/fixtures/files/income_proof.pdf')
+              file_size = File.size(income_file_path)
+              puts "  Found income proof file (#{file_size} bytes)"
+              
+              # Attach file using ActiveStorage
+              rex_app.income_proof.attach(
+                io: File.open(income_file_path),
+                filename: 'income_proof.pdf',
+                content_type: 'application/pdf'
+              )
+              
+              # Verify attachment worked and save
+              rex_app.reload
+              puts "  Attachment state after attaching: #{rex_app.income_proof.attached?}"
+              
+              # Save the application to ensure consistency
+              rex_app.save!
+              puts "  ✓ Rex's application saved successfully with income proof attached"
+            rescue => e
+              puts "  ✗ Error fixing Rex's application: #{e.message}"
+              puts "  #{e.backtrace.first(3).join("\n  ")}"
+              raise ActiveRecord::Rollback
+            end
+          end
+        end
+      else
+        puts "  ✗ Could not find Rex Canine's application"
+      end
+      
+      # Then process all other applications
       Application.find_each do |app|
-        # Attach income proof
-        unless app.income_proof.attached?
-          app.income_proof.attach(
-            io: File.open(Rails.root.join('test/fixtures/files/income_proof.pdf')),
-            filename: 'income_proof.pdf',
-            content_type: 'application/pdf'
-          )
-          puts "  Attached income proof for Application ##{app.id}"
-        end
+        # Skip Rex since we already processed it
+        next if rex_app && app.id == rex_app.id
+        
+        puts "\nProcessing Application ##{app.id} (#{app.user.email})"
+        puts "  Current status - Income: #{app.income_proof_status}, Residency: #{app.residency_proof_status}"
+        puts "  Initial state - Income attached: #{app.income_proof.attached?}, Residency attached: #{app.residency_proof.attached?}"
+        
+        # Process in a transaction to ensure consistency
+        ActiveRecord::Base.transaction do
+          begin
+            # For applications with approved or rejected status, always ensure files are attached
+            if app.income_proof_status.in?(["approved", "rejected"]) && !app.income_proof.attached?
+              puts "  Attaching income proof..."
+              income_file_path = Rails.root.join('test/fixtures/files/income_proof.pdf')
+              file_size = File.size(income_file_path)
+              puts "  Found income proof file (#{file_size} bytes)"
+              
+              app.income_proof.attach(
+                io: File.open(income_file_path),
+                filename: 'income_proof.pdf',
+                content_type: 'application/pdf'
+              )
+            end
 
-        # Attach residency proof
-        unless app.residency_proof.attached?
-          app.residency_proof.attach(
-            io: File.open(Rails.root.join('test/fixtures/files/residency_proof.pdf')),
-            filename: 'residency_proof.pdf',
-            content_type: 'application/pdf'
-          )
-          puts "  Attached residency proof for Application ##{app.id}"
-        end
+            # For applications with approved or rejected status, always ensure files are attached
+            if app.residency_proof_status.in?(["approved", "rejected"]) && !app.residency_proof.attached?
+              puts "  Attaching residency proof..."
+              residency_file_path = Rails.root.join('test/fixtures/files/residency_proof.pdf')
+              file_size = File.size(residency_file_path)
+              puts "  Found residency proof file (#{file_size} bytes)"
+              
+              app.residency_proof.attach(
+                io: File.open(residency_file_path),
+                filename: 'residency_proof.pdf',
+                content_type: 'application/pdf'
+              )
+            end
 
-        # Attach medical certification if needed
-        unless app.medical_certification.attached?
-          if app.medical_certification_status.to_s.in?([ 'received', 'accepted' ])
-            app.medical_certification.attach(
-              io: File.open(Rails.root.join('test/fixtures/files/medical_certification_valid.pdf')),
-              filename: 'medical_certification_valid.pdf',
-              content_type: 'application/pdf'
-            )
-            puts "  Attached valid medical certification for Application ##{app.id}"
+            # Attach medical certification if needed
+            if app.medical_certification_status.to_s.in?([ 'received', 'accepted' ]) && !app.medical_certification.attached?
+              puts "  Attaching medical certification..."
+              app.medical_certification.attach(
+                io: File.open(Rails.root.join('test/fixtures/files/medical_certification_valid.pdf')),
+                filename: 'medical_certification_valid.pdf',
+                content_type: 'application/pdf'
+              )
+            end
+            
+            # Save the application to ensure consistency
+            app.save!
+            
+            # Verify attachments after processing
+            app.reload
+            puts "  Final state:"
+            puts "    Income proof attached? #{app.income_proof.attached?}"
+            puts "    Residency proof attached? #{app.residency_proof.attached?}"
+            puts "  ✓ Application saved successfully"
+          rescue => e
+            puts "  ✗ Failed to process application: #{e.message}"
+            puts "  #{e.backtrace.first(3).join("\n  ")}"
+            # Don't raise error here to continue processing other applications
           end
         end
       end

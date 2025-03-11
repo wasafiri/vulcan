@@ -19,25 +19,25 @@ module Authentication
     @current_user ||= begin
       # Special handling for test environment
       if Rails.env.test?
-        # Direct test user override - highest priority
+        # Try signed cookies first
+        if cookies.signed[:session_token]
+          session_record = Session.find_by(session_token: cookies.signed[:session_token])
+          return session_record&.user if session_record
+        end
+
+        # Fall back to unsigned cookies 
+        if cookies[:session_token]
+          session_record = Session.find_by(session_token: cookies[:session_token])
+          return session_record&.user if session_record
+        end
+        
+        # Use direct test user override as last resort
         if ENV["TEST_USER_ID"].present?
           test_user = User.find_by(id: ENV["TEST_USER_ID"])
           if test_user
             puts "TEST AUTH: Using test user override: #{test_user.email}" if ENV["DEBUG_AUTH"] == "true"
             return test_user
           end
-        end
-
-        # Try signed cookies
-        if cookies.signed[:session_token]
-          session_record = Session.find_by(session_token: cookies.signed[:session_token])
-          return session_record&.user if session_record
-        end
-
-        # Fall back to unsigned cookies
-        if cookies[:session_token]
-          session_record = Session.find_by(session_token: cookies[:session_token])
-          return session_record&.user if session_record
         end
 
         # Debug logging for authentication issues
@@ -76,6 +76,18 @@ module Authentication
 
   # Redirects unauthenticated users to the sign-in page with an alert message
   def authenticate_user!
+    # Special debug for test environment
+    if Rails.env.test? && ENV["DEBUG_AUTH"] == "true"
+      Rails.logger.debug "AUTHENTICATE_USER! called from #{caller[0]}"
+      Rails.logger.debug "current_user: #{current_user&.email || 'nil'}"
+      Rails.logger.debug "TEST_USER_ID: #{ENV["TEST_USER_ID"]}"
+      Rails.logger.debug "cookies: #{cookies.to_h}"
+      if cookies[:session_token]
+        session = Session.find_by(session_token: cookies[:session_token])
+        Rails.logger.debug "Session found by token: #{session&.id || 'nil'}"
+      end
+    end
+    
     return if current_user
     store_location
     redirect_to sign_in_path, alert: "Please sign in to continue"

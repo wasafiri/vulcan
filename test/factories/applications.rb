@@ -20,21 +20,18 @@ FactoryBot.define do
     annual_income  { 50_000 }
 
     after(:build) do |application|
-      # Create and attach proofs
-      fixture_dir = Rails.root.join("test", "fixtures", "files")
-      FileUtils.mkdir_p(fixture_dir)
-      [ "income_proof.pdf", "residency_proof.pdf" ].each do |filename|
-        file_path = fixture_dir.join(filename)
-        unless File.exist?(file_path)
-          File.write(file_path, "test content for #{filename}")
-        end
-        proof_type = filename.sub(".pdf", "").to_sym
-        application.public_send(proof_type).attach(
-          io: File.open(file_path),
-          filename: filename,
-          content_type: "application/pdf"
-        )
-      end
+      # Attach known good PDF files
+      application.income_proof.attach(
+        io: File.open(Rails.root.join('test/fixtures/files/income_proof.pdf')),
+        filename: 'income_proof.pdf',
+        content_type: 'application/pdf'
+      )
+      
+      application.residency_proof.attach(
+        io: File.open(Rails.root.join('test/fixtures/files/residency_proof.pdf')),
+        filename: 'residency_proof.pdf',
+        content_type: 'application/pdf'
+      )
     end
 
     trait :completed do
@@ -87,30 +84,14 @@ FactoryBot.define do
       needs_review_since { Time.current }
       last_activity_at { Time.current }
 
-      after(:build) do |application|
-        fixture_dir = Rails.root.join("test", "fixtures", "files")
-        FileUtils.mkdir_p(fixture_dir)
-        [ "income_proof_rejected.pdf", "residency_proof_rejected.pdf" ].each do |filename|
-          file_path = fixture_dir.join(filename)
-          unless File.exist?(file_path)
-            File.write(file_path, "test content for #{filename}")
-          end
-          proof_type = filename.sub("_rejected.pdf", "").to_sym
-          application.public_send(proof_type).attach(
-            io: File.open(file_path),
-            filename: filename,
-            content_type: "application/pdf"
-          )
-        end
-      end
+      # Use the same PDF files as the base factory - the status is what matters
+      # No need to override attachment behavior
     end
 
     trait :with_approved_proofs do
       income_proof_status { :approved }
       residency_proof_status { :approved }
-      after(:create) do |application|
-        # Attach test files
-      end
+      # Use the same PDF files as the base factory
     end
 
     trait :in_progress_with_approved_proofs do
@@ -120,26 +101,7 @@ FactoryBot.define do
       income_proof_status { :approved }
       residency_proof_status { :approved }
       last_activity_at { Time.current }
-
-      after(:build) do |application|
-        fixture_dir = Rails.root.join("test", "fixtures", "files")
-        FileUtils.mkdir_p(fixture_dir)
-        files = {
-          "approved_income_proof.pdf" => :income_proof,
-          "placeholder_residency_proof.pdf" => :residency_proof
-        }
-        files.each do |filename, proof_type|
-          file_path = fixture_dir.join(filename)
-          unless File.exist?(file_path)
-            File.write(file_path, "test content for #{filename}")
-          end
-          application.public_send(proof_type).attach(
-            io: File.open(file_path),
-            filename: filename,
-            content_type: "application/pdf"
-          )
-        end
-      end
+      # Use the same PDF files as the base factory
     end
 
     trait :in_progress_with_pending_proofs do
@@ -149,26 +111,7 @@ FactoryBot.define do
       income_proof_status { :not_reviewed }
       residency_proof_status { :not_reviewed }
       last_activity_at { Time.current }
-
-      after(:build) do |application|
-        fixture_dir = Rails.root.join("test", "fixtures", "files")
-        FileUtils.mkdir_p(fixture_dir)
-        files = {
-          "income_proof.pdf" => :income_proof,
-          "residency_proof.pdf" => :residency_proof
-        }
-        files.each do |filename, proof_type|
-          file_path = fixture_dir.join(filename)
-          unless File.exist?(file_path)
-            File.write(file_path, "test content for #{filename}")
-          end
-          application.public_send(proof_type).attach(
-            io: File.open(file_path),
-            filename: filename,
-            content_type: "application/pdf"
-          )
-        end
-      end
+      # Use the same PDF files as the base factory
     end
 
     trait :submitted_by_guardian do

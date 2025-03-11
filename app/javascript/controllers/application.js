@@ -6,12 +6,7 @@ const application = Application.start()
 application.debug = false
 window.Stimulus = application
 
-// Register the modal controller
-import ModalController from "./modal_controller"
-application.register("modal", ModalController)
-
-// Register the date input controller
-import DateInputController from "./date_input_controller"
-application.register("date-input", DateInputController)
+// The controllers are registered in index.js to avoid duplicate registrations
+// Do not register controllers here directly
 
 export { application }

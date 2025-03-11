@@ -22,6 +22,8 @@ gem "jbuilder"
 gem "pagy"
 # pdf generation capability
 gem "prawn", "~> 2.5"
+# pdf display capability
+gem 'mupdf', '~> 1.0'
 
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 gem "bcrypt", "~> 3.1.7"
