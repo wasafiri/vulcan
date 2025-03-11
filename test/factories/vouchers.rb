@@ -3,7 +3,7 @@ FactoryBot.define do
     code { SecureRandom.alphanumeric(12).upcase }
     initial_value { 500.00 }
     remaining_value { initial_value }
-    status { :issued }
+    status { :active }
     issued_at { Time.current }
     association :application
     association :vendor, factory: :vendor, strategy: :build

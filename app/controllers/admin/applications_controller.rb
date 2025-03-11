@@ -592,8 +592,8 @@ class Admin::ApplicationsController < Admin::BaseController
     @previous_fy_vouchers = Voucher.where(created_at: @previous_fy_start..@previous_fy_end).count
 
     # Unredeemed vouchers
-    @current_fy_unredeemed_vouchers = Voucher.where(created_at: @current_fy_start..@current_fy_end, status: :issued).count
-    @previous_fy_unredeemed_vouchers = Voucher.where(created_at: @previous_fy_start..@previous_fy_end, status: :issued).count
+    @current_fy_unredeemed_vouchers = Voucher.where(created_at: @current_fy_start..@current_fy_end, status: :active).count
+    @previous_fy_unredeemed_vouchers = Voucher.where(created_at: @previous_fy_start..@previous_fy_end, status: :active).count
 
     # Voucher values
     @current_fy_voucher_value = Voucher.where(created_at: @current_fy_start..@current_fy_end).sum(:initial_value)

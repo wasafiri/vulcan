@@ -1,8 +1,8 @@
 require "test_helper"
 
 class VoucherActivationTest < ActiveSupport::TestCase
-  test "activate_if_valid! activates an issued voucher" do
-    voucher = FactoryBot.create(:voucher, status: :issued)
+  test "activate_if_valid! maintains active status on a valid voucher" do
+    voucher = FactoryBot.create(:voucher, status: :active)
 
     voucher.activate_if_valid!
     assert_equal "active", voucher.status
@@ -11,7 +11,7 @@ class VoucherActivationTest < ActiveSupport::TestCase
   test "activate_if_valid! marks an expired voucher as expired" do
     expiration_period = Policy.voucher_validity_period
     voucher = FactoryBot.create(:voucher,
-      status: :issued,
+      status: :active,
       issued_at: Time.current - expiration_period - 1.day
     )
 

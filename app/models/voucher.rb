@@ -53,6 +53,26 @@ class Voucher < ApplicationRecord
     ((issued_at + Policy.voucher_validity_period) - Time.current).to_i / 1.day
   end
 
+  def activate_if_valid!
+    # Don't modify if voucher is already in a final state
+    return if ["redeemed", "cancelled"].include?(status)
+    
+    # If voucher is already active, only check if it needs to be marked as expired
+    if status == "active"
+      if expired?
+        update!(status: :expired)
+      end
+      return
+    end
+    
+    # For any other status, check if it should be expired or active
+    if expired?
+      update!(status: :expired)
+    else
+      update!(status: :active)
+    end
+  end
+
   def can_redeem?(amount)
     return false unless voucher_active?
     return false if expired?

@@ -28,11 +28,14 @@ class FixProofStatusInconsistencies < ActiveRecord::Migration[8.0]
 
     # Reset income proof status if inconsistent
     if income_inconsistent_ids.any?
-      execute(<<-SQL)
-        UPDATE applications
-        SET income_proof_status = 0 -- not_reviewed
-        WHERE id IN (#{income_inconsistent_ids.join(',')})
-      SQL
+      income_ids_list = income_inconsistent_ids.join(',')
+      if income_ids_list.present?
+        execute(<<-SQL)
+          UPDATE applications
+          SET income_proof_status = 0 -- not_reviewed
+          WHERE id IN (#{income_ids_list})
+        SQL
+      end
       
       puts "Reset income_proof_status to 'not_reviewed' for #{income_inconsistent_ids.size} applications"
     else
@@ -41,11 +44,14 @@ class FixProofStatusInconsistencies < ActiveRecord::Migration[8.0]
 
     # Reset residency proof status if inconsistent
     if residency_inconsistent_ids.any?
-      execute(<<-SQL)
-        UPDATE applications
-        SET residency_proof_status = 0 -- not_reviewed
-        WHERE id IN (#{residency_inconsistent_ids.join(',')})
-      SQL
+      residency_ids_list = residency_inconsistent_ids.join(',')
+      if residency_ids_list.present?
+        execute(<<-SQL)
+          UPDATE applications
+          SET residency_proof_status = 0 -- not_reviewed
+          WHERE id IN (#{residency_ids_list})
+        SQL
+      end
       
       puts "Reset residency_proof_status to 'not_reviewed' for #{residency_inconsistent_ids.size} applications"
     else
