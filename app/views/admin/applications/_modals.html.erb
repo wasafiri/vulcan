@@ -1,4 +1,6 @@
 <div id="modals">
+  <!-- Certification History Modal -->
+  <%= render "certification_history_modal" %>
   <!-- Modal for Income Proof Review -->
   <div id="incomeProofReviewModal" class="fixed inset-0 hidden" data-modal-target="container">
     <!-- Backdrop -->
@@ -326,10 +328,10 @@
                       method: :patch,
                       local: false,
                       class: "space-y-4",
-                      data: { 
-                        turbo: true,
-                        action: "submit->rejection-form#validateForm"
-                      } do |f| %>
+                        data: { 
+                          turbo: true,
+                          action: "submit->rejection-form#validateForm"
+                        } do |f| %>
           <%= f.hidden_field :status, value: "rejected" %>
           <%= f.hidden_field :proof_type, 
               id: "rejection-proof-type",

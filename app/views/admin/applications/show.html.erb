@@ -240,81 +240,92 @@
       </dl>
     </section>
 
-    <!-- Medical Certification Status Section -->
-    <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="certification-status-title">
+    <!-- Medical Certification Section -->
+    <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="certification-title" data-testid="medical-certification-section">
       <div class="flex justify-between items-start">
-        <h2 id="certification-status-title" class="text-xl font-semibold text-gray-900">Medical Certification Status</h2>
-        <% if @application.medical_certification.attached? && @application.medical_certification_status == 'accepted' %>
-          <%= link_to url_for(@application.medical_certification),
-              class: "inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50",
-              target: "_blank" do %>
-            View DCF
-            <svg class="ml-2 -mr-1 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-          <% end %>
-        <% end %>
+        <h2 id="certification-title" class="text-xl font-semibold text-gray-900">Medical Certification</h2>
+        <span class="px-2 py-1 text-sm font-medium rounded-full <%= case @application.medical_certification_status
+            when 'requested' then 'bg-yellow-100 text-yellow-800'
+            when 'received' then 'bg-blue-100 text-blue-800'
+            when 'accepted', 'approved' then 'bg-green-100 text-green-800'
+            when 'rejected' then 'bg-red-100 text-red-800'
+            else 'bg-gray-100 text-gray-800'
+            end %>">
+          <%= @application.medical_certification_status.titleize %>
+        </span>
       </div>
-      <div class="mt-4">
-        <div class="flex items-center space-x-2">
-          <span class="px-2 py-1 text-sm font-medium rounded-full <%= case @application.medical_certification_status
-              when 'not_requested' then 'bg-gray-100 text-gray-800'
-              when 'requested' then 'bg-yellow-100 text-yellow-800'
-              when 'received' then 'bg-blue-100 text-blue-800'
-              when 'accepted' then 'bg-green-100 text-green-800'
-              when 'rejected' then 'bg-red-100 text-red-800'
-              end %>">
-            <%= @application.medical_certification_status.titleize %>
-          </span>
-          <% if @application.medical_certification_verified_at.present? %>
-            <span class="text-sm text-gray-500">
-              Verified <%= time_ago_in_words(@application.medical_certification_verified_at) %> ago
-              <% if @application.medical_certification_verified_by %>
-                by <%= @application.medical_certification_verified_by&.full_name || "Unknown User" %>
-              <% end %>
-            </span>
-          <% end %>
-        </div>
-        <% if @application.medical_certification_status == 'received' %>
-          <div class="mt-4">
-            <button type="button"
-                  data-action="click->modal#open"
-                  data-modal-id="medicalCertificationReviewModal"
-                  class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">
-              Review Certification
-            </button>
+
+      <div class="mt-6 space-y-4">
+        <!-- Provider Information -->
+        <% if @application.medical_provider_name.present? %>
+          <div class="mb-4" data-testid="provider-information">
+            <h3 class="text-sm font-medium text-gray-700 mb-2">Provider Information</h3>
+            <div class="pl-4 border-l-2 border-gray-200">
+              <p class="text-sm font-medium text-gray-900"><%= @application.medical_provider_name %></p>
+              <p class="text-sm text-gray-600">
+                <% if @application.medical_provider_phone.present? %>
+                  Phone: <%= @application.medical_provider_phone %>
+                <% end %>
+                <% if @application.respond_to?(:medical_provider_fax) && @application.medical_provider_fax.present? %>
+                  <% if @application.medical_provider_phone.present? %> / <% end %>
+                  Fax: <%= @application.medical_provider_fax %>
+                <% end %>
+                <% if @application.medical_provider_email.present? %>
+                  <br>Email: <%= @application.medical_provider_email %>
+                <% end %>
+              </p>
+            </div>
           </div>
-        <% elsif @application.medical_certification_status == 'requested' || @application.medical_certification_status == 'not_requested' %>
-          <div class="mt-4 space-y-4">
-            <!-- Medical Professional Information -->
-            <% if @application.medical_provider_name.present? %>
-              <div class="mb-3">
-                <p class="text-sm font-medium text-gray-900"><%= @application.medical_provider_name %></p>
-                <p class="text-sm text-gray-600">
-                  <% if @application.medical_provider_phone.present? %>
-                    Phone: <%= @application.medical_provider_phone %>
-                  <% end %>
-                  <% if @application.respond_to?(:medical_provider_fax) && @application.medical_provider_fax.present? %>
-                    <% if @application.medical_provider_phone.present? %> / <% end %>
-                    Fax: <%= @application.medical_provider_fax %>
-                  <% end %>
-                  <% if @application.medical_provider_email.present? %>
-                    <br>Email: <%= @application.medical_provider_email %>
-                  <% end %>
-                </p>
-              </div>
-            <% end %>
-            
-            <!-- Certification Status -->
-            <p class="text-sm text-gray-700 font-medium">
-              Disability Certification Form Requested 
-              (<%= pluralize(@application.medical_certification_request_count || 0, "request") %> sent)
+        <% end %>
+
+        <!-- Certification Status -->
+        <div class="mb-4" data-testid="certification-status">
+          <h3 class="text-sm font-medium text-gray-700 mb-2">Certification Status</h3>
+          <div class="pl-4 border-l-2 border-gray-200">
+            <p class="text-sm text-gray-700">
+              Disability Certification Form <%= @application.medical_certification_status&.titleize %>
+              <% if @application.medical_certification_request_count && @application.medical_certification_request_count > 0 %>
+                (<%= pluralize(@application.medical_certification_request_count, "request") %> sent)
+              <% end %>
             </p>
             
-            <!-- Request History -->
-            <%= render "certification_history" %>
+            <% if @application.medical_certification_status == "rejected" %>
+              <% if @application.respond_to?(:medical_certification_rejection_reason) && @application.medical_certification_rejection_reason.present? %>
+                <p class="text-sm text-red-600 mt-1">
+                  <strong>Reason:</strong> <%= sanitize @application.medical_certification_rejection_reason %>
+                </p>
+              <% elsif @application.respond_to?(:rejection_reason) && @application.rejection_reason.present? %>
+                <p class="text-sm text-red-600 mt-1">
+                  <strong>Reason:</strong> <%= sanitize @application.rejection_reason %>
+                </p>
+              <% end %>
+            <% end %>
             
-            <!-- Resend Button -->
+            <% if @application.medical_certification_verified_at.present? && 
+                  (@application.medical_certification_status == "accepted" || 
+                   @application.medical_certification_status == "approved") %>
+              <p class="text-sm text-gray-600 mt-1">
+                Certified on <%= @application.medical_certification_verified_at.strftime("%B %d, %Y at %I:%M %p") %>
+                <% if @application.medical_certification_verified_by.present? %>
+                  by <%= @application.medical_certification_verified_by.full_name %>
+                <% end %>
+              </p>
+            <% end %>
+          </div>
+        </div>
+        
+        <!-- Request History -->
+        <div class="mb-4" data-testid="request-history">
+          <h3 class="text-sm font-medium text-gray-700 mb-2">Request History</h3>
+          <%= render "certification_history" %>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="mt-6">
+          <% if @application.medical_certification_status == "not_requested" || 
+                @application.medical_certification_status == "rejected" ||
+                @application.medical_certification_status == "requested" %>
+            <!-- Send Request button -->
             <% request_count = @application.medical_certification_request_count || 0 %>
             <% button_text = request_count.zero? ? "Send Request" : "Resend Request" %>
             <%= button_to resend_medical_certification_admin_application_path(@application),
@@ -325,20 +336,33 @@
                 } do %>
               <%= button_text %>
             <% end %>
-          </div>
-        <% end %>
-        <% if @application.medical_certification_status == 'rejected' %>
-          <div class="mt-4">
-            <h3 class="text-sm font-medium text-gray-900">Rejection Reason:</h3>
-            <p class="mt-1 text-sm text-gray-500">
-              <% if @application.respond_to?(:rejection_reason) && @application.rejection_reason.present? %>
-                <%= @application.rejection_reason %>
-              <% else %>
-                No reason provided
-              <% end %>
-            </p>
-          </div>
-        <% end %>
+          <% elsif @application.medical_certification_status == "received" %>
+            <!-- Review button -->
+            <button type="button"
+                  data-action="click->modal#open"
+                  data-modal-id="medicalCertificationReviewModal"
+                  class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">
+              Review Certification
+            </button>
+          <% elsif @application.medical_certification.attached? && 
+                  (@application.medical_certification_status == "accepted" || 
+                   @application.medical_certification_status == "approved") %>
+            <!-- View button -->
+            <%= link_to rails_blob_path(@application.medical_certification, disposition: :inline),
+                target: "_blank",
+                rel: "noopener noreferrer",
+                class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none",
+                data: { turbo: false } do %>
+              <svg class="h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              View Certification
+            <% end %>
+          <% end %>
+          
+          <%# View History button removed - history already shown in the certification section %>
+        </div>
       </div>
     </section>
 

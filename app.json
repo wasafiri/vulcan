@@ -1,0 +1,20 @@
+{
+  "name": "mat_vulcan",
+  "description": "Application for administering programs",
+  "keywords": [
+    "rails",
+    "ruby"
+  ],
+  "environments": {
+    "test": {
+      "buildpacks": [
+        { "url": "heroku/ruby" },
+        { "url": "heroku-community/chrome-for-testing" }
+      ],
+      "scripts": {
+        "test-setup": "bin/rails db:prepare",
+        "test": "bin/rails test && bin/rails test:system"
+      }
+    }
+  }
+}

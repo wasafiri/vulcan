@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Setup script for Chrome for Testing and ChromeDriver
+
+echo "Setting up Chrome for Testing and ChromeDriver..."
+
+# Check if npm is installed
+if ! command -v npm &> /dev/null; then
+  echo "npm is required to install Chrome for Testing. Please install Node.js."
+  exit 1
+fi
+
+# Check if npx is installed
+if ! command -v npx &> /dev/null; then
+  echo "npx is required to install Chrome for Testing. Please install Node.js."
+  exit 1
+fi
+
+# Install Chrome for Testing (stable channel) and matching ChromeDriver
+echo "Installing Chrome for Testing (stable) and ChromeDriver..."
+npx @puppeteer/browsers install chrome@stable chromedriver@stable
+
+echo "Chrome for Testing setup complete!"
+echo "You can now run system tests with: bin/rails test:system"
+
+# Save the browser paths for reference
+echo "Browser paths for reference:"
+npx @puppeteer/browsers list chrome | grep "chrome@stable" | head -n 1
+npx @puppeteer/browsers list chromedriver | grep "chromedriver@stable" | head -n 1

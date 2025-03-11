@@ -2,6 +2,7 @@ class Application < ApplicationRecord
   include ApplicationStatusManagement
   include NotificationDelivery
   include ProofManageable
+  include ProofConsistencyValidation
 
   # Associations
   belongs_to :user, class_name: "Constituent", foreign_key: :user_id
