@@ -21,7 +21,7 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
       email.deliver_now
     end
 
-    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "no_reply@mdmat.org" ], email.from
     assert_equal [ @user.email ], email.to
     assert_match "approved", email.subject
 
@@ -47,7 +47,7 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
       email.deliver_now
     end
 
-    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "no_reply@mdmat.org" ], email.from
     assert_equal [ @user.email ], email.to
     assert_match "needs revision", email.subject
 
@@ -70,7 +70,7 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
       email.deliver_now
     end
 
-    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "no_reply@mdmat.org" ], email.from
     assert_equal [ @user.email ], email.to
     assert_match "Status Update", email.subject
 
@@ -100,7 +100,7 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
       email.deliver_now
     end
 
-    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "no_reply@mdmat.org" ], email.from
     assert_equal [ @admin.email ], email.to
     assert_match "Awaiting Proof Review", email.subject
 
@@ -133,7 +133,7 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
       email.deliver_now
     end
 
-    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "no_reply@mdmat.org" ], email.from
     assert_equal [ constituent.email ], email.to
     assert_match "Your MAT Application Account", email.subject
 
@@ -176,7 +176,7 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
       email.deliver_now
     end
 
-    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "no_reply@mdmat.org" ], email.from
     assert_equal [ "john.doe@example.com" ], email.to
     assert_match "Important Information About Your MAT Application", email.subject
 

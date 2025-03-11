@@ -2,8 +2,8 @@ class ApplicationMailer < ActionMailer::Base
   helper :mailer
 
   default(
-    from: "info@mdmat.org",
-    reply_to: "info@mdmat.org"
+    from: "no_reply@mdmat.org",
+    reply_to: "no_reply@mdmat.org"
   )
 
   layout "mailer"
@@ -25,7 +25,7 @@ class ApplicationMailer < ActionMailer::Base
   def set_common_variables
     @current_year = Time.current.year
     @organization_name = "Maryland Accessible Telecommunications Program"
-    @organization_email = "info@mdmat.org"
+    @organization_email = "no_reply@mdmat.org"
     @organization_website = "https://mdmat.org"
   end
 end

@@ -15,7 +15,7 @@ class EvaluatorMailerTest < ActionMailer::TestCase
       email.deliver_now
     end
 
-    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "no_reply@mdmat.org" ], email.from
     assert_equal [ @evaluator.email ], email.to
     assert_match "New Evaluation", email.subject
 
@@ -40,7 +40,7 @@ class EvaluatorMailerTest < ActionMailer::TestCase
       email.deliver_now
     end
 
-    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "no_reply@mdmat.org" ], email.from
     assert_equal [ @constituent.email ], email.to
     assert_match "Evaluation has been Submitted", email.subject
 

@@ -13,7 +13,7 @@ class MedicalProviderMailerTest < ActionMailer::TestCase
       email.deliver_now
     end
 
-    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "no_reply@mdmat.org" ], email.from
     assert_equal [ @application.medical_provider_email ], email.to
     assert_match "Certification Request", email.subject
 

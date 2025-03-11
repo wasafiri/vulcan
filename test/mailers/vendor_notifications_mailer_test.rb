@@ -21,7 +21,7 @@ class VendorNotificationsMailerTest < ActionMailer::TestCase
       email.deliver_now
     end
 
-    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "no_reply@mdmat.org" ], email.from
     assert_equal [ @vendor.email ], email.to
     assert_match "Payment Issued", email.subject
 
@@ -46,7 +46,7 @@ class VendorNotificationsMailerTest < ActionMailer::TestCase
       email.deliver_now
     end
 
-    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "no_reply@mdmat.org" ], email.from
     assert_equal [ @vendor.email ], email.to
     assert_match "W9 Form Approved", email.subject
 
@@ -72,7 +72,7 @@ class VendorNotificationsMailerTest < ActionMailer::TestCase
       email.deliver_now
     end
 
-    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "no_reply@mdmat.org" ], email.from
     assert_equal [ @vendor.email ], email.to
     assert_match "W9 Form Requires Attention", email.subject
 

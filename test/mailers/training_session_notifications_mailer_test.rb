@@ -25,7 +25,7 @@ class TrainingSessionNotificationsMailerTest < ActionMailer::TestCase
 
     email = TrainingSessionNotificationsMailer.trainer_assigned(@training_session)
 
-    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "no_reply@mdmat.org" ], email.from
     assert_equal [ @trainer.email ], email.to
     assert_equal "New Training Assignment - Application ##{@application.id}", email.subject
 
@@ -51,7 +51,7 @@ class TrainingSessionNotificationsMailerTest < ActionMailer::TestCase
 
     email = TrainingSessionNotificationsMailer.training_scheduled(@training_session)
 
-    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "no_reply@mdmat.org" ], email.from
     assert_equal [ @constituent.email ], email.to
 
     # Check that the subject contains "Training Session Scheduled"
@@ -79,7 +79,7 @@ class TrainingSessionNotificationsMailerTest < ActionMailer::TestCase
 
     email = TrainingSessionNotificationsMailer.training_completed(@training_session)
 
-    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "no_reply@mdmat.org" ], email.from
     assert_equal [ @constituent.email ], email.to
 
     # Check that the subject contains "Training Session Completed"

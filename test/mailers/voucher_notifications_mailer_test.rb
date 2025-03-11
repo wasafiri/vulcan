@@ -17,7 +17,7 @@ class VoucherNotificationsMailerTest < ActionMailer::TestCase
       email.deliver_now
     end
 
-    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "no_reply@mdmat.org" ], email.from
     assert_equal [ @user.email ], email.to
     assert_match "Voucher Has Been Assigned", email.subject
 
@@ -42,7 +42,7 @@ class VoucherNotificationsMailerTest < ActionMailer::TestCase
       email.deliver_now
     end
 
-    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "no_reply@mdmat.org" ], email.from
     assert_equal [ @user.email ], email.to
     assert_match "Expire Soon", email.subject
 
@@ -67,7 +67,7 @@ class VoucherNotificationsMailerTest < ActionMailer::TestCase
       email.deliver_now
     end
 
-    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "no_reply@mdmat.org" ], email.from
     assert_equal [ @user.email ], email.to
     assert_match "Expired", email.subject
 
@@ -92,7 +92,7 @@ class VoucherNotificationsMailerTest < ActionMailer::TestCase
       email.deliver_now
     end
 
-    assert_equal [ "info@mdmat.org" ], email.from
+    assert_equal [ "no_reply@mdmat.org" ], email.from
     assert_equal [ @user.email ], email.to
     assert_match "Redeemed", email.subject
 
