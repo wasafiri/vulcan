@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_03_10_213300) do
+ActiveRecord::Schema[8.0].define(version: 2025_03_11_194141) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -139,19 +139,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_10_213300) do
     t.bigint "product_id", null: false
     t.index ["application_id", "product_id"], name: "index_applications_products_on_application_id_and_product_id"
     t.index ["product_id", "application_id"], name: "index_applications_products_on_product_id_and_application_id"
-  end
-
-  create_table "appointments", force: :cascade do |t|
-    t.bigint "user_id", null: false
-    t.bigint "evaluator_id", null: false
-    t.integer "appointment_type"
-    t.datetime "scheduled_for"
-    t.datetime "completed_at"
-    t.text "notes"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["evaluator_id"], name: "index_appointments_on_evaluator_id"
-    t.index ["user_id"], name: "index_appointments_on_user_id"
   end
 
   create_table "email_templates", force: :cascade do |t|
@@ -648,8 +635,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_10_213300) do
   add_foreign_key "applications", "users"
   add_foreign_key "applications", "users", column: "income_verified_by_id"
   add_foreign_key "applications", "users", column: "trainer_id"
-  add_foreign_key "appointments", "users"
-  add_foreign_key "appointments", "users", column: "evaluator_id"
   add_foreign_key "email_templates", "users", column: "updated_by_id"
   add_foreign_key "evaluations", "applications"
   add_foreign_key "evaluations", "users", column: "constituent_id"

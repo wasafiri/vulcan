@@ -23,9 +23,6 @@ module ConstituentPortal
       @max_training_sessions = Policy.get("max_training_sessions") || 3
       @remaining_training_sessions = @max_training_sessions - @training_sessions.count if @active_application
 
-      # Get upcoming appointments
-      @upcoming_appointments = current_user.appointments.where("scheduled_for > ?", Time.current).order(scheduled_for: :asc)
-      @upcoming_appointments_count = @upcoming_appointments.count
     end
 
     private

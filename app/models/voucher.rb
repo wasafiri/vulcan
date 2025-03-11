@@ -1,12 +1,12 @@
+# Represents a voucher that can be redeemed by constituents for assistive technology products
 class Voucher < ApplicationRecord
   belongs_to :application
-  belongs_to :vendor, optional: true, class_name: "User"
+  belongs_to :vendor, optional: true, class_name: 'User'
   belongs_to :invoice, optional: true
-  has_many :transactions, class_name: "VoucherTransaction", dependent: :restrict_with_error
+  has_many :transactions, class_name: 'VoucherTransaction', dependent: :restrict_with_error
 
   validates :code, presence: true, uniqueness: true
-  validates :initial_value, :remaining_value, presence: true,
-    numericality: { greater_than_or_equal_to: 0 }
+  validates :initial_value, :remaining_value, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validate :remaining_value_cannot_exceed_initial_value
 
   before_validation :generate_code, on: :create
@@ -25,18 +25,19 @@ class Voucher < ApplicationRecord
   scope :available, -> { where(status: :active) }
   scope :for_vendor, ->(vendor_id) { where(vendor_id: vendor_id) }
   scope :not_invoiced, -> { where(invoice_id: nil) }
-  scope :expiring_soon, -> {
+  scope :expiring_soon, lambda {
     expiration_threshold = 7.days
     where(status: :active)
       .where(
         "issued_at + (INTERVAL '1 month' * ?) - CURRENT_TIMESTAMP <= INTERVAL '? days'",
-        Policy.get("voucher_validity_period_months"),
+        Policy.get('voucher_validity_period_months'),
         expiration_threshold.to_i
       )
   }
 
   def expired?
-    return true if status == "expired"
+    return true if status == 'expired'
+
     if issued_at
       issued_at + Policy.voucher_validity_period <= Time.current
     else
@@ -50,21 +51,20 @@ class Voucher < ApplicationRecord
 
   def days_until_expiration
     return nil unless issued_at
+
     ((issued_at + Policy.voucher_validity_period) - Time.current).to_i / 1.day
   end
 
   def activate_if_valid!
     # Don't modify if voucher is already in a final state
-    return if ["redeemed", "cancelled"].include?(status)
-    
+    return if %w[redeemed cancelled].include?(status)
+
     # If voucher is already active, only check if it needs to be marked as expired
-    if status == "active"
-      if expired?
-        update!(status: :expired)
-      end
+    if status == 'active'
+      update!(status: :expired) if expired?
       return
     end
-    
+
     # For any other status, check if it should be expired or active
     if expired?
       update!(status: :expired)
@@ -78,6 +78,7 @@ class Voucher < ApplicationRecord
     return false if expired?
     return false if amount > remaining_value
     return false if amount < Policy.voucher_minimum_redemption_amount
+
     true
   end
 
@@ -131,7 +132,7 @@ class Voucher < ApplicationRecord
 
     update!(
       status: :cancelled,
-      notes: [ notes, "Cancelled at #{Time.current}" ].compact.join("\n")
+      notes: [notes, "Cancelled at #{Time.current}"].compact.join("\n")
     )
   end
 
@@ -152,6 +153,17 @@ class Voucher < ApplicationRecord
     code
   end
 
+  def self.calculate_value_for_constituent(constituent)
+    Constituent::DISABILITY_TYPES.sum do |disability_type|
+      # Explicitly check for true to handle any truthy/falsey values
+      if constituent.send("#{disability_type}_disability") == true
+        Policy.voucher_value_for_disability(disability_type)
+      else
+        0
+      end
+    end
+  end
+
   private
 
   def send_assigned_notification
@@ -159,11 +171,11 @@ class Voucher < ApplicationRecord
   end
 
   def check_status_changes
-    if saved_change_to_status?
-      case status
-      when "expired"
-        VoucherNotificationsMailer.voucher_expired(self).deliver_later
-      end
+    return unless saved_change_to_status?
+
+    case status
+    when 'expired'
+      VoucherNotificationsMailer.voucher_expired(self).deliver_later
     end
   end
 
@@ -181,7 +193,7 @@ class Voucher < ApplicationRecord
 
   def remaining_value_cannot_exceed_initial_value
     if remaining_value && initial_value && remaining_value > initial_value
-      errors.add(:remaining_value, "cannot exceed initial value")
+      errors.add(:remaining_value, 'cannot exceed initial value')
     end
   end
 
@@ -195,17 +207,6 @@ class Voucher < ApplicationRecord
 
   def generate_reference_number
     "TXN-#{SecureRandom.hex(6).upcase}"
-  end
-
-  def self.calculate_value_for_constituent(constituent)
-    Constituent::DISABILITY_TYPES.sum do |disability_type|
-      # Explicitly check for true to handle any truthy/falsey values
-      if constituent.send("#{disability_type}_disability") == true
-        Policy.voucher_value_for_disability(disability_type)
-      else
-        0
-      end
-    end
   end
 
   def set_initial_values

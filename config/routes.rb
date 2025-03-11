@@ -76,7 +76,6 @@ Rails.application.routes.draw do
     end
 
     resources :constituents_dashboard, only: [ :index, :show ]
-    resources :appointments_dashboard, only: [ :index, :show ]
 
     resources :proof_reviews, only: [ :index, :show, :new, :create ]
     resources :proofs, only: [ :new, :create ] do
@@ -204,7 +203,6 @@ Rails.application.routes.draw do
   get "/constituent/applications/:id", to: redirect("/constituent_portal/applications/%{id}")
   get "/constituent/dashboard", to: redirect("/constituent_portal/dashboard")
   get "/constituent/applications", to: redirect("/constituent_portal/applications")
-  get "/constituent/appointments", to: redirect("/constituent_portal/appointments")
   get "/constituent/evaluations", to: redirect("/constituent_portal/evaluations")
   get "/constituent/devices", to: redirect("/constituent_portal/products")
 
@@ -229,7 +227,6 @@ Rails.application.routes.draw do
         post "proofs/direct_upload", to: "proofs/proofs#direct_upload", as: :direct_upload_proof
       end
     end
-    resources :appointments, only: [ :index, :show ]
     resources :evaluations, only: [ :index, :show ]
     resources :products, only: [ :index, :show ]
 

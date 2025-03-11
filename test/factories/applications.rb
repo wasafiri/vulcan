@@ -26,7 +26,7 @@ FactoryBot.define do
         filename: 'income_proof.pdf',
         content_type: 'application/pdf'
       )
-      
+
       application.residency_proof.attach(
         io: File.open(Rails.root.join('test/fixtures/files/residency_proof.pdf')),
         filename: 'residency_proof.pdf',

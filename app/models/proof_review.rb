@@ -1,7 +1,8 @@
+# Manages the review process for income and residency proof documents
 class ProofReview < ApplicationRecord
   # Associations
   belongs_to :application
-  belongs_to :admin, class_name: "User"
+  belongs_to :admin, class_name: 'User'
 
   # Enums (using the original syntax to avoid argument errors)
   enum :proof_type, { income: 0, residency: 1 }, prefix: true
@@ -24,7 +25,7 @@ class ProofReview < ApplicationRecord
   scope :recent, -> { order(created_at: :desc) }
   scope :by_admin, ->(admin_id) { where(admin_id: admin_id) }
   scope :rejections, -> { where(status: :rejected) }
-  scope :last_3_days, -> { where("created_at > ?", 3.days.ago) }
+  scope :last_3_days, -> { where('created_at > ?', 3.days.ago) }
 
   private
 
@@ -33,16 +34,16 @@ class ProofReview < ApplicationRecord
   end
 
   def admin_must_be_admin_type
-    errors.add(:admin, "must be an administrator") unless admin&.type == "Admin"
+    errors.add(:admin, 'must be an administrator') unless admin&.type == 'Admin'
   end
 
   def application_must_be_active
-    errors.add(:application, "cannot be reviewed when archived") if application&.archived?
+    errors.add(:application, 'cannot be reviewed when archived') if application&.archived?
   end
 
   def should_validate_proof_attachment?
     # Only validate proof attachment in production or when explicitly testing this validation
-    return false if Rails.env.test? && ENV["VALIDATE_PROOF_ATTACHMENTS"] != "true"
+    return false if Rails.env.test? && ENV['VALIDATE_PROOF_ATTACHMENTS'] != 'true'
 
     # Always validate in production
     return true if Rails.env.production?
@@ -64,9 +65,9 @@ class ProofReview < ApplicationRecord
 
   def proof_must_be_attached
     proof = case proof_type
-    when "income" then application&.income_proof
-    when "residency" then application&.residency_proof
-    end
+            when 'income' then application&.income_proof
+            when 'residency' then application&.residency_proof
+            end
     errors.add(:base, "No #{proof_type} proof found for review") unless proof&.attached?
   end
 
@@ -81,19 +82,19 @@ class ProofReview < ApplicationRecord
     begin
       ActiveRecord::Base.transaction do
         if status_rejected?
-          Rails.logger.info "Status is rejected, handling rejection flow"
+          Rails.logger.info 'Status is rejected, handling rejection flow'
           increment_rejections_if_rejected
           check_max_rejections
         else
-          Rails.logger.info "Status is approved, skipping rejection flow"
+          Rails.logger.info 'Status is approved, skipping rejection flow'
         end
       end
 
       # Send appropriate notification based on status
       if status_rejected?
-        send_notification("proof_rejected", :proof_rejected, { proof_type: proof_type, rejection_reason: rejection_reason })
+        send_notification('proof_rejected', :proof_rejected, { proof_type: proof_type, rejection_reason: rejection_reason })
       else
-        send_notification("proof_approved", :proof_approved, { proof_type: proof_type })
+        send_notification('proof_approved', :proof_approved, { proof_type: proof_type })
       end
     rescue StandardError => e
       Rails.logger.error "Failed to process proof review actions: #{e.message}\n#{e.backtrace.join("\n")}"
@@ -136,7 +137,7 @@ class ProofReview < ApplicationRecord
         Notification.create!(
           recipient: User.admins.first,
           actor: admin,
-          action: "max_rejections_warning",
+          action: 'max_rejections_warning',
           notifiable: application
         )
       end
@@ -147,7 +148,7 @@ class ProofReview < ApplicationRecord
     end
   rescue StandardError => e
     Rails.logger.error "Failed to process max rejections: #{e.message}"
-    errors.add(:base, "Failed to process rejection limits")
+    errors.add(:base, 'Failed to process rejection limits')
     raise ActiveRecord::Rollback
   end
 

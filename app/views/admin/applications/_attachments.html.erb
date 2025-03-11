@@ -12,7 +12,7 @@
         <%= @application.income_proof_status.titleize %>
       </span>
     </div>
-    
+
     <div class="p-4">
       <!-- Proof file information if attached -->
       <% if @application.income_proof.attached? %>
@@ -40,7 +40,7 @@
           </div>
         </div>
       <% end %>
-      
+
       <!-- History Section -->
       <% if @application.income_proof.attached? %>
         <div class="mt-4">
@@ -93,13 +93,13 @@
               <!-- Fallback when no audit records exist -->
               <div class="history-item mb-2">
                 <p class="text-sm text-gray-600 mb-1">
-                  <span class="text-blue-600">→</span> Submitted on 
+                  <span class="text-blue-600">→</span> Submitted on
                   <%= @application.created_at.strftime("%B %d, %Y at %I:%M %p") %>
                   <span class="text-xs text-gray-500">(via application submission)</span>
                 </p>
               </div>
             <% end %>
-            
+
             <% if !@proof_histories[:income] || (@proof_histories[:income][:reviews].empty? && @proof_histories[:income][:audits].empty?) %>
               <div class="history-item mb-2">
                 <p class="text-sm text-gray-600 mb-1">
@@ -110,7 +110,7 @@
           </div>
         </div>
       <% end %>
-      
+
       <!-- Action Buttons -->
       <div class="mt-4 flex space-x-2">
         <% if @application.income_proof.attached? %>
@@ -119,12 +119,12 @@
                     data-action="click->modal#open"
                     data-modal-id="incomeProofReviewModal"
                     data-proof-type="income"
-                    class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">
+                    class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none">
               <svg class="h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
-              View Current Proof
+              View Approved Proof
             </button>
           <% else %>
             <button type="button"
@@ -156,7 +156,7 @@
         <%= @application.residency_proof_status.titleize %>
       </span>
     </div>
-    
+
     <div class="p-4">
       <!-- Proof file information if attached -->
       <% if @application.residency_proof.attached? %>
@@ -184,7 +184,7 @@
           </div>
         </div>
       <% end %>
-      
+
       <!-- History Section -->
       <% if @application.residency_proof.attached? %>
         <div class="mt-4">
@@ -196,9 +196,9 @@
                 <div class="history-item mb-2">
                   <p class="text-sm text-gray-600 mb-1">
                     <% if review.status_approved? %>
-                      <span class="text-green-600">✓</span> Approved on 
+                      <span class="text-green-600">✓</span> Approved on
                     <% else %>
-                      <span class="text-red-600">×</span> Rejected on 
+                      <span class="text-red-600">×</span> Rejected on
                     <% end %>
                     <%= review.reviewed_at&.strftime("%B %d, %Y at %I:%M %p") %>
                     by <%= review.admin&.full_name || "Unknown Admin" %>
@@ -221,7 +221,7 @@
               <% initial_submission = @proof_histories[:residency][:audits].last %>
               <div class="history-item mb-2">
                 <p class="text-sm text-gray-600 mb-1">
-                  <span class="text-blue-600">→</span> Submitted on 
+                  <span class="text-blue-600">→</span> Submitted on
                   <%= initial_submission.created_at&.strftime("%B %d, %Y at %I:%M %p") %>
                   <% if initial_submission.respond_to?(:submission_method) && initial_submission.submission_method.present? %>
                     <span class="text-xs text-gray-500">(via <%= initial_submission.submission_method %>)</span>
@@ -243,7 +243,7 @@
                 </p>
               </div>
             <% end %>
-            
+
             <% if !@proof_histories[:residency] || (@proof_histories[:residency][:reviews].empty? && @proof_histories[:residency][:audits].empty?) %>
               <div class="history-item mb-2">
                 <p class="text-sm text-gray-600 mb-1">
@@ -254,7 +254,7 @@
           </div>
         </div>
       <% end %>
-      
+
       <!-- Action Buttons -->
       <div class="mt-4 flex space-x-2">
         <% if @application.residency_proof.attached? %>
@@ -263,12 +263,12 @@
                     data-action="click->modal#open"
                     data-modal-id="residencyProofReviewModal"
                     data-proof-type="residency"
-                    class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">
+                    class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none">
               <svg class="h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
-              View Current Proof
+              View Approved Proof
             </button>
           <% else %>
             <button type="button"
@@ -282,7 +282,6 @@
         <% else %>
           <span class="text-sm text-gray-500">Not Attached</span>
         <% end %>
-
       </div>
     </div>
   </div>

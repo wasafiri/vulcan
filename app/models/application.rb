@@ -1,27 +1,30 @@
 class Application < ApplicationRecord
+  delegate :guardian_relationship, :guardian_relationship=, to: :user, allow_nil: true
   include ApplicationStatusManagement
   include NotificationDelivery
   include ProofManageable
   include ProofConsistencyValidation
 
   # Associations
-  belongs_to :user, class_name: "Constituent", foreign_key: :user_id
-  belongs_to :income_verified_by, class_name: "User",
-    foreign_key: :income_verified_by_id, optional: true
-  has_many :training_sessions, class_name: "TrainingSession"
+  belongs_to :user, class_name: 'Constituent', foreign_key: :user_id
+  belongs_to :income_verified_by, 
+             class_name: 'User',
+             foreign_key: :income_verified_by_id, 
+             optional: true
+  has_many :training_sessions, class_name: 'TrainingSession'
   has_many :trainers, through: :training_sessions
   has_many :evaluations, dependent: :destroy
   has_many :notifications, as: :notifiable, dependent: :destroy
   has_many :proof_reviews, dependent: :destroy
-  has_many :status_changes, class_name: "ApplicationStatusChange"
+  has_many :status_changes, class_name: 'ApplicationStatusChange'
   has_many :proof_submission_audits, dependent: :destroy
   has_many :vouchers, dependent: :restrict_with_error
   has_many :application_notes, dependent: :destroy
   has_and_belongs_to_many :products
   has_one_attached :medical_certification
   belongs_to :medical_certification_verified_by,
-    class_name: "User",
-    optional: true
+             class_name: 'User',
+             optional: true
 
   # Enums
   enum :income_proof_status, {
@@ -46,12 +49,12 @@ class Application < ApplicationRecord
 
   # Validations
   validates :user, :application_date, :status, presence: true
-  validates :maryland_resident, inclusion: { in: [ true ],
-    message: "You must be a Maryland resident to apply" }
+  validates :maryland_resident, inclusion: { in: [true],
+                                             message: 'You must be a Maryland resident to apply' }
   validates :terms_accepted, :information_verified, :medical_release_authorized,
-    acceptance: { accept: true }, if: :submitted?
+            acceptance: { accept: true }, if: :submitted?
   validates :medical_provider_name, :medical_provider_phone, :medical_provider_email,
-    presence: true, unless: :draft?
+            presence: true, unless: :draft?
   validates :household_size, :annual_income, presence: true
   validates :self_certify_disability, inclusion: { in: [ true, false ] }
   validates :guardian_relationship, presence: true, if: :is_guardian?
@@ -66,7 +69,7 @@ class Application < ApplicationRecord
   # Scopes
   scope :search_by_last_name, ->(query) {
     includes(:user, :proof_reviews, :training_sessions, :evaluations)
-      .where("users.last_name ILIKE ?", "%#{query}%")
+      .where('users.last_name ILIKE ?', "%#{query}%")
       .references(:users)
   }
   scope :needs_review, -> { where(status: :needs_information) }
@@ -87,7 +90,7 @@ class Application < ApplicationRecord
       # Create event for approval
       Event.create!(
         user: Current.user,
-        action: "application_approved",
+        action: 'application_approved',
         metadata: {
           application_id: id,
           timestamp: Time.current.iso8601
@@ -97,7 +100,7 @@ class Application < ApplicationRecord
       # Create initial voucher
       create_initial_voucher if can_create_voucher?
     end
-  rescue => e
+  rescue StandardError => e
     Rails.logger.error "Failed to approve application #{id}: #{e.message}"
     false
   end
@@ -107,10 +110,9 @@ class Application < ApplicationRecord
 
     with_lock do
       voucher = vouchers.create!
-
       Event.create!(
         user: assigned_by || Current.user,
-        action: "voucher_assigned",
+        action: 'voucher_assigned',
         metadata: {
           application_id: id,
           voucher_id: voucher.id,
@@ -124,20 +126,20 @@ class Application < ApplicationRecord
       create_system_notification!(
         recipient: user,
         actor: assigned_by || Current.user,
-        action: "voucher_assigned"
+        action: 'voucher_assigned'
       )
 
       voucher
     end
-  rescue => e
+  rescue StandardError => e
     Rails.logger.error "Failed to assign voucher for application #{id}: #{e.message}"
     false
   end
 
   def can_create_voucher?
     approved? &&
-    medical_certification_status_accepted? &&
-    !vouchers.exists?
+      medical_certification_status_accepted? &&
+      !vouchers.exists?
   end
 
   def create_initial_voucher
@@ -150,7 +152,7 @@ class Application < ApplicationRecord
     with_lock do
       update!(status: :rejected)
     end
-  rescue => e
+  rescue StandardError => e
     Rails.logger.error "Failed to reject application #{id}: #{e.message}"
     false
   end
@@ -161,27 +163,9 @@ class Application < ApplicationRecord
       Notification.create!(
         recipient: user,
         actor: Current.user,
-        action: "documents_requested",
+        action: 'documents_requested',
         notifiable: self
       )
-    end
-  end
-
-  # On chopping block
-  def self.batch_update_status(ids, status)
-    transaction do
-      where(id: ids).lock("FOR UPDATE SKIP LOCKED").find_each do |application|
-        unless application.update(status: status)
-          Rails.logger.error(
-            "Failed to update application #{application.id}: #{application.errors.full_messages}"
-          )
-          raise ActiveRecord::Rollback
-        end
-      end
-      true
-    rescue => e
-      Rails.logger.error "Batch update failed: #{e.message}"
-      false
     end
   end
 
@@ -193,8 +177,8 @@ class Application < ApplicationRecord
         application: self,
         evaluation_type: determine_evaluation_type,
         evaluation_datetime: nil, # Will be set when scheduling
-        needs: "",
-        location: ""
+        needs: '',
+        location: ''
         # Initialize other required fields as needed
       )
       # Send email notification to evaluator
@@ -221,7 +205,7 @@ class Application < ApplicationRecord
       create_system_notification!(
         recipient: user,
         actor: Current.user,
-        action: "trainer_assigned"
+        action: 'trainer_assigned'
       )
 
       # Send email notification to the trainer with constituent contact info
@@ -247,24 +231,22 @@ class Application < ApplicationRecord
       }
 
       # Add rejection reason if provided
-      if status == "rejected"
-        attrs[:medical_certification_rejection_reason] = rejection_reason
-      end
+      attrs[:medical_certification_rejection_reason] = rejection_reason if status == 'rejected'
 
       update!(attrs)
-      
+
       # Create notification for audit logging
-      action = case status
-               when "accepted" then "medical_certification_approved"
-               when "rejected" then "medical_certification_rejected"
-               when "received" then "medical_certification_received"
-               else nil
-               end
-      
+      action_mapping = {
+        'accepted' => 'medical_certification_approved',
+        'rejected' => 'medical_certification_rejected',
+        'received' => 'medical_certification_received'
+      }
+      action = action_mapping[status]
+
       if action
         metadata = {}
-        metadata["reason"] = rejection_reason if rejection_reason.present?
-        
+        metadata['reason'] = rejection_reason if rejection_reason.present?
+
         Notification.create!(
           recipient: user,
           actor: verified_by,
@@ -310,61 +292,60 @@ class Application < ApplicationRecord
   def constituent_full_name
     # Checking if user exists and has both names to avoid nil errors
     return "#{user&.first_name} #{user&.last_name}".strip if user&.first_name || user&.last_name
-    "Unknown Constituent"
+
+    'Unknown Constituent'
   end
-  
+
   # Determines the appropriate proof review button text based on proof status
   # @param proof_type [String] The type of proof ("income" or "residency")
   # @return [String] The appropriate button text
   def proof_review_button_text(proof_type)
-    proof = send("#{proof_type}_proof")
     latest_review = proof_reviews.where(proof_type: proof_type).order(created_at: :desc).first
     latest_audit = proof_submission_audits.where(proof_type: proof_type).order(created_at: :desc).first
-    
+
     if latest_review&.status_rejected?
       if latest_audit && latest_audit.created_at > latest_review.created_at
-        "Review Resubmitted Proof"
+        'Review Resubmitted Proof'
       else
-        "Review Rejected Proof"
+        'Review Rejected Proof'
       end
     else
-      "Review Proof"
+      'Review Proof'
     end
   end
-  
+
   # Determines the appropriate CSS classes for the proof review button
   # @param proof_type [String] The type of proof ("income" or "residency")
   # @return [String] The appropriate CSS class string for the button
   def proof_review_button_class(proof_type)
     latest_review = proof_reviews.where(proof_type: proof_type).order(created_at: :desc).first
     latest_audit = proof_submission_audits.where(proof_type: proof_type).order(created_at: :desc).first
-    
+
     if latest_review&.status_rejected?
       if latest_audit && latest_audit.created_at > latest_review.created_at
         # Resubmitted proof - keep blue
-        "bg-blue-600 hover:bg-blue-700"
+        'bg-blue-600 hover:bg-blue-700'
       else
         # Rejected proof - use red
-        "bg-red-600 hover:bg-red-700"
+        'bg-red-600 hover:bg-red-700'
       end
     else
       # Initial review - keep blue
-      "bg-blue-600 hover:bg-blue-700"
+      'bg-blue-600 hover:bg-blue-700'
     end
   end
 
   # Application status change tracking
   def update_status(new_status, user: nil, notes: nil)
     old_status = status
+    return unless update(status: new_status)
 
-    if update(status: new_status)
-      status_changes.create!(
-        from_status: old_status,
-        to_status: new_status,
-        user: user,
-        notes: notes
-      )
-    end
+    status_changes.create!(
+      from_status: old_status,
+      to_status: new_status,
+      user: user,
+      notes: notes
+    )
   end
 
   def medical_provider_name
@@ -372,8 +353,8 @@ class Application < ApplicationRecord
   end
 
   def medical_certification_requested?
-    medical_certification_requested_at.present? || 
-    medical_certification_status.in?(["requested", "received", "accepted", "rejected"])
+    medical_certification_requested_at.present? ||
+      medical_certification_status.in?(['requested', 'received', 'accepted', 'rejected'])
   end
 
   private
@@ -388,7 +369,7 @@ class Application < ApplicationRecord
 
     Event.create!(
       user: acting_user,
-      action: "application_status_changed",
+      action: 'application_status_changed',
       metadata: {
         application_id: id,
         old_status: status_before_last_save,
@@ -396,7 +377,7 @@ class Application < ApplicationRecord
         timestamp: Time.current.iso8601
       }
     )
-  rescue => e
+  rescue StandardError => e
     Rails.logger.error "Failed to log status change for application #{id}: #{e.message}"
     # Don't raise the error, just log it
   end
@@ -414,14 +395,13 @@ class Application < ApplicationRecord
     return if new_record?
 
     last_application = user&.applications&.where&.not(id: id)
-      &.order(application_date: :desc)&.first
+                           &.order(application_date: :desc)&.first
     return unless last_application
 
-    waiting_period = Policy.get("waiting_period_years") || 3
+    waiting_period = Policy.get('waiting_period_years') || 3
+    return unless last_application.application_date > waiting_period.years.ago
 
-    if last_application.application_date > waiting_period.years.ago
-      errors.add(:base, "You must wait #{waiting_period} years before submitting a new application.")
-    end
+    errors.add(:base, "You must wait #{waiting_period} years before submitting a new application.")
   end
 
   def needs_proof_review?
@@ -443,7 +423,7 @@ class Application < ApplicationRecord
       {
         recipient_id: admin_id,
         actor_id: user.id,
-        action: "proof_submitted",
+        action: 'proof_submitted',
         notifiable_type: self.class.name,
         notifiable_id: id,
         metadata: { proof_types: pending_proof_types }
@@ -456,8 +436,8 @@ class Application < ApplicationRecord
 
   def pending_proof_types
     types = []
-    types << "income" if income_proof_status_not_reviewed?
-    types << "residency" if residency_proof_status_not_reviewed?
+    types << 'income' if income_proof_status_not_reviewed?
+    types << 'residency' if residency_proof_status_not_reviewed?
     types
   end
 
@@ -479,17 +459,17 @@ class Application < ApplicationRecord
   end
 
   def constituent_must_have_disability
-    unless user&.has_disability_selected?
-      errors.add(:base, "At least one disability must be selected before submitting an application.")
-    end
+    return if user&.has_disability_selected?
+    errors.add(:base, 'At least one disability must be selected before submitting an application.')
   end
 
   def validate_disability?
     # Only validate when transitioning from draft to a submitted state
     # or when already in a submitted state
     return false if draft?
-    return true if status_changed? && status_was == "draft"
+    return true if status_changed? && status_was == 'draft'
     return true if submitted?
+
     false
   end
 end

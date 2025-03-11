@@ -1,15 +1,16 @@
+# User model that serves as the base class for all user types in the system
 class User < ApplicationRecord
   # Class methods
   def self.system_user
     @system_user ||= begin
-      user = User.find_or_create_by!(email: "system@example.com") do |u|
-        u.first_name = "System"
-        u.last_name = "User"
+      user = User.find_or_create_by!(email: 'system@example.com') do |u|
+        u.first_name = 'System'
+        u.last_name = 'User'
         u.password = SecureRandom.hex(32)
-        u.type = "Admin"
+        u.type = 'Admin'
         u.verified = true
       end
-      user.admin? ? user : user.tap { |u| u.update!(type: "Admin") }
+      user.admin? ? user : user.tap { |u| u.update!(type: 'Admin') }
     end
   end
 
@@ -30,21 +31,21 @@ class User < ApplicationRecord
   # Associations
   has_many :sessions, dependent: :destroy
   has_many :received_notifications,
-    class_name: "Notification",
-    foreign_key: :recipient_id,
-    dependent: :destroy
+           class_name: 'Notification',
+           foreign_key: :recipient_id,
+           dependent: :destroy
   has_many :applications, foreign_key: :user_id
   has_many :role_capabilities, dependent: :destroy
   # removed: has_many :activities, dependent: :destroy
 
   has_and_belongs_to_many :products,
-    join_table: "products_users"
+                          join_table: 'products_users'
 
   # Validations
   validates :password, length: { minimum: 8 }, if: -> { password.present? }
   validates :email, presence: true,
-    uniqueness: true,
-    format: { with: URI::MailTo::EMAIL_REGEXP }
+                    uniqueness: true,
+                    format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :first_name, :last_name, presence: true
   validates :reset_password_token, uniqueness: true, allow_nil: true
   validate :phone_number_must_be_valid
@@ -55,29 +56,29 @@ class User < ApplicationRecord
   # Class methods for capabilities
   def self.capable_types_for(capability)
     case capability
-    when "can_train"
-      [ "Admin", "Trainer" ]
-    when "can_evaluate"
-      [ "Admin", "Evaluator" ]
+    when 'can_train'
+      ['Admin', 'Trainer']
+    when 'can_evaluate'
+      ['Admin', 'Evaluator']
     else
       []
     end
   end
 
   # Scopes
-  scope :with_capability, ->(capability) {
+  scope :with_capability, lambda { |capability|
     joins(:role_capabilities)
       .where(role_capabilities: { capability: capability })
       .or(where(type: capable_types_for(capability)))
   }
-  scope :admins, -> { where(type: "Admin") }
-  scope :vendors, -> { where(type: "Vendor") }
+  scope :admins, -> { where(type: 'Admin') }
+  scope :vendors, -> { where(type: 'Vendor') }
   scope :ordered_by_name, -> { order(:first_name) }
   scope :locked, -> { where.not(locked_at: nil) }
 
   # Basic user information
   def full_name
-    [ first_name, last_name ].compact.join(" ")
+    [first_name, last_name].compact.join(' ')
   end
 
   # Role methods
@@ -177,11 +178,18 @@ class User < ApplicationRecord
     end
   end
 
-  def remove_capability(capability)
-    return true if !has_capability?(capability)
-    role_capabilities.find_by(capability: capability)&.destroy
+  def cached_capabilities
+    @cached_capabilities ||= {
+      available: available_capabilities_list,
+      inherent: inherent_capabilities_list,
+      preloaded: role_capabilities.to_a
+    }
   end
 
+  def remove_capability(capability)
+    return true unless has_capability?(capability)
+    role_capabilities.find_by(capability: capability)&.destroy
+  end
 
   private
 
@@ -193,62 +201,52 @@ class User < ApplicationRecord
     @loaded_capabilities = nil
   end
 
-  def cached_capabilities
-    @cached_capabilities ||= {
-      available: begin
-        base = RoleCapability::CAPABILITIES
-        base -= [ "can_evaluate" ] if evaluator? || admin?
-        base -= [ "can_train" ] if trainer? || admin?
-        base
-      end,
-      inherent: begin
-        caps = []
-        caps << "can_evaluate" if evaluator? || admin?
-        caps << "can_train" if trainer? || admin?
-        caps
-      end,
-      preloaded: role_capabilities.to_a
-    }
-  end
-
   def active_application
-    applications.where.not(status: "draft").order(created_at: :desc).first
-  end
-
-  def guardian_relationship=(value)
-    super(value)
+    applications.where.not(status: 'draft').order(created_at: :desc).first
   end
 
   def format_phone_number
     return if phone.blank?
 
     # Strip all non-digit characters
-    digits = phone.gsub(/\D/, "")
+    digits = phone.gsub(/\D/, '')
 
     # Remove leading '1' if present
-    digits = digits[1..-1] if digits.length == 11 && digits.start_with?("1")
+    digits = digits[1..] if digits.length == 11 && digits.start_with?('1')
 
-    # Format as XXX-XXX-XXXX if we have 10 digits
-    if digits.length == 10
-      self.phone = digits.gsub(/(\d{3})(\d{3})(\d{4})/, '\1-\2-\3')
-    else
-      # Keep the original input if invalid
-      self.phone = phone
-    end
+    # Format as XXX-XXX-XXXX if we have 10 digits or keep original
+    self.phone = if digits.length == 10
+                   digits.gsub(/(\d{3})(\d{3})(\d{4})/, '\1-\2-\3')
+                 else
+                   # Keep the original input if invalid
+                   phone
+                 end
   end
 
   def phone_number_must_be_valid
     return if phone.blank?
 
     # Strip all non-digit characters
-    digits = phone.gsub(/\D/, "")
+    digits = phone.gsub(/\D/, '')
 
     # Remove leading '1' if present
-    digits = digits[1..-1] if digits.length == 11 && digits.start_with?("1")
+    digits = digits[1..] if digits.length == 11 && digits.start_with?('1')
 
     # Validate that there are exactly 10 digits
-    if digits.length != 10
-      errors.add(:phone, "must be a valid 10-digit US phone number")
-    end
+    errors.add(:phone, 'must be a valid 10-digit US phone number') if digits.length != 10
+  end
+
+  def available_capabilities_list
+    base = RoleCapability::CAPABILITIES.dup
+    base -= ['can_evaluate'] if evaluator? || admin?
+    base -= ['can_train'] if trainer? || admin?
+    base
+  end
+
+  def inherent_capabilities_list
+    caps = []
+    caps << 'can_evaluate' if evaluator? || admin?
+    caps << 'can_train' if trainer? || admin?
+    caps
   end
 end

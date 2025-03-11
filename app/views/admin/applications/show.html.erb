@@ -372,22 +372,6 @@
       <%= render "attachments" %>
     </section>
 
-    <!-- Documents Section -->
-    <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="documents-title">
-      <h2 id="documents-title" class="text-xl font-semibold text-gray-900 mb-4">Documents</h2>
-      <% if @application.documents.any? %>
-        <ul class="list-disc list-inside space-y-2">
-          <% @application.documents.each do |document| %>
-            <li>
-              <%= link_to document.filename.to_s, url_for(document), target: "_blank", class: "text-indigo-600 hover:text-indigo-500" %>
-            </li>
-          <% end %>
-        </ul>
-      <% else %>
-        <span class="text-sm text-gray-500">No Documents Attached</span>
-      <% end %>
-    </section>
-
     <!-- Modals -->
     <%= render "modals" %>
 

@@ -2,7 +2,6 @@ module Users
   class Constituent < User
     # Associations
     has_many :applications, foreign_key: :user_id, dependent: :destroy
-    has_many :appointments, foreign_key: :user_id
     has_many :evaluations, foreign_key: :constituent_id
     has_many :assigned_evaluators, through: :evaluations, source: :evaluator
     # Removed unconditional validation: validate :must_have_at_least_one_disability
