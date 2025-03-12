@@ -2,8 +2,8 @@ class ApplicationMailer < ActionMailer::Base
   helper :mailer
 
   default(
-    from: "no_reply@mdmat.org",
-    reply_to: "no_reply@mdmat.org"
+    from: "no_reply@mdmat.org"
+    # Removing reply_to as it might be causing Postmark API issues
   )
 
   layout "mailer"
