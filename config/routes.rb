@@ -28,6 +28,14 @@ Rails.application.routes.draw do
   resource :profile, only: [ :edit, :update ], controller: "users"
   get "up", to: "rails/health#show", as: :rails_health_check
 
+  # Notifications
+  resources :notifications, only: [:index] do
+    member do
+      post :mark_as_read
+      post :check_email_status
+    end
+  end
+
   # Action Mailbox routes
   namespace :rails do
     namespace :action_mailbox do
