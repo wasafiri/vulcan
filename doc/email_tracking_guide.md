@@ -73,6 +73,27 @@ A rake task is provided for backfilling tracking data for existing notifications
 rails notification_tracking:backfill
 ```
 
+## Postmark Configuration Requirements
+
+For email tracking to work correctly, you need:
+
+1. **API Token**: Set the `POSTMARK_API_TOKEN` environment variable with a valid Postmark API token that has permission to access message analytics.
+
+2. **Open Tracking**: Ensure that open tracking is enabled in your Postmark account settings. This feature is now enabled in our application's configuration:
+
+   ```ruby
+   # in config/initializers/postmark_format.rb
+   def postmark_settings
+     {
+       return_response: true,
+       track_opens: true,  # Must be true to enable open tracking
+       track_links: "none"
+     }
+   end
+   ```
+
+3. **Webhook Setup** (Optional): For real-time updates, you can configure Postmark webhooks to notify your application about delivery events. See Postmark documentation for details.
+
 ## Debugging
 
 Email delivery and tracking issues can be debugged by:

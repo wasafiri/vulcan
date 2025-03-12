@@ -5,9 +5,9 @@ if defined?(ActionMailer::Base)
   ActionMailer::Base.instance_eval do
     def postmark_settings
       {
-        # These settings prevent Postmark from adding unnecessary headers
+        # Enable necessary features for email tracking while keeping payload clean
         return_response: true,
-        track_opens: false,
+        track_opens: true,  # Enable open tracking for delivery confirmation
         track_links: "none"
       }
     end
