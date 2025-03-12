@@ -55,13 +55,31 @@ module Applications
     end
 
     def create_notification(timestamp)
+      # Check for existing notification with this request count
+      request_count = application.medical_certification_request_count
+      existing_notification = Notification.find_by(
+        recipient: application.user,
+        action: "medical_certification_requested",
+        notifiable: application,
+        metadata: { "request_count" => request_count }
+      )
+      
+      if existing_notification
+        # Log the attempt to create a duplicate
+        Rails.logger.warn "Prevented duplicate notification for Application ##{application.id} request_count=#{request_count}"
+        
+        # Return the existing notification
+        return existing_notification
+      end
+      
+      # No duplicate found, create a new notification
       notification = Notification.create!(
         recipient: application.user,
         actor: actor,
         action: "medical_certification_requested",
         notifiable: application,
         metadata: {
-          request_count: application.medical_certification_request_count,
+          request_count: request_count,
           timestamp: timestamp.iso8601,
           provider: application.medical_provider_name,
           provider_email: application.medical_provider_email

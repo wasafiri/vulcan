@@ -102,6 +102,32 @@ Email delivery and tracking issues can be debugged by:
 2. Using the `UpdateEmailStatusJob` to manually check status
 3. Examining the notification records for tracking information
 
+## Handling Duplicate Notifications
+
+When the backfill task is run, it may create duplicate notification records with placeholder message IDs in the format `backfilled-ID-TIMESTAMP`. This can result in a discrepancy between:
+
+1. The actual number of emails sent (tracked in `Application.medical_certification_request_count`)
+2. The number of notification records in the database
+
+To prevent this:
+
+- The `MedicalCertificationService` now includes duplicate detection logic that checks for existing notifications with the same request count
+- For applications with existing duplicates, run the fix task:
+  ```
+  rails notification_tracking:fix_duplicates[APPLICATION_ID]
+  ```
+
+The fix task will:
+1. Identify notifications with duplicate request counts
+2. Keep the notification with a real (non-backfilled) message ID if available, otherwise keep the oldest
+3. Remove duplicate notifications
+4. Ensure the application's `medical_certification_request_count` matches the actual notification count
+
+You can also use the diagnostic task to analyze discrepancies without making changes:
+```
+rails notification_tracking:analyze[APPLICATION_ID]
+```
+
 ## Integration With Other Email Types
 
 To add tracking to other types of emails:
