@@ -1,5 +1,4 @@
 class ApplicationNotificationsMailer < ApplicationMailer
-  use_message_stream :notifications
   include Rails.application.routes.url_helpers
   include Mailers::ApplicationNotificationsHelper
 
@@ -39,7 +38,8 @@ class ApplicationNotificationsMailer < ApplicationMailer
       to: @user.email,
       subject: subject_line,
       template_path: "application_notifications_mailer",
-      template_name: template_name
+      template_name: template_name,
+      message_stream: "notifications"
     )
 
     Rails.logger.info "Email body: #{mail_obj.body}"
@@ -88,7 +88,8 @@ class ApplicationNotificationsMailer < ApplicationMailer
       to: @user.email,
       subject: "Important: Application Status Update",
       template_path: "application_notifications_mailer",
-      template_name: "max_rejections_reached"
+      template_name: "max_rejections_reached",
+      message_stream: "notifications"
     )
 
     Rails.logger.info "Email body: #{mail_obj.body}"
@@ -120,7 +121,8 @@ class ApplicationNotificationsMailer < ApplicationMailer
       to: @admin.email,
       subject: "Reminder: Applications Awaiting Proof Review",
       template_path: "application_notifications_mailer",
-      template_name: "proof_needs_review_reminder"
+      template_name: "proof_needs_review_reminder",
+      message_stream: "notifications"
     )
 
     Rails.logger.info "Email body: #{mail_obj.body}"
@@ -140,7 +142,8 @@ class ApplicationNotificationsMailer < ApplicationMailer
 
     mail(
       to: @constituent.email,
-      subject: "Your MAT Application Account Has Been Created"
+      subject: "Your MAT Application Account Has Been Created",
+      message_stream: "notifications"
     )
   end
 
@@ -156,7 +159,8 @@ class ApplicationNotificationsMailer < ApplicationMailer
 
     mail(
       to: @constituent.email,
-      subject: "Important Information About Your MAT Application"
+      subject: "Important Information About Your MAT Application",
+      message_stream: "notifications"
     )
   end
 
@@ -168,7 +172,8 @@ class ApplicationNotificationsMailer < ApplicationMailer
 
     mail(
       to: @constituent.email,
-      subject: "Error Processing Your Proof Submission"
+      subject: "Error Processing Your Proof Submission",
+      message_stream: "notifications"
     )
   end
 end

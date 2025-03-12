@@ -1,5 +1,4 @@
 class TrainingSessionNotificationsMailer < ApplicationMailer
-  use_message_stream :notifications
   def trainer_assigned(training_session)
     @training_session = training_session
     @constituent = training_session.constituent
@@ -9,7 +8,8 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     # Send email to trainer
     mail(
       to: @trainer.email,
-      subject: "New Training Assignment - Application ##{@application.id}"
+      subject: "New Training Assignment - Application ##{@application.id}",
+      message_stream: "notifications"
     )
   rescue => e
     Event.create!(
@@ -50,7 +50,11 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     subject, body = template.render(**variables)
     @rendered_body = body # Make the body available to the view
 
-    mail(to: @constituent.email, subject: subject)
+    mail(
+      to: @constituent.email, 
+      subject: subject,
+      message_stream: "notifications"
+    )
   rescue => e
     Event.create!(
       user: @trainer,
@@ -91,7 +95,11 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     subject, body = template.render(**variables)
     @rendered_body = body # Make the body available to the view
 
-    mail(to: @constituent.email, subject: subject)
+    mail(
+      to: @constituent.email, 
+      subject: subject,
+      message_stream: "notifications"
+    )
   rescue => e
     Event.create!(
       user: @trainer,
@@ -132,7 +140,11 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     subject, body = template.render(**variables)
     @rendered_body = body # Make the body available to the view
 
-    mail(to: @constituent.email, subject: subject)
+    mail(
+      to: @constituent.email, 
+      subject: subject,
+      message_stream: "notifications"
+    )
   rescue => e
     Event.create!(
       user: @trainer,
@@ -174,7 +186,11 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     subject, body = template.render(**variables)
     @rendered_body = body # Make the body available to the view
 
-    mail(to: @constituent.email, subject: subject)
+    mail(
+      to: @constituent.email, 
+      subject: subject,
+      message_stream: "notifications"
+    )
   rescue => e
     Event.create!(
       user: @trainer,

@@ -1,5 +1,4 @@
 class VendorNotificationsMailer < ApplicationMailer
-  use_message_stream :transactional
   def invoice_generated(invoice)
     @invoice = invoice
     @vendor = invoice.vendor
@@ -9,7 +8,8 @@ class VendorNotificationsMailer < ApplicationMailer
 
     mail(
       to: @vendor.email,
-      subject: "New Invoice Generated - #{@invoice.invoice_number}"
+      subject: "New Invoice Generated - #{@invoice.invoice_number}",
+      message_stream: "outbound"
     )
   end
 
@@ -19,7 +19,8 @@ class VendorNotificationsMailer < ApplicationMailer
 
     mail(
       to: @vendor.email,
-      subject: "Payment Issued for Invoice #{@invoice.invoice_number}"
+      subject: "Payment Issued for Invoice #{@invoice.invoice_number}",
+      message_stream: "outbound"
     )
   end
 
@@ -28,7 +29,8 @@ class VendorNotificationsMailer < ApplicationMailer
 
     mail(
       to: @vendor.email,
-      subject: "W9 Form Approved"
+      subject: "W9 Form Approved",
+      message_stream: "outbound"
     )
   end
 
@@ -38,7 +40,8 @@ class VendorNotificationsMailer < ApplicationMailer
 
     mail(
       to: @vendor.email,
-      subject: "W9 Form Requires Attention"
+      subject: "W9 Form Requires Attention",
+      message_stream: "outbound"
     )
   end
 
@@ -48,7 +51,8 @@ class VendorNotificationsMailer < ApplicationMailer
 
     mail(
       to: @vendor.email,
-      subject: "W9 Form Expiring Soon"
+      subject: "W9 Form Expiring Soon",
+      message_stream: "outbound"
     )
   end
 
@@ -57,7 +61,8 @@ class VendorNotificationsMailer < ApplicationMailer
 
     mail(
       to: @vendor.email,
-      subject: "W9 Form Has Expired - Action Required"
+      subject: "W9 Form Has Expired - Action Required",
+      message_stream: "outbound"
     )
   end
 

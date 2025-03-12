@@ -42,7 +42,7 @@ class TrainingSessionNotificationsMailerTest < ActionMailer::TestCase
     TrainingSessionNotificationsMailer.any_instance.stubs(:deliver_notifications).returns(true)
 
     # Create a template for the test
-    template = EmailTemplate.find_or_create_by!(
+    EmailTemplate.find_or_create_by!(
       name: "training_scheduled"
     ) do |t|
       t.subject = "Training Session Scheduled"
@@ -67,7 +67,7 @@ class TrainingSessionNotificationsMailerTest < ActionMailer::TestCase
     TrainingSessionNotificationsMailer.any_instance.stubs(:deliver_notifications).returns(true)
 
     # Create a template for the test
-    template = EmailTemplate.find_or_create_by!(
+    EmailTemplate.find_or_create_by!(
       name: "training_completed"
     ) do |t|
       t.subject = "Training Session Completed"

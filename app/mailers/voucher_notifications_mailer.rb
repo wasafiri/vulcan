@@ -1,5 +1,4 @@
 class VoucherNotificationsMailer < ApplicationMailer
-  use_message_stream :notifications
   include Rails.application.routes.url_helpers
 
   def self.default_url_options
@@ -20,7 +19,8 @@ class VoucherNotificationsMailer < ApplicationMailer
       to: @user.email,
       subject: subject,
       template_path: "voucher_notifications_mailer",
-      template_name: template_name
+      template_name: template_name,
+      message_stream: "notifications"
     )
 
     Rails.logger.info "Email body: #{mail_obj.body}"
@@ -81,7 +81,8 @@ class VoucherNotificationsMailer < ApplicationMailer
       to: @user.email,
       subject: "Your Voucher Has Been Redeemed",
       template_path: "voucher_notifications_mailer",
-      template_name: "voucher_redeemed"
+      template_name: "voucher_redeemed",
+      message_stream: "notifications"
     )
 
     Rails.logger.info "Email body: #{mail_obj.body}"
