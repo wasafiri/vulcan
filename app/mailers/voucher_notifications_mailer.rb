@@ -1,4 +1,5 @@
 class VoucherNotificationsMailer < ApplicationMailer
+  use_message_stream :notifications
   include Rails.application.routes.url_helpers
 
   def self.default_url_options

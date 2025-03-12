@@ -1,4 +1,5 @@
 class TrainingSessionNotificationsMailer < ApplicationMailer
+  use_message_stream :notifications
   def trainer_assigned(training_session)
     @training_session = training_session
     @constituent = training_session.constituent

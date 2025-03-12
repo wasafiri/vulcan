@@ -1,4 +1,5 @@
 class UserMailer < ApplicationMailer
+  use_message_stream :transactional
   def password_reset
     @user = params[:user]
     @token = @user.generate_token_for(:password_reset)

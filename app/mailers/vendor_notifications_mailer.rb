@@ -1,4 +1,5 @@
 class VendorNotificationsMailer < ApplicationMailer
+  use_message_stream :transactional
   def invoice_generated(invoice)
     @invoice = invoice
     @vendor = invoice.vendor

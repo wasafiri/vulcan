@@ -1,4 +1,5 @@
 class EvaluatorMailer < ApplicationMailer
+  use_message_stream :notifications
   def new_evaluation_assigned
     @evaluation = params[:evaluation]
     @evaluator = @evaluation.evaluator

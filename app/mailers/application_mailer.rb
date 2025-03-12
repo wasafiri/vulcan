@@ -1,4 +1,5 @@
 class ApplicationMailer < ActionMailer::Base
+  include MessageStreamable
   helper :mailer
 
   default(

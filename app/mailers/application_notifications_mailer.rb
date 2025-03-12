@@ -1,4 +1,5 @@
 class ApplicationNotificationsMailer < ApplicationMailer
+  use_message_stream :notifications
   include Rails.application.routes.url_helpers
   include Mailers::ApplicationNotificationsHelper
 
