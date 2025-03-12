@@ -22,11 +22,11 @@ module Applications
           increment_request_count(current_time)
         end
         
-        # Create notification outside the main transaction
-        create_notification(current_time)
+        # Create notification for tracking
+        notification = create_notification(current_time)
         
-        # Send email
-        send_email
+        # Send email with notification for tracking
+        send_email(notification)
         
         true
       rescue StandardError => e
@@ -55,27 +55,34 @@ module Applications
     end
 
     def create_notification(timestamp)
-      Notification.create!(
+      notification = Notification.create!(
         recipient: application.user,
         actor: actor,
         action: "medical_certification_requested",
         notifiable: application,
         metadata: {
           request_count: application.medical_certification_request_count,
-          timestamp: timestamp.iso8601
+          timestamp: timestamp.iso8601,
+          provider: application.medical_provider_name,
+          provider_email: application.medical_provider_email
         }
       )
+      
+      # Return the notification for use in email tracking
+      notification
     rescue StandardError => e
       # Log but don't fail the process
       log_error(e, "Failed to create notification")
+      nil
     end
 
-    def send_email
+    def send_email(notification)
       # Queue email delivery to background job instead of immediate delivery
       # This prevents email failures from blocking the request process
       MedicalCertificationEmailJob.perform_later(
         application_id: application.id,
-        timestamp: Time.current.iso8601
+        timestamp: Time.current.iso8601,
+        notification_id: notification&.id
       )
     rescue StandardError => e
       # Still log the error if job enqueuing fails

@@ -16,9 +16,14 @@ namespace :notification_tracking do
       print "Processing notification #{processed}/#{total}... "
       
       # Skip if the notification doesn't have the right metadata
-      unless notification.notifiable.is_a?(Application) && 
-             notification.metadata&.dig("provider_email").present?
-        puts "SKIPPED (missing data)"
+      if !notification.notifiable.is_a?(Application)
+        puts "SKIPPED (not an application)"
+        next
+      end
+      
+      application = notification.notifiable
+      if !application.medical_provider_email.present?
+        puts "SKIPPED (no provider email)"
         next
       end
       
