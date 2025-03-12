@@ -4,10 +4,10 @@
 if defined?(Postmark::HttpClient)
   module PostmarkDebugger
     def post(path, data = {})
-      # Log the data being sent to Postmark
-      Rails.logger.info "POSTMARK PAYLOAD: #{data.to_json}"
+      # Log the original data being sent to Postmark
+      Rails.logger.info "POSTMARK PAYLOAD (ORIGINAL): #{data.to_json}"
       
-      # If this is an email, attempt to simplify the payload to match our successful curl request
+      # If this is an email, simplify the payload to match our successful curl request
       if path == '/email' && data.is_a?(Hash)
         # Ensure MessageStream is a top-level parameter, not a header
         if data['Headers']&.any? { |h| h['Name'] == 'X-PM-Message-Stream' }
@@ -31,16 +31,19 @@ if defined?(Postmark::HttpClient)
         end
         
         # Log the modified payload
-        Rails.logger.info "MODIFIED POSTMARK PAYLOAD: #{data.to_json}"
+        Rails.logger.info "POSTMARK PAYLOAD (MODIFIED): #{data.to_json}"
       end
       
+      # Call the original method
       super
     end
     
-    # Also intercept the handle_response method to log errors in detail
+    # Simple error logging without trying to inspect the response type
     def handle_response(response)
       begin
-        super
+        result = super
+        Rails.logger.info "POSTMARK SUCCESS: Email sent successfully"
+        result
       rescue => e
         Rails.logger.error "POSTMARK ERROR: #{e.class} - #{e.message}"
         raise
