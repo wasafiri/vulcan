@@ -115,7 +115,7 @@ class ProofReview < ApplicationRecord
 
     mail = ApplicationNotificationsMailer.send(mail_method, application, self)
     Rails.logger.info "Generated mail with subject: #{mail.subject}"
-    mail.deliver_now
+    mail.deliver_later
     Rails.logger.info "Successfully sent #{action_name} email to User ID: #{application.user.id}"
   rescue StandardError => e
     Rails.logger.error "Failed to send #{action_name} email: #{e.message}\n#{e.backtrace.join("\n")}"
@@ -143,7 +143,7 @@ class ProofReview < ApplicationRecord
       end
       if application.total_rejections > 8
         application.update!(status: :archived)
-        ApplicationNotificationsMailer.max_rejections_reached(application).deliver_now
+        ApplicationNotificationsMailer.max_rejections_reached(application).deliver_later
       end
     end
   rescue StandardError => e

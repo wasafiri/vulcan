@@ -9,7 +9,7 @@ class UserMailerTest < ActionMailer::TestCase
     email = UserMailer.with(user: @user).password_reset
 
     assert_emails 1 do
-      email.deliver_now
+      email.deliver_later
     end
 
     assert_equal [ "no_reply@mdmat.org" ], email.from
@@ -34,7 +34,7 @@ class UserMailerTest < ActionMailer::TestCase
     email = UserMailer.with(user: @user).email_verification
 
     assert_emails 1 do
-      email.deliver_now
+      email.deliver_later
     end
 
     assert_equal [ "no_reply@mdmat.org" ], email.from

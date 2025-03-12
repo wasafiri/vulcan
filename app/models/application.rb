@@ -185,7 +185,7 @@ class Application < ApplicationRecord
       EvaluatorMailer.with(
         evaluation: evaluation,
         constituent: user
-      ).new_evaluation_assigned.deliver_now
+      ).new_evaluation_assigned.deliver_later
     end
     true
   rescue ActiveRecord::RecordInvalid => e
@@ -209,7 +209,7 @@ class Application < ApplicationRecord
       )
 
       # Send email notification to the trainer with constituent contact info
-      TrainingSessionNotificationsMailer.trainer_assigned(training_session).deliver_now
+      TrainingSessionNotificationsMailer.trainer_assigned(training_session).deliver_later
     end
     true
   rescue ActiveRecord::RecordInvalid => e

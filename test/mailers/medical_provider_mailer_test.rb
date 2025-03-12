@@ -10,7 +10,7 @@ class MedicalProviderMailerTest < ActionMailer::TestCase
     email = MedicalProviderMailer.request_certification(@application)
 
     assert_emails 1 do
-      email.deliver_now
+      email.deliver_later
     end
 
     assert_equal [ "no_reply@mdmat.org" ], email.from

@@ -115,7 +115,7 @@ module ApplicationStatusManagement
     # Update certification status and send email
     with_lock do
       update!(medical_certification_status: :requested)
-      MedicalProviderMailer.request_certification(self).deliver_now
+      MedicalProviderMailer.request_certification(self).deliver_later
     end
   end
 end

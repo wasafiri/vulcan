@@ -6,7 +6,7 @@ class MedicalCertificationEmailJob < ApplicationJob
     Rails.logger.info "Processing medical certification email for application #{application_id}"
     
     application = Application.find(application_id)
-    MedicalProviderMailer.request_certification(application).deliver_now
+    MedicalProviderMailer.request_certification(application).deliver_later
     
     Rails.logger.info "Successfully sent medical certification email for application #{application_id}"
   rescue StandardError => e

@@ -14,7 +14,7 @@ class VoucherNotificationsMailerTest < ActionMailer::TestCase
     email = VoucherNotificationsMailer.voucher_assigned(@voucher)
 
     assert_emails 1 do
-      email.deliver_now
+      email.deliver_later
     end
 
     assert_equal [ "no_reply@mdmat.org" ], email.from
@@ -39,7 +39,7 @@ class VoucherNotificationsMailerTest < ActionMailer::TestCase
     email = VoucherNotificationsMailer.voucher_expiring_soon(@voucher)
 
     assert_emails 1 do
-      email.deliver_now
+      email.deliver_later
     end
 
     assert_equal [ "no_reply@mdmat.org" ], email.from
@@ -64,7 +64,7 @@ class VoucherNotificationsMailerTest < ActionMailer::TestCase
     email = VoucherNotificationsMailer.voucher_expired(@voucher)
 
     assert_emails 1 do
-      email.deliver_now
+      email.deliver_later
     end
 
     assert_equal [ "no_reply@mdmat.org" ], email.from
@@ -89,7 +89,7 @@ class VoucherNotificationsMailerTest < ActionMailer::TestCase
     email = VoucherNotificationsMailer.voucher_redeemed(@transaction)
 
     assert_emails 1 do
-      email.deliver_now
+      email.deliver_later
     end
 
     assert_equal [ "no_reply@mdmat.org" ], email.from

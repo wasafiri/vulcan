@@ -213,7 +213,7 @@ module ConstituentPortal
     def submit
       @application = current_user.applications.find(params[:id])
       if @application.update(submission_params.merge(status: :in_progress))
-        ApplicationNotificationsMailer.submission_confirmation(@application).deliver_now
+        ApplicationNotificationsMailer.submission_confirmation(@application).deliver_later
         redirect_to constituent_portal_application_path(@application),
                     notice: "Application submitted successfully!"
       else

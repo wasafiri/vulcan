@@ -34,7 +34,7 @@ module Evaluations
     end
 
     def notify_constituent
-      EvaluatorMailer.evaluation_submission_confirmation(@evaluation).deliver_now
+      EvaluatorMailer.evaluation_submission_confirmation(@evaluation).deliver_later
     end
 
     def update_application_status

@@ -12,7 +12,7 @@ class EvaluatorMailerTest < ActionMailer::TestCase
     email = EvaluatorMailer.with(evaluation: @evaluation).new_evaluation_assigned
 
     assert_emails 1 do
-      email.deliver_now
+      email.deliver_later
     end
 
     assert_equal [ "no_reply@mdmat.org" ], email.from
@@ -37,7 +37,7 @@ class EvaluatorMailerTest < ActionMailer::TestCase
     email = EvaluatorMailer.evaluation_submission_confirmation(@evaluation)
 
     assert_emails 1 do
-      email.deliver_now
+      email.deliver_later
     end
 
     assert_equal [ "no_reply@mdmat.org" ], email.from

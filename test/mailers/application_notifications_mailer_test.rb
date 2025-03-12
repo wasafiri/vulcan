@@ -18,7 +18,7 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     email = ApplicationNotificationsMailer.proof_approved(@application, @proof_review)
 
     assert_emails 1 do
-      email.deliver_now
+      email.deliver_later
     end
 
     assert_equal [ "no_reply@mdmat.org" ], email.from
@@ -44,7 +44,7 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     email = ApplicationNotificationsMailer.proof_rejected(@application, @proof_review)
 
     assert_emails 1 do
-      email.deliver_now
+      email.deliver_later
     end
 
     assert_equal [ "no_reply@mdmat.org" ], email.from
@@ -67,7 +67,7 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     email = ApplicationNotificationsMailer.max_rejections_reached(@application)
 
     assert_emails 1 do
-      email.deliver_now
+      email.deliver_later
     end
 
     assert_equal [ "no_reply@mdmat.org" ], email.from
@@ -97,7 +97,7 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     email = ApplicationNotificationsMailer.proof_needs_review_reminder(@admin, applications)
 
     assert_emails 1 do
-      email.deliver_now
+      email.deliver_later
     end
 
     assert_equal [ "no_reply@mdmat.org" ], email.from
@@ -130,7 +130,7 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     email = ApplicationNotificationsMailer.account_created(constituent, temp_password)
 
     assert_emails 1 do
-      email.deliver_now
+      email.deliver_later
     end
 
     assert_equal [ "no_reply@mdmat.org" ], email.from
@@ -173,7 +173,7 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     email = ApplicationNotificationsMailer.income_threshold_exceeded(constituent_params, notification_params)
 
     assert_emails 1 do
-      email.deliver_now
+      email.deliver_later
     end
 
     assert_equal [ "no_reply@mdmat.org" ], email.from

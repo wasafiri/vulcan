@@ -11,7 +11,7 @@ class ProofReviewReminderJob < ApplicationJob
     # For now, send to all admins
     User.where(type: "Admin").find_each do |admin|
       ApplicationNotificationsMailer.proof_needs_review_reminder(admin, stale_applications)
-        .deliver_now
+        .deliver_later
     end
   end
 end

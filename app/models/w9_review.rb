@@ -75,9 +75,9 @@ class W9Review < ApplicationRecord
 
   def send_notification(action)
     if action == "w9_rejected"
-      VendorNotificationsMailer.w9_rejected(vendor, self).deliver_now
+      VendorNotificationsMailer.w9_rejected(vendor, self).deliver_later
     else
-      VendorNotificationsMailer.w9_approved(vendor).deliver_now
+      VendorNotificationsMailer.w9_approved(vendor).deliver_later
     end
   rescue StandardError => e
     Rails.logger.error "Failed to send #{action} email: #{e.message}\n#{e.backtrace.join("\n")}"

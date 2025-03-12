@@ -6,7 +6,7 @@ class MessageStreamTest < ActionMailer::TestCase
     constituent = users(:constituent)
     temp_password = "tempPassword123"
     
-    email = ApplicationNotificationsMailer.account_created(constituent, temp_password).deliver_now
+    email = ApplicationNotificationsMailer.account_created(constituent, temp_password).deliver_later
     
     assert_equal 'notifications', email.header['X-PM-Message-Stream'].value
   end
@@ -14,7 +14,7 @@ class MessageStreamTest < ActionMailer::TestCase
   test "transactional mailer uses correct message stream" do
     user = users(:admin)
     
-    email = UserMailer.with(user: user).password_reset.deliver_now
+    email = UserMailer.with(user: user).password_reset.deliver_later
     
     assert_equal 'outbound', email.header['X-PM-Message-Stream'].value
   end

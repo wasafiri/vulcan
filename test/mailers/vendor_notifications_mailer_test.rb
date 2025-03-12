@@ -18,7 +18,7 @@ class VendorNotificationsMailerTest < ActionMailer::TestCase
     email = VendorNotificationsMailer.payment_issued(@invoice)
 
     assert_emails 1 do
-      email.deliver_now
+      email.deliver_later
     end
 
     assert_equal [ "no_reply@mdmat.org" ], email.from
@@ -43,7 +43,7 @@ class VendorNotificationsMailerTest < ActionMailer::TestCase
     email = VendorNotificationsMailer.w9_approved(@vendor)
 
     assert_emails 1 do
-      email.deliver_now
+      email.deliver_later
     end
 
     assert_equal [ "no_reply@mdmat.org" ], email.from
@@ -69,7 +69,7 @@ class VendorNotificationsMailerTest < ActionMailer::TestCase
     email = VendorNotificationsMailer.w9_rejected(@vendor, review)
 
     assert_emails 1 do
-      email.deliver_now
+      email.deliver_later
     end
 
     assert_equal [ "no_reply@mdmat.org" ], email.from
