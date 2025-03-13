@@ -101,8 +101,10 @@ class ProofReview < ApplicationRecord
     end
   end
 
-  # DRY method to create a notification record and send the email
+  # Creates a notification record and sends the email
+  # Notification failures don't interrupt the proof review process
   def send_notification(action_name, mail_method, metadata)
+    # First create the notification record
     notification = Notification.create!(
       recipient: application.user,
       actor: admin,
@@ -110,15 +112,14 @@ class ProofReview < ApplicationRecord
       notifiable: application,
       metadata: metadata
     )
-    Rails.logger.info "Created notification ID: #{notification.id}"
 
-    mail = ApplicationNotificationsMailer.send(mail_method, application, self)
-    Rails.logger.info "Generated mail with subject: #{mail.subject}"
-    mail.deliver_later
-    Rails.logger.info "Successfully sent #{action_name} email to User ID: #{application.user.id}"
+    # Send the email notification
+    # Important: We call deliver_later directly with the method 
+    # since ActionMailer only serializes arguments, not the mail object
+    ApplicationNotificationsMailer.send(mail_method, application, self).deliver_later
   rescue StandardError => e
-    Rails.logger.error "Failed to send #{action_name} email: #{e.message}\n#{e.backtrace.join("\n")}"
-    raise
+    Rails.logger.error "Failed to send #{action_name} email: #{e.message}"
+    # Don't re-raise - notification errors shouldn't fail the whole operation
   end
 
   def increment_rejections_if_rejected

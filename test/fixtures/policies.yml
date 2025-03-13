@@ -1,0 +1,116 @@
+# FPL (Federal Poverty Level) policy settings
+fpl_1_person:
+  key: fpl_1_person
+  value: 15000
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+fpl_2_person:
+  key: fpl_2_person
+  value: 24000
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+fpl_3_person:
+  key: fpl_3_person
+  value: 30000
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+fpl_4_person:
+  key: fpl_4_person
+  value: 36000
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+fpl_5_person:
+  key: fpl_5_person
+  value: 42000
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+fpl_6_person:
+  key: fpl_6_person
+  value: 48000
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+fpl_7_person:
+  key: fpl_7_person
+  value: 54000
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+fpl_8_person:
+  key: fpl_8_person
+  value: 60000
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+# Modifier percentage (used to calculate income threshold)
+fpl_modifier_percentage:
+  key: fpl_modifier_percentage
+  value: 200
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+# Other policy settings
+proof_submission_rate_limit_web:
+  key: proof_submission_rate_limit_web
+  value: 10
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+proof_submission_rate_limit_email:
+  key: proof_submission_rate_limit_email
+  value: 5
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+proof_submission_rate_period:
+  key: proof_submission_rate_period
+  value: 24
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+voucher_validity_period_months:
+  key: voucher_validity_period_months
+  value: 6
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+voucher_minimum_redemption_amount:
+  key: voucher_minimum_redemption_amount
+  value: 10
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+voucher_value_hearing_disability:
+  key: voucher_value_hearing_disability
+  value: 1000
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+voucher_value_vision_disability:
+  key: voucher_value_vision_disability
+  value: 800
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+voucher_value_speech_disability:
+  key: voucher_value_speech_disability
+  value: 800
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+voucher_value_mobility_disability:
+  key: voucher_value_mobility_disability
+  value: 1200
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+voucher_value_cognition_disability:
+  key: voucher_value_cognition_disability
+  value: 1000
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>

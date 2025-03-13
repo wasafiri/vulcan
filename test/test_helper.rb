@@ -11,6 +11,7 @@ require "support/notification_delivery_stub"
 require "support/authentication_test_helper"
 require "support/flash_test_helper"
 require "support/form_test_helper"
+require "support/active_storage_helper"
 
 # Configure Webdrivers gem for system tests
 Webdrivers.cache_time = 86_400 # Cache drivers for one day
@@ -61,6 +62,7 @@ module ActiveSupport
     include AuthenticationTestHelper
     include FlashTestHelper
     include FormTestHelper
+    include ActiveStorageHelper
 
     def assert_enqueued_email_with(mailer_class, method_name, args: nil)
       block_result = nil

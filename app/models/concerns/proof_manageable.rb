@@ -49,6 +49,43 @@ module ProofManageable
     Rails.logger.error "Failed to update proof status: #{e.message}"
     false
   end
+  
+  # Special method for updating to rejected status that bypasses validations
+  # This is needed for paper applications where we reject without attachment
+  def reject_proof_without_attachment!(proof_type, admin:, reason: 'other', notes: 'Rejected during application submission')
+    attr_name = "#{proof_type}_proof_status"
+    
+    begin
+      transaction do
+        # First create the review
+        proof_review = proof_reviews.create!(
+          admin: admin,
+          proof_type: proof_type,
+          status: :rejected,
+          rejection_reason: reason,
+          notes: notes,
+          submission_method: :paper,
+          reviewed_at: Time.current
+        )
+        
+        # Then update the status directly in the database to bypass validations
+        # This is key - we use update_column to skip validations that would otherwise
+        # prevent rejected proofs without attachments
+        update_column(attr_name, Application.public_send("#{attr_name.pluralize}").fetch(:rejected))
+      end
+      
+      # Reload to get latest state
+      reload
+      
+      # If we reached here, there was no exception, so return true
+      return true
+      
+    rescue => e
+      Rails.logger.error "Failed to reject proof without attachment: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      return false
+    end
+  end
 
   def purge_proofs(admin_user)
     raise ArgumentError, "Admin user required" unless admin_user&.admin?
@@ -105,9 +142,10 @@ module ProofManageable
     end
   end
   
-  # Verifies that proofs marked as approved actually have their files attached
+  # Verifies that proofs have the right attachment state based on status
   def verify_proof_attachments
     # This validation runs for ALL applications, including paper applications
+    # Check approved proofs - they must have an attachment
     if income_proof_status_approved? && !income_proof.attached?
       # Log the error for debugging purposes
       Rails.logger.error("Income proof marked as approved but no file is attached for application #{id}")
@@ -119,6 +157,11 @@ module ProofManageable
       Rails.logger.error("Residency proof marked as approved but no file is attached for application #{id}")
       errors.add(:residency_proof, "must be attached when status is approved")
     end
+    
+    # We deliberately do NOT validate attachments for rejected proofs
+    # This is because paper applications can be rejected without any file attachment
+    # In the case of paper applications, the rejection happens at the point of submission
+    # For online applications, the rejected proof may still have an attachment, but it's not required
   end
 
   def set_proof_status_to_unreviewed
