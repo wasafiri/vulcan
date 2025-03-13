@@ -15,9 +15,9 @@ class MedicalProviderMailer < ApplicationMailer
 
     # Record the message ID if we have a notification to track
     if @notification.present? && response.delivery_method.is_a?(Mail::Postmark) && 
-       message.delivery_handler.response.present?
+       response.delivery_handler.response.present?
       begin
-        message_id = message.delivery_handler.response['MessageID']
+        message_id = response.delivery_handler.response['MessageID']
         if message_id.present?
           @notification.update(message_id: message_id)
           UpdateEmailStatusJob.set(wait: 1.minute).perform_later(@notification.id)
