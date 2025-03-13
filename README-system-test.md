@@ -41,7 +41,10 @@ When running in CI (GitHub Actions), the system tests use a similar configuratio
 
 1. **Tests hanging**: Check for orphaned Chrome processes and kill them:
    ```bash
-   pkill -f '(chrome)?(--headless)'
+   # Only target Chrome for Testing, not regular Chrome
+   pkill -TERM -f 'Chrome for Testing'  # Try graceful shutdown first
+   sleep 1
+   pkill -f 'Chrome for Testing'        # Then force if needed
    ```
 
 2. **Element not found**: Increase wait time by using explicit waits:

@@ -1,12 +1,14 @@
 require "test_helper"
 require "support/system_test_helpers"
+require "support/system_test_authentication"
 
 class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   include VoucherTestHelper
   include SystemTestHelpers
+  include SystemTestAuthentication
 
   # Use standard headless Chrome driver
-  driven_by :headless_chrome, screen_size: [1400, 1400]
+  driven_by :selenium, using: :headless_chrome
 
   def setup
     # Reset the Capybara session before each test
@@ -66,9 +68,42 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
           # If quit fails, try to at least clear the session
           Capybara.reset_sessions! rescue nil
           
-          # Last resort - kill chrome processes (Mac only)
+          # Safely clean up only Chrome for Testing processes
           if RUBY_PLATFORM =~ /darwin/
-            system("pkill -f '(chrome)?(--headless)' || true")
+            # First check if regular Chrome is running
+            regular_chrome = `pgrep -f "Google Chrome$" | wc -l`.strip.to_i
+            had_regular_chrome = regular_chrome > 0
+            
+            # Try SIGTERM first for graceful shutdown
+            system("pkill -TERM -f 'Google Chrome for Testing' > /dev/null 2>&1 || true")
+            sleep 2
+            
+            # Only force kill if still running
+            test_chrome_count = `pgrep -f "Google Chrome for Testing" | wc -l`.strip.to_i
+            if test_chrome_count > 0
+              puts "Chrome for Testing still running after SIGTERM, using force kill..."
+              system("pkill -9 -f 'Google Chrome for Testing' > /dev/null 2>&1 || true")
+            end
+            
+            # Same approach for ChromeDriver
+            system("pkill -TERM -f 'chromedriver.*testing' > /dev/null 2>&1 || true")
+            sleep 1
+            system("pkill -9 -f 'chromedriver.*testing' > /dev/null 2>&1 || true")
+            
+            # Verify regular Chrome wasn't affected
+            if had_regular_chrome
+              after_chrome = `pgrep -f "Google Chrome$" | wc -l`.strip.to_i
+              if after_chrome > 0
+                puts "✓ Regular Chrome browser preserved during teardown"
+              else
+                puts "! Warning: Regular Chrome browser may have been affected"
+              end
+            end
+          elsif RUBY_PLATFORM =~ /linux/
+            # Linux version
+            system("pkill -TERM -f 'chrome.*for.*testing' > /dev/null 2>&1 || true")
+            sleep 2
+            system("pkill -9 -f 'chrome.*for.*testing' > /dev/null 2>&1 || true")
           end
         end
       else

@@ -4,12 +4,17 @@ require "rails/test_help"
 require "minitest/mock"
 require "mocha/minitest"
 require "capybara/rails"
+require "webdrivers" # Load webdrivers for Chrome/ChromeDriver management
 require "support/voucher_test_helper"
 require "support/mailer_test_helper"
 require "support/notification_delivery_stub"
 require "support/authentication_test_helper"
 require "support/flash_test_helper"
 require "support/form_test_helper"
+
+# Configure Webdrivers gem for system tests
+Webdrivers.cache_time = 86_400 # Cache drivers for one day
+Webdrivers.install_dir = File.join(Dir.home, '.webdrivers')
 require "support/capybara_config"
 
 # Load test-specific controllers and routes for webhooks
