@@ -7,46 +7,45 @@ class Admin::PaperApplicationsController < Admin::BaseController
   end
 
   def create
-    ActiveRecord::Base.transaction do
-      # Check if constituent already has an active application
-      if (existing_constituent = find_existing_constituent(constituent_params))
-        if existing_constituent.active_application?
-          flash[:alert] = "This constituent already has an active application."
-          return render :new, status: :unprocessable_entity
+    service = Applications::PaperApplicationService.new(
+      params: paper_application_params,
+      admin: current_user
+    )
+
+    if service.create
+      # Check if any proofs were rejected and add more detailed notice
+      if service.application.proof_reviews.where(status: :rejected).any?
+        rejected_proofs = []
+        rejected_proofs << "income" if service.application.income_proof_status_rejected?
+        rejected_proofs << "residency" if service.application.residency_proof_status_rejected?
+        
+        if rejected_proofs.any?
+          notice_message = "Paper application successfully submitted with #{rejected_proofs.length} rejected "
+          notice_message += rejected_proofs.length == 1 ? "proof" : "proofs"
+          notice_message += ": #{rejected_proofs.join(' and ')}. Notifications will be sent."
+        else
+          notice_message = "Paper application successfully submitted."
         end
-        @constituent = existing_constituent
       else
-        # Create new constituent with a temporary password
-        @constituent = create_new_constituent(constituent_params)
+        notice_message = "Paper application successfully submitted."
       end
-
-      # Create application
-      @application = @constituent.applications.new(application_params)
-      @application.submission_method = :paper
-      @application.application_date = Time.current
-      @application.status = :in_progress
-
-      # Validate income threshold
-      unless income_within_threshold?(@application.household_size, @application.annual_income)
-        flash[:alert] = "Income exceeds the maximum threshold for the household size."
-        return render :new, status: :unprocessable_entity
-      end
-
-      # Handle proof uploads and rejections
-      handle_proof_uploads(@application)
-
-      if @application.save
-        # Send notifications for rejected proofs if any
-        send_proof_rejection_notifications(@application)
-
-        redirect_to admin_application_path(@application), notice: "Paper application successfully submitted."
+      
+      redirect_to admin_application_path(service.application), notice: notice_message
+    else
+      if params[:income_proof].present? || params[:residency_proof].present?
+        # Add message about preserving attachments
+        flash.now[:alert] = "#{service.errors.first} Your uploaded files have been preserved." if service.errors.any?
       else
-        render :new, status: :unprocessable_entity
+        # Regular error message
+        flash.now[:alert] = service.errors.first if service.errors.any?
       end
+      
+      @paper_application = {
+        application: service.application || Application.new,
+        constituent: service.constituent || Constituent.new
+      }
+      render :new, status: :unprocessable_entity
     end
-  rescue ActiveRecord::RecordInvalid => e
-    flash.now[:alert] = "Error: #{e.message}"
-    render :new, status: :unprocessable_entity
   end
 
   def fpl_thresholds
@@ -99,169 +98,47 @@ class Admin::PaperApplicationsController < Admin::BaseController
 
   private
 
-  def find_existing_constituent(params)
-    # Try to find existing constituent by email or phone
-    constituent = Constituent.find_by(email: params[:email]) if params[:email].present?
-    constituent ||= Constituent.find_by(phone: params[:phone]) if params[:phone].present?
-    constituent
-  end
-
-  def create_new_constituent(params)
-    # Generate a secure random password
-    temp_password = SecureRandom.hex(8)
-
-    # Create the constituent with the temporary password
-    constituent = Constituent.new(params)
-    constituent.password = temp_password
-    constituent.password_confirmation = temp_password
-    constituent.verified = true # Mark as verified since admin is creating it
-    constituent.save!
-
-    # Send account creation notification with the temporary password
-    ApplicationNotificationsMailer.account_created(constituent, temp_password).deliver_later
-
-    constituent
-  end
-
-  def income_within_threshold?(household_size, annual_income)
-    # Get the base FPL amount for the household size
-    base_fpl = Policy.get("fpl_#{[ household_size, 8 ].min}_person").to_i
-
-    # Get the modifier percentage
-    modifier = Policy.get("fpl_modifier_percentage").to_i
-
-    # Calculate the threshold
-    threshold = base_fpl * (modifier / 100.0)
-
-    # Check if income is within threshold
-    annual_income <= threshold
-  end
-
-  def handle_proof_uploads(application)
-    # Handle income proof
-    case params[:income_proof_action]
-    when "accept"
-      if params[:income_proof].present?
-        application.income_proof.attach(params[:income_proof])
-        application.income_proof_status = :approved
-      end
-    when "reject"
-      # Always attach the proof if provided, even if rejecting it
-      if params[:income_proof].present?
-        application.income_proof.attach(params[:income_proof])
-      end
-
-      application.income_proof_status = :rejected
-
-      # Always create a proof review record when rejecting, even if no file is attached
-      # This is safe now that we've modified ProofConsistencyValidation to skip validation for paper applications
-      income_rejection_reason = params[:income_proof_rejection_reason]
-      income_rejection_notes = params[:income_proof_rejection_notes]
-
-      @income_proof_review = application.proof_reviews.build(
-        admin: current_user.presence || User.system_user,
-        proof_type: :income,
-        status: :rejected,
-        rejection_reason: income_rejection_reason,
-        notes: income_rejection_notes,
-        submission_method: :paper,
-        reviewed_at: Time.current
-      )
-
-      unless @income_proof_review.save
-        Rails.logger.error "Failed to create income proof review: #{@income_proof_review.errors.full_messages.join(', ')}"
-        raise ActiveRecord::RecordInvalid.new(@income_proof_review)
-      end
-    end
-
-    # Handle residency proof (similar logic)
-    case params[:residency_proof_action]
-    when "accept"
-      if params[:residency_proof].present?
-        application.residency_proof.attach(params[:residency_proof])
-        application.residency_proof_status = :approved
-      end
-    when "reject"
-      # Always attach the proof if provided, even if rejecting it
-      if params[:residency_proof].present?
-        application.residency_proof.attach(params[:residency_proof])
-      end
-
-      application.residency_proof_status = :rejected
-
-      # Always create a proof review record when rejecting, even if no file is attached
-      # This is safe now that we've modified ProofConsistencyValidation to skip validation for paper applications
-      residency_rejection_reason = params[:residency_proof_rejection_reason]
-      residency_rejection_notes = params[:residency_proof_rejection_notes]
-
-      @residency_proof_review = application.proof_reviews.build(
-        admin: current_user.presence || User.system_user,
-        proof_type: :residency,
-        status: :rejected,
-        rejection_reason: residency_rejection_reason,
-        notes: residency_rejection_notes,
-        submission_method: :paper,
-        reviewed_at: Time.current
-      )
-
-      unless @residency_proof_review.save
-        Rails.logger.error "Failed to create residency proof review: #{@residency_proof_review.errors.full_messages.join(', ')}"
-        raise ActiveRecord::RecordInvalid.new(@residency_proof_review)
-      end
-    end
-  end
-
-  def send_proof_rejection_notifications(application)
-    # Send email notifications for rejected proofs
-    if application.income_proof_status_rejected? && @income_proof_review.present?
-      ApplicationNotificationsMailer.proof_rejected(
-        application,
-        @income_proof_review
-      ).deliver_later
-    end
-
-    if application.residency_proof_status_rejected? && @residency_proof_review.present?
-      ApplicationNotificationsMailer.proof_rejected(
-        application,
-        @residency_proof_review
-      ).deliver_later
-    end
-  end
-
-  def constituent_params
-    params.require(:constituent).permit(
-      :first_name,
-      :last_name,
-      :email,
-      :phone,
-      :physical_address_1,
-      :physical_address_2,
-      :city,
-      :state,
-      :zip_code,
-      :is_guardian,
-      :guardian_relationship,
-      :hearing_disability,
-      :vision_disability,
-      :speech_disability,
-      :mobility_disability,
-      :cognition_disability
-    )
-  end
-
-  def application_params
-    params.require(:application).permit(
-      :household_size,
-      :annual_income,
-      :maryland_resident,
-      :self_certify_disability,
-      :medical_provider_name,
-      :medical_provider_phone,
-      :medical_provider_fax,
-      :medical_provider_email,
-      :terms_accepted,
-      :information_verified,
-      :medical_release_authorized
-    )
+  def paper_application_params
+    {
+      constituent: params.require(:constituent).permit(
+        :first_name,
+        :last_name,
+        :email,
+        :phone,
+        :physical_address_1,
+        :physical_address_2,
+        :city,
+        :state,
+        :zip_code,
+        :is_guardian,
+        :guardian_relationship,
+        :hearing_disability,
+        :vision_disability,
+        :speech_disability,
+        :mobility_disability,
+        :cognition_disability
+      ),
+      application: params.require(:application).permit(
+        :household_size,
+        :annual_income,
+        :maryland_resident,
+        :self_certify_disability,
+        :medical_provider_name,
+        :medical_provider_phone,
+        :medical_provider_fax,
+        :medical_provider_email,
+        :terms_accepted,
+        :information_verified,
+        :medical_release_authorized
+      ),
+      income_proof_action: params[:income_proof_action],
+      income_proof: params[:income_proof],
+      income_proof_rejection_reason: params[:income_proof_rejection_reason],
+      income_proof_rejection_notes: params[:income_proof_rejection_notes],
+      residency_proof_action: params[:residency_proof_action],
+      residency_proof: params[:residency_proof],
+      residency_proof_rejection_reason: params[:residency_proof_rejection_reason],
+      residency_proof_rejection_notes: params[:residency_proof_rejection_notes]
+    }
   end
 end

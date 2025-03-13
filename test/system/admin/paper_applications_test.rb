@@ -208,4 +208,144 @@ class Admin::PaperApplicationsTest < ApplicationSystemTestCase
     # Verify submit button is disabled
     assert_selector "input[type=submit][disabled]"
   end
+  
+  test "admin can submit application with rejected proofs" do
+    # Ensure we have the FPL policies set up
+    Policy.find_or_create_by(key: "fpl_2_person").update(value: 20000)
+    Policy.find_or_create_by(key: "fpl_modifier_percentage").update(value: 400)
+
+    visit new_admin_paper_application_path
+
+    # Fill in constituent information with a unique email
+    within "fieldset", text: "Constituent Information" do
+      fill_in "First Name", with: "John"
+      fill_in "Last Name", with: "Doe"
+      # Use a unique email to avoid conflicts
+      fill_in "Email", with: "john.doe.rejected.#{Time.now.to_i}@example.com"
+      fill_in "Phone", with: "555-123-4567"
+      fill_in "Address Line 1", with: "123 Main St"
+      fill_in "City", with: "Baltimore"
+      fill_in "ZIP Code", with: "21201"
+    end
+
+    # Fill in application details
+    within "fieldset", text: "Application Details" do
+      fill_in "Household Size", with: "2"
+      fill_in "Annual Income", with: "10000" # Below threshold
+      check "I certify that the applicant is a resident of Maryland"
+    end
+
+    # Fill in disability information
+    within "fieldset", text: "Disability Information" do
+      check "The applicant certifies that they have a disability that affects their ability to access telecommunications services"
+      check "Hearing"
+    end
+
+    # Fill in medical provider information
+    within "fieldset", text: "Medical Provider Information" do
+      fill_in "Name", with: "Dr. Jane Smith"
+      fill_in "Phone", with: "555-987-6543"
+      fill_in "Email", with: "dr.smith@example.com"
+    end
+
+    # Handle proof documents - both rejected
+    within "fieldset", text: "Proof Documents" do
+      # Income proof
+      find("input[id='reject_income_proof']").click
+      select "Missing Income Amount", from: "income_proof_rejection_reason"
+      # Notes should be auto-filled by JavaScript
+      
+      # Residency proof
+      find("input[id='reject_residency_proof']").click
+      select "Expired Documentation", from: "residency_proof_rejection_reason"
+      # Notes should be auto-filled by JavaScript
+    end
+
+    click_on "Submit Paper Application"
+
+    # Should be redirected to application page with detailed success message
+    assert_text "Paper application successfully submitted with 2 rejected proofs: income and residency. Notifications will be sent."
+    assert_current_path %r{/admin/applications/\d+}
+    
+    # Check statuses are rejected
+    assert_text "Income Proof: Rejected"
+    assert_text "Residency Proof: Rejected"
+    
+    # Verify proof reviews
+    assert_text "Missing Income Amount"
+    assert_text "Expired Documentation"
+  end
+  
+  test "attachments are preserved when validation fails" do
+    visit new_admin_paper_application_path
+    
+    # Fill in partial information but attach files
+    within "fieldset", text: "Constituent Information" do
+      fill_in "First Name", with: "John"
+      fill_in "Last Name", with: "Doe"
+      # Intentionally skip email to cause validation error
+      fill_in "Phone", with: "555-123-4567"
+    end
+    
+    # Handle proof documents
+    within "fieldset", text: "Proof Documents" do
+      # Income proof
+      find("input[id='accept_income_proof']").click
+      attach_file "income_proof", Rails.root.join("test/fixtures/files/sample.pdf"), visible: false
+      
+      # Residency proof
+      find("input[id='accept_residency_proof']").click
+      attach_file "residency_proof", Rails.root.join("test/fixtures/files/sample.pdf"), visible: false
+    end
+    
+    click_on "Submit Paper Application"
+    
+    # Should see validation error, still on form page
+    assert_text "Constituent email can't be blank"
+    # Check for the file preservation message
+    assert_text "Your uploaded files have been preserved"
+    # The path should remain on the paper applications path after form resubmission
+    assert_current_path %r{/admin/paper_applications}
+    
+    # Now fill in the missing information
+    within "fieldset", text: "Constituent Information" do
+      fill_in "Email", with: "preserved.files.#{Time.now.to_i}@example.com"
+    end
+    
+    # Complete required fields
+    within "fieldset", text: "Application Details" do
+      fill_in "Household Size", with: "2"
+      fill_in "Annual Income", with: "10000"
+      check "I certify that the applicant is a resident of Maryland"
+    end
+    
+    within "fieldset", text: "Disability Information" do
+      check "The applicant certifies that they have a disability that affects their ability to access telecommunications services"
+    end
+    
+    within "fieldset", text: "Medical Provider Information" do
+      fill_in "Name", with: "Dr. Jane Smith"
+      fill_in "Phone", with: "555-987-6543"
+      fill_in "Email", with: "dr.smith@example.com"
+    end
+    
+    # Verify files are still shown on the form
+    within "fieldset", text: "Proof Documents" do
+      # Income proof - should still show accept selected
+      assert find("input[id='accept_income_proof']").checked?
+      
+      # Residency proof - should still show accept selected
+      assert find("input[id='accept_residency_proof']").checked?
+    end
+    
+    click_on "Submit Paper Application"
+    
+    # Should be redirected to application page
+    assert_text "Paper application successfully submitted"
+    assert_current_path %r{/admin/applications/\d+}
+    
+    # Check that files were properly attached
+    assert_text "Income Proof: Approved"
+    assert_text "Residency Proof: Approved"
+  end
 end

@@ -9,7 +9,7 @@ module ProofConsistencyValidation
 
   def proofs_consistent_with_status
     # Skip validation for paper applications
-    return if submission_method == :paper
+    return if submission_method&.to_sym == :paper
     
     # Check income proof
     if income_proof_status.in?(['approved', 'rejected']) && !income_proof.attached?
