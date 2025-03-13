@@ -88,7 +88,20 @@ module Applications
       return unless action.in?(%w[accept reject])
 
       if action == "accept" && params["#{type}_proof"].present?
+        # Attempt to attach the file
         @application.send("#{type}_proof").attach(params["#{type}_proof"])
+        
+        # Force reload association to verify the attachment
+        @application.send("#{type}_proof").reload
+        
+        # Verify attachment was successful
+        unless @application.send("#{type}_proof").attached?
+          error_message = "Failed to attach #{type} proof - attachment verification failed"
+          Rails.logger.error(error_message)
+          raise ActiveRecord::RecordInvalid.new(@application)
+        end
+        
+        # Only update status if attachment succeeded
         @application.update!("#{type}_proof_status" => :approved)
       elsif action == "reject"
         @application.update!("#{type}_proof_status" => :rejected)
@@ -100,6 +113,10 @@ module Applications
       end
     rescue StandardError => e
       log_error(e, "Failed to handle #{type} proof")
+      # Add S3 specific error details if present
+      if e.respond_to?(:cause) && e.cause.is_a?(Aws::S3::Errors::ServiceError)
+        log_error(e.cause, "S3 Error Details")
+      end
       raise
     end
 

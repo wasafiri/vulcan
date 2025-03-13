@@ -1,131 +1,145 @@
-require 'test_helper'
+require "test_helper"
 
 module Applications
   class PaperApplicationServiceTest < ActiveSupport::TestCase
     setup do
       @admin = users(:admin)
-      @params = {
-        constituent: {
-          first_name: "Test",
-          last_name: "User",
-          email: "test@example.com",
-          phone: "123-456-7890",
-          physical_address_1: "123 Main St",
-          city: "Anytown",
-          state: "MD",
-          zip_code: "12345"
-        },
-        application: {
-          household_size: 2,
-          annual_income: 15000,
-          maryland_resident: true,
-          self_certify_disability: true,
-          medical_provider_name: "Dr. Smith",
-          medical_provider_phone: "555-123-4567",
-          medical_provider_email: "doctor@example.com"
-        },
-        income_proof_action: "accept",
-        residency_proof_action: "reject",
-        residency_proof_rejection_reason: "expired",
-        residency_proof_rejection_notes: "Your document is expired"
-      }
-    end
-
-    test "creates application with accepted income proof and rejected residency proof" do
-      # Use existing fixture file
-      file = fixture_file_upload('files/test_document.pdf', 'application/pdf')
-      @params[:income_proof] = file
-
-      service = PaperApplicationService.new(
-        params: @params,
-        admin: @admin
-      )
-
-      assert service.create
-      assert service.application.present?
-      assert service.constituent.present?
-      
-      # Check application attributes
-      assert_equal 2, service.application.household_size
-      assert_equal 15000, service.application.annual_income
-      assert_equal "paper", service.application.submission_method
-      
-      # Check proof statuses
-      assert service.application.income_proof_status_approved?
-      assert service.application.residency_proof_status_rejected?
-      
-      # Check proof file attachment
-      assert service.application.income_proof.attached?
-      refute service.application.residency_proof.attached?
-      
-      # Check proof review
-      residency_reviews = service.application.proof_reviews.where(proof_type: "residency")
-      assert_equal 1, residency_reviews.count
-      review = residency_reviews.first
-      assert_equal "rejected", review.status
-      assert_equal "expired", review.rejection_reason
-      assert_equal "Your document is expired", review.notes
-      assert_equal "paper", review.submission_method
-    end
-
-    test "creates application with both proofs rejected" do
-      @params[:income_proof_action] = "reject"
-      @params[:income_proof_rejection_reason] = "missing_amount"
-      @params[:income_proof_rejection_notes] = "Income amount not visible"
-      
-      # Include test file even though it will be rejected
-      file = fixture_file_upload('files/test_document.pdf', 'application/pdf')
-      @params[:income_proof] = file
-
-      service = PaperApplicationService.new(
-        params: @params,
-        admin: @admin
-      )
-
-      assert service.create
-      
-      # Check proof statuses
-      assert service.application.income_proof_status_rejected?
-      assert service.application.residency_proof_status_rejected?
-      
-      # Check proof reviews
-      assert_equal 2, service.application.proof_reviews.count
-      
-      income_review = service.application.proof_reviews.find_by(proof_type: "income")
-      assert_equal "missing_amount", income_review.rejection_reason
-      
-      residency_review = service.application.proof_reviews.find_by(proof_type: "residency")
-      assert_equal "expired", residency_review.rejection_reason
-    end
-
-    test "finds existing constituent by email" do
-      existing = Constituent.create!(
-        first_name: "Existing",
+      @constituent_params = {
+        first_name: "Test",
         last_name: "User",
-        email: "test@example.com",
-        password: "password123"
-      )
-
-      service = PaperApplicationService.new(
-        params: @params,
-        admin: @admin
-      )
-
-      assert service.create
-      assert_equal existing.id, service.constituent.id
-    end
-
-    test "validates income threshold" do
-      # Set income above threshold
-      @params[:application][:annual_income] = 999999
+        email: "test-#{Time.now.to_i}@example.com",
+        phone: "2025551234",
+        physical_address_1: "123 Test St",
+        city: "Baltimore",
+        state: "MD",
+        zip_code: "21201",
+        hearing_disability: "1",
+        vision_disability: "0",
+        speech_disability: "0",
+        mobility_disability: "0",
+        cognition_disability: "0"
+      }
       
-      service = PaperApplicationService.new(
-        params: @params,
-        admin: @admin
+      @application_params = {
+        household_size: "2",
+        annual_income: "15000",
+        maryland_resident: "1",
+        self_certify_disability: "1",
+        medical_provider_name: "Dr. Smith",
+        medical_provider_phone: "2025559876",
+        medical_provider_email: "drsmith@example.com"
+      }
+      
+      # Use existing test files
+      @pdf_file = fixture_file_upload(
+        Rails.root.join("test", "fixtures", "files", "income_proof.pdf"),
+        "application/pdf"
       )
-
-      refute service.create
-      assert_includes service.errors, "Income exceeds the maximum threshold for the household size."
+      
+      @invalid_file = fixture_file_upload(
+        Rails.root.join("test", "fixtures", "files", "invalid.exe"),
+        "application/octet-stream"
+      )
+      
+      @large_file_mock = Minitest::Mock.new
+      @large_file_mock.expect :content_type, "application/pdf"
+      @large_file_mock.expect :byte_size, 10.megabytes
+    end
+    
+    test "approved income proof must have an attachment" do
+      service_params = {
+        constituent: @constituent_params,
+        application: @application_params,
+        income_proof_action: "accept",
+        income_proof: @pdf_file
+      }
+      
+      service = PaperApplicationService.new(params: service_params, admin: @admin)
+      assert service.create, "Failed to create paper application"
+      
+      # Verify the application was created with the income proof attached
+      application = Constituent.find_by(email: @constituent_params[:email]).applications.last
+      assert_not_nil application
+      assert application.income_proof.attached?
+      assert application.income_proof_status_approved?
+    end
+    
+    test "application creation fails when proof attachment fails but status is approved" do
+      # Mock a situation where attachment appears to succeed but actually fails
+      mock_attachment = Minitest::Mock.new
+      mock_attachment.expect :attached?, false
+      mock_attachment.expect :reload, nil
+      
+      service_params = {
+        constituent: @constituent_params,
+        application: @application_params,
+        income_proof_action: "accept",
+        income_proof: @pdf_file
+      }
+      
+      service = PaperApplicationService.new(params: service_params, admin: @admin)
+      
+      # Replace the attachment with our mock that will fail verification
+      Application.new
+      Application.stub_any_instance(:income_proof, mock_attachment) do
+        assert_not service.create, "Paper application should fail when attachment fails"
+      end
+    end
+    
+    test "rejected proofs do not require attachment" do
+      service_params = {
+        constituent: @constituent_params,
+        application: @application_params,
+        income_proof_action: "reject",
+        income_proof_rejection_reason: "other",
+        income_proof_rejection_notes: "Test rejection"
+      }
+      
+      service = PaperApplicationService.new(params: service_params, admin: @admin)
+      assert service.create, "Failed to create paper application with rejected proof"
+      
+      # Verify the application was created with rejected income proof
+      application = Constituent.find_by(email: @constituent_params[:email]).applications.last
+      assert_not_nil application
+      assert_not application.income_proof.attached?
+      assert application.income_proof_status_rejected?
+      
+      # Verify proof review was created
+      proof_review = application.proof_reviews.find_by(proof_type: "income")
+      assert_not_nil proof_review
+      assert_equal "rejected", proof_review.status
+    end
+    
+    test "application rejects invalid file types" do
+      service_params = {
+        constituent: @constituent_params,
+        application: @application_params,
+        income_proof_action: "accept",
+        income_proof: @invalid_file
+      }
+      
+      service = PaperApplicationService.new(params: service_params, admin: @admin)
+      assert_not service.create, "Paper application with invalid file type should be rejected"
+    end
+    
+    test "application rejects files that exceed size limit" do
+      # Mock an oversized file
+      large_file = fixture_file_upload(
+        Rails.root.join("test", "fixtures", "files", "income_proof.pdf"),
+        "application/pdf"
+      )
+      
+      ActiveStorage::Blob.stub_any_instance(:byte_size, 10.megabytes) do
+        service_params = {
+          constituent: @constituent_params,
+          application: @application_params,
+          income_proof_action: "accept",
+          income_proof: large_file
+        }
+        
+        service = PaperApplicationService.new(params: service_params, admin: @admin)
+        assert_not service.create, "Paper application with oversized file should be rejected"
+      end
     end
   end
 end

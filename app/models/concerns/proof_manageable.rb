@@ -12,6 +12,7 @@ module ProofManageable
 
     validate :correct_proof_mime_type
     validate :proof_size_within_limit
+    validate :verify_proof_attachments
   end
 
   def all_proofs_approved?
@@ -101,6 +102,22 @@ module ProofManageable
 
     if income_proof.attached? && income_proof.byte_size > MAX_FILE_SIZE
       errors.add(:income_proof, "is too large. Maximum size allowed is 5MB.")
+    end
+  end
+  
+  # Verifies that proofs marked as approved actually have their files attached
+  def verify_proof_attachments
+    # This validation runs for ALL applications, including paper applications
+    if income_proof_status_approved? && !income_proof.attached?
+      # Log the error for debugging purposes
+      Rails.logger.error("Income proof marked as approved but no file is attached for application #{id}")
+      errors.add(:income_proof, "must be attached when status is approved")
+    end
+    
+    if residency_proof_status_approved? && !residency_proof.attached?
+      # Log the error for debugging purposes
+      Rails.logger.error("Residency proof marked as approved but no file is attached for application #{id}")
+      errors.add(:residency_proof, "must be attached when status is approved")
     end
   end
 
