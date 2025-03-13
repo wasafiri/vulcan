@@ -3,7 +3,7 @@ require "test_helper"
 module Applications
   class PaperApplicationServiceTest < ActiveSupport::TestCase
     setup do
-      @admin = users(:admin)
+      @admin = users(:admin_david)
       @constituent_params = {
         first_name: "Test",
         last_name: "User",
@@ -64,12 +64,7 @@ module Applications
       assert application.income_proof_status_approved?
     end
     
-    test "application creation fails when proof attachment fails but status is approved" do
-      # Mock a situation where attachment appears to succeed but actually fails
-      mock_attachment = Minitest::Mock.new
-      mock_attachment.expect :attached?, false
-      mock_attachment.expect :reload, nil
-      
+    test "application creation fails when blob creation fails" do
       service_params = {
         constituent: @constituent_params,
         application: @application_params,
@@ -79,10 +74,32 @@ module Applications
       
       service = PaperApplicationService.new(params: service_params, admin: @admin)
       
-      # Replace the attachment with our mock that will fail verification
-      Application.new
-      Application.stub_any_instance(:income_proof, mock_attachment) do
-        assert_not service.create, "Paper application should fail when attachment fails"
+      # Mock the blob creation to raise an error
+      ActiveStorage::Blob.stub :create_and_upload!, -> (*args) { raise ActiveStorage::IntegrityError.new("Test integrity error") } do
+        assert_not service.create, "Paper application should fail when blob creation fails"
+      end
+    end
+    
+    test "application creation fails when S3 upload fails" do
+      service_params = {
+        constituent: @constituent_params,
+        application: @application_params,
+        income_proof_action: "accept",
+        income_proof: @pdf_file
+      }
+      
+      service = PaperApplicationService.new(params: service_params, admin: @admin)
+      
+      # Create a mock AWS error
+      aws_error = Class.new(StandardError) do
+        def code; "AccessDenied"; end
+        def message; "Access Denied"; end
+      end
+      
+      # Mock the blob creation to raise an AWS error
+      aws_s3_error = Aws::S3::Errors::ServiceError.new(nil, aws_error.new)
+      ActiveStorage::Blob.stub :create_and_upload!, -> (*args) { raise aws_s3_error } do
+        assert_not service.create, "Paper application should fail when S3 upload fails"
       end
     end
     

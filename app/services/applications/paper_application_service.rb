@@ -10,20 +10,48 @@ module Applications
       @constituent = nil
     end
 
-    def create
-      begin
-        ActiveRecord::Base.transaction do
-          find_or_create_constituent
-          create_application
-          handle_proofs
-          send_notifications
+  def create
+    begin
+      # First, validate and upload any proof files outside the transaction
+      # This is because file uploads can be slow and we don't want to hold a DB transaction
+      proof_blobs = {}
+      
+      # Pre-process income proof if provided
+      if params[:income_proof_action] == "accept" && params[:income_proof].present?
+        begin
+          Rails.logger.info "Pre-processing income proof for upload"
+          proof_blobs[:income] = create_blob_from_uploaded_file(params[:income_proof], "income")
+        rescue => e
+          log_error(e, "Failed to process income proof file")
+          return false
         end
-        true
-      rescue StandardError => e
-        log_error(e, "Failed to create paper application")
-        false
       end
+      
+      # Pre-process residency proof if provided
+      if params[:residency_proof_action] == "accept" && params[:residency_proof].present?
+        begin
+          Rails.logger.info "Pre-processing residency proof for upload"
+          proof_blobs[:residency] = create_blob_from_uploaded_file(params[:residency_proof], "residency")
+        rescue => e
+          log_error(e, "Failed to process residency proof file")
+          return false
+        end
+      end
+      
+      # Now do the database work in a transaction
+      ActiveRecord::Base.transaction do
+        find_or_create_constituent
+        create_application
+        handle_proofs(proof_blobs)
+        send_notifications
+      end
+      
+      true
+    rescue StandardError => e
+      log_error(e, "Failed to create paper application")
+      false
     end
+  end
 
     private
 
@@ -78,31 +106,91 @@ module Applications
       end
     end
 
-    def handle_proofs
-      handle_proof(:income)
-      handle_proof(:residency)
+    def create_blob_from_uploaded_file(uploaded_file, type)
+      # Validate file type
+      unless ProofManageable::ALLOWED_TYPES.include?(uploaded_file.content_type)
+        error_message = "Invalid file type for #{type} proof: #{uploaded_file.content_type}"
+        Rails.logger.error error_message
+        raise ActiveStorage::IntegrityError, error_message
+      end
+      
+      # Validate file size
+      if uploaded_file.size > ProofManageable::MAX_FILE_SIZE
+        error_message = "File too large for #{type} proof: #{uploaded_file.size} bytes"
+        Rails.logger.error error_message
+        raise ActiveStorage::IntegrityError, error_message
+      end
+      
+      # Create and upload the blob
+      blob = ActiveStorage::Blob.create_and_upload!(
+        io: uploaded_file,
+        filename: uploaded_file.original_filename,
+        content_type: uploaded_file.content_type
+      )
+      
+      Rails.logger.info "Successfully created blob for #{type} proof: #{blob.id}"
+      blob
+    rescue ActiveStorage::IntegrityError => e
+      Rails.logger.error "File integrity error when uploading #{type} proof: #{e.message}"
+      raise
+    rescue Aws::S3::Errors::ServiceError => e
+      Rails.logger.error "S3 error when uploading #{type} proof: #{e.message}"
+      Rails.logger.error "AWS Error Code: #{e.code}, Message: #{e.message}"
+      raise
+    rescue StandardError => e
+      Rails.logger.error "Unexpected error when processing #{type} proof: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      raise
     end
 
-    def handle_proof(type)
+    def handle_proofs(proof_blobs = {})
+      handle_proof(:income, proof_blobs[:income])
+      handle_proof(:residency, proof_blobs[:residency])
+    end
+
+    def handle_proof(type, blob = nil)
       action = params["#{type}_proof_action"]
       return unless action.in?(%w[accept reject])
 
-      if action == "accept" && params["#{type}_proof"].present?
-        # Attempt to attach the file
-        @application.send("#{type}_proof").attach(params["#{type}_proof"])
-        
-        # Force reload association to verify the attachment
-        @application.send("#{type}_proof").reload
-        
-        # Verify attachment was successful
-        unless @application.send("#{type}_proof").attached?
-          error_message = "Failed to attach #{type} proof - attachment verification failed"
-          Rails.logger.error(error_message)
-          raise ActiveRecord::RecordInvalid.new(@application)
+      if action == "accept"
+        # Use the pre-uploaded blob if provided
+        if blob
+          # Attach the blob to the application
+          @application.send("#{type}_proof").attach(blob)
+          
+          # Verify attachment was successful by reloading and checking
+          @application.send("#{type}_proof").reload
+          
+          unless @application.send("#{type}_proof").attached?
+            error_message = "Failed to attach #{type} proof - verification failed after attach"
+            Rails.logger.error error_message
+            raise StandardError, error_message
+          end
+          
+          # Only update status if attachment verification succeeds
+          @application.update!("#{type}_proof_status" => :approved)
+          
+          Rails.logger.info "Successfully attached and approved #{type} proof for application #{@application.id}"
+        elsif params["#{type}_proof"].present?
+          # This is a fallback if blob wasn't pre-processed
+          # This shouldn't normally happen with our improved flow
+          Rails.logger.warn "No pre-processed blob for #{type} proof, creating one now (unexpected)"
+          
+          # Create and upload blob
+          blob = create_blob_from_uploaded_file(params["#{type}_proof"], type)
+          
+          # Attach and verify
+          @application.send("#{type}_proof").attach(blob)
+          @application.send("#{type}_proof").reload
+          
+          unless @application.send("#{type}_proof").attached?
+            error_message = "Failed to attach #{type} proof in fallback path"
+            Rails.logger.error error_message
+            raise StandardError, error_message
+          end
+          
+          @application.update!("#{type}_proof_status" => :approved)
         end
-        
-        # Only update status if attachment succeeded
-        @application.update!("#{type}_proof_status" => :approved)
       elsif action == "reject"
         @application.update!("#{type}_proof_status" => :rejected)
         create_proof_review(
@@ -113,10 +201,6 @@ module Applications
       end
     rescue StandardError => e
       log_error(e, "Failed to handle #{type} proof")
-      # Add S3 specific error details if present
-      if e.respond_to?(:cause) && e.cause.is_a?(Aws::S3::Errors::ServiceError)
-        log_error(e.cause, "S3 Error Details")
-      end
       raise
     end
 
