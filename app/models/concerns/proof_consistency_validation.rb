@@ -8,6 +8,9 @@ module ProofConsistencyValidation
   private
 
   def proofs_consistent_with_status
+    # Skip validation for paper applications
+    return if submission_method == :paper
+    
     # Check income proof
     if income_proof_status.in?(['approved', 'rejected']) && !income_proof.attached?
       errors.add(:income_proof, "must be attached if status is #{income_proof_status}")
