@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Run a specific system test with enhanced debugging
+
+echo "=============================================="
+echo "System Test Runner with Enhanced Debugging"
+echo "=============================================="
+
+# Check and clean up Chrome for Testing processes
+echo "Checking for Chrome for Testing processes..."
+
+# Use a more direct approach to avoid Ruby load path issues
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  # macOS - Check for regular Chrome
+  regular_chrome=$(pgrep -f "Google Chrome$" | wc -l | tr -d ' ')
+  
+  # Try graceful shutdown for testing Chrome
+  pkill -TERM -f "Google Chrome for Testing" > /dev/null 2>&1 || true
+  pkill -TERM -f "chromedriver.*testing" > /dev/null 2>&1 || true
+  sleep 2
+  
+  # Only force kill if still running
+  test_chrome_count=$(pgrep -f "Google Chrome for Testing" | wc -l | tr -d ' ')
+  if [ "$test_chrome_count" -gt 0 ]; then
+    echo "Process still running after SIGTERM, using force kill for testing processes..."
+    pkill -9 -f "Google Chrome for Testing" > /dev/null 2>&1 || true
+  fi
+  
+  # Check if regular Chrome is preserved
+  after_chrome=$(pgrep -f "Google Chrome$" | wc -l | tr -d ' ')
+  if [ "$regular_chrome" -gt 0 ] && [ "$after_chrome" -gt 0 ]; then
+    echo "✓ Regular Chrome browser preserved during test process cleanup"
+  elif [ "$regular_chrome" -gt 0 ]; then
+    echo "! Warning: Regular Chrome browser may have been affected"
+  fi
+elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+  # Linux - similar approach
+  pkill -TERM -f "chrome.*for.*testing" > /dev/null 2>&1 || true
+  sleep 2
+  pkill -9 -f "chrome.*for.*testing" > /dev/null 2>&1 || true
+fi
+
+# Clean up temp directories
+echo "Cleaning up temporary directories..."
+rm -rf tmp/chrome_testing_profile tmp/capybara
+mkdir -p tmp/chrome_testing_profile tmp/capybara
+
+# Set up special environment variables for debugging
+export DEBUG_AUTH=true
+export WEBDRIVER_TIMEOUT=15
+export CAPYBARA_SCREENSHOTS=true
+
+# Clear logs
+echo "Cleaning old logs..."
+rm -f tmp/chromedriver.log log/test.log
+
+# Setup Chrome for Testing
+echo "Setting up Chrome for Testing..."
+bash bin/setup-test-browser
+
+# Get the browser path for reference
+CHROME_BINARY=$(npx @puppeteer/browsers list chrome | grep "chrome@stable" | head -n 1)
+echo "Chrome binary path: $CHROME_BINARY"
+
+# Run the specific test with extra debugging output
+echo "Running test with debugging enabled..."
+echo "Command: bin/rails test $@"
+RAILS_ENV=test bin/rails test "$@" -v
+
+# Print the logs for reference
+echo "=============================================="
+echo "Recent test logs:"
+tail -n 100 log/test.log 2>/dev/null || echo "No test log found"
+
+echo "=============================================="
+echo "Recent ChromeDriver logs:"
+cat tmp/chromedriver.log 2>/dev/null || echo "No ChromeDriver log found"
+
+echo "=============================================="
+echo "Test run complete"
+echo "Screenshots saved to: tmp/capybara/"
