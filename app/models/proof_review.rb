@@ -42,10 +42,14 @@ class ProofReview < ApplicationRecord
   end
 
   def should_validate_proof_attachment?
+    # For paper submissions with rejected proofs, we don't need to validate
+    # since the admin might be rejecting a proof that wasn't provided
+    return false if status_rejected? && submission_method_paper?
+    
     # Only validate proof attachment in production or when explicitly testing this validation
     return false if Rails.env.test? && ENV['VALIDATE_PROOF_ATTACHMENTS'] != 'true'
 
-    # Always validate in production
+    # In production for cases other than paper submissions with rejected proofs
     return true if Rails.env.production?
 
     # In other environments, validate based on the proof type and status
@@ -54,10 +58,6 @@ class ProofReview < ApplicationRecord
 
     # For rejected proofs, we might want to be more lenient in development/test
     return false if status_rejected? && (Rails.env.development? || Rails.env.test?)
-
-    # For paper submissions with rejected proofs, we don't need to validate
-    # since the admin might be rejecting a proof that wasn't provided
-    return false if status_rejected? && submission_method_paper?
 
     # Default to validating
     true
