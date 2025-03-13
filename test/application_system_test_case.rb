@@ -1,6 +1,7 @@
 require "test_helper"
 require "support/system_test_helpers"
 require "support/system_test_authentication"
+# We don't use chrome_process_manager.rb anymore, it's built into the scripts directly
 
 class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   include VoucherTestHelper

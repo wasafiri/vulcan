@@ -3,37 +3,70 @@ require 'capybara/rails'
 require 'selenium-webdriver'
 
 # Safely clean up only Chrome for Testing processes
-# First check if regular Chrome is running
-if RUBY_PLATFORM =~ /darwin/
-  regular_chrome = `pgrep -f "Google Chrome$" | wc -l`.strip.to_i
-  had_regular_chrome = regular_chrome > 0
+puts "Ensuring no stray Chrome for Testing processes before Capybara setup..."
+
+# Helper to count processes matching pattern
+def count_processes(pattern)
+  `ps aux | grep -E "#{pattern}" | grep -v "grep" | wc -l`.strip.to_i
+end
+
+# More specific process counting for debugging
+def debug_chrome_processes
+  main_chrome = count_processes("Google Chrome$")
+  testing_chrome = count_processes("Chrome for Testing")
+  chromedriver = count_processes("chromedriver")
   
-  # Clean up Chrome for Testing processes only
-  system("pkill -TERM -f 'Google Chrome for Testing' > /dev/null 2>&1 || true") 
-  system("pkill -TERM -f 'chromedriver.*testing' > /dev/null 2>&1 || true")
-  sleep 2
+  puts "Regular Chrome processes: #{main_chrome}"
+  puts "Chrome for Testing processes: #{testing_chrome}"
+  puts "ChromeDriver processes: #{chromedriver}"
   
-  # Only force kill if still running
-  chrome_testing_count = `pgrep -f "Google Chrome for Testing" | wc -l`.strip.to_i
-  if chrome_testing_count > 0
-    puts "Chrome for Testing still running after SIGTERM, using force kill..."
-    system("pkill -9 -f 'Google Chrome for Testing' > /dev/null 2>&1 || true")
-  end
-  
-  # Verify regular Chrome wasn't affected
-  if had_regular_chrome
-    after_chrome = `pgrep -f "Google Chrome$" | wc -l`.strip.to_i
-    if after_chrome > 0
-      puts "✓ Regular Chrome browser preserved during Capybara setup"
-    else
-      puts "! Warning: Regular Chrome browser may have been affected - please check"
+  [main_chrome, testing_chrome, chromedriver]
+end
+
+# Better process killing with pattern check
+def kill_process_gracefully(pattern, name = "Process")
+  count = count_processes(pattern)
+  if count > 0
+    puts "Found #{count} #{name} process(es), cleaning up..."
+    system("pkill -TERM -f '#{pattern}' > /dev/null 2>&1 || true") 
+    sleep 2
+    
+    # Check if still running after SIGTERM
+    remaining = count_processes(pattern)
+    if remaining > 0
+      puts "#{name} still running after SIGTERM, using force kill..."
+      system("pkill -9 -f '#{pattern}' > /dev/null 2>&1 || true")
     end
   end
+end
+
+# Debug before
+puts "-- Chrome processes before cleanup --"
+regular_chrome, testing_chrome, chromedriver = debug_chrome_processes
+
+if RUBY_PLATFORM =~ /darwin/
+  # macOS - precise pattern matching
+  kill_process_gracefully("Chrome for Testing", "Chrome for Testing")
+  kill_process_gracefully("chromedriver", "ChromeDriver")
+  
+  # Verify regular Chrome wasn't affected
+  after_chrome = count_processes("Google Chrome$")
+  
+  puts "-- Chrome processes after cleanup --"
+  debug_chrome_processes
+  
+  if regular_chrome > 0 && after_chrome > 0
+    puts "✓ Regular Chrome browser preserved during Capybara setup"
+  elsif regular_chrome > 0
+    puts "! Warning: Regular Chrome browser may have been affected - please check"
+  end
 elsif RUBY_PLATFORM =~ /linux/
-  # Linux version - similar approach but with platform-specific commands
-  system("pkill -TERM -f 'chrome.*for.*testing' > /dev/null 2>&1 || true")
-  sleep 2
-  system("pkill -9 -f 'chrome.*for.*testing' > /dev/null 2>&1 || true")
+  # Linux - similar approach with platform-specific commands
+  kill_process_gracefully("chrome.*for.*testing", "Chrome for Testing")
+  kill_process_gracefully("chromedriver", "ChromeDriver")
+  
+  puts "-- Chrome processes after cleanup --"
+  debug_chrome_processes
 end
 
 # Global Capybara configuration

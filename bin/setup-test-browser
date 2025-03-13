@@ -21,53 +21,124 @@ if ! command -v npx &> /dev/null; then
 fi
 
 # Function to kill any existing Chrome for Testing processes
+# Function to count processes matching a pattern
+count_processes() {
+  local pattern="$1"
+  if [[ "$OSTYPE" == "darwin"* || "$OSTYPE" == "linux-gnu"* ]]; then
+    ps aux | grep -E "$pattern" | grep -v "grep" | wc -l | tr -d ' '
+  elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
+    tasklist | find /i "$pattern" | measure-object -line | select-object -expandproperty Lines
+  else
+    echo "0"
+  fi
+}
+
+# Debug helper to show Chrome processes
+debug_chrome_processes() {
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    local main_chrome=$(count_processes "Google Chrome$")
+    local testing_chrome=$(count_processes "Chrome for Testing")
+    local chromedriver=$(count_processes "chromedriver")
+    
+    echo "Regular Chrome processes: $main_chrome"
+    echo "Chrome for Testing processes: $testing_chrome"
+    echo "ChromeDriver processes: $chromedriver"
+    
+    return 0
+  elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    local main_chrome=$(count_processes "chrome$")
+    local testing_chrome=$(count_processes "chrome.*for.*testing")
+    local chromedriver=$(count_processes "chromedriver")
+    
+    echo "Regular Chrome processes: $main_chrome"
+    echo "Chrome for Testing processes: $testing_chrome"
+    echo "ChromeDriver processes: $chromedriver"
+    
+    return 0
+  fi
+  
+  # Windows or other platform
+  echo "Process counting not implemented for this platform"
+  return 1
+}
+
 # Function to gracefully kill processes
 kill_process() {
-  pattern="$1"
-  echo "Gracefully shutting down $pattern processes..."
+  local pattern="$1"
+  local name="$2"
+  local count=$(count_processes "$pattern")
   
-  # First try SIGTERM for graceful shutdown
-  if [[ "$OSTYPE" == "darwin"* || "$OSTYPE" == "linux-gnu"* ]]; then
-    pkill -TERM -f "$pattern" > /dev/null 2>&1 || true
-    # Wait for grace period
-    sleep 2
-    # Check if process still exists
-    count=$(pgrep -f "$pattern" | wc -l | tr -d ' ')
-    if [ "$count" -gt 0 ]; then
-      echo "Process still running after SIGTERM, using force kill for testing processes..."
-      pkill -9 -f "$pattern" > /dev/null 2>&1 || true
+  if [ "$count" -gt 0 ]; then
+    echo "Found $count $name process(es), shutting down gracefully..."
+    
+    # First try SIGTERM for graceful shutdown
+    if [[ "$OSTYPE" == "darwin"* || "$OSTYPE" == "linux-gnu"* ]]; then
+      pkill -TERM -f "$pattern" > /dev/null 2>&1 || true
+      # Wait for grace period
+      sleep 2
+      # Check if process still exists
+      local remaining=$(count_processes "$pattern")
+      if [ "$remaining" -gt 0 ]; then
+        echo "Process still running after SIGTERM, using force kill..."
+        pkill -9 -f "$pattern" > /dev/null 2>&1 || true
+      fi
+    elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
+      # Windows version - convert pattern to process name
+      local process_name=$(echo "$pattern" | sed 's/.*\///' | sed 's/\.[^.]*$//')
+      taskkill //IM "$process_name.exe" > /dev/null 2>&1 || true
+      sleep 2
+      taskkill //F //IM "$process_name.exe" > /dev/null 2>&1 || true
     fi
-  elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
-    # Windows version - convert pattern to process name
-    process_name=$(echo "$pattern" | sed 's/.*\///' | sed 's/\.[^.]*$//')
-    taskkill //IM "$process_name.exe" > /dev/null 2>&1 || true
-    sleep 2
-    taskkill //F //IM "$process_name.exe" > /dev/null 2>&1 || true
   fi
 }
 
 # Function to check for regular Chrome
 check_regular_chrome() {
-  if [[ "$OSTYPE" == "darwin"* || "$OSTYPE" == "linux-gnu"* ]]; then
-    pgrep -f "Google Chrome$" > /dev/null 2>&1
-    return $?
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    if [ "$(count_processes "Google Chrome$")" -gt 0 ]; then
+      return 0
+    fi
+  elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    if [ "$(count_processes "chrome$")" -gt 0 ]; then
+      return 0
+    fi
   elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
-    tasklist | find /i "chrome.exe" | find /v "for Testing" > /dev/null 2>&1
-    return $?
+    if [ "$(count_processes "chrome.exe" | grep -v "for Testing")" -gt 0 ]; then
+      return 0
+    fi
   fi
   return 1
 }
 
 kill_chrome() {
-  echo "Checking for Chrome for Testing processes..."
+  echo "Checking for Chrome processes..."
+  
+  # Show debug info
+  echo "-- Chrome processes before cleanup --"
+  debug_chrome_processes
   
   # Save state of regular Chrome
   check_regular_chrome
-  had_regular_chrome=$?
+  local had_regular_chrome=$?
   
-  # Kill only Chrome for Testing processes
-  kill_process "Google Chrome for Testing"
-  kill_process "chromedriver.*for.*testing"
+  # Kill only Chrome for Testing processes with better names
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS specific patterns
+    kill_process "Chrome for Testing" "Chrome for Testing"
+    kill_process "chromedriver" "ChromeDriver"
+  elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    # Linux specific patterns
+    kill_process "chrome.*for.*testing" "Chrome for Testing"
+    kill_process "chromedriver" "ChromeDriver"
+  elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
+    # Windows specific
+    kill_process "Chrome for Testing.exe" "Chrome for Testing"
+    kill_process "chromedriver.exe" "ChromeDriver"
+  fi
+  
+  # Show after state
+  echo "-- Chrome processes after cleanup --"
+  debug_chrome_processes
   
   # Verify regular Chrome was preserved if it was running
   if [ $had_regular_chrome -eq 0 ]; then

@@ -8,37 +8,77 @@ echo "System Test Runner with Enhanced Debugging"
 echo "=============================================="
 
 # Check and clean up Chrome for Testing processes
-echo "Checking for Chrome for Testing processes..."
+echo "Checking for Chrome processes..."
+
+# Debug helpers
+count_processes() {
+  local pattern="$1"
+  local count=$(ps aux | grep -E "$pattern" | grep -v "grep" | wc -l | tr -d ' ')
+  echo "$count"
+}
 
 # Use a more direct approach to avoid Ruby load path issues
 if [[ "$OSTYPE" == "darwin"* ]]; then
-  # macOS - Check for regular Chrome
-  regular_chrome=$(pgrep -f "Google Chrome$" | wc -l | tr -d ' ')
+  # Debug: Show running Chrome processes
+  echo "-- Before cleanup --"
+  
+  # Only count the main Chrome process, not helpers
+  MAIN_CHROME_PATTERN="Google Chrome$"
+  TESTING_CHROME_PATTERN="Chrome for Testing$"
+  CHROMEDRIVER_PATTERN="chromedriver"
+  
+  regular_chrome=$(count_processes "$MAIN_CHROME_PATTERN")
+  testing_chrome=$(count_processes "$TESTING_CHROME_PATTERN")
+  chromedriver=$(count_processes "$CHROMEDRIVER_PATTERN")
+  
+  echo "Regular Chrome processes: $regular_chrome"
+  echo "Chrome for Testing processes: $testing_chrome"
+  echo "ChromeDriver processes: $chromedriver"
   
   # Try graceful shutdown for testing Chrome
-  pkill -TERM -f "Google Chrome for Testing" > /dev/null 2>&1 || true
-  pkill -TERM -f "chromedriver.*testing" > /dev/null 2>&1 || true
-  sleep 2
+  if [ "$testing_chrome" -gt 0 ]; then
+    echo "Sending SIGTERM to Chrome for Testing processes..."
+    pkill -TERM -f 'Chrome for Testing' > /dev/null 2>&1 || true
+    sleep 2
+  fi
+  
+  if [ "$chromedriver" -gt 0 ]; then
+    echo "Sending SIGTERM to ChromeDriver processes..."
+    pkill -TERM -f 'chromedriver' > /dev/null 2>&1 || true
+    sleep 1
+  fi
   
   # Only force kill if still running
-  test_chrome_count=$(pgrep -f "Google Chrome for Testing" | wc -l | tr -d ' ')
-  if [ "$test_chrome_count" -gt 0 ]; then
-    echo "Process still running after SIGTERM, using force kill for testing processes..."
-    pkill -9 -f "Google Chrome for Testing" > /dev/null 2>&1 || true
+  testing_chrome_after=$(count_processes "$TESTING_CHROME_PATTERN")
+  if [ "$testing_chrome_after" -gt 0 ]; then
+    echo "Process still running after SIGTERM, using force kill for Chrome for Testing..."
+    pkill -9 -f 'Chrome for Testing' > /dev/null 2>&1 || true
+  fi
+  
+  chromedriver_after=$(count_processes "$CHROMEDRIVER_PATTERN")
+  if [ "$chromedriver_after" -gt 0 ]; then
+    echo "Process still running after SIGTERM, using force kill for ChromeDriver..."
+    pkill -9 -f 'chromedriver' > /dev/null 2>&1 || true
   fi
   
   # Check if regular Chrome is preserved
-  after_chrome=$(pgrep -f "Google Chrome$" | wc -l | tr -d ' ')
-  if [ "$regular_chrome" -gt 0 ] && [ "$after_chrome" -gt 0 ]; then
+  regular_chrome_after=$(count_processes "$MAIN_CHROME_PATTERN")
+  echo "-- After cleanup --"
+  echo "Regular Chrome processes: $regular_chrome_after"
+  
+  if [ "$regular_chrome" -gt 0 ] && [ "$regular_chrome_after" -gt 0 ]; then
     echo "✓ Regular Chrome browser preserved during test process cleanup"
   elif [ "$regular_chrome" -gt 0 ]; then
     echo "! Warning: Regular Chrome browser may have been affected"
   fi
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-  # Linux - similar approach
-  pkill -TERM -f "chrome.*for.*testing" > /dev/null 2>&1 || true
+  # Linux - similar approach with more precise patterns
+  echo "Linux environment detected - cleaning up only testing processes"
+  pkill -TERM -f 'chrome.*for.*testing' > /dev/null 2>&1 || true
+  pkill -TERM -f 'chromedriver' > /dev/null 2>&1 || true
   sleep 2
-  pkill -9 -f "chrome.*for.*testing" > /dev/null 2>&1 || true
+  pkill -9 -f 'chrome.*for.*testing' > /dev/null 2>&1 || true
+  pkill -9 -f 'chromedriver' > /dev/null 2>&1 || true
 fi
 
 # Clean up temp directories

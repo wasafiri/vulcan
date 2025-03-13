@@ -96,10 +96,11 @@ The key files for Chrome for Testing setup are:
 5. Keep Chrome and ChromeDriver versions in sync
 6. Use a dedicated user profile for testing
 7. Our process management now:
-   - Uses precise pattern matching to only target Chrome for Testing
+   - Uses precise pattern matching to only target Chrome for Testing processes
    - Implements graceful shutdown with SIGTERM before force-killing
+   - Provides detailed debugging output about running processes
    - Verifies preservation of your regular Chrome browser during tests
-   - Provides clear log messages about process management actions
+   - Includes more reliable process detection on different platforms
 
 ## References
 
