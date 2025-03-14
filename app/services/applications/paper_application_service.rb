@@ -149,155 +149,78 @@ module Applications
     end
 
     # Handles proof submission process for paper applications
-    # 
-    # Uses the same approach as constituent portal, passing signed_ids directly
-    # to ProofAttachmentService
     def handle_proof(type)
       action = params["#{type}_proof_action"]
       return true unless action.in?(%w[accept reject]) # Return success if no action needed
 
       if action == "accept"
         begin
-          # Use ProofAttachmentService to handle the attachment
-          Rails.logger.info "Using ProofAttachmentService for #{type} proof attachment"
+          # Simpler direct attachment mechanism to avoid potential issues with ProofAttachmentService
+          # This is a fallback approach that bypasses some of the complexity
+          Rails.logger.info "Paper application direct attachment for #{type}_proof"
           
-          # Now giving priority to the regular file upload since we've removed direct upload functionality
-          blob_or_file = nil
+          # Get the file from params
+          file = params["#{type}_proof"]
           
-          if params["#{type}_proof"].present?
-            blob_or_file = params["#{type}_proof"]
-            Rails.logger.info "Using file upload for #{type} proof: #{blob_or_file.class.name}"
-          # Fallback: signed_id from direct upload (for backward compatibility)
-          elsif params["#{type}_proof_signed_id"].present?
-            blob_or_file = params["#{type}_proof_signed_id"]
-            Rails.logger.info "Found signed_id for #{type} proof: #{blob_or_file}"
+          unless file.present?
+            Rails.logger.error "No #{type}_proof file found in params"
+            return add_error("Missing #{type} proof file")
+          end
+          
+          Rails.logger.info "File details: Class=#{file.class.name}, Name=#{file.original_filename}, Type=#{file.content_type}, Size=#{file.size}"
+          
+          # Direct attachment approach
+          @application.send("#{type}_proof").attach(file)
+          
+          # Set the status to approved (for paper applications)
+          @application.update_column("#{type}_proof_status", Application.send("#{type}_proof_statuses")[:approved])
+          
+          # Verify attachment
+          @application.reload
+          
+          # Log verification
+          if @application.send("#{type}_proof").attached?
+            Rails.logger.info "Successfully attached #{type} proof directly for application #{@application.id}"
+            attachment = @application.send("#{type}_proof").attachment
+            Rails.logger.info "Attachment details: ID=#{attachment.id}, Blob ID=#{attachment.blob_id}"
+            return true
           else
-            Rails.logger.error "No #{type}_proof parameter provided"
-            return add_error("No file provided for #{type} proof")
-          end
-          
-          Rails.logger.info "Using blob_or_file: #{blob_or_file.class.name}" if blob_or_file.present?
-          
-          result = ProofAttachmentService.attach_proof(
-            application: @application,
-            proof_type: type,
-            blob_or_file: blob_or_file,
-            status: :approved,  # Always approved for paper applications
-            admin: @admin,
-            metadata: {
-              ip_address: '0.0.0.0', # Paper application doesn't have an IP
-              submission_method: 'paper',
-              paper_application_id: @application.id
-            }
-          )
-          
-          # Error handling and verification
-          unless result && result[:success]
-            error_message = result&.dig(:error)&.message || "Failed to attach and approve #{type} proof"
-            Rails.logger.error "ATTACHMENT ERROR: #{error_message}"
-            return add_error(error_message)
-          end
-          
-          # Check if the attachment was truly successful by looking directly at the attachments table
-          attachment_exists = ActiveStorage::Attachment.where(
-            record_type: 'Application',
-            record_id: @application.id,
-            name: "#{type}_proof"
-          ).exists?
-          
-          unless attachment_exists
-            Rails.logger.warn "Attachment record not found for #{type}_proof - fixing now"
-            
-            # Determine the blob ID to use
-            blob_id = nil
-            
-            if blob_or_file.is_a?(String) && blob_or_file.start_with?("eyJf")
-              # It's a signed_id, find the actual blob
-              blob_id = ActiveStorage::Blob.find_signed(blob_or_file)&.id
-              Rails.logger.info "Found blob ID #{blob_id} from signed_id"
-            elsif blob_or_file.respond_to?(:id) && blob_or_file.is_a?(ActiveStorage::Blob)
-              # It's already a blob object
-              blob_id = blob_or_file.id
-              Rails.logger.info "Using direct blob ID #{blob_id}"
-            end
-            
-            if blob_id.present?
-              # Directly create the attachment record
-              Rails.logger.info "Creating missing attachment record for #{type}_proof with blob ID #{blob_id}"
-              ActiveStorage::Attachment.create!(
-                name: "#{type}_proof",
-                record_type: 'Application',
-                record_id: @application.id,
-                blob_id: blob_id
-              )
-            else
-              error_message = "Failed to determine blob ID for #{type}_proof"
-              Rails.logger.error error_message
-              return add_error(error_message)
-            end
-          end
-          
-          # Reload the application to refresh attachments
-          @application = Application.uncached { Application.find(@application.id) }
-          
-          # Verify the attachment exists after our fix
-          unless @application.send("#{type}_proof").attached?
-            error_message = "Failed to verify #{type}_proof attachment after fixing records"
+            error_message = "Failed to verify #{type}_proof attachment after direct attachment"
             Rails.logger.error error_message
             return add_error(error_message)
           end
           
-          # Verify status was set correctly
-          unless @application.send("#{type}_proof_status") == "approved"
-            # Manually set the status if it's not right
-            @application.update_column("#{type}_proof_status", Application.send("#{type}_proof_statuses")[:approved])
-            Rails.logger.warn "Had to manually set #{type} proof status to approved"
-          end
-          
-          Rails.logger.info "Successfully attached and approved #{type} proof for application #{@application.id}"
-          return true
         rescue => e
-          Rails.logger.error "Error in handle_proof(#{type}): #{e.message}\n#{e.backtrace.join("\n")}"
-          return add_error("Error processing #{type} proof: #{e.message}")
+          Rails.logger.error "Error directly attaching #{type} proof: #{e.message}\n#{e.backtrace.join("\n")}"
+          return add_error("Error attaching #{type} proof: #{e.message}")
         end
       elsif action == "reject"
         # Get the reason and notes from the params
         reason = params["#{type}_proof_rejection_reason"].presence || "other"
         notes = params["#{type}_proof_rejection_notes"].presence || "Rejected during paper application submission"
         
-        # Use a separate isolated transaction for rejection
-        result = nil
-        ActiveRecord::Base.transaction(requires_new: true) do
-          # Use the ProofAttachmentService to handle rejection with telemetry
-          result = ProofAttachmentService.reject_proof_without_attachment(
-            application: @application,
-            proof_type: type,
+        begin
+          # Create rejection directly
+          @application.proof_reviews.create!(
             admin: @admin,
-            reason: reason,
+            proof_type: type,
+            status: :rejected,
+            rejection_reason: reason,
             notes: notes,
-            metadata: {
-              ip_address: '0.0.0.0', # Paper application doesn't have an IP
-              submission_method: 'paper',
-              paper_application_id: @application.id
-            }
+            submission_method: :paper,
+            reviewed_at: Time.current
           )
-        end
-        
-        unless result && result[:success]
-          error_message = result&.dig(:error)&.message || "Failed to reject #{type} proof"
-          return add_error(error_message)
-        end
-        
-        # Verify status was set correctly
-        @application.reload
-        unless @application.send("#{type}_proof_status") == "rejected"
-          error_message = "Failed to set #{type} proof status to rejected"
+          
+          # Update status directly
+          @application.update_column("#{type}_proof_status", Application.send("#{type}_proof_statuses")[:rejected])
+          
+          Rails.logger.info "Successfully rejected #{type} proof for application #{@application.id}"
+          return true
+        rescue => e
+          error_message = "Failed to reject #{type} proof: #{e.message}"
           Rails.logger.error error_message
           return add_error(error_message)
         end
-        
-        Rails.logger.info "Successfully rejected #{type} proof for application #{@application.id}"
-        return true
       end
       
       true # Default success

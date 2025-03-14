@@ -12,12 +12,28 @@ class Admin::PaperApplicationsController < Admin::BaseController
   # Removed direct_upload method as we're using standard Rails file uploads now
 
   def create
+    # Log file upload information for debugging
+    if params[:income_proof].present?
+      Rails.logger.info "INCOME PROOF FILE: Class=#{params[:income_proof].class.name}, Size=#{params[:income_proof].size}"
+    else
+      Rails.logger.info "No income proof file uploaded"
+    end
+    
+    if params[:residency_proof].present?
+      Rails.logger.info "RESIDENCY PROOF FILE: Class=#{params[:residency_proof].class.name}, Size=#{params[:residency_proof].size}"
+    else
+      Rails.logger.info "No residency proof file uploaded"
+    end
+
     service = Applications::PaperApplicationService.new(
       params: paper_application_params,
       admin: current_user
     )
 
     if service.create
+      # Force reload the application to ensure attachments are visible
+      service.application.reload
+      
       # Check if any proofs were rejected and add more detailed notice
       if service.application.proof_reviews.where(status: :rejected).any?
         rejected_proofs = []
@@ -33,6 +49,15 @@ class Admin::PaperApplicationsController < Admin::BaseController
         end
       else
         notice_message = "Paper application successfully submitted."
+      end
+      
+      # Double-check attachments
+      if params[:income_proof].present? && !service.application.income_proof.attached?
+        notice_message += " Warning: Income proof attachment may need review."
+      end
+      
+      if params[:residency_proof].present? && !service.application.residency_proof.attached?
+        notice_message += " Warning: Residency proof attachment may need review."
       end
       
       redirect_to admin_application_path(service.application), notice: notice_message
