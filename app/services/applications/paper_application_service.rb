@@ -161,19 +161,18 @@ module Applications
           # Use ProofAttachmentService to handle the attachment
           Rails.logger.info "Using ProofAttachmentService for #{type} proof attachment"
           
-          # Check for the signed_id first, then fall back to the regular file
+          # Now giving priority to the regular file upload since we've removed direct upload functionality
           blob_or_file = nil
           
-          # First priority: signed_id from direct upload
-          if params["#{type}_proof_signed_id"].present?
+          if params["#{type}_proof"].present?
+            blob_or_file = params["#{type}_proof"]
+            Rails.logger.info "Using file upload for #{type} proof: #{blob_or_file.class.name}"
+          # Fallback: signed_id from direct upload (for backward compatibility)
+          elsif params["#{type}_proof_signed_id"].present?
             blob_or_file = params["#{type}_proof_signed_id"]
             Rails.logger.info "Found signed_id for #{type} proof: #{blob_or_file}"
-          # Second priority: regular file upload
-          elsif params["#{type}_proof"].present?
-            blob_or_file = params["#{type}_proof"]
-            Rails.logger.info "Using file upload for #{type} proof"
           else
-            Rails.logger.error "No #{type}_proof or #{type}_proof_signed_id parameter provided"
+            Rails.logger.error "No #{type}_proof parameter provided"
             return add_error("No file provided for #{type} proof")
           end
           

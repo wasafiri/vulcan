@@ -15,21 +15,21 @@
 # This is the single source of truth for attachment operations to avoid inconsistencies
 # between different submission paths.
 class ProofAttachmentService
-  # Attaches a proof document to an application
-  #
-  # This is the central method used by both constituent portal and paper application
-  # workflows to attach proof documents. It handles different input types, manages
-  # transactions, and provides consistent logging and metrics.
-  #
-  # @param application [Application] The application to attach the proof to
-  # @param proof_type [Symbol] The type of proof (:income or :residency)
-  # @param blob_or_file [ActiveStorage::Blob, String, ActionDispatch::Http::UploadedFile] 
-  #        The file to attach - can be a direct blob, a signed_id string, or an uploaded file
-  # @param status [Symbol] The status to set for the proof (:not_reviewed, :approved, :rejected)
-  # @param admin [User] The admin user if this is an admin action (nil for constituent actions)
-  # @param metadata [Hash] Additional metadata to store with the attachment audit
-  #
-  # @return [Hash] Result hash with :success, :error, and :duration_ms keys
+    # Attaches a proof document to an application
+    #
+    # This is the central method used by both constituent portal and paper application
+    # workflows to attach proof documents. It handles different input types, manages
+    # transactions, and provides consistent logging and metrics.
+    #
+    # @param application [Application] The application to attach the proof to
+    # @param proof_type [Symbol] The type of proof (:income or :residency)
+    # @param blob_or_file [ActiveStorage::Blob, String, ActionDispatch::Http::UploadedFile] 
+    #        The file to attach - can be a direct blob, a signed_id string, or an uploaded file
+    # @param status [Symbol] The status to set for the proof (:not_reviewed, :approved, :rejected)
+    # @param admin [User] The admin user if this is an admin action (nil for constituent actions)
+    # @param metadata [Hash] Additional metadata to store with the attachment audit
+    #
+    # @return [Hash] Result hash with :success, :error, and :duration_ms keys
   def self.attach_proof(application:, proof_type:, blob_or_file:, status: :not_reviewed, admin: nil, metadata: {})
     start_time = Time.current
     result = { success: false, error: nil, duration_ms: 0 }
@@ -61,10 +61,28 @@ class ProofAttachmentService
         # Already a signed_id string - use as is
         Rails.logger.info "Input is already a signed_id, using directly: #{blob_or_file[0..20]}..."
         attachment_param = blob_or_file
-      elsif blob_or_file.respond_to?(:tempfile)
-        # ActionDispatch::Http::UploadedFile - use as is
-        Rails.logger.info "UPLOAD INFO: Filename=#{blob_or_file.original_filename}, Content-Type=#{blob_or_file.content_type}, Size=#{blob_or_file.size}"
+      elsif blob_or_file.respond_to?(:tempfile) || blob_or_file.is_a?(ActionDispatch::Http::UploadedFile)
+        # ActionDispatch::Http::UploadedFile or similar - use as is
+        if blob_or_file.respond_to?(:original_filename)
+          Rails.logger.info "UPLOAD INFO: Filename=#{blob_or_file.original_filename}, Content-Type=#{blob_or_file.content_type}, Size=#{blob_or_file.size}"
+        end
+        Rails.logger.info "Using direct file upload attachment: #{blob_or_file.class.name}"
         attachment_param = blob_or_file
+        
+        # Create ActiveStorage blob directly for more reliable attachment
+        Rails.logger.info "Creating blob from uploaded file"
+        begin
+          blob = ActiveStorage::Blob.create_and_upload!(
+            io: blob_or_file.tempfile,
+            filename: blob_or_file.original_filename,
+            content_type: blob_or_file.content_type
+          )
+          Rails.logger.info "Successfully created blob for #{proof_type}_proof: #{blob.id}"
+          attachment_param = blob.signed_id
+        rescue => e
+          Rails.logger.error "Failed to create blob from uploaded file: #{e.message}"
+          # Continue with original param as fallback
+        end
       else
         # Other types (IO, Hash, etc) - use as is
         Rails.logger.info "ATTACHMENT PARAM TYPE: #{blob_or_file.class.name}"
