@@ -43,6 +43,11 @@ Rails.application.routes.draw do
         resources :inbound_emails, only: [:create]
       end
     end
+
+    # Active Storage direct upload routes
+    namespace :active_storage do
+      resources :direct_uploads, only: [:create]
+    end
   end
 
   namespace :admin do
@@ -52,7 +57,6 @@ Rails.application.routes.draw do
       collection do
         post :send_rejection_notification
         get :fpl_thresholds
-        post :direct_upload
       end
     end
 

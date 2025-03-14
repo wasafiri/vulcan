@@ -1,13 +1,5 @@
 class Admin::PaperApplicationsController < Admin::BaseController
   before_action :set_paper_application_context, only: [:create]
-  skip_before_action :verify_authenticity_token, only: [:direct_upload]
-  def direct_upload
-    blob = ActiveStorage::Blob.create_before_direct_upload!(blob_params)
-    render json: direct_upload_json(blob)
-  rescue ActionController::ParameterMissing => e
-    render json: { error: e.message }, status: :unprocessable_entity
-  end
-
   def new
     @paper_application = {
       application: Application.new,
@@ -131,21 +123,6 @@ class Admin::PaperApplicationsController < Admin::BaseController
   end
 
   private
-
-  def blob_params
-    params.require(:blob).permit(:filename, :byte_size, :checksum, :content_type, metadata: {})
-  end
-
-  def direct_upload_json(blob)
-    {
-      signed_id: blob.signed_id,
-      direct_upload: {
-        url: blob.service_url_for_direct_upload,
-        headers: blob.service_headers_for_direct_upload
-      }
-    }
-  end
-
 
   def set_paper_application_context
     # Set thread variable to indicate we're in a paper application context
