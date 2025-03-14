@@ -23,3 +23,11 @@ proof_attachment_metrics:
   description: "Generate daily metrics on proof attachment success/failure rates"
   queue: "low"
   args: []
+
+# Run proof consistency check job weekly
+proof_consistency_check:
+  class: ProofConsistencyCheckJob
+  cron: "0 3 * * 0"  # At 3 AM every Sunday
+  description: "Check for inconsistent proof attachments and statuses"
+  queue: "low"
+  args: []

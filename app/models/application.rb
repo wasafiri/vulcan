@@ -61,6 +61,8 @@ class Application < ApplicationRecord
 
   validate :waiting_period_completed, on: :create
   validate :constituent_must_have_disability, if: :validate_disability?
+  validate :proof_status_consistency
+  validate :proof_attachment_integrity
 
   # Callbacks
   after_update :schedule_admin_notifications, if: :needs_proof_review?
@@ -471,5 +473,31 @@ class Application < ApplicationRecord
     return true if submitted?
 
     false
+  end
+  
+  def proof_status_consistency
+    # Check if approved proofs have attachments
+    if income_proof_status_approved? && !income_proof.attached?
+      errors.add(:income_proof, "must be attached when status is approved")
+      Rails.logger.warn "Application #{id}: Income proof marked as approved but no file is attached"
+    end
+    
+    if residency_proof_status_approved? && !residency_proof.attached?
+      errors.add(:residency_proof, "must be attached when status is approved")
+      Rails.logger.warn "Application #{id}: Residency proof marked as approved but no file is attached"
+    end
+  end
+  
+  def proof_attachment_integrity
+    # Check if attached proofs have appropriate status
+    if income_proof.attached? && income_proof_status_not_reviewed?
+      errors.add(:income_proof_status, "cannot be not_reviewed when proof is attached")
+      Rails.logger.warn "Application #{id}: Income proof is attached but status is not_reviewed"
+    end
+    
+    if residency_proof.attached? && residency_proof_status_not_reviewed?
+      errors.add(:residency_proof_status, "cannot be not_reviewed when proof is attached")
+      Rails.logger.warn "Application #{id}: Residency proof is attached but status is not_reviewed"
+    end
   end
 end

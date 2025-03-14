@@ -7,8 +7,8 @@ class ProofAttachmentService
     result = { success: false, error: nil, duration_ms: 0 }
     
     begin
-      # Single transaction pattern (like constituent portal)
-      application.transaction do
+      # Using requires_new to ensure nested transactions work properly
+      ActiveRecord::Base.transaction(requires_new: true) do
         # Attach the proof
         application.send("#{proof_type}_proof").attach(blob_or_file)
         
@@ -16,25 +16,30 @@ class ProofAttachmentService
         status_attrs = {"#{proof_type}_proof_status" => status}
         status_attrs[:needs_review_since] = Time.current if status == :not_reviewed
         application.update!(status_attrs)
+        
+        # Create audit record within the same transaction for atomic operations
+        ProofSubmissionAudit.create!(
+          application: application,
+          user: admin || application.user,
+          proof_type: proof_type,
+          submission_method: admin ? :paper : :web,
+          ip_address: metadata[:ip_address] || '0.0.0.0',
+          metadata: metadata.merge(
+            success: true,
+            status: status,
+            has_attachment: true, # We know it's attached at this point in the transaction
+            blob_id: blob_or_file.respond_to?(:id) ? blob_or_file.id : nil
+          )
+        )
       end
       
-      # Create audit record for tracking and metrics
-      ProofSubmissionAudit.create!(
-        application: application,
-        user: admin || application.user,
-        proof_type: proof_type,
-        submission_method: admin ? :paper : :web,
-        ip_address: metadata[:ip_address] || '0.0.0.0',
-        metadata: metadata.merge(
-          success: true,
-          status: status,
-          has_attachment: application.send("#{proof_type}_proof").attached?,
-          blob_id: application.send("#{proof_type}_proof").blob&.id
-        )
-      )
+      # Verify the attachment outside the transaction
+      application.reload
+      if !application.send("#{proof_type}_proof").attached?
+        raise "Failed to verify attachment: #{proof_type}_proof not attached after transaction"
+      end
       
       result[:success] = true
-      application.reload
     rescue => e
       # Track failure with detailed information
       record_failure(application, proof_type, e, admin, metadata)
@@ -128,23 +133,69 @@ class ProofAttachmentService
   end
   
   def self.record_metrics(result, proof_type, status)
-    # Basic logging
-    if result[:success]
-      Rails.logger.info "Proof #{proof_type} #{status} completed in #{result[:duration_ms]}ms"
-    else
-      Rails.logger.error "Proof #{proof_type} #{status} failed in #{result[:duration_ms]}ms: #{result[:error]&.message}"
+    # Enhanced metrics for better monitoring in production
+    begin
+      # Basic logging
+      if result[:success]
+        Rails.logger.info "Proof #{proof_type} #{status} completed in #{result[:duration_ms]}ms"
+      else
+        Rails.logger.error "Proof #{proof_type} #{status} failed in #{result[:duration_ms]}ms: #{result[:error]&.message}"
+      end
+      
+      # Additional context for troubleshooting
+      context = {
+        proof_type: proof_type,
+        status: status,
+        success: result[:success],
+        duration_ms: result[:duration_ms],
+        environment: Rails.env,
+        transaction_id: SecureRandom.uuid
+      }
+      
+      # Add blob size if available for capacity planning
+      if result[:success] && result[:blob_size].present?
+        context[:blob_size_bytes] = result[:blob_size]
+      end
+      
+      # Add error details if present
+      if result[:error]
+        context[:error_class] = result[:error].class.name
+        context[:error_message] = result[:error].message
+        context[:error_backtrace] = result[:error].backtrace.first(3) if result[:error].backtrace
+      end
+      
+      # Record to Honeybadger if failure in production for automatic alerting
+      if !result[:success] && Rails.env.production? && defined?(Honeybadger)
+        Honeybadger.notify(
+          "Proof attachment operation failed",
+          context: context
+        )
+      end
+      
+      # Add integration with monitoring tools
+      # This is a placeholder - we'd integrate with whatever monitoring system is in use
+      if defined?(Datadog)
+        tags = [
+          "proof_type:#{proof_type}",
+          "status:#{status}",
+          "success:#{result[:success]}",
+          "environment:#{Rails.env}"
+        ]
+        
+        Datadog.increment('proof_attachments.operations', tags: tags)
+        Datadog.timing('proof_attachments.duration', result[:duration_ms], tags: tags)
+        
+        # Track blob sizes for capacity planning
+        if result[:success] && result[:blob_size].present?
+          Datadog.histogram('proof_attachments.size', result[:blob_size], tags: tags)
+        end
+      end
+      
+      # Log metric details to application logs for easier troubleshooting
+      Rails.logger.info("METRICS: proof_attachment #{context.to_json}")
+    rescue => e
+      # Don't let metrics recording failures impact the actual operation
+      Rails.logger.error "Failed to record proof metrics: #{e.message}"
     end
-    
-    # Add integration with monitoring tools
-    # This is a placeholder - we'd integrate with whatever monitoring system is in use
-    # For example, with Datadog:
-    if defined?(Datadog)
-      tags = ["proof_type:#{proof_type}", "status:#{status}", "success:#{result[:success]}"]
-      Datadog.increment('proof_attachments.count', tags: tags)
-      Datadog.timing('proof_attachments.duration', result[:duration_ms], tags: tags)
-    end
-  rescue => e
-    # Don't let metrics recording failures impact the actual operation
-    Rails.logger.error "Failed to record proof metrics: #{e.message}"
   end
 end

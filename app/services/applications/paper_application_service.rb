@@ -160,40 +160,54 @@ module Applications
           return add_error("No file provided for #{type} proof")
         end
         
-        # Use the pre-uploaded blob if provided, otherwise create one
-        actual_blob = blob
-        if !actual_blob && params["#{type}_proof"].present?
-          Rails.logger.info "Creating blob for #{type} proof from uploaded file"
-          actual_blob = create_blob_from_uploaded_file(params["#{type}_proof"], type)
+        begin
+          # Use the pre-uploaded blob if provided, otherwise create one
+          actual_blob = blob
+          if !actual_blob && params["#{type}_proof"].present?
+            Rails.logger.info "Creating blob for #{type} proof from uploaded file"
+            actual_blob = create_blob_from_uploaded_file(params["#{type}_proof"], type)
+          end
+          
+          # Make sure we have a blob
+          unless actual_blob
+            error_message = "Failed to create or find blob for #{type} proof"
+            Rails.logger.error error_message
+            return add_error(error_message)
+          end
+          
+          # Use a separate transaction to isolate file attachment operations
+          # Use the ProofAttachmentService to handle attachment with telemetry
+          result = ProofAttachmentService.attach_proof(
+            application: @application,
+            proof_type: type,
+            blob_or_file: actual_blob,
+            status: :approved,  # Always approved for paper applications
+            admin: @admin,
+            metadata: {
+              ip_address: '0.0.0.0', # Paper application doesn't have an IP
+              submission_method: 'paper',
+              paper_application_id: @application.id
+            }
+          )
+          
+          unless result[:success]
+            error_message = result[:error]&.message || "Failed to attach and approve #{type} proof"
+            Rails.logger.error "#{error_message}\n#{result[:error]&.backtrace&.join("\n")}"
+            return add_error(error_message)
+          end
+          
+          # Verify the attachment was successful
+          unless @application.reload.send("#{type}_proof").attached?
+            error_message = "Failed to verify #{type} proof attachment"
+            Rails.logger.error error_message
+            return add_error(error_message)
+          end
+          
+          Rails.logger.info "Successfully attached and approved #{type} proof for application #{@application.id}"
+        rescue => e
+          Rails.logger.error "Error in handle_proof(#{type}): #{e.message}\n#{e.backtrace.join("\n")}"
+          return add_error("Error processing #{type} proof: #{e.message}")
         end
-        
-        # Make sure we have a blob
-        unless actual_blob
-          error_message = "Failed to create or find blob for #{type} proof"
-          Rails.logger.error error_message
-          return add_error(error_message)
-        end
-        
-        # Use the ProofAttachmentService to handle attachment with telemetry
-        result = ProofAttachmentService.attach_proof(
-          application: @application,
-          proof_type: type,
-          blob_or_file: actual_blob,
-          status: :approved,
-          admin: @admin,
-          metadata: {
-            ip_address: '0.0.0.0', # Paper application doesn't have an IP
-            submission_method: 'paper',
-            paper_application_id: @application.id
-          }
-        )
-        
-        unless result[:success]
-          error_message = result[:error]&.message || "Failed to attach and approve #{type} proof"
-          return add_error(error_message)
-        end
-        
-        Rails.logger.info "Successfully attached and approved #{type} proof for application #{@application.id}"
         
       elsif action == "reject"
         # Get the reason and notes from the params

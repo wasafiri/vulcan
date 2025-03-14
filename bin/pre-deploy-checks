@@ -1,0 +1,110 @@
+#!/usr/bin/env ruby
+
+# Script to run pre-deployment checks
+# This ensures that the application is in a consistent state before deployment
+# Usage: bin/pre-deploy-checks
+
+require_relative '../config/environment'
+
+puts "Running pre-deployment checks..."
+
+# Check database sequences
+begin
+  if ActiveRecord::Base.connection.adapter_name.downcase.include?('postgresql')
+    puts "Checking database sequences..."
+    
+    # Check applications sequence
+    sequence_value = ActiveRecord::Base.connection.execute("SELECT last_value FROM applications_id_seq").first["last_value"]
+    
+    if sequence_value < 980_000_000
+      puts "WARNING: applications_id_seq is too low (#{sequence_value}), should be at least 980,000,000"
+      puts "Consider running: ALTER SEQUENCE applications_id_seq RESTART WITH 980000000;"
+    else
+      puts "✓ applications_id_seq is at a safe value (#{sequence_value})"
+    end
+  end
+rescue => e
+  puts "ERROR checking sequences: #{e.message}"
+end
+
+# Check for inconsistent proof attachments/statuses
+begin
+  puts "Checking for proof status inconsistencies..."
+  
+  approved_without_attachment = Application.where(income_proof_status: :approved)
+                                          .joins("LEFT JOIN active_storage_attachments ON active_storage_attachments.record_id = applications.id AND active_storage_attachments.record_type = 'Application' AND active_storage_attachments.name = 'income_proof'")
+                                          .where("active_storage_attachments.id IS NULL")
+                                          .count
+  
+  attached_not_reviewed = ActiveStorage::Attachment.where(record_type: 'Application', name: 'income_proof')
+                                                  .joins("JOIN applications ON applications.id = active_storage_attachments.record_id")
+                                                  .where("applications.income_proof_status = 0") # 0 = not_reviewed
+                                                  .count
+  
+  if approved_without_attachment > 0
+    puts "WARNING: Found #{approved_without_attachment} applications with approved income proof but no attachment"
+  else
+    puts "✓ No applications with approved income proof and missing attachment"
+  end
+  
+  if attached_not_reviewed > 0
+    puts "WARNING: Found #{attached_not_reviewed} applications with income proof attached but status not_reviewed"
+  else
+    puts "✓ No applications with attached income proof and not_reviewed status"
+  end
+  
+  # Similar checks for residency proof
+  approved_without_attachment = Application.where(residency_proof_status: :approved)
+                                          .joins("LEFT JOIN active_storage_attachments ON active_storage_attachments.record_id = applications.id AND active_storage_attachments.record_type = 'Application' AND active_storage_attachments.name = 'residency_proof'")
+                                          .where("active_storage_attachments.id IS NULL")
+                                          .count
+  
+  attached_not_reviewed = ActiveStorage::Attachment.where(record_type: 'Application', name: 'residency_proof')
+                                                  .joins("JOIN applications ON applications.id = active_storage_attachments.record_id")
+                                                  .where("applications.residency_proof_status = 0") # 0 = not_reviewed
+                                                  .count
+  
+  if approved_without_attachment > 0
+    puts "WARNING: Found #{approved_without_attachment} applications with approved residency proof but no attachment"
+  else
+    puts "✓ No applications with approved residency proof and missing attachment"
+  end
+  
+  if attached_not_reviewed > 0
+    puts "WARNING: Found #{attached_not_reviewed} applications with residency proof attached but status not_reviewed"
+  else
+    puts "✓ No applications with attached residency proof and not_reviewed status"
+  end
+rescue => e
+  puts "ERROR checking proof consistency: #{e.message}"
+end
+
+# Check database constraints
+begin
+  if ActiveRecord::Base.connection.adapter_name.downcase.include?('postgresql')
+    puts "Checking database constraints..."
+    
+    constraints = ActiveRecord::Base.connection.execute("
+      SELECT conname 
+      FROM pg_constraint 
+      WHERE conrelid = 'applications'::regclass::oid
+      AND conname IN ('income_proof_status_check', 'residency_proof_status_check')
+    ").map { |row| row["conname"] }
+    
+    if constraints.include?('income_proof_status_check')
+      puts "✓ income_proof_status_check constraint exists"
+    else
+      puts "WARNING: income_proof_status_check constraint is missing"
+    end
+    
+    if constraints.include?('residency_proof_status_check')
+      puts "✓ residency_proof_status_check constraint exists"
+    else
+      puts "WARNING: residency_proof_status_check constraint is missing"
+    end
+  end
+rescue => e
+  puts "ERROR checking constraints: #{e.message}"
+end
+
+puts "Pre-deployment checks completed"
