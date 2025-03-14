@@ -13,6 +13,7 @@ class RegistrationsController < ApplicationController
   def create
     @user = User.new(registration_params)
     @user.type = "Constituent"
+    @user.force_password_change = true
 
     if @user.save
       @session = @user.sessions.create!(

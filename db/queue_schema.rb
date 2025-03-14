@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_03_13_000000) do
+ActiveRecord::Schema[8.0].define(version: 2025_03_14_020003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -547,6 +547,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_13_000000) do
     t.integer "w9_status", default: 0, null: false
     t.integer "w9_rejections_count", default: 0, null: false
     t.datetime "last_w9_reminder_sent_at"
+    t.boolean "force_password_change", default: false, null: false
     t.index ["business_name"], name: "index_users_on_business_name"
     t.index ["business_tax_id"], name: "index_users_on_business_tax_id"
     t.index ["email"], name: "index_users_on_email", unique: true

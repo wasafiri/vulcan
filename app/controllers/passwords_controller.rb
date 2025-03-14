@@ -26,7 +26,7 @@ class PasswordsController < ApplicationController
     if params[:password] == params[:password_confirmation]
       @user = current_user
       if @user&.authenticate(params[:password_challenge])
-        if @user.update(password: params[:password])
+        if @user.update(password: params[:password], force_password_change: false)
           redirect_to sign_in_path, notice: "Password successfully updated"
         else
           flash.now[:alert] = "Unable to update password"

@@ -77,6 +77,7 @@ module Applications
         @constituent.password = temp_password
         @constituent.password_confirmation = temp_password
         @constituent.verified = true
+        @constituent.force_password_change = true
         
         unless @constituent.save
           return add_error("Failed to create constituent: #{@constituent.errors.full_messages.join(', ')}")
