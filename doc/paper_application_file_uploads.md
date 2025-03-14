@@ -6,39 +6,44 @@ This document explains how file uploads work for paper applications in the MAT s
 
 ## Implementation
 
-### Standard Rails File Uploads
+### Direct Upload to S3
 
-As of March 2025, we've simplified the paper application upload process by removing the direct-to-S3 upload mechanism and replacing it with standard Rails file uploads. This change resolves CORS issues that were occurring with direct uploads.
+The paper application upload process uses Rails' built-in direct upload functionality, which allows files to be uploaded directly from the browser to S3. This is the same approach used in the constituent portal, providing a consistent and reliable upload mechanism across the application.
 
 ### How It Works
 
 1. **File Selection:**
-   - Admin selects a file using the standard file input in the form
+   - Admin selects a file using the file input in the form
    - The JavaScript controller (`upload_controller.js`) tracks the selected file and updates the UI
+   - The file input is configured with `direct_upload: true` and `rails_direct_uploads_url` to enable Rails' direct upload functionality
 
-2. **Form Submission:**
-   - When the admin submits the form, Rails handles the file upload as part of the standard form submission process
-   - The file is temporarily stored on the server and then uploaded to S3 by Rails' ActiveStorage
-   - This eliminates the need for direct browser-to-S3 uploads that were causing CORS issues
+2. **Direct Upload Process:**
+   - When a file is selected, Rails' direct upload mechanism creates a blob record
+   - The browser uploads the file directly to S3 using pre-signed URLs
+   - Progress is tracked and displayed to the user through the UI
+   - The signed blob ID is stored in a hidden field for form submission
 
-3. **Backend Processing:**
-   - The `PaperApplicationService` processes the uploaded file
+3. **Form Submission:**
+   - When the admin submits the form, the signed blob ID is included
+   - The `PaperApplicationService` processes the uploaded file using the blob
    - Files are attached to the application record using ActiveStorage
    - Proof statuses are updated based on admin selections
 
-### Key Changes
+### Key Components
 
-- Removed direct upload endpoint from `Admin::PaperApplicationsController`
-- Simplified the JavaScript controller to only handle file selection feedback
-- Let Rails standard multipart form handling manage the file uploads
-- The form now posts directly to the create action with the file as part of the submission
+- **Controller:** `Admin::PaperApplicationsController` handles the form submission
+- **JavaScript:** `upload_controller.js` manages the direct upload UI and progress tracking (shared with constituent portal)
+- **Service:** `PaperApplicationService` processes the uploaded files and creates the application record
+- **View:** The form in `new.html.erb` configures file inputs to use Rails' direct upload endpoint
 
 ### Benefits
 
-- Eliminated CORS issues with direct uploads
-- Simpler codebase with fewer moving parts
-- Consistent file upload mechanism with standard Rails patterns
-- Improved reliability for paper application processing
+- Direct browser-to-S3 uploads improve performance by bypassing the application server
+- Progress tracking provides better user feedback during uploads
+- Consistent upload mechanism with the constituent portal
+- Built-in error handling and retry capabilities
+- No CORS issues since it uses Rails' standard direct upload endpoint
+- Shared JavaScript controller reduces code duplication
 
 ## Troubleshooting
 
@@ -50,10 +55,14 @@ If file uploads fail:
 2. **Verify File Type:**
    - Supported types: PDF, JPEG, PNG, TIFF, BMP
 
-3. **Server Logs:**
-   - Check server logs for ActiveStorage errors
+3. **Check Browser Console:**
+   - Look for JavaScript errors during upload
+   - Check network requests for direct upload issues
+
+4. **Server Logs:**
+   - Check for ActiveStorage errors
    - Look for S3 configuration issues or permissions problems
 
-4. **Rails Console:**
+5. **Rails Console:**
    - Use `Application.find(id).income_proof.attached?` to verify attachment status
-   - Check for `ActiveStorage::Attachment` records related to the application
+   - Check for `ActiveStorage::Blob` and `ActiveStorage::Attachment` records
