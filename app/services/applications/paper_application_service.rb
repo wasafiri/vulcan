@@ -255,12 +255,23 @@ module Applications
           # This prevents issues with validation during the attachment process
           Thread.current[:paper_application_context] = true
           
-          # Use the central ProofAttachmentService for all proof attachments
-          Rails.logger.info "Using ProofAttachmentService to attach #{type} proof to application #{@application.id}"
+          # EMERGENCY DEBUG: Try direct attachment first
+          Rails.logger.info "EMERGENCY DEBUG: Trying direct attachment first via signed_id"
+          signed_id = actual_blob.signed_id
+          Rails.logger.info "Got signed_id: #{signed_id || 'NIL'}"
+          
+          # Direct attach using signed_id - this should always work
+          @application.send("#{type}_proof").attach(signed_id)
+          @application.reload
+          
+          Rails.logger.info "DIRECT ATTACHMENT: Is attached now? #{@application.send("#{type}_proof").attached?}"
+          
+          # Continue with ProofAttachmentService to update status and create audit
+          Rails.logger.info "Now using ProofAttachmentService to update status for #{type} proof"
           result = ProofAttachmentService.attach_proof(
             application: @application,
             proof_type: type,
-            blob_or_file: actual_blob,
+            blob_or_file: signed_id, # Use the signed_id that we know works
             status: :approved,  # Always approved for paper applications
             admin: @admin,
             metadata: {

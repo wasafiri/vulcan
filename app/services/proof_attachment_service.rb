@@ -45,15 +45,32 @@ class ProofAttachmentService
       # ActiveStorage attach requires a signed_id, IO object, Hash with keys, or ActionDispatch::Http::UploadedFile
       attachment_param = blob_or_file
       
-      # If it's an ActiveStorage::Blob, we need to use its signed_id
+      # CRITICAL FIX: Proper handling of different input types
       if blob_or_file.is_a?(ActiveStorage::Blob)
+        # Direct blob object - convert to signed_id
         Rails.logger.info "Converting blob to signed_id for #{proof_type} proof attachment"
+        Rails.logger.info "BLOB INFO: ID=#{blob_or_file.id}, Key=#{blob_or_file.key}, Content-Type=#{blob_or_file.content_type}, Size=#{blob_or_file.byte_size}"
         attachment_param = blob_or_file.signed_id
-        Rails.logger.debug "Using signed_id: #{attachment_param}"
+        Rails.logger.info "Using signed_id: #{attachment_param || '[nil]'}"
+      elsif blob_or_file.is_a?(String) && blob_or_file.start_with?("eyJf")
+        # Already a signed_id string - use as is
+        Rails.logger.info "Input is already a signed_id, using directly: #{blob_or_file[0..20]}..."
+        attachment_param = blob_or_file
+      elsif blob_or_file.respond_to?(:tempfile)
+        # ActionDispatch::Http::UploadedFile - use as is
+        Rails.logger.info "UPLOAD INFO: Filename=#{blob_or_file.original_filename}, Content-Type=#{blob_or_file.content_type}, Size=#{blob_or_file.size}"
+        attachment_param = blob_or_file
+      else
+        # Other types (IO, Hash, etc) - use as is
+        Rails.logger.info "ATTACHMENT PARAM TYPE: #{blob_or_file.class.name}"
+        attachment_param = blob_or_file
       end
       
+      # Log pre-attachment info
+      Rails.logger.info "PRE-ATTACHMENT CHECK: Application #{application.id}, #{proof_type}_proof attached? #{application.send("#{proof_type}_proof").attached?}"
+      
       # Step 2: Direct attachment first, outside any transaction
-      Rails.logger.info "Attaching #{proof_type} proof to application #{application.id}"
+      Rails.logger.info "EXECUTING ATTACHMENT: #{proof_type}_proof to application #{application.id}"
       application.send("#{proof_type}_proof").attach(attachment_param)
       
       # Step 2: Verify attachment succeeded before proceeding
