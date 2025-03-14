@@ -96,19 +96,22 @@ class ConstituentPortal::Proofs::ProofsController < ApplicationController
       end
 
       def attach_and_update_proof
-        case params[:proof_type]
-        when "income"
-          @application.income_proof.attach(params[:income_proof])
-          @application.update!(
-            income_proof_status: :not_reviewed,
-            needs_review_since: Time.current
-          )
-        when "residency"
-          @application.residency_proof.attach(params[:residency_proof])
-          @application.update!(
-            residency_proof_status: :not_reviewed,
-            needs_review_since: Time.current
-          )
+        result = ProofAttachmentService.attach_proof(
+          application: @application,
+          proof_type: params[:proof_type],
+          blob_or_file: params[:"#{params[:proof_type]}_proof"],
+          status: :not_reviewed,
+          admin: nil,
+          metadata: {
+            ip_address: request.remote_ip,
+            submission_method: :web,
+            user_agent: request.user_agent
+          }
+        )
+        
+        unless result[:success]
+          Rails.logger.error "Failed to attach proof: #{result[:error]&.message}"
+          raise "Failed to attach proof: #{result[:error]&.message}"
         end
       end
 

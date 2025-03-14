@@ -15,3 +15,11 @@ check_voucher_expiration:
   queue: "default"
   args: []
   static: true
+
+# Run proof attachment metrics job daily
+proof_attachment_metrics:
+  class: ProofAttachmentMetricsJob
+  cron: "0 0 * * *"  # At midnight every day
+  description: "Generate daily metrics on proof attachment success/failure rates"
+  queue: "low"
+  args: []
