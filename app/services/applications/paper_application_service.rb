@@ -10,10 +10,59 @@ module Applications
       @constituent = nil
     end
 
-  def create
-    begin
-      # First, validate and upload any proof files outside the transaction
-      # This is because file uploads can be slow and we don't want to hold a DB transaction
+    def create
+      begin
+        # Step 1: Pre-process files to create blobs
+        proof_blobs = process_proof_files
+        return false unless proof_blobs
+        
+        # Step 2: Create constituent and application in a transaction
+        success = false
+        ActiveRecord::Base.transaction do
+          find_or_create_constituent
+          create_application
+          success = @application.present? && @constituent.present?
+        end
+        
+        unless success
+          Rails.logger.error "Failed to create constituent or application"
+          return false
+        end
+        
+        # Verify application was created
+        unless @application&.persisted?
+          add_error("Application creation failed")
+          return false
+        end
+        
+        # Step 3: Handle proofs outside main transaction
+        # This is critical - attachments need their own transaction boundary
+        success = attach_proofs(proof_blobs)
+        unless success
+          # Log but continue - we created the application, just didn't attach proofs
+          Rails.logger.error "Failed to attach one or more proofs for application #{@application.id}"
+        end
+        
+        # Step 4: Send notifications (can fail without rolling back)
+        begin
+          send_notifications
+        rescue StandardError => e
+          # Log but don't fail the overall operation
+          log_error(e, "Failed to send notifications, but application was created")
+        end
+        
+        # Return true if we at least created the application
+        true
+      rescue StandardError => e
+        log_error(e, "Failed to create paper application")
+        false
+      end
+    end
+  
+    private
+    
+    # Process proof files separately to create blobs
+    def process_proof_files
       proof_blobs = {}
       
       # Pre-process income proof if provided
@@ -23,7 +72,7 @@ module Applications
           proof_blobs[:income] = create_blob_from_uploaded_file(params[:income_proof], "income")
         rescue => e
           log_error(e, "Failed to process income proof file")
-          return false
+          return nil
         end
       end
       
@@ -34,26 +83,38 @@ module Applications
           proof_blobs[:residency] = create_blob_from_uploaded_file(params[:residency_proof], "residency")
         rescue => e
           log_error(e, "Failed to process residency proof file")
-          return false
+          return nil
         end
       end
       
-      # Now do the database work in a transaction
-      ActiveRecord::Base.transaction do
-        find_or_create_constituent
-        create_application
-        handle_proofs(proof_blobs)
-        send_notifications
+      proof_blobs
+    end
+    
+    # Attach proofs in separate transactions
+    def attach_proofs(proof_blobs)
+      success = true
+      
+      # Handle each proof separately to isolate failures
+      if proof_blobs[:income]
+        begin
+          success = handle_proof(:income, proof_blobs[:income]) && success
+        rescue => e
+          log_error(e, "Failed to handle income proof")
+          success = false
+        end
       end
       
-      true
-    rescue StandardError => e
-      log_error(e, "Failed to create paper application")
-      false
+      if proof_blobs[:residency]
+        begin
+          success = handle_proof(:residency, proof_blobs[:residency]) && success
+        rescue => e
+          log_error(e, "Failed to handle residency proof")
+          success = false
+        end
+      end
+      
+      success
     end
-  end
-
-    private
 
     def find_or_create_constituent
       constituent_attrs = params[:constituent]
@@ -144,14 +205,9 @@ module Applications
       raise
     end
 
-    def handle_proofs(proof_blobs = {})
-      handle_proof(:income, proof_blobs[:income])
-      handle_proof(:residency, proof_blobs[:residency])
-    end
-
     def handle_proof(type, blob = nil)
       action = params["#{type}_proof_action"]
-      return unless action.in?(%w[accept reject])
+      return true unless action.in?(%w[accept reject]) # Return success if no action needed
 
       if action == "accept"
         # Make sure we have a blob or a file to process
@@ -175,35 +231,49 @@ module Applications
             return add_error(error_message)
           end
           
-          # Use a separate transaction to isolate file attachment operations
-          # Use the ProofAttachmentService to handle attachment with telemetry
-          result = ProofAttachmentService.attach_proof(
-            application: @application,
-            proof_type: type,
-            blob_or_file: actual_blob,
-            status: :approved,  # Always approved for paper applications
-            admin: @admin,
-            metadata: {
-              ip_address: '0.0.0.0', # Paper application doesn't have an IP
-              submission_method: 'paper',
-              paper_application_id: @application.id
-            }
-          )
+          # Use a separate isolated transaction for attachment
+          # This is the critical part - we need a dedicated transaction for attachment
+          result = nil
+          ActiveRecord::Base.transaction(requires_new: true) do
+            # Use the ProofAttachmentService to handle attachment with telemetry
+            result = ProofAttachmentService.attach_proof(
+              application: @application,
+              proof_type: type,
+              blob_or_file: actual_blob,
+              status: :approved,  # Always approved for paper applications
+              admin: @admin,
+              metadata: {
+                ip_address: '0.0.0.0', # Paper application doesn't have an IP
+                submission_method: 'paper',
+                paper_application_id: @application.id,
+                blob_size: actual_blob.byte_size
+              }
+            )
+          end
           
-          unless result[:success]
-            error_message = result[:error]&.message || "Failed to attach and approve #{type} proof"
-            Rails.logger.error "#{error_message}\n#{result[:error]&.backtrace&.join("\n")}"
+          unless result && result[:success]
+            error_message = result&.dig(:error)&.message || "Failed to attach and approve #{type} proof"
+            Rails.logger.error "#{error_message}\n#{result&.dig(:error)&.backtrace&.join("\n")}"
             return add_error(error_message)
           end
           
-          # Verify the attachment was successful
-          unless @application.reload.send("#{type}_proof").attached?
+          # Verify the attachment was successful - very important check
+          @application.reload
+          unless @application.send("#{type}_proof").attached?
             error_message = "Failed to verify #{type} proof attachment"
             Rails.logger.error error_message
             return add_error(error_message)
           end
           
+          # Verify status was set correctly
+          unless @application.send("#{type}_proof_status") == "approved"
+            error_message = "Failed to set #{type} proof status to approved"
+            Rails.logger.error error_message
+            return add_error(error_message)
+          end
+          
           Rails.logger.info "Successfully attached and approved #{type} proof for application #{@application.id}"
+          return true
         rescue => e
           Rails.logger.error "Error in handle_proof(#{type}): #{e.message}\n#{e.backtrace.join("\n")}"
           return add_error("Error processing #{type} proof: #{e.message}")
@@ -214,30 +284,46 @@ module Applications
         reason = params["#{type}_proof_rejection_reason"].presence || "other"
         notes = params["#{type}_proof_rejection_notes"].presence || "Rejected during paper application submission"
         
-        # Use the ProofAttachmentService to handle rejection with telemetry
-        result = ProofAttachmentService.reject_proof_without_attachment(
-          application: @application,
-          proof_type: type,
-          admin: @admin,
-          reason: reason,
-          notes: notes,
-          metadata: {
-            ip_address: '0.0.0.0', # Paper application doesn't have an IP
-            submission_method: 'paper',
-            paper_application_id: @application.id
-          }
-        )
+        # Use a separate isolated transaction for rejection
+        result = nil
+        ActiveRecord::Base.transaction(requires_new: true) do
+          # Use the ProofAttachmentService to handle rejection with telemetry
+          result = ProofAttachmentService.reject_proof_without_attachment(
+            application: @application,
+            proof_type: type,
+            admin: @admin,
+            reason: reason,
+            notes: notes,
+            metadata: {
+              ip_address: '0.0.0.0', # Paper application doesn't have an IP
+              submission_method: 'paper',
+              paper_application_id: @application.id
+            }
+          )
+        end
         
-        unless result[:success]
-          error_message = result[:error]&.message || "Failed to reject #{type} proof"
+        unless result && result[:success]
+          error_message = result&.dig(:error)&.message || "Failed to reject #{type} proof"
+          return add_error(error_message)
+        end
+        
+        # Verify status was set correctly
+        @application.reload
+        unless @application.send("#{type}_proof_status") == "rejected"
+          error_message = "Failed to set #{type} proof status to rejected"
+          Rails.logger.error error_message
           return add_error(error_message)
         end
         
         Rails.logger.info "Successfully rejected #{type} proof for application #{@application.id}"
+        return true
       end
+      
+      true # Default success
     rescue StandardError => e
       log_error(e, "Failed to handle #{type} proof")
       add_error("An unexpected error occurred while processing #{type} proof")
+      false
     end
 
     def create_proof_review(type, reason, notes)
