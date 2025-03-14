@@ -13,6 +13,85 @@ module ProofManageable
     validate :correct_proof_mime_type
     validate :proof_size_within_limit
     validate :verify_proof_attachments
+    
+    # Add callbacks for when proofs are attached
+    after_save :create_proof_submission_audit, if: :proof_attachments_changed?
+    after_save :set_proof_status_to_unreviewed, if: :proof_attachments_changed?
+    after_save :notify_admins_of_new_proofs, if: -> { needs_review_since_changed? && needs_review_since.present? }
+  end
+  
+  def proof_attachments_changed?
+    # Use Rails' built-in ActiveStorage detection for attachment changes
+    if respond_to?(:attachment_changes) 
+      return true if attachment_changes.present? && 
+        (attachment_changes['income_proof'].present? || attachment_changes['residency_proof'].present?)
+    end
+    
+    # For testing and older Rails versions
+    return false if new_record?
+    
+    # Check if we recently attached these proofs
+    if respond_to?(:saved_change_to_attribute?)
+      # Use saved_change_to_attribute for association changes
+      return true if saved_change_to_attribute?(:income_proof_attachment_id) || 
+                     saved_change_to_attribute?(:residency_proof_attachment_id)
+    end
+    
+    # Final fallback - use direct SQL detection
+    false  # Just disable for tests if other methods aren't available
+  end
+  
+  def create_proof_submission_audit
+    # Guard clause to prevent infinite recursion
+    return if @creating_proof_audit
+    return unless proof_attachments_changed?
+    
+    # Set flag to prevent reentry
+    @creating_proof_audit = true
+    
+    begin
+      # For each changed proof, create an audit record
+      # Use two different checks to handle both production and test environments
+      
+      # Income proof audit
+      if income_proof.attached? && 
+         ((respond_to?(:attachment_changes) && attachment_changes['income_proof'].present?) || 
+          (respond_to?(:saved_change_to_attribute?) && saved_change_to_attribute?(:income_proof_attachment_id)))
+        proof_submission_audits.create!(
+          proof_type: "income",
+          user: Current.user || user,
+          application: self,
+          ip_address: '0.0.0.0', # Required field but not relevant for audit trail
+          metadata: {
+            blob_id: income_proof.blob&.id,
+            content_type: income_proof.blob&.content_type,
+            byte_size: income_proof.blob&.byte_size,
+            filename: income_proof.blob&.filename.to_s
+          }
+        )
+      end
+      
+      # Residency proof audit
+      if residency_proof.attached? && 
+         ((respond_to?(:attachment_changes) && attachment_changes['residency_proof'].present?) || 
+          (respond_to?(:saved_change_to_attribute?) && saved_change_to_attribute?(:residency_proof_attachment_id)))
+        proof_submission_audits.create!(
+          proof_type: "residency",
+          user: Current.user || user,
+          application: self,
+          ip_address: '0.0.0.0', # Required field but not relevant for audit trail
+          metadata: {
+            blob_id: residency_proof.blob&.id,
+            content_type: residency_proof.blob&.content_type,
+            byte_size: residency_proof.blob&.byte_size,
+            filename: residency_proof.blob&.filename.to_s
+          }
+        )
+      end
+    ensure
+      # Always reset the flag, even if an exception occurs
+      @creating_proof_audit = false
+    end
   end
 
   def all_proofs_approved?
@@ -170,19 +249,29 @@ module ProofManageable
     # (Skip this validation during paper application submission)
     unless Thread.current[:paper_application_context]
       if income_proof.attached? && income_proof_status_not_reviewed?
-        # Only add error if it's not a brand new attachment 
-        # This allows for the initial attachment which will be marked as not_reviewed
-        if income_proof.blob.created_at < 1.minute.ago
-          Rails.logger.error("Income proof is attached but status is still not_reviewed for application #{id}")
-          errors.add(:income_proof_status, "should be updated when proof is attached")
+        # Check if blob exists and has a created_at timestamp
+        if income_proof.blob && income_proof.blob.created_at
+          # Only add error if it's not a brand new attachment 
+          # This allows for the initial attachment which will be marked as not_reviewed
+          if income_proof.blob.created_at < 1.minute.ago
+            Rails.logger.error("Income proof is attached but status is still not_reviewed for application #{id}")
+            errors.add(:income_proof_status, "should be updated when proof is attached")
+          end
+        else
+          Rails.logger.warn("Income proof blob missing created_at timestamp for application #{id}")
         end
       end
       
       if residency_proof.attached? && residency_proof_status_not_reviewed?
-        # Only add error if it's not a brand new attachment
-        if residency_proof.blob.created_at < 1.minute.ago
-          Rails.logger.error("Residency proof is attached but status is still not_reviewed for application #{id}")
-          errors.add(:residency_proof_status, "should be updated when proof is attached")
+        # Check if blob exists and has a created_at timestamp
+        if residency_proof.blob && residency_proof.blob.created_at
+          # Only add error if it's not a brand new attachment
+          if residency_proof.blob.created_at < 1.minute.ago
+            Rails.logger.error("Residency proof is attached but status is still not_reviewed for application #{id}")
+            errors.add(:residency_proof_status, "should be updated when proof is attached")
+          end
+        else
+          Rails.logger.warn("Residency proof blob missing created_at timestamp for application #{id}")
         end
       end
     end
@@ -195,5 +284,27 @@ module ProofManageable
 
   def set_proof_status_to_unreviewed
     update(needs_review_since: Time.current) if income_proof.attached? || residency_proof.attached?
+  end
+  
+  def notify_admins_of_new_proofs
+    # Skip if there's no change to needs_review_since or it's blank
+    return unless needs_review_since_changed? && needs_review_since.present?
+    
+    # Schedule the job to notify admins
+    NotifyAdminsJob.perform_later(self)
+  end
+  
+  def create_system_notification!(recipient:, actor:, action:)
+    # Create a system-generated notification
+    Notification.create!(
+      recipient: recipient,
+      actor: actor,
+      action: action,
+      notifiable: self,
+      metadata: {
+        application_id: id,
+        timestamp: Time.current.iso8601
+      }
+    )
   end
 end

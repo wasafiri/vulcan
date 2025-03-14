@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_03_14_020003) do
+ActiveRecord::Schema[8.0].define(version: 2025_03_14_024211) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -122,16 +122,20 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_14_020003) do
     t.text "medical_certification_rejection_reason"
     t.datetime "medical_certification_requested_at"
     t.integer "medical_certification_request_count", default: 0
+    t.index ["income_proof_status"], name: "idx_applications_on_income_proof_status"
     t.index ["income_verified_by_id"], name: "index_applications_on_income_verified_by_id"
     t.index ["last_proof_submitted_at"], name: "index_applications_on_last_proof_submitted_at"
     t.index ["medical_certification_status"], name: "index_applications_on_medical_certification_status"
     t.index ["medical_certification_verified_by_id"], name: "index_applications_on_medical_certification_verified_by_id"
     t.index ["medical_provider_email", "status"], name: "index_applications_on_medical_provider_email_and_status"
     t.index ["needs_review_since"], name: "index_applications_on_needs_review_since"
+    t.index ["residency_proof_status"], name: "idx_applications_on_residency_proof_status"
     t.index ["status", "needs_review_since"], name: "index_applications_on_status_and_needs_review_since"
     t.index ["total_rejections"], name: "index_applications_on_total_rejections"
     t.index ["trainer_id"], name: "index_applications_on_trainer_id"
     t.index ["user_id"], name: "index_applications_on_user_id"
+    t.check_constraint "income_proof_status = ANY (ARRAY[0, 1, 2])", name: "income_proof_status_check"
+    t.check_constraint "residency_proof_status = ANY (ARRAY[0, 1, 2])", name: "residency_proof_status_check"
   end
 
   create_table "applications_products", id: false, force: :cascade do |t|

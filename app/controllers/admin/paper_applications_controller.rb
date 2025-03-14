@@ -1,9 +1,21 @@
 class Admin::PaperApplicationsController < Admin::BaseController
+  skip_before_action :verify_authenticity_token, only: [:direct_upload]
+  before_action :set_paper_application_context, only: [:create]
+
   def new
     @paper_application = {
       application: Application.new,
       constituent: Constituent.new
     }
+  end
+
+  # Direct upload endpoint for Active Storage
+  # This allows the JavaScript to upload files directly to the storage provider
+  def direct_upload
+    blob = ActiveStorage::Blob.create_before_direct_upload!(blob_params)
+    render json: direct_upload_json(blob)
+  rescue ActionController::ParameterMissing => e
+    render json: { error: e.message }, status: :unprocessable_entity
   end
 
   def create
@@ -98,6 +110,26 @@ class Admin::PaperApplicationsController < Admin::BaseController
 
   private
 
+  def set_paper_application_context
+    # Set thread variable to indicate we're in a paper application context
+    # This will be used by the model validations to skip certain checks
+    Thread.current[:paper_application_context] = true
+  end
+
+  def blob_params
+    params.require(:blob).permit(:filename, :byte_size, :checksum, :content_type, metadata: {})
+  end
+
+  def direct_upload_json(blob)
+    {
+      signed_id: blob.signed_id,
+      direct_upload: {
+        url: blob.service_url_for_direct_upload,
+        headers: blob.service_headers_for_direct_upload
+      }
+    }
+  end
+
   def paper_application_params
     {
       constituent: params.require(:constituent).permit(
@@ -133,10 +165,12 @@ class Admin::PaperApplicationsController < Admin::BaseController
       ),
       income_proof_action: params[:income_proof_action],
       income_proof: params[:income_proof],
+      income_proof_signed_id: params[:income_proof_signed_id], # Add signed ID parameter
       income_proof_rejection_reason: params[:income_proof_rejection_reason],
       income_proof_rejection_notes: params[:income_proof_rejection_notes],
       residency_proof_action: params[:residency_proof_action],
       residency_proof: params[:residency_proof],
+      residency_proof_signed_id: params[:residency_proof_signed_id], # Add signed ID parameter
       residency_proof_rejection_reason: params[:residency_proof_rejection_reason],
       residency_proof_rejection_notes: params[:residency_proof_rejection_notes]
     }

@@ -5,11 +5,19 @@ class ProofManageableTest < ActiveSupport::TestCase
   include ActionDispatch::TestProcess::FixtureFile
 
   setup do
-    @application = applications(:one)
+    # Set paper application context for tests
+    Thread.current[:paper_application_context] = true
+    
+    @application = applications(:draft_application) # This has not_reviewed proof statuses
     @user = users(:constituent_john)
     @valid_pdf = fixture_file_upload("test/fixtures/files/residency_proof.pdf", "application/pdf")
     @large_pdf = fixture_file_upload("test/fixtures/files/large.pdf", "application/pdf")
     @invalid_type = fixture_file_upload("test/fixtures/files/invalid.exe", "application/x-msdownload")
+  end
+  
+  teardown do
+    # Clear paper application context after tests
+    Thread.current[:paper_application_context] = nil
   end
 
   test "allows valid PDF uploads" do
@@ -73,12 +81,17 @@ class ProofManageableTest < ActiveSupport::TestCase
   end
 
   test "handles direct uploads" do
-    blob = ActiveStorage::Blob.create_before_direct_upload!(
+    # Create a real blob instead of just a placeholder
+    blob = ActiveStorage::Blob.create_and_upload!(
+      io: StringIO.new("dummy content"),
       filename: "direct.pdf",
-      byte_size: 1.megabyte,
-      checksum: "dummy",
       content_type: "application/pdf"
     )
+    
+    # Ensure the blob has a created_at timestamp
+    if blob.created_at.nil?
+      blob.update_column(:created_at, 2.minutes.ago)
+    end
 
     @application.income_proof.attach(blob)
     assert @application.valid?

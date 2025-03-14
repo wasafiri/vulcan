@@ -1,25 +1,35 @@
 import { Controller } from "@hotwired/stimulus"
 import { DirectUpload } from "@rails/activestorage/src/direct_upload"
 
+// This controller handles direct file uploads for paper applications
+// It is a modified version of the constituent portal upload controller
+// that has been adapted for admin use.
 export default class extends Controller {
-  static targets = [ "input", "progress", "submit", "cancel", "statusText", "percentage", "signedId" ]
+  static targets = [ "input", "progress", "submit", "cancel", "statusText" ]
 
   connect() {
     this.progressBar = this.progressTarget.querySelector("[role='progressbar']")
-    if (this.hasSubmitTarget) {
-      this.submitTarget.disabled = false
-    }
+    this.submitTarget.disabled = false
     this.hideProgress()
+    
+    // Set default status text
+    if (this.hasStatusTextTarget) {
+      this.statusTextTarget.textContent = "No file selected"
+    }
   }
 
   handleFileSelect(event) {
     const file = event.target.files[0]
     if (!file) return
 
+    // Update status text
+    if (this.hasStatusTextTarget) {
+      this.statusTextTarget.textContent = `Selected: ${file.name} (${this.formatFileSize(file.size)})`
+    }
+
     this.showProgress()
     this.disableSubmit()
     this.showCancel()
-    this.updateStatusText(`Uploading ${file.name}...`)
 
     const url = this.inputTarget.dataset.directUploadUrl
     const upload = new DirectUpload(file, url, this)
@@ -52,8 +62,9 @@ export default class extends Controller {
       this.progressBar.style.width = `${progress}%`
       this.progressBar.setAttribute("aria-valuenow", progress)
       
-      if (this.hasPercentageTarget) {
-        this.percentageTarget.textContent = `${progress}%`
+      // Update status text
+      if (this.hasStatusTextTarget) {
+        this.statusTextTarget.textContent = `Uploading: ${progress}%`
       }
       
       // Announce progress to screen readers
@@ -68,27 +79,34 @@ export default class extends Controller {
   }
 
   handleSuccess(blob) {
-    // Update the hidden field with the signed_id
-    if (this.hasSignedIdTarget) {
-      this.signedIdTarget.value = blob.signed_id
-    } else {
-      // Fallback to creating a new hidden field if no target exists
-      const hiddenField = document.createElement('input')
-      hiddenField.setAttribute("type", "hidden")
-      hiddenField.setAttribute("value", blob.signed_id)
-      hiddenField.name = this.inputTarget.name
-      this.element.appendChild(hiddenField)
+    // Create hidden input with blob id
+    const hiddenField = document.createElement('input')
+    hiddenField.setAttribute("type", "hidden")
+    hiddenField.setAttribute("value", blob.signed_id)
+    hiddenField.name = this.inputTarget.name
+    this.element.appendChild(hiddenField)
+
+    // Update status text
+    if (this.hasStatusTextTarget) {
+      this.statusTextTarget.textContent = `Upload complete - File ready for submission`
     }
 
     this.enableSubmit()
     this.hideProgress()
     this.hideCancel()
-    this.updateStatusText(`File uploaded successfully`)
   }
 
   handleError(error) {
     // Show error message
-    this.updateStatusText(`Error uploading file: ${error.message || "Unknown error"}`)
+    const flash = document.createElement("div")
+    flash.className = "mb-4 p-4 border rounded border-red-500 bg-red-50 text-red-700"
+    flash.textContent = "Error uploading file. Please try again."
+    this.element.insertBefore(flash, this.element.firstChild)
+
+    // Update status text
+    if (this.hasStatusTextTarget) {
+      this.statusTextTarget.textContent = "Upload failed - Please try again"
+    }
 
     this.enableSubmit()
     this.hideProgress()
@@ -103,17 +121,15 @@ export default class extends Controller {
       this.currentXHR = null
     }
     
+    // Update status text
+    if (this.hasStatusTextTarget) {
+      this.statusTextTarget.textContent = "Upload canceled"
+    }
+    
     this.enableSubmit()
     this.hideProgress()
     this.hideCancel()
     this.inputTarget.value = ""
-    this.updateStatusText("Upload canceled")
-  }
-
-  updateStatusText(text) {
-    if (this.hasStatusTextTarget) {
-      this.statusTextTarget.textContent = text
-    }
   }
 
   showProgress() {
@@ -133,14 +149,21 @@ export default class extends Controller {
   }
 
   enableSubmit() {
-    if (this.hasSubmitTarget) {
-      this.submitTarget.disabled = false
-    }
+    this.submitTarget.disabled = false
   }
 
   disableSubmit() {
-    if (this.hasSubmitTarget) {
-      this.submitTarget.disabled = true
-    }
+    this.submitTarget.disabled = true
+  }
+  
+  // Helper for formatting file sizes
+  formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 }

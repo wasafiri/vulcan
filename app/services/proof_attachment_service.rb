@@ -45,7 +45,12 @@ class ProofAttachmentService
       # ActiveStorage attach requires a signed_id, IO object, Hash with keys, or ActionDispatch::Http::UploadedFile
       attachment_param = blob_or_file
       
-      # CRITICAL FIX: Proper handling of different input types
+      # ENHANCED LOGGING FOR ATTACHMENT DEBUGGING
+      Rails.logger.info "PROOF ATTACHMENT INPUT TYPE: #{blob_or_file.class.name}"
+      Rails.logger.info "PROOF ATTACHMENT ENVIRONMENT: #{Rails.env}"
+      Rails.logger.info "PROOF ATTACHMENT STORAGE SERVICE: #{ActiveStorage::Blob.service.class.name}"
+      
+      # Proper handling of different input types
       if blob_or_file.is_a?(ActiveStorage::Blob)
         # Direct blob object - convert to signed_id
         Rails.logger.info "Converting blob to signed_id for #{proof_type} proof attachment"
@@ -63,6 +68,7 @@ class ProofAttachmentService
       else
         # Other types (IO, Hash, etc) - use as is
         Rails.logger.info "ATTACHMENT PARAM TYPE: #{blob_or_file.class.name}"
+        Rails.logger.info "ATTACHMENT PARAM DETAILS: #{blob_or_file.inspect[0..100]}" rescue "Could not inspect blob_or_file"
         attachment_param = blob_or_file
       end
       
@@ -71,12 +77,37 @@ class ProofAttachmentService
       
       # Step 2: Direct attachment first, outside any transaction
       Rails.logger.info "EXECUTING ATTACHMENT: #{proof_type}_proof to application #{application.id}"
-      application.send("#{proof_type}_proof").attach(attachment_param)
       
-      # Step 2: Verify attachment succeeded before proceeding
-      application.reload
+      # Create a fresh attachment: attach directly to a record obtained from a fresh query
+      fresh_application = Application.unscoped.find(application.id)
+      fresh_application.send("#{proof_type}_proof").attach(attachment_param)
+      
+      # Force a reload of the application to ensure we see latest changes
+      application = Application.unscoped.find(application.id)
+      
+      # Log details to help debug attachments
+      Rails.logger.debug "Attachment check - application_id: #{application.id}, #{proof_type}_proof attached? #{application.send("#{proof_type}_proof").attached?}"
+      if application.send("#{proof_type}_proof").attached?
+        attachment = application.send("#{proof_type}_proof").attachment
+        Rails.logger.info "Attachment confirmed - ID: #{attachment.id}, Blob ID: #{attachment.blob_id}"
+      end
+      
+      # Verify attachment succeeded before proceeding
       unless application.send("#{proof_type}_proof").attached?
-        raise "Failed to verify attachment: #{proof_type}_proof not attached after direct attachment"
+        # Try one last manual DB query to check if attachment exists
+        attachment_exists = ActiveStorage::Attachment.where(
+          record_type: 'Application',
+          record_id: application.id,
+          name: "#{proof_type}_proof"
+        ).exists?
+        
+        if attachment_exists
+          Rails.logger.warn "Attachment exists in DB but not detected in model - forcing reload"
+          # The attachment exists but isn't being picked up - do a manual association reload
+          application.send("#{proof_type}_proof").reset
+        else
+          raise "Failed to verify attachment: #{proof_type}_proof not attached after direct attachment"
+        end
       end
       
       Rails.logger.info "Successfully verified #{proof_type} proof attachment for application #{application.id}"

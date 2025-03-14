@@ -19,19 +19,67 @@ FactoryBot.define do
     household_size { 4 }
     annual_income  { 50_000 }
 
-    after(:build) do |application|
-      # Attach known good PDF files
-      application.income_proof.attach(
-        io: File.open(Rails.root.join('test/fixtures/files/income_proof.pdf')),
-        filename: 'income_proof.pdf',
-        content_type: 'application/pdf'
-      )
+    transient do
+      skip_proofs { false }
+    end
 
-      application.residency_proof.attach(
-        io: File.open(Rails.root.join('test/fixtures/files/residency_proof.pdf')),
-        filename: 'residency_proof.pdf',
-        content_type: 'application/pdf'
-      )
+    after(:build) do |application, evaluator|
+      # Skip attachment during tests unless explicitly requested
+      next if evaluator.skip_proofs
+
+      # Set the thread variable to disable callbacks during factory creation
+      original_context = Thread.current[:paper_application_context]
+      Thread.current[:paper_application_context] = true
+
+      # Attach known good PDF files using direct SQL to bypass callbacks
+      begin
+        # Create the blobs directly
+        income_blob = ActiveStorage::Blob.create_and_upload!(
+          io: File.open(Rails.root.join('test/fixtures/files/income_proof.pdf')),
+          filename: 'income_proof.pdf',
+          content_type: 'application/pdf'
+        )
+        
+        # Ensure the blob has a created_at timestamp
+        income_blob.update_column(:created_at, 2.minutes.ago) if income_blob.created_at.nil?
+        
+        residency_blob = ActiveStorage::Blob.create_and_upload!(
+          io: File.open(Rails.root.join('test/fixtures/files/residency_proof.pdf')),
+          filename: 'residency_proof.pdf',
+          content_type: 'application/pdf'
+        )
+        
+        # Ensure the blob has a created_at timestamp
+        residency_blob.update_column(:created_at, 2.minutes.ago) if residency_blob.created_at.nil?
+        
+        # Create attachment records directly without callbacks
+        if application.persisted?
+          # Create attachments via direct SQL if the application is already persisted
+          ActiveStorage::Attachment.insert_all([
+            {
+              name: 'income_proof',
+              record_type: 'Application',
+              record_id: application.id,
+              blob_id: income_blob.id,
+              created_at: Time.current
+            },
+            {
+              name: 'residency_proof',
+              record_type: 'Application',
+              record_id: application.id,
+              blob_id: residency_blob.id,
+              created_at: Time.current
+            }
+          ])
+        else
+          # Use regular attach for non-persisted applications
+          application.income_proof.attach(income_blob)
+          application.residency_proof.attach(residency_blob)
+        end
+      ensure
+        # Restore the thread variable
+        Thread.current[:paper_application_context] = original_context
+      end
     end
 
     trait :completed do

@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 
+// Controls the Paper Application form behavior
 export default class extends Controller {
   static targets = [
     "householdSize", 
@@ -11,155 +12,218 @@ export default class extends Controller {
     "residencyProofRejectionReason",
     "residencyProofRejectionNotes"
   ]
-  
+
   connect() {
-    this.setupProofActionListeners('income');
-    this.setupProofActionListeners('residency');
+    this.setupRadioListeners()
+    this.validateIncomeThreshold()
+    this.initializeFormValidation()
+  }
+
+  setupRadioListeners() {
+    // Income proof radio buttons
+    document.getElementById('accept_income_proof').addEventListener('change', () => {
+      document.getElementById('income_proof_upload').classList.remove('hidden')
+      document.getElementById('income_proof_rejection').classList.add('hidden')
+      this.enableFileInput('income_proof')
+    })
+
+    document.getElementById('reject_income_proof').addEventListener('change', () => {
+      document.getElementById('income_proof_upload').classList.add('hidden')
+      document.getElementById('income_proof_rejection').classList.remove('hidden')
+      this.clearFileUpload('income_proof')
+      this.disableFileInput('income_proof')
+    })
+
+    // Residency proof radio buttons
+    document.getElementById('accept_residency_proof').addEventListener('change', () => {
+      document.getElementById('residency_proof_upload').classList.remove('hidden')
+      document.getElementById('residency_proof_rejection').classList.add('hidden')
+      this.enableFileInput('residency_proof')
+    })
+
+    document.getElementById('reject_residency_proof').addEventListener('change', () => {
+      document.getElementById('residency_proof_upload').classList.add('hidden')
+      document.getElementById('residency_proof_rejection').classList.remove('hidden')
+      this.clearFileUpload('residency_proof')
+      this.disableFileInput('residency_proof')
+    })
+  }
+
+  // Enable file input when Accept is selected
+  enableFileInput(inputName) {
+    const fileInput = document.querySelector(`input[name="${inputName}"]`)
+    if (fileInput) {
+      fileInput.disabled = false
+    }
+  }
+
+  // Disable file input when Reject is selected
+  disableFileInput(inputName) {
+    const fileInput = document.querySelector(`input[name="${inputName}"]`)
+    if (fileInput) {
+      fileInput.disabled = true
+    }
+  }
+
+  // Clear file input and hidden signed_id field when switching to Reject
+  clearFileUpload(inputName) {
+    // Clear file input
+    const fileInput = document.querySelector(`input[name="${inputName}"]`)
+    if (fileInput) {
+      fileInput.value = ''
+    }
     
-    // Initialize FPL thresholds - these will be populated from the server
-    this.fplThresholds = {};
-    this.fplModifier = 400; // Default to 400% if not set
+    // Clear hidden signed_id field
+    const signedIdInput = document.querySelector(`input[name="${inputName}_signed_id"]`)
+    if (signedIdInput) {
+      signedIdInput.value = ''
+    }
     
-    // Fetch FPL thresholds from the server
-    this.fetchFplThresholds();
-    
-    // Set up predefined rejection reasons
-    this.predefinedReasons = {
-      income: {
-        address_mismatch: "The address provided on your income documentation does not match the application address. Please submit documentation that contains the address exactly matching the one shared in your application.",
-        expired: "The income documentation you provided is more than 1 year old or is expired. Please submit documentation that is less than 1 year old and which is not expired.",
-        exceeds_threshold: "Based on the income documentation you provided, your household income exceeds the maximum threshold to qualify for the MAT program. The program is designed to assist those with financial need, and unfortunately, your income level is above our current eligibility limits.",
-        outdated_ss_award: "Your Social Security benefit award letter is out-of-date. Please submit your most recent award letter, which should be dated within the last 12 months. You can obtain a new benefit verification letter by visiting the Social Security Administration website or contacting your local SSA office.",
-        missing_name: "The income documentation you provided does not show your name. Please submit documentation that clearly displays your full name as it appears on your application.",
-        wrong_document: "The document you submitted is not an acceptable type of income proof. Please submit one of the following: recent pay stubs, tax returns, Social Security benefit statements, or other official documentation that verifies your income.",
-        missing_amount: "The income documentation you provided does not clearly show your income amount. Please submit documentation that clearly displays your income figures, such as pay stubs with earnings clearly visible or benefit statements showing payment amounts."
-      },
-      residency: {
-        address_mismatch: "The address provided on your residency documentation does not match the application address. Please submit documentation that contains the address exactly matching the one shared in your application.",
-        expired: "The residency documentation you provided is more than 1 year old or is expired. Please submit documentation that is less than 1 year old and which is not expired.",
-        missing_name: "The residency documentation you provided does not show your name. Please submit documentation that clearly displays your full name as it appears on your application.",
-        wrong_document: "The document you submitted is not an acceptable type of residency proof. Please submit one of the following: utility bill, lease agreement, mortgage statement, or other official documentation that verifies your Maryland residence."
+    // Reset status text if possible
+    const statusElement = document.querySelector(`#${inputName}_upload [data-upload-target="statusText"]`)
+    if (statusElement) {
+      statusElement.textContent = 'No file selected'
+    }
+  }
+
+  // Set up form validation before submission
+  initializeFormValidation() {
+    const form = this.element
+    form.addEventListener('submit', (event) => {
+      if (!this.validateForm()) {
+        event.preventDefault()
       }
-    };
+    })
   }
-  
-  setupProofActionListeners(proofType) {
-    const acceptRadio = document.getElementById(`accept_${proofType}_proof`);
-    const rejectRadio = document.getElementById(`reject_${proofType}_proof`);
-    const uploadDiv = document.getElementById(`${proofType}_proof_upload`);
-    const rejectionDiv = document.getElementById(`${proofType}_proof_rejection`);
+
+  // Validate the form before submission
+  validateForm() {
+    let isValid = true
     
-    if (acceptRadio && rejectRadio && uploadDiv && rejectionDiv) {
-      acceptRadio.addEventListener('change', () => {
-        uploadDiv.classList.remove('hidden');
-        rejectionDiv.classList.add('hidden');
-      });
-      
-      rejectRadio.addEventListener('change', () => {
-        uploadDiv.classList.add('hidden');
-        rejectionDiv.classList.remove('hidden');
-      });
-    }
-    
-    // Set up rejection reason dropdown change handler
-    const reasonSelect = document.querySelector(`select[name="${proofType}_proof_rejection_reason"]`);
-    const notesTextarea = document.querySelector(`textarea[name="${proofType}_proof_rejection_notes"]`);
-    
-    if (reasonSelect && notesTextarea) {
-      reasonSelect.addEventListener('change', (event) => {
-        const selectedReason = event.target.value;
-        
-        if (selectedReason && selectedReason !== 'other') {
-          // Fill in the predefined text
-          notesTextarea.value = this.predefinedReasons[proofType][selectedReason];
-          
-          // Show the full text
-          const reasonPreview = document.getElementById(`${proofType}_proof_reason_preview`);
-          if (reasonPreview) {
-            reasonPreview.textContent = this.predefinedReasons[proofType][selectedReason];
-            reasonPreview.classList.remove('hidden');
-          }
-        } else {
-          // Clear the textarea for custom input if "Other" is selected
-          notesTextarea.value = '';
-          
-          // Hide the preview
-          const reasonPreview = document.getElementById(`${proofType}_proof_reason_preview`);
-          if (reasonPreview) {
-            reasonPreview.classList.add('hidden');
-          }
-        }
-      });
-    }
-  }
-  
-  fetchFplThresholds() {
-    // Fetch FPL thresholds from the server
-    fetch('/admin/paper_applications/fpl_thresholds')
-      .then(response => response.json())
-      .then(data => {
-        this.fplThresholds = data.thresholds;
-        this.fplModifier = data.modifier;
-      })
-      .catch(error => {
-        console.error('Error fetching FPL thresholds:', error);
-      });
-  }
-  
-  validateIncomeThreshold() {
-    const householdSize = parseInt(this.householdSizeTarget.value) || 0;
-    const annualIncome = parseFloat(this.annualIncomeTarget.value) || 0;
-    
-    if (householdSize < 1 || annualIncome < 1) {
-      return; // Not enough data to validate
-    }
-    
-    // Get the base FPL amount for the household size (default to 8-person if larger)
-    const baseFpl = this.fplThresholds[Math.min(householdSize, 8)] || 0;
-    
-    // Calculate the threshold (base FPL * modifier percentage)
-    const threshold = baseFpl * (this.fplModifier / 100);
-    
-    const warningElement = document.getElementById('income-threshold-warning');
-    const badgeElement = document.getElementById('income-threshold-badge');
-    const rejectionButton = document.getElementById('rejection-button');
-    
-    if (annualIncome > threshold) {
-      // Income exceeds threshold - show warning, badge, and disable submit button
-      warningElement.classList.remove('hidden');
-      badgeElement.classList.remove('hidden');
-      this.submitButtonTarget.disabled = true;
-      this.submitButtonTarget.classList.add('opacity-50', 'cursor-not-allowed');
-      rejectionButton.classList.remove('hidden');
-      
-      // Update hidden fields in the rejection form
-      this.updateRejectionFormFields();
+    // Validate income proof
+    if (document.getElementById('accept_income_proof').checked) {
+      const signedIdInput = document.querySelector('input[name="income_proof_signed_id"]')
+      if (!signedIdInput || !signedIdInput.value) {
+        this.showError('Please upload an income proof document')
+        isValid = false
+      }
+    } else if (document.getElementById('reject_income_proof').checked) {
+      const reasonSelect = document.querySelector('select[name="income_proof_rejection_reason"]')
+      if (!reasonSelect || !reasonSelect.value) {
+        this.showError('Please select a reason for rejecting income proof')
+        isValid = false
+      }
     } else {
-      // Income is within threshold - hide warning, badge, and enable submit button
-      warningElement.classList.add('hidden');
-      badgeElement.classList.add('hidden');
-      this.submitButtonTarget.disabled = false;
-      this.submitButtonTarget.classList.remove('opacity-50', 'cursor-not-allowed');
-      rejectionButton.classList.add('hidden');
+      this.showError('Please select an option for income proof')
+      isValid = false
     }
+    
+    // Validate residency proof
+    if (document.getElementById('accept_residency_proof').checked) {
+      const signedIdInput = document.querySelector('input[name="residency_proof_signed_id"]')
+      if (!signedIdInput || !signedIdInput.value) {
+        this.showError('Please upload a residency proof document')
+        isValid = false
+      }
+    } else if (document.getElementById('reject_residency_proof').checked) {
+      const reasonSelect = document.querySelector('select[name="residency_proof_rejection_reason"]')
+      if (!reasonSelect || !reasonSelect.value) {
+        this.showError('Please select a reason for rejecting residency proof')
+        isValid = false
+      }
+    } else {
+      this.showError('Please select an option for residency proof')
+      isValid = false
+    }
+    
+    return isValid
   }
-  
-  updateRejectionFormFields() {
-    // Copy values from the main form to the rejection form
-    document.querySelector('input[name="first_name"]').value = document.querySelector('input[name="constituent[first_name]"]').value;
-    document.querySelector('input[name="last_name"]').value = document.querySelector('input[name="constituent[last_name]"]').value;
-    document.querySelector('input[name="email"]').value = document.querySelector('input[name="constituent[email]"]').value;
-    document.querySelector('input[name="phone"]').value = document.querySelector('input[name="constituent[phone]"]').value;
-    document.querySelector('input[name="household_size"]').value = this.householdSizeTarget.value;
-    document.querySelector('input[name="annual_income"]').value = this.annualIncomeTarget.value;
+
+  // Show an error message at the top of the form
+  showError(message) {
+    // Check if error container already exists
+    let errorContainer = document.querySelector('.form-error-container')
+    if (!errorContainer) {
+      // Create new error container if not found
+      errorContainer = document.createElement('div')
+      errorContainer.className = 'form-error-container bg-red-100 border border-red-400 text-red-700 p-4 rounded mb-4'
+      this.element.insertBefore(errorContainer, this.element.firstChild)
+    }
+    
+    const errorMessage = document.createElement('p')
+    errorMessage.textContent = message
+    errorContainer.appendChild(errorMessage)
+  }
+
+  async validateIncomeThreshold() {
+    if (!this.hasHouseholdSizeTarget || !this.hasAnnualIncomeTarget) return
+
+    const householdSize = parseInt(this.householdSizeTarget.value) || 0
+    const annualIncome = parseFloat(this.annualIncomeTarget.value) || 0
+    
+    if (householdSize <= 0 || annualIncome <= 0) return
+    
+    try {
+      // Fetch FPL thresholds from the server
+      const response = await fetch('/admin/paper_applications/fpl_thresholds')
+      const data = await response.json()
+      
+      // Calculate the threshold for the household size
+      let size = Math.min(householdSize, 8) // Max 8 person household in our thresholds
+      let baseFpl = data.thresholds[size] || data.thresholds[8] // Default to 8 if size not found
+      let threshold = baseFpl * (data.modifier / 100.0)
+      
+      const exceedsThreshold = annualIncome > threshold
+      
+      // Show warning if income exceeds threshold
+      const warningElement = document.getElementById('income-threshold-warning')
+      const rejectionButton = document.getElementById('rejection-button')
+      
+      if (exceedsThreshold) {
+        warningElement.classList.remove('hidden')
+        rejectionButton.classList.remove('hidden')
+        this.submitButtonTarget.disabled = true
+      } else {
+        warningElement.classList.add('hidden')
+        rejectionButton.classList.add('hidden')
+        this.submitButtonTarget.disabled = false
+      }
+      
+      // Update badge
+      const badgeElement = document.getElementById('income-threshold-badge')
+      if (badgeElement) {
+        if (exceedsThreshold) {
+          badgeElement.classList.remove('hidden')
+        } else {
+          badgeElement.classList.add('hidden')
+        }
+      }
+    } catch (error) {
+      console.error('Error validating income threshold:', error)
+    }
   }
   
   openRejectionModal() {
-    this.updateRejectionFormFields();
-    this.rejectionModalTarget.classList.remove('hidden');
+    if (!this.hasRejectionModalTarget) return
+    
+    // Copy constituent information to the modal form
+    const firstNameField = document.querySelector('input[name="constituent[first_name]"]')
+    const lastNameField = document.querySelector('input[name="constituent[last_name]"]')
+    const emailField = document.querySelector('input[name="constituent[email]"]')
+    const phoneField = document.querySelector('input[name="constituent[phone]"]')
+    
+    document.querySelector('input[name="first_name"]').value = firstNameField?.value || ''
+    document.querySelector('input[name="last_name"]').value = lastNameField?.value || ''
+    document.querySelector('input[name="email"]').value = emailField?.value || ''
+    document.querySelector('input[name="phone"]').value = phoneField?.value || ''
+    document.querySelector('input[name="household_size"]').value = this.householdSizeTarget?.value || ''
+    document.querySelector('input[name="annual_income"]').value = this.annualIncomeTarget?.value || ''
+    
+    this.rejectionModalTarget.classList.remove('hidden')
   }
   
   closeRejectionModal() {
-    this.rejectionModalTarget.classList.add('hidden');
+    if (!this.hasRejectionModalTarget) return
+    this.rejectionModalTarget.classList.add('hidden')
   }
 }
