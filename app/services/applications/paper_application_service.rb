@@ -199,18 +199,53 @@ module Applications
             return add_error(error_message)
           end
           
-          # Verify the attachment was successful - forced reload to ensure we see latest changes
-          @application = Application.find(@application.id)  # Force a complete reload from database
-          unless @application.send("#{type}_proof").attached?
-            # Force manual reload of attachment association
-            @application.send("#{type}_proof").reload
+          # Check if the attachment was truly successful by looking directly at the attachments table
+          attachment_exists = ActiveStorage::Attachment.where(
+            record_type: 'Application',
+            record_id: @application.id,
+            name: "#{type}_proof"
+          ).exists?
+          
+          unless attachment_exists
+            Rails.logger.warn "Attachment record not found for #{type}_proof - fixing now"
             
-            # Double check after forced reload
-            if !@application.send("#{type}_proof").attached?
-              error_message = "Failed to verify #{type} proof attachment"
+            # Determine the blob ID to use
+            blob_id = nil
+            
+            if blob_or_file.is_a?(String) && blob_or_file.start_with?("eyJf")
+              # It's a signed_id, find the actual blob
+              blob_id = ActiveStorage::Blob.find_signed(blob_or_file)&.id
+              Rails.logger.info "Found blob ID #{blob_id} from signed_id"
+            elsif blob_or_file.respond_to?(:id) && blob_or_file.is_a?(ActiveStorage::Blob)
+              # It's already a blob object
+              blob_id = blob_or_file.id
+              Rails.logger.info "Using direct blob ID #{blob_id}"
+            end
+            
+            if blob_id.present?
+              # Directly create the attachment record
+              Rails.logger.info "Creating missing attachment record for #{type}_proof with blob ID #{blob_id}"
+              ActiveStorage::Attachment.create!(
+                name: "#{type}_proof",
+                record_type: 'Application',
+                record_id: @application.id,
+                blob_id: blob_id
+              )
+            else
+              error_message = "Failed to determine blob ID for #{type}_proof"
               Rails.logger.error error_message
               return add_error(error_message)
             end
+          end
+          
+          # Reload the application to refresh attachments
+          @application = Application.uncached { Application.find(@application.id) }
+          
+          # Verify the attachment exists after our fix
+          unless @application.send("#{type}_proof").attached?
+            error_message = "Failed to verify #{type}_proof attachment after fixing records"
+            Rails.logger.error error_message
+            return add_error(error_message)
           end
           
           # Verify status was set correctly
