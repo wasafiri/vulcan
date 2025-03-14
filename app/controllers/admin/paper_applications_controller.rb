@@ -12,10 +12,22 @@ class Admin::PaperApplicationsController < Admin::BaseController
   # Direct upload endpoint for Active Storage
   # This allows the JavaScript to upload files directly to the storage provider
   def direct_upload
-    blob = ActiveStorage::Blob.create_before_direct_upload!(blob_params)
-    render json: direct_upload_json(blob)
-  rescue ActionController::ParameterMissing => e
-    render json: { error: e.message }, status: :unprocessable_entity
+    begin
+      params_hash = blob_params.to_h
+      blob = ActiveStorage::Blob.create_before_direct_upload!(
+        filename: params_hash[:filename],
+        byte_size: params_hash[:byte_size],
+        checksum: params_hash[:checksum],
+        content_type: params_hash[:content_type],
+        metadata: params_hash[:metadata] || {}
+      )
+      render json: direct_upload_json(blob)
+    rescue ActionController::ParameterMissing => e
+      render json: { error: e.message }, status: :unprocessable_entity
+    rescue StandardError => e
+      Rails.logger.error "Direct upload error: #{e.message}\n#{e.backtrace.join("\n")}"
+      render json: { error: "Server error during upload: #{e.message}" }, status: :internal_server_error
+    end
   end
 
   def create
