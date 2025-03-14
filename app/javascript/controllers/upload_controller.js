@@ -12,38 +12,27 @@ export default class extends Controller {
     this.hideProgress()
   }
 
-  handleFileSelect(event) {
+  fileSelected(event) {
     const file = event.target.files[0]
     if (!file) return
 
-    this.showProgress()
-    this.disableSubmit()
-    this.showCancel()
-    this.updateStatusText(`Uploading ${file.name}...`)
-
-    const url = this.inputTarget.dataset.directUploadUrl
-    const upload = new DirectUpload(file, url, this)
-
-    this.currentUpload = upload
+    // Update the status text to show the selected file
+    this.updateStatusText(`Selected: ${file.name} (${this.formatFileSize(file.size)})`)
     
-    upload.create((error, blob) => {
-      if (error) {
-        this.handleError(error)
-      } else {
-        this.handleSuccess(blob)
-      }
-    })
+    // No longer start uploading immediately - Rails will handle this on form submit
+    // Instead, show a success message and enable the form
+    this.enableSubmit()
   }
-
-  directUploadWillStoreFileWithXHR(xhr) {
-    this.bindProgressEvents(xhr)
-    this.currentXHR = xhr
-  }
-
-  bindProgressEvents(xhr) {
-    xhr.upload.addEventListener("progress", event => {
-      this.updateProgress(event)
-    })
+  
+  // Optional helper function for formatting file sizes
+  formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
   updateProgress(event) {

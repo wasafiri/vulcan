@@ -1,77 +1,59 @@
-# Paper Application File Upload Guide
-
-This document explains how file uploads work for paper applications, focusing on S3 integration and direct uploads.
+# Paper Application File Uploads
 
 ## Overview
 
-Paper applications allow admins to upload proof documents (income and residency) when submitting applications. We use ActiveStorage with direct uploads to ensure consistent behavior between development (local storage) and production (S3 storage).
+This document explains how file uploads work for paper applications in the MAT system.
 
-## How Direct Upload Works
+## Implementation
 
-### Client-Side Flow
+### Standard Rails File Uploads
 
-1. When an admin selects a file in the paper application form, the `upload_controller.js` handles the file:
-   - Captures the selected file
-   - Shows a progress bar
-   - Uploads directly to the storage provider (S3 in production, local disk in development)
-   - Receives a `signed_id` from the server
-   - Stores the `signed_id` in a hidden field that gets submitted with the form
+As of March 2025, we've simplified the paper application upload process by removing the direct-to-S3 upload mechanism and replacing it with standard Rails file uploads. This change resolves CORS issues that were occurring with direct uploads.
 
-2. The full form submission includes these `signed_id` values instead of the actual files
+### How It Works
 
-### Server-Side Flow
+1. **File Selection:**
+   - Admin selects a file using the standard file input in the form
+   - The JavaScript controller (`upload_controller.js`) tracks the selected file and updates the UI
 
-1. The `PaperApplicationsController` provides a `direct_upload` endpoint:
-   - Creates blob records with ActiveStorage
-   - Returns signed URLs for direct upload to S3
+2. **Form Submission:**
+   - When the admin submits the form, Rails handles the file upload as part of the standard form submission process
+   - The file is temporarily stored on the server and then uploaded to S3 by Rails' ActiveStorage
+   - This eliminates the need for direct browser-to-S3 uploads that were causing CORS issues
 
-2. When the application form is submitted:
-   - `PaperApplicationService` passes the signed_ids to `ProofAttachmentService`
-   - `ProofAttachmentService` handles the attachment and status updates
-   - All attachments use the same central attachment service for consistency
+3. **Backend Processing:**
+   - The `PaperApplicationService` processes the uploaded file
+   - Files are attached to the application record using ActiveStorage
+   - Proof statuses are updated based on admin selections
 
-## Common Issues and Solutions
+### Key Changes
 
-### Storage Provider Differences
+- Removed direct upload endpoint from `Admin::PaperApplicationsController`
+- Simplified the JavaScript controller to only handle file selection feedback
+- Let Rails standard multipart form handling manage the file uploads
+- The form now posts directly to the create action with the file as part of the submission
 
-- **Local Storage** (development): Files are stored locally in `storage/` directory
-- **S3 Storage** (production): Files are stored in AWS S3 buckets
+### Benefits
 
-Direct upload handles these differences automatically, but certain ActiveStorage behaviors differ between environments.
+- Eliminated CORS issues with direct uploads
+- Simpler codebase with fewer moving parts
+- Consistent file upload mechanism with standard Rails patterns
+- Improved reliability for paper application processing
 
-### Attachment Debugging
+## Troubleshooting
 
-`ProofAttachmentService` includes extensive logging to help debug attachment issues:
+If file uploads fail:
 
-```
-PROOF ATTACHMENT INPUT TYPE: [Type of input received]
-PROOF ATTACHMENT ENVIRONMENT: [Current Rails environment]
-PROOF ATTACHMENT STORAGE SERVICE: [ActiveStorage service class]
-```
+1. **Check File Size:**
+   - Ensure the file is under the maximum allowed size (5MB)
 
-### Database Validation and Transaction Isolation
+2. **Verify File Type:**
+   - Supported types: PDF, JPEG, PNG, TIFF, BMP
 
-Attachment operations are performed outside the main transaction that creates the application record. This ensures transaction isolation and prevents issues when storage operations fail.
+3. **Server Logs:**
+   - Check server logs for ActiveStorage errors
+   - Look for S3 configuration issues or permissions problems
 
-## Recommended Testing Approach
-
-1. Test in development with `USE_S3=true` environment variable to simulate production S3 storage
-2. Run the paper application direct upload test to verify attachment functionality
-
-## Code Paths
-
-1. Form submission starts in `app/views/admin/paper_applications/new.html.erb`
-2. Direct upload handled by `app/javascript/controllers/upload_controller.js`
-3. Controller endpoint defined in `app/controllers/admin/paper_applications_controller.rb`
-4. Application creation in `app/services/applications/paper_application_service.rb`
-5. Attachment handling in `app/services/proof_attachment_service.rb`
-
-## Comparison with Constituent Portal
-
-The paper application upload flow has been modified to match the constituent portal's upload flow, ensuring consistent behavior for both paths:
-
-1. Both use direct uploads to storage
-2. Both pass signed_ids to ProofAttachmentService 
-3. Both follow the same attachment and status update process
-
-This consistency ensures that attachment behavior is the same regardless of whether uploads are submitted via the constituent portal or by admins through paper applications.
+4. **Rails Console:**
+   - Use `Application.find(id).income_proof.attached?` to verify attachment status
+   - Check for `ActiveStorage::Attachment` records related to the application

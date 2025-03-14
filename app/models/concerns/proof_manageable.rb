@@ -283,7 +283,29 @@ module ProofManageable
   end
 
   def set_proof_status_to_unreviewed
-    update(needs_review_since: Time.current) if income_proof.attached? || residency_proof.attached?
+    # Guard clause to prevent infinite recursion
+    return if @setting_proof_status
+    
+    # Only proceed if proofs are attached
+    return unless income_proof.attached? || residency_proof.attached?
+    
+    begin
+      # Set flag to prevent reentry
+      @setting_proof_status = true
+      
+      # Use update_column to avoid triggering callbacks again
+      update_column(:needs_review_since, Time.current)
+      
+      # Log success for debugging
+      Rails.logger.info "Successfully set needs_review_since to #{Time.current} for application #{id}"
+    rescue => e
+      # Log any errors for debugging
+      Rails.logger.error "Error setting proof status to unreviewed: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+    ensure
+      # Always reset the flag, even if an exception occurs
+      @setting_proof_status = false
+    end
   end
   
   def notify_admins_of_new_proofs

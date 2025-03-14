@@ -1,5 +1,5 @@
 class Admin::PaperApplicationsController < Admin::BaseController
-  skip_before_action :verify_authenticity_token, only: [:direct_upload]
+  # No longer need to skip CSRF for direct uploads
   before_action :set_paper_application_context, only: [:create]
 
   def new
@@ -9,26 +9,7 @@ class Admin::PaperApplicationsController < Admin::BaseController
     }
   end
 
-  # Direct upload endpoint for Active Storage
-  # This allows the JavaScript to upload files directly to the storage provider
-  def direct_upload
-    begin
-      params_hash = blob_params.to_h
-      blob = ActiveStorage::Blob.create_before_direct_upload!(
-        filename: params_hash[:filename],
-        byte_size: params_hash[:byte_size],
-        checksum: params_hash[:checksum],
-        content_type: params_hash[:content_type],
-        metadata: params_hash[:metadata] || {}
-      )
-      render json: direct_upload_json(blob)
-    rescue ActionController::ParameterMissing => e
-      render json: { error: e.message }, status: :unprocessable_entity
-    rescue StandardError => e
-      Rails.logger.error "Direct upload error: #{e.message}\n#{e.backtrace.join("\n")}"
-      render json: { error: "Server error during upload: #{e.message}" }, status: :internal_server_error
-    end
-  end
+  # Removed direct_upload method as we're using standard Rails file uploads now
 
   def create
     service = Applications::PaperApplicationService.new(
@@ -128,19 +109,7 @@ class Admin::PaperApplicationsController < Admin::BaseController
     Thread.current[:paper_application_context] = true
   end
 
-  def blob_params
-    params.require(:blob).permit(:filename, :byte_size, :checksum, :content_type, metadata: {})
-  end
-
-  def direct_upload_json(blob)
-    {
-      signed_id: blob.signed_id,
-      direct_upload: {
-        url: blob.service_url_for_direct_upload,
-        headers: blob.service_headers_for_direct_upload
-      }
-    }
-  end
+  # Removed direct upload related methods
 
   def paper_application_params
     {
