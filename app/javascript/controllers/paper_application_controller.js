@@ -102,8 +102,8 @@ export default class extends Controller {
     
     // Validate income proof
     if (document.getElementById('accept_income_proof').checked) {
-      const signedIdInput = document.querySelector('input[name="income_proof_signed_id"]')
-      if (!signedIdInput || !signedIdInput.value) {
+      const fileInput = document.querySelector('input[name="income_proof"]')
+      if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
         this.showError('Please upload an income proof document')
         isValid = false
       }
@@ -120,8 +120,8 @@ export default class extends Controller {
     
     // Validate residency proof
     if (document.getElementById('accept_residency_proof').checked) {
-      const signedIdInput = document.querySelector('input[name="residency_proof_signed_id"]')
-      if (!signedIdInput || !signedIdInput.value) {
+      const fileInput = document.querySelector('input[name="residency_proof"]')
+      if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
         this.showError('Please upload a residency proof document')
         isValid = false
       }
