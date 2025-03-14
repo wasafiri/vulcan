@@ -79,12 +79,25 @@ export default class extends Controller {
   }
 
   handleSuccess(blob) {
-    // Create hidden input with blob id
-    const hiddenField = document.createElement('input')
-    hiddenField.setAttribute("type", "hidden")
-    hiddenField.setAttribute("value", blob.signed_id)
-    hiddenField.name = this.inputTarget.name
-    this.element.appendChild(hiddenField)
+    // Create hidden input with blob id using the specific _signed_id field name
+    const inputName = this.inputTarget.getAttribute('name')
+    const signedIdFieldName = inputName.replace(/^(.+?)(\[.+\])?$/, '$1_signed_id')
+    
+    // Check if we already have a hidden field with this name
+    const existingField = document.querySelector(`input[name="${signedIdFieldName}"]`)
+    if (existingField) {
+      // Update existing field
+      existingField.value = blob.signed_id
+    } else {
+      // Create new field
+      const hiddenField = document.createElement('input')
+      hiddenField.setAttribute("type", "hidden")
+      hiddenField.setAttribute("value", blob.signed_id)
+      hiddenField.setAttribute("name", signedIdFieldName)
+      this.element.appendChild(hiddenField)
+    }
+
+    console.log(`Set ${signedIdFieldName} to ${blob.signed_id}`)
 
     // Update status text
     if (this.hasStatusTextTarget) {
@@ -97,10 +110,26 @@ export default class extends Controller {
   }
 
   handleError(error) {
+    // Determine appropriate error message based on error type
+    let errorMessage = "Error uploading file. Please try again."
+    
+    // Check for network-related errors (Status: 0)
+    if (error && error.status === 0) {
+      errorMessage = "Network error during file upload. This could be due to a connection issue or CORS configuration. Please try again or contact support if the issue persists."
+      console.error("Network error (Status: 0) during direct upload. Possible CORS issue.", error)
+    } else if (error && error.status) {
+      // Handle other HTTP status errors
+      errorMessage = `Server error (${error.status}) during file upload. Please try again.`
+      console.error(`Upload failed with status ${error.status}:`, error)
+    } else {
+      // Generic error handling
+      console.error("Upload error:", error)
+    }
+    
     // Show error message
     const flash = document.createElement("div")
     flash.className = "mb-4 p-4 border rounded border-red-500 bg-red-50 text-red-700"
-    flash.textContent = "Error uploading file. Please try again."
+    flash.textContent = errorMessage
     this.element.insertBefore(flash, this.element.firstChild)
 
     // Update status text
@@ -111,8 +140,6 @@ export default class extends Controller {
     this.enableSubmit()
     this.hideProgress()
     this.hideCancel()
-    
-    console.error("Upload error:", error)
   }
 
   cancelUpload() {
