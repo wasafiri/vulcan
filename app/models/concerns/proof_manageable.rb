@@ -144,7 +144,15 @@ module ProofManageable
   
   # Verifies that proofs have the right attachment state based on status
   def verify_proof_attachments
+    # Skip validation for new records - validation will happen when they're saved
+    return if new_record?
+    
     # This validation runs for ALL applications, including paper applications
+    # Log current state for diagnostics
+    Rails.logger.debug("Validating proof attachments for application #{id || 'new'}")
+    Rails.logger.debug("Income proof status: #{income_proof_status}, attached: #{income_proof.attached?}")
+    Rails.logger.debug("Residency proof status: #{residency_proof_status}, attached: #{residency_proof.attached?}")
+    
     # Check approved proofs - they must have an attachment
     if income_proof_status_approved? && !income_proof.attached?
       # Log the error for debugging purposes
@@ -156,6 +164,27 @@ module ProofManageable
       # Log the error for debugging purposes
       Rails.logger.error("Residency proof marked as approved but no file is attached for application #{id}")
       errors.add(:residency_proof, "must be attached when status is approved")
+    end
+    
+    # For non-paper applications, check that attached proofs have appropriate status
+    # (Skip this validation during paper application submission)
+    unless Thread.current[:paper_application_context]
+      if income_proof.attached? && income_proof_status_not_reviewed?
+        # Only add error if it's not a brand new attachment 
+        # This allows for the initial attachment which will be marked as not_reviewed
+        if income_proof.blob.created_at < 1.minute.ago
+          Rails.logger.error("Income proof is attached but status is still not_reviewed for application #{id}")
+          errors.add(:income_proof_status, "should be updated when proof is attached")
+        end
+      end
+      
+      if residency_proof.attached? && residency_proof_status_not_reviewed?
+        # Only add error if it's not a brand new attachment
+        if residency_proof.blob.created_at < 1.minute.ago
+          Rails.logger.error("Residency proof is attached but status is still not_reviewed for application #{id}")
+          errors.add(:residency_proof_status, "should be updated when proof is attached")
+        end
+      end
     end
     
     # We deliberately do NOT validate attachments for rejected proofs

@@ -6,18 +6,35 @@ class ProofAttachmentService
     start_time = Time.current
     result = { success: false, error: nil, duration_ms: 0 }
     
+    # Calculate blob size for metrics if available
+    blob_size = nil
+    if blob_or_file.respond_to?(:byte_size)
+      blob_size = blob_or_file.byte_size
+    end
+    
     begin
-      # Using requires_new to ensure nested transactions work properly
-      ActiveRecord::Base.transaction(requires_new: true) do
-        # Attach the proof
-        application.send("#{proof_type}_proof").attach(blob_or_file)
-        
+      # Step 1: Direct attachment first, outside any transaction
+      Rails.logger.info "Attaching #{proof_type} proof to application #{application.id}"
+      application.send("#{proof_type}_proof").attach(blob_or_file)
+      
+      # Step 2: Verify attachment succeeded before proceeding
+      application.reload
+      unless application.send("#{proof_type}_proof").attached?
+        raise "Failed to verify attachment: #{proof_type}_proof not attached after direct attachment"
+      end
+      
+      Rails.logger.info "Successfully verified #{proof_type} proof attachment for application #{application.id}"
+      
+      # Step 3: Update status and create audit record in a single transaction
+      ActiveRecord::Base.transaction do
         # Update status
         status_attrs = {"#{proof_type}_proof_status" => status}
         status_attrs[:needs_review_since] = Time.current if status == :not_reviewed
         application.update!(status_attrs)
         
-        # Create audit record within the same transaction for atomic operations
+        Rails.logger.info "Updated #{proof_type} proof status to #{status} for application #{application.id}"
+        
+        # Create audit record
         ProofSubmissionAudit.create!(
           application: application,
           user: admin || application.user,
@@ -27,18 +44,21 @@ class ProofAttachmentService
           metadata: metadata.merge(
             success: true,
             status: status,
-            has_attachment: true, # We know it's attached at this point in the transaction
-            blob_id: blob_or_file.respond_to?(:id) ? blob_or_file.id : nil
+            has_attachment: true,
+            blob_id: blob_or_file.respond_to?(:id) ? blob_or_file.id : nil,
+            blob_size: blob_size
           )
         )
       end
       
-      # Verify the attachment outside the transaction
+      # Final verification after status update
       application.reload
       if !application.send("#{proof_type}_proof").attached?
-        raise "Failed to verify attachment: #{proof_type}_proof not attached after transaction"
+        raise "Critical error: Attachment disappeared after status update"
       end
       
+      # Set blob size for metrics
+      result[:blob_size] = blob_size
       result[:success] = true
     rescue => e
       # Track failure with detailed information

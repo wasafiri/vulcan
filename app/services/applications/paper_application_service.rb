@@ -205,51 +205,55 @@ module Applications
       raise
     end
 
-    def handle_proof(type, blob = nil)
-      action = params["#{type}_proof_action"]
-      return true unless action.in?(%w[accept reject]) # Return success if no action needed
+  def handle_proof(type, blob = nil)
+    action = params["#{type}_proof_action"]
+    return true unless action.in?(%w[accept reject]) # Return success if no action needed
 
-      if action == "accept"
-        # Make sure we have a blob or a file to process
-        unless blob || params["#{type}_proof"].present?
-          Rails.logger.error "No blob or #{type}_proof file provided for accept action"
-          return add_error("No file provided for #{type} proof")
+    if action == "accept"
+      # Make sure we have a blob or a file to process
+      unless blob || params["#{type}_proof"].present?
+        Rails.logger.error "No blob or #{type}_proof file provided for accept action"
+        return add_error("No file provided for #{type} proof")
+      end
+      
+      begin
+        # Use the pre-uploaded blob if provided, otherwise create one
+        actual_blob = blob
+        if !actual_blob && params["#{type}_proof"].present?
+          Rails.logger.info "Creating blob for #{type} proof from uploaded file"
+          actual_blob = create_blob_from_uploaded_file(params["#{type}_proof"], type)
+        end
+        
+        # Make sure we have a blob
+        unless actual_blob
+          error_message = "Failed to create or find blob for #{type} proof"
+          Rails.logger.error error_message
+          return add_error(error_message)
         end
         
         begin
-          # Use the pre-uploaded blob if provided, otherwise create one
-          actual_blob = blob
-          if !actual_blob && params["#{type}_proof"].present?
-            Rails.logger.info "Creating blob for #{type} proof from uploaded file"
-            actual_blob = create_blob_from_uploaded_file(params["#{type}_proof"], type)
-          end
+          # Set paper application context flag to disable certain validations
+          # This prevents issues with validation during the attachment process
+          Thread.current[:paper_application_context] = true
           
-          # Make sure we have a blob
-          unless actual_blob
-            error_message = "Failed to create or find blob for #{type} proof"
-            Rails.logger.error error_message
-            return add_error(error_message)
-          end
-          
-          # Use a separate isolated transaction for attachment
-          # This is the critical part - we need a dedicated transaction for attachment
-          result = nil
-          ActiveRecord::Base.transaction(requires_new: true) do
-            # Use the ProofAttachmentService to handle attachment with telemetry
-            result = ProofAttachmentService.attach_proof(
-              application: @application,
-              proof_type: type,
-              blob_or_file: actual_blob,
-              status: :approved,  # Always approved for paper applications
-              admin: @admin,
-              metadata: {
-                ip_address: '0.0.0.0', # Paper application doesn't have an IP
-                submission_method: 'paper',
-                paper_application_id: @application.id,
-                blob_size: actual_blob.byte_size
-              }
-            )
-          end
+          # Use ProofAttachmentService for attachment, status update, and auditing
+          result = ProofAttachmentService.attach_proof(
+            application: @application,
+            proof_type: type,
+            blob_or_file: actual_blob,
+            status: :approved,  # Always approved for paper applications
+            admin: @admin,
+            metadata: {
+              ip_address: '0.0.0.0', # Paper application doesn't have an IP
+              submission_method: 'paper',
+              paper_application_id: @application.id,
+              blob_size: actual_blob.byte_size
+            }
+          )
+        ensure
+          # Always reset the thread context flag
+          Thread.current[:paper_application_context] = nil
+        end
           
           unless result && result[:success]
             error_message = result&.dig(:error)&.message || "Failed to attach and approve #{type} proof"
