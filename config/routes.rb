@@ -52,6 +52,7 @@ Rails.application.routes.draw do
       collection do
         post :send_rejection_notification
         get :fpl_thresholds
+        post :direct_upload
       end
     end
 
