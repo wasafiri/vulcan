@@ -52,7 +52,7 @@ Rails.application.routes.draw do
       collection do
         post :send_rejection_notification
         get :fpl_thresholds
-        # Removed direct_upload route as we're using standard Rails file uploads now
+        post :direct_upload  # Add back direct upload endpoint for client-side S3 uploads
       end
     end
 

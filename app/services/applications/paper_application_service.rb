@@ -153,81 +153,86 @@ module Applications
       action = params["#{type}_proof_action"]
       return true unless action.in?(%w[accept reject]) # Return success if no action needed
 
-      if action == "accept"
-        begin
-          # Simpler direct attachment mechanism to avoid potential issues with ProofAttachmentService
-          # This is a fallback approach that bypasses some of the complexity
-          Rails.logger.info "Paper application direct attachment for #{type}_proof"
+      begin
+        if action == "accept"
+          # Use the consistent ProofAttachmentService for attaching proofs
+          Rails.logger.info "Paper application using ProofAttachmentService for #{type}_proof"
           
-          # Get the file from params
+          # Get the file or signed_id from params
           file = params["#{type}_proof"]
+          signed_id = params["#{type}_proof_signed_id"]
           
-          unless file.present?
-            Rails.logger.error "No #{type}_proof file found in params"
+          unless file.present? || signed_id.present?
+            Rails.logger.error "No #{type}_proof file or signed_id found in params"
             return add_error("Missing #{type} proof file")
           end
           
-          Rails.logger.info "File details: Class=#{file.class.name}, Name=#{file.original_filename}, Type=#{file.content_type}, Size=#{file.size}"
+          # Log details if we have a file
+          if file.present?
+            Rails.logger.info "File details: Class=#{file.class.name}, Name=#{file.original_filename}, Type=#{file.content_type}, Size=#{file.size}"
+          elsif signed_id.present?
+            Rails.logger.info "Using signed_id for #{type}_proof: #{signed_id[0..20]}..."
+          end
           
-          # Direct attachment approach
-          @application.send("#{type}_proof").attach(file)
+          # Determine what to pass to ProofAttachmentService (prefer signed_id if available)
+          attachment_param = signed_id.present? ? signed_id : file
           
-          # Set the status to approved (for paper applications)
-          @application.update_column("#{type}_proof_status", Application.send("#{type}_proof_statuses")[:approved])
+          # Use ProofAttachmentService for consistent handling
+          result = ProofAttachmentService.attach_proof(
+            application: @application,
+            proof_type: type,
+            blob_or_file: attachment_param,
+            status: :approved, # Default to approved for paper applications
+            admin: @admin,
+            metadata: {
+              submission_method: :paper,
+              admin_id: @admin&.id
+            }
+          )
           
-          # Verify attachment
-          @application.reload
-          
-          # Log verification
-          if @application.send("#{type}_proof").attached?
-            Rails.logger.info "Successfully attached #{type} proof directly for application #{@application.id}"
-            attachment = @application.send("#{type}_proof").attachment
-            Rails.logger.info "Attachment details: ID=#{attachment.id}, Blob ID=#{attachment.blob_id}"
-            return true
-          else
-            error_message = "Failed to verify #{type}_proof attachment after direct attachment"
+          # Check if the attachment was successful
+          unless result[:success]
+            error_message = "Failed to attach #{type} proof using ProofAttachmentService: #{result[:error]&.message}"
             Rails.logger.error error_message
             return add_error(error_message)
           end
           
-        rescue => e
-          Rails.logger.error "Error directly attaching #{type} proof: #{e.message}\n#{e.backtrace.join("\n")}"
-          return add_error("Error attaching #{type} proof: #{e.message}")
-        end
-      elsif action == "reject"
-        # Get the reason and notes from the params
-        reason = params["#{type}_proof_rejection_reason"].presence || "other"
-        notes = params["#{type}_proof_rejection_notes"].presence || "Rejected during paper application submission"
-        
-        begin
-          # Create rejection directly
-          @application.proof_reviews.create!(
-            admin: @admin,
+          Rails.logger.info "Successfully attached #{type} proof for application #{@application.id}"
+          return true
+        elsif action == "reject"
+          # Get the reason and notes from the params
+          reason = params["#{type}_proof_rejection_reason"].presence || "other"
+          notes = params["#{type}_proof_rejection_notes"].presence || "Rejected during paper application submission"
+          
+          # Use ProofAttachmentService for consistent rejection handling
+          result = ProofAttachmentService.reject_proof_without_attachment(
+            application: @application,
             proof_type: type,
-            status: :rejected,
-            rejection_reason: reason,
+            admin: @admin,
+            reason: reason,
             notes: notes,
-            submission_method: :paper,
-            reviewed_at: Time.current
+            metadata: {
+              submission_method: :paper
+            }
           )
           
-          # Update status directly
-          @application.update_column("#{type}_proof_status", Application.send("#{type}_proof_statuses")[:rejected])
+          # Check if the rejection was successful
+          unless result[:success]
+            error_message = "Failed to reject #{type} proof: #{result[:error]&.message}"
+            Rails.logger.error error_message
+            return add_error(error_message)
+          end
           
           Rails.logger.info "Successfully rejected #{type} proof for application #{@application.id}"
           return true
-        rescue => e
-          error_message = "Failed to reject #{type} proof: #{e.message}"
-          Rails.logger.error error_message
-          return add_error(error_message)
         end
+        
+        true # Default success
+      rescue StandardError => e
+        log_error(e, "Failed to handle #{type} proof")
+        add_error("An unexpected error occurred while processing #{type} proof")
+        false
       end
-      
-      true # Default success
-    rescue StandardError => e
-      log_error(e, "Failed to handle #{type} proof")
-      add_error("An unexpected error occurred while processing #{type} proof")
-      false
     end
 
     def send_notifications
