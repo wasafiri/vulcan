@@ -1,3 +1,15 @@
+# Controller for handling proof submissions from constituents through the portal
+#
+# This controller handles the constituent-facing proof submission workflow:
+# 1. Initial proof upload setup
+# 2. Direct upload for client-side uploading to S3
+# 3. Proof resubmission (after rejection)
+# 
+# Note: While this controller handles the UI and workflow for proof submission,
+# the actual attachment is delegated to ProofAttachmentService to maintain
+# consistency with the paper application submission path. Both constituent portal
+# and paper submissions use ProofAttachmentService as the single source of truth
+# for proof attachments.
 class ConstituentPortal::Proofs::ProofsController < ApplicationController
       # Tell Rails to look for views in the new location
       prepend_view_path "app/views/constituent_portal/proofs"
@@ -95,6 +107,9 @@ class ConstituentPortal::Proofs::ProofsController < ApplicationController
         RateLimit.check!(:proof_submission, current_user.id)
       end
 
+      # Delegates the actual proof attachment to ProofAttachmentService
+      # This ensures a consistent approach to attachment across the application
+      # Both constituent portal and paper applications use the same service
       def attach_and_update_proof
         result = ProofAttachmentService.attach_proof(
           application: @application,

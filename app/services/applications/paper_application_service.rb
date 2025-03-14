@@ -1,4 +1,17 @@
 module Applications
+  # Service to handle paper application submissions.
+  #
+  # This service handles the creation of paper applications, including:
+  # 1. File validation and blob creation for proofs
+  # 2. Constituent creation/lookup
+  # 3. Application record creation
+  # 4. Proof attachment via ProofAttachmentService
+  #
+  # Note: While this service handles file validation and blob creation,
+  # the actual proof attachments are done through ProofAttachmentService
+  # to maintain consistency with the constituent portal submission path.
+  # Both paper and online submissions use ProofAttachmentService as the
+  # single source of truth for proof attachments.
   class PaperApplicationService < BaseService
     attr_reader :params, :admin, :application, :constituent
 
@@ -205,6 +218,12 @@ module Applications
       raise
     end
 
+  # Handles proof submission process for paper applications
+  # 
+  # Note: This method pre-processes files and creates blobs, but the actual
+  # attachment is delegated to ProofAttachmentService to maintain consistency
+  # with the constituent portal submission path. Both paper and online submissions
+  # use ProofAttachmentService as the single source of truth for proof attachments.
   def handle_proof(type, blob = nil)
     action = params["#{type}_proof_action"]
     return true unless action.in?(%w[accept reject]) # Return success if no action needed
@@ -236,7 +255,8 @@ module Applications
           # This prevents issues with validation during the attachment process
           Thread.current[:paper_application_context] = true
           
-          # Use ProofAttachmentService for attachment, status update, and auditing
+          # Use the central ProofAttachmentService for all proof attachments
+          Rails.logger.info "Using ProofAttachmentService to attach #{type} proof to application #{@application.id}"
           result = ProofAttachmentService.attach_proof(
             application: @application,
             proof_type: type,
@@ -247,7 +267,7 @@ module Applications
               ip_address: '0.0.0.0', # Paper application doesn't have an IP
               submission_method: 'paper',
               paper_application_id: @application.id,
-              blob_size: actual_blob.byte_size
+              blob_size: actual_blob.respond_to?(:byte_size) ? actual_blob.byte_size : nil
             }
           )
         ensure
@@ -255,9 +275,30 @@ module Applications
           Thread.current[:paper_application_context] = nil
         end
           
+          # More detailed error handling and debugging
           unless result && result[:success]
             error_message = result&.dig(:error)&.message || "Failed to attach and approve #{type} proof"
-            Rails.logger.error "#{error_message}\n#{result&.dig(:error)&.backtrace&.join("\n")}"
+            
+            # Add detailed debugging info
+            Rails.logger.error "ATTACHMENT ERROR: #{error_message}"
+            Rails.logger.error "Error backtrace: #{result&.dig(:error)&.backtrace&.join("\n")}"
+            Rails.logger.error "Blob details: #{actual_blob.inspect}" if actual_blob
+            
+            # Also check if the blob exists in ActiveStorage
+            if actual_blob.is_a?(ActiveStorage::Blob)
+              begin
+                found_blob = ActiveStorage::Blob.find_by(id: actual_blob.id)
+                Rails.logger.error "Blob found in database: #{found_blob.present?}"
+                if found_blob
+                  Rails.logger.error "Blob content type: #{found_blob.content_type}"
+                  Rails.logger.error "Blob byte size: #{found_blob.byte_size}"
+                  Rails.logger.error "Blob created at: #{found_blob.created_at}"
+                end
+              rescue => e
+                Rails.logger.error "Error checking blob: #{e.message}"
+              end
+            end
+            
             return add_error(error_message)
           end
           

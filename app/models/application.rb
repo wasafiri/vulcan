@@ -489,15 +489,25 @@ class Application < ApplicationRecord
   end
   
   def proof_attachment_integrity
+    # Skip this validation during paper application process
+    return if Thread.current[:paper_application_context]
+    
     # Check if attached proofs have appropriate status
+    # Give a grace period for newly created attachments
     if income_proof.attached? && income_proof_status_not_reviewed?
-      errors.add(:income_proof_status, "cannot be not_reviewed when proof is attached")
-      Rails.logger.warn "Application #{id}: Income proof is attached but status is not_reviewed"
+      # Allow brand new attachments to be not_reviewed
+      unless income_proof.blob.created_at > 1.minute.ago
+        errors.add(:income_proof_status, "cannot be not_reviewed when proof is attached")
+        Rails.logger.warn "Application #{id}: Income proof is attached but status is not_reviewed"
+      end
     end
     
     if residency_proof.attached? && residency_proof_status_not_reviewed?
-      errors.add(:residency_proof_status, "cannot be not_reviewed when proof is attached")
-      Rails.logger.warn "Application #{id}: Residency proof is attached but status is not_reviewed"
+      # Allow brand new attachments to be not_reviewed
+      unless residency_proof.blob.created_at > 1.minute.ago
+        errors.add(:residency_proof_status, "cannot be not_reviewed when proof is attached")
+        Rails.logger.warn "Application #{id}: Residency proof is attached but status is not_reviewed"
+      end
     end
   end
 end

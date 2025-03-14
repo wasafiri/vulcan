@@ -1,7 +1,35 @@
 # frozen_string_literal: true
 
 # Service to handle proof attachments with consistent transaction handling and telemetry
+#
+# This service is the central point for all proof attachment operations in the application.
+# It's used by both the constituent portal and paper application workflows to ensure
+# consistency in how attachments are processed, validated, and tracked.
+#
+# Key responsibilities:
+# 1. Provide a unified interface for attaching proofs for both paper and online submissions
+# 2. Handle blob/file conversion for different input types
+# 3. Maintain audit records and metrics for all attachment operations
+# 4. Provide consistent error handling and diagnostics
+#
+# This is the single source of truth for attachment operations to avoid inconsistencies
+# between different submission paths.
 class ProofAttachmentService
+  # Attaches a proof document to an application
+  #
+  # This is the central method used by both constituent portal and paper application
+  # workflows to attach proof documents. It handles different input types, manages
+  # transactions, and provides consistent logging and metrics.
+  #
+  # @param application [Application] The application to attach the proof to
+  # @param proof_type [Symbol] The type of proof (:income or :residency)
+  # @param blob_or_file [ActiveStorage::Blob, String, ActionDispatch::Http::UploadedFile] 
+  #        The file to attach - can be a direct blob, a signed_id string, or an uploaded file
+  # @param status [Symbol] The status to set for the proof (:not_reviewed, :approved, :rejected)
+  # @param admin [User] The admin user if this is an admin action (nil for constituent actions)
+  # @param metadata [Hash] Additional metadata to store with the attachment audit
+  #
+  # @return [Hash] Result hash with :success, :error, and :duration_ms keys
   def self.attach_proof(application:, proof_type:, blob_or_file:, status: :not_reviewed, admin: nil, metadata: {})
     start_time = Time.current
     result = { success: false, error: nil, duration_ms: 0 }
@@ -13,9 +41,20 @@ class ProofAttachmentService
     end
     
     begin
-      # Step 1: Direct attachment first, outside any transaction
+      # Step 1: Process blob_or_file to ensure it's in the right format for attachment
+      # ActiveStorage attach requires a signed_id, IO object, Hash with keys, or ActionDispatch::Http::UploadedFile
+      attachment_param = blob_or_file
+      
+      # If it's an ActiveStorage::Blob, we need to use its signed_id
+      if blob_or_file.is_a?(ActiveStorage::Blob)
+        Rails.logger.info "Converting blob to signed_id for #{proof_type} proof attachment"
+        attachment_param = blob_or_file.signed_id
+        Rails.logger.debug "Using signed_id: #{attachment_param}"
+      end
+      
+      # Step 2: Direct attachment first, outside any transaction
       Rails.logger.info "Attaching #{proof_type} proof to application #{application.id}"
-      application.send("#{proof_type}_proof").attach(blob_or_file)
+      application.send("#{proof_type}_proof").attach(attachment_param)
       
       # Step 2: Verify attachment succeeded before proceeding
       application.reload
@@ -72,8 +111,21 @@ class ProofAttachmentService
     result
   end
   
+  # Rejects a proof without requiring a file attachment
+  #
+  # This method is used to explicitly reject proof submissions, typically when an admin
+  # is reviewing a paper application and decides not to accept the proof document.
+  # It maintains the same audit trail and metrics as the attachment flow.
+  #
+  # @param application [Application] The application to reject the proof for
+  # @param proof_type [Symbol] The type of proof (:income or :residency)
+  # @param admin [User] The admin user performing the rejection (required)
+  # @param reason [String] The reason for rejection (e.g., 'unclear', 'incomplete', 'other')
+  # @param notes [String, nil] Optional notes explaining the rejection
+  # @param metadata [Hash] Additional metadata to store with the rejection audit
+  #
+  # @return [Hash] Result hash with :success, :error, and :duration_ms keys
   def self.reject_proof_without_attachment(application:, proof_type:, admin:, reason: 'other', notes: nil, metadata: {})
-    # Delegate to the existing model method that works
     start_time = Time.current
     result = { success: false, error: nil, duration_ms: 0 }
     
