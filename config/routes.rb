@@ -45,11 +45,6 @@ Rails.application.routes.draw do
     end
   end
 
-  # Active Storage routes
-  ActiveStorage::Engine.routes.draw do
-    direct_uploads '/direct_uploads', to: 'direct_uploads#create'
-  end
-
   namespace :admin do
     root to: "applications#index"
 

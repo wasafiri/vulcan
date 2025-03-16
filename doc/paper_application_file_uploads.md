@@ -15,7 +15,8 @@ The paper application upload process uses Rails' built-in direct upload function
 1. **File Selection:**
    - Admin selects a file using the file input in the form
    - The JavaScript controller (`upload_controller.js`) tracks the selected file and updates the UI
-   - The file input is configured with `direct_upload: true` and `rails_direct_uploads_url` to enable Rails' direct upload functionality
+   - The file input is configured with `direct_upload: true` and `rails_direct_uploads_url` to use Rails' built-in direct upload endpoint
+   - We use Rails' standard direct upload functionality (/rails/active_storage/direct_uploads) for consistent behavior across the application
 
 2. **Direct Upload Process:**
    - When a file is selected, Rails' direct upload mechanism creates a blob record
@@ -42,8 +43,12 @@ The paper application upload process uses Rails' built-in direct upload function
 - Progress tracking provides better user feedback during uploads
 - Consistent upload mechanism with the constituent portal
 - Built-in error handling and retry capabilities
-- No CORS issues since it uses Rails' standard direct upload endpoint
 - Shared JavaScript controller reduces code duplication
+- Uses Rails' standard direct upload endpoint which:
+  - Handles CSRF protection automatically
+  - Manages blob creation and direct upload URLs
+  - Provides consistent behavior across the application
+  - Eliminates need for custom upload endpoints
 
 ## Troubleshooting
 
