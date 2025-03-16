@@ -3,7 +3,7 @@ import { Controller } from "@hotwired/stimulus"
 // This controller provides UI feedback for file uploads
 // It relies on Rails' built-in direct upload functionality
 export default class extends Controller {
-  static targets = ["input", "progress", "percentage", "statusText", "cancel"]
+  static targets = ["input", "progress", "percentage", "statusText", "cancel", "signedId"]
 
   connect() {
     // Set default status text
@@ -103,6 +103,13 @@ export default class extends Controller {
       this.cancelTarget.classList.add('hidden')
     }
   }
+
+  handleDirectUploadEnd(event) {
+    const { signedId } = event.detail.blob
+    if (this.hasSignedIdTarget) {
+      this.signedIdTarget.value = signedId
+    }
+  }
   
   cancelUpload(event) {
     // Reset file input
@@ -121,6 +128,11 @@ export default class extends Controller {
     
     if (this.hasCancelTarget) {
       this.cancelTarget.classList.add('hidden')
+    }
+
+    // Clear signed ID
+    if (this.hasSignedIdTarget) {
+      this.signedIdTarget.value = ''
     }
   }
   

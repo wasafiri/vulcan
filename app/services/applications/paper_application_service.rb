@@ -158,35 +158,27 @@ module Applications
           # Use the consistent ProofAttachmentService for attaching proofs
           Rails.logger.info "Paper application using ProofAttachmentService for #{type}_proof"
           
-          # Get the file or signed_id from params
-          file = params["#{type}_proof"]
-          signed_id = params["#{type}_proof_signed_id"]
+          # Get the signed blob ID from direct upload
+          signed_id = params["#{type}_proof"]
           
-          unless file.present? || signed_id.present?
-            Rails.logger.error "No #{type}_proof file or signed_id found in params"
+          unless signed_id.present?
+            Rails.logger.error "No #{type}_proof signed_id found in params"
             return add_error("Missing #{type} proof file")
           end
           
-          # Log details if we have a file
-          if file.present?
-            Rails.logger.info "File details: Class=#{file.class.name}, Name=#{file.original_filename}, Type=#{file.content_type}, Size=#{file.size}"
-          elsif signed_id.present?
-            Rails.logger.info "Using signed_id for #{type}_proof: #{signed_id[0..20]}..."
-          end
+          Rails.logger.info "Using signed_id for #{type}_proof: #{signed_id[0..20]}..."
           
-          # Determine what to pass to ProofAttachmentService (prefer signed_id if available)
-          attachment_param = signed_id.present? ? signed_id : file
-          
-          # Use ProofAttachmentService for consistent handling
+          # Use ProofAttachmentService with signed blob ID
           result = ProofAttachmentService.attach_proof(
             application: @application,
             proof_type: type,
-            blob_or_file: attachment_param,
+            blob_or_file: signed_id, # Pass signed_id directly like constituent portal
             status: :approved, # Default to approved for paper applications
             admin: @admin,
             metadata: {
               submission_method: :paper,
-              admin_id: @admin&.id
+              admin_id: @admin&.id,
+              direct_upload: true
             }
           )
           
