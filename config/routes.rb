@@ -43,11 +43,11 @@ Rails.application.routes.draw do
         resources :inbound_emails, only: [:create]
       end
     end
+  end
 
-    # Active Storage direct upload routes
-    namespace :active_storage do
-      resources :direct_uploads, only: [:create]
-    end
+  # Active Storage routes
+  ActiveStorage::Engine.routes.draw do
+    direct_uploads '/direct_uploads', to: 'direct_uploads#create'
   end
 
   namespace :admin do
