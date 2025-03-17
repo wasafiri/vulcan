@@ -16,16 +16,17 @@ module NotificationDelivery
     @delivering_notifications = true
 
     begin
-      if Rails.configuration.use_job_scheduler
-        # New job-based delivery while preserving retry logic
-        NotificationJob.set(retry: 3).perform_later(self)
+      # Use the appropriate mailer based on the model type
+      case self
+      when TrainingSession
+        TrainingSessionNotificationsMailer.trainer_assigned(self).deliver_now
       else
-        # Existing robust delivery logic
-        ApplicationNotifier.new(self).deliver_all
+        Rails.logger.warn("No notification handler defined for #{self.class.name}")
       end
-    rescue => e
+    rescue StandardError => e
       log_delivery_error(e)
-      retry_delivery_later
+      # Re-raise the error to trigger Rails' retry mechanism
+      raise
     ensure
       # Always reset the flag, even if an exception occurs
       @delivering_notifications = false
@@ -36,7 +37,6 @@ module NotificationDelivery
 
   def should_deliver_notifications?
     # Skip notifications in test environment unless explicitly required
-    # This helps prevent test failures due to notification side effects
     return false if Rails.env.test? && !Thread.current[:force_notifications]
 
     status_changed? ||
@@ -48,9 +48,5 @@ module NotificationDelivery
     Rails.logger.error("Notification delivery failed: #{error.message}")
     Rails.logger.error("Record: #{self.class.name}, ID: #{id}")
     Rails.logger.error("Error details: #{error.backtrace.join("\n")}")
-  end
-
-  def retry_delivery_later
-    NotificationRetryJob.set(wait: 5.minutes).perform_later(self)
   end
 end

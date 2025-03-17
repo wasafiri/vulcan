@@ -11,10 +11,10 @@ module TrainingStatusManagement
       no_show: 5        # Constituent didn't show up
     }, validate: true
 
-    scope :active, -> { where(status: [ :scheduled, :confirmed, :in_progress ]) }
-    scope :pending, -> { where(status: [ :scheduled, :confirmed ]) }
+    scope :active, -> { where(status: %i[scheduled confirmed in_progress]) }
+    scope :pending, -> { where(status: %i[scheduled confirmed]) }
     scope :completed_sessions, -> { where(status: :completed) }
-    scope :needing_followup, -> { where(status: [ :no_show, :cancelled ]) }
+    scope :needing_followup, -> { where(status: %i[no_show cancelled]) }
   end
 
   def active?

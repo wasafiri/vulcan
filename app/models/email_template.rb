@@ -42,7 +42,7 @@ class EmailTemplate < ApplicationRecord
 
     Event.create!(
       user: current_user,
-      action: "email_template_rendered",
+      action: 'email_template_rendered',
       user_agent: Current.user_agent,
       ip_address: Current.ip_address
     )
@@ -51,7 +51,7 @@ class EmailTemplate < ApplicationRecord
   rescue StandardError
     Event.create!(
       user: current_user,
-      action: "email_template_error",
+      action: 'email_template_error',
       user_agent: Current.user_agent,
       ip_address: Current.ip_address
     )
@@ -64,9 +64,7 @@ class EmailTemplate < ApplicationRecord
     required_vars = AVAILABLE_TEMPLATES[name]&.dig(:required_vars) || []
 
     required_vars.each do |var|
-      unless body.include?("%{#{var}}")
-        errors.add(:body, "must include the variable %{#{var}}")
-      end
+      errors.add(:body, "must include the variable %{#{var}}") unless body.include?("%{#{var}}")
     end
   end
 
@@ -74,8 +72,8 @@ class EmailTemplate < ApplicationRecord
     required_vars = AVAILABLE_TEMPLATES[name]&.dig(:required_vars) || []
     missing_vars = required_vars - vars.keys.map(&:to_s)
 
-    if missing_vars.any?
-      raise ArgumentError, "Missing required variables: #{missing_vars.join(', ')}"
-    end
+    return unless missing_vars.any?
+
+    raise ArgumentError, "Missing required variables: #{missing_vars.join(', ')}"
   end
 end

@@ -22,8 +22,8 @@ class Event < ApplicationRecord
   private
 
   def validate_metadata_structure
-    unless metadata.is_a?(Hash)
-      errors.add(:metadata, 'must be a JSON object')
-    end
+    return if metadata.is_a?(Hash)
+
+    errors.add(:metadata, 'must be a JSON object')
   end
 end

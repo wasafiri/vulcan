@@ -39,28 +39,28 @@ module ApplicationStatusManagement
     scope :submitted, -> { where.not(status: :draft) }
     scope :filter_by_status, ->(status) { where(status: status) if status.present? }
     scope :filter_by_type, ->(filter_type) {
-      case filter_type
-      when "proofs_needing_review"
-        where(
-          "income_proof_status = ? OR residency_proof_status = ?",
-          income_proof_statuses[:not_reviewed],
-          residency_proof_statuses[:not_reviewed]
-        )
-      when "proofs_rejected"
-        where(
-          income_proof_status: income_proof_statuses[:rejected],
-          residency_proof_status: residency_proof_statuses[:rejected]
-        )
-      when "awaiting_medical_response"
-        where(status: statuses[:awaiting_documents])
-      end
+       case filter_type
+       when 'proofs_needing_review'
+         where(
+           'income_proof_status = ? OR residency_proof_status = ?',
+           income_proof_statuses[:not_reviewed],
+           residency_proof_statuses[:not_reviewed]
+         )
+       when 'proofs_rejected'
+         where(
+           income_proof_status: income_proof_statuses[:rejected],
+           residency_proof_status: residency_proof_statuses[:rejected]
+         )
+       when 'awaiting_medical_response'
+         where(status: statuses[:awaiting_documents])
+       end
      }
      scope :sorted_by, ->(column, direction) {
-      direction = direction&.downcase == "desc" ? "desc" : "asc"
+      direction = direction&.downcase == 'desc' ? 'desc' : 'asc'
 
       if column.present?
-        if column.start_with?("user.")
-          association = "users"
+        if column.start_with?('user.')
+          association = 'users'
           column_name = column.split(".").last
           joins(:user).order("#{association}.#{column_name} #{direction}")
         elsif column_names.include?(column)
@@ -103,9 +103,9 @@ module ApplicationStatusManagement
   private
 
   def handle_status_change
-    if status_previously_changed?(to: "awaiting_documents")
-      handle_awaiting_documents_transition
-    end
+    return unless status_previously_changed?(to: 'awaiting_documents')
+
+    handle_awaiting_documents_transition
   end
 
   def handle_awaiting_documents_transition

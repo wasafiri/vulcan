@@ -104,8 +104,7 @@ class ProofReview < ApplicationRecord
   # Creates a notification record and sends the email
   # Notification failures don't interrupt the proof review process
   def send_notification(action_name, mail_method, metadata)
-    # First create the notification record
-    notification = Notification.create!(
+    Notification.create!(
       recipient: application.user,
       actor: admin,
       action: action_name,
@@ -114,7 +113,7 @@ class ProofReview < ApplicationRecord
     )
 
     # Send the email notification
-    # Important: We call deliver_later directly with the method 
+    # Important: We call deliver_later directly with the method
     # since ActionMailer only serializes arguments, not the mail object
     ApplicationNotificationsMailer.send(mail_method, application, self).deliver_later
   rescue StandardError => e

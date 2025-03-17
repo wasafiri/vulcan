@@ -6,7 +6,7 @@ class Application < ApplicationRecord
   include ProofConsistencyValidation
 
   # Associations
-  belongs_to :user, class_name: 'Constituent', foreign_key: :user_id
+  belongs_to :user, class_name: 'Users::Constituent', foreign_key: :user_id
   belongs_to :income_verified_by, 
              class_name: 'User',
              foreign_key: :income_verified_by_id, 
@@ -357,7 +357,7 @@ class Application < ApplicationRecord
 
   def medical_certification_requested?
     medical_certification_requested_at.present? ||
-      medical_certification_status.in?(['requested', 'received', 'accepted', 'rejected'])
+      medical_certification_status.in?(%w[requested received accepted rejected'])
   end
 
   private
@@ -496,46 +496,35 @@ class Application < ApplicationRecord
   def proof_status_consistency
     # Check if approved proofs have attachments
     if income_proof_status_approved? && !income_proof.attached?
-      errors.add(:income_proof, "must be attached when status is approved")
+      errors.add(:income_proof, 'must be attached when status is approved')
       Rails.logger.warn "Application #{id}: Income proof marked as approved but no file is attached"
     end
-    
-    if residency_proof_status_approved? && !residency_proof.attached?
-      errors.add(:residency_proof, "must be attached when status is approved")
-      Rails.logger.warn "Application #{id}: Residency proof marked as approved but no file is attached"
-    end
+
+    return unless residency_proof_status_approved? && !residency_proof.attached?
+
+    errors.add(:residency_proof, 'must be attached when status is approved')
+    Rails.logger.warn "Application #{id}: Residency proof marked as approved but no file is attached"
   end
 
   def proof_attachment_integrity
-    # Skip this validation during paper application process
     return if Thread.current[:paper_application_context]
 
-    # Check if attached proofs have appropriate status
-    # Give a grace period for newly created attachments
-    if income_proof.attached? && income_proof_status_not_reviewed?
-      # Check if blob exists and has a created_at timestamp
-      if income_proof.blob && income_proof.blob.created_at
-        # Allow brand new attachments to be not_reviewed
-        unless income_proof.blob.created_at > 1.minute.ago
-          errors.add(:income_proof_status, "cannot be not_reviewed when proof is attached")
-          Rails.logger.warn "Application #{id}: Income proof is attached but status is not_reviewed"
-        end
-      else
-        Rails.logger.warn "Application #{id}: Income proof blob missing created_at timestamp"
-      end
-    end
+    check_proof_integrity(income_proof, :income) if income_proof_status_not_reviewed?
+    check_proof_integrity(residency_proof, :residency) if residency_proof_status_not_reviewed?
+  end
 
-    if residency_proof.attached? && residency_proof_status_not_reviewed?
-      # Check if blob exists and has a created_at timestamp
-      if residency_proof.blob && residency_proof.blob.created_at
-        # Allow brand new attachments to be not_reviewed
-        unless residency_proof.blob.created_at > 1.minute.ago
-          errors.add(:residency_proof_status, "cannot be not_reviewed when proof is attached")
-          Rails.logger.warn "Application #{id}: Residency proof is attached but status is not_reviewed"
-        end
-      else
-        Rails.logger.warn "Application #{id}: Residency proof blob missing created_at timestamp"
+  def check_proof_integrity(proof, proof_type)
+    return unless proof&.attached?
+
+    if proof&.blob&.created_at
+      # Allow brand new attachments to remain :not_reviewed for up to 1 minute
+      if proof.blob.created_at <= 1.minute.ago
+        errors.add("#{proof_type}_proof_status".to_sym,
+                   'cannot be not_reviewed when proof is attached')
+        Rails.logger.warn "Application #{id}: #{proof_type.capitalize} proof is attached but status is not_reviewed"
       end
+    else
+      Rails.logger.warn "Application #{id}: #{proof_type.capitalize} proof blob missing created_at timestamp"
     end
   end
 end

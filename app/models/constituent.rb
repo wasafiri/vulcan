@@ -8,7 +8,7 @@ class Constituent < User
   def method_missing(method, *args, &block)
     Users::Constituent.instance_method(method).bind(self).call(*args, &block) if Users::Constituent.instance_methods.include?(method)
   end
-  
+
   # Directly include key methods for compatibility
   DISABILITY_TYPES = Users::Constituent::DISABILITY_TYPES
 
