@@ -15,9 +15,9 @@ class Event < ApplicationRecord
   end
 
   # Scope for finding events by metadata key/value
-  scope :with_metadata, ->(key, value) do
+  scope :with_metadata, lambda { |key, value|
     where('metadata @> ?', { key => value }.to_json)
-  end
+  }
 
   private
 
