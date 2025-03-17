@@ -464,7 +464,7 @@ module ConstituentPortal
                   "speech=#{current_user.speech_disability}, mobility=#{current_user.mobility_disability}, cognition=#{current_user.cognition_disability}")
         log_debug("User has_disability_selected? returns: #{current_user.has_disability_selected?}")
         true
-      rescue => e
+      rescue StandardError => e
         Rails.logger.error("Update failed: #{e.message}")
         false
       end

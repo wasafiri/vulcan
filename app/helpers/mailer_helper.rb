@@ -70,7 +70,7 @@ module MailerHelper
       else
         date.strftime("%B %d %Y")
       end
-    rescue => e
+    rescue StandardError => e
       Rails.logger.error("Error formatting date: #{e.message} for date: #{date.inspect}")
       date.to_s
     end

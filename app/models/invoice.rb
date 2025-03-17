@@ -5,8 +5,7 @@ class Invoice < ApplicationRecord
 
   validates :vendor, presence: true
   validates :start_date, :end_date, presence: true
-  validates :total_amount, presence: true,
-    numericality: { greater_than_or_equal_to: 0 }
+  validates :total_amount, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :invoice_number, presence: true, uniqueness: true
   validate :end_date_after_start_date
   validate :dates_do_not_overlap_for_vendor
@@ -22,7 +21,7 @@ class Invoice < ApplicationRecord
     invoice_cancelled: 4     # Invoice has been cancelled
   }
 
-  scope :unpaid, -> { where.not(status: [ :invoice_paid, :invoice_cancelled ]) }
+  scope :unpaid, -> { where.not(status: %i[invoice_paid invoice_cancelled]) }
   scope :for_vendor, ->(vendor_id) { where(vendor_id: vendor_id) }
   scope :in_date_range, ->(start_date, end_date) {
     where("start_date >= ? AND end_date <= ?", start_date, end_date)
@@ -32,9 +31,9 @@ class Invoice < ApplicationRecord
   def self.generate_biweekly
     # Find vendors with uninvoiced transactions
     vendor_ids = VoucherTransaction.pending_invoice
-      .select(:vendor_id)
-      .distinct
-      .pluck(:vendor_id)
+                                   .select(:vendor_id)
+                                   .distinct
+                                   .pluck(:vendor_id)
 
     vendor_ids.each do |vendor_id|
       # Calculate date range for this invoice
@@ -50,10 +49,10 @@ class Invoice < ApplicationRecord
   def self.create_for_vendor(vendor_id, start_date, end_date)
     # Get all completed, uninvoiced transactions for this vendor in date range
     transactions = VoucherTransaction
-      .completed
-      .pending_invoice
-      .for_vendor(vendor_id)
-      .in_date_range(start_date, end_date)
+                   .completed
+                   .pending_invoice
+                   .for_vendor(vendor_id)
+                   .in_date_range(start_date, end_date)
 
     return if transactions.empty?
 
@@ -108,8 +107,6 @@ class Invoice < ApplicationRecord
   def total_transaction_amount
     voucher_transactions.sum(:amount)
   end
-
-  private
 
   def generate_invoice_number
     return if invoice_number.present?

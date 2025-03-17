@@ -2,8 +2,8 @@ class Admin::ProofReviewsController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin!
   before_action :set_application
-  before_action :set_proof_review, only: [ :show ]
-  before_action :ensure_reviewable_status, only: [ :new, :create ]
+  before_action :set_proof_review, only: %i[show]
+  before_action :ensure_reviewable_status, only: %i[new create]
 
   def index
     @proof_reviews = @application.proof_reviews.includes(:admin).order(created_at: :desc)
@@ -11,16 +11,15 @@ class Admin::ProofReviewsController < ApplicationController
 
   def show
     @proof = case @proof_review.proof_type
-    when "income"
-      @application.income_proof
-    when "residency"
-      @application.residency_proof
-    end
+             when 'income'
+               @application.income_proof
+             when 'residency'
+               @application.residency_proof
+             end
 
-    unless @proof&.attached?
-      redirect_to admin_application_path(@application),
-        alert: "Proof file no longer available"
-    end
+    return if @proof&.attached?
+
+    redirect_to admin_application_path(@application), alert: 'Proof file no longer available'
   end
 
   def new
@@ -28,16 +27,15 @@ class Admin::ProofReviewsController < ApplicationController
     @proof_type = params[:proof_type]
 
     @proof = case @proof_type
-    when "income"
-      @application.income_proof
-    when "residency"
-      @application.residency_proof
-    end
+             when 'income'
+               @application.income_proof
+             when 'residency'
+               @application.residency_proof
+             end
 
-    unless @proof.attached? || @proof.nil?
-      redirect_to admin_application_path(@application),
-        alert: "#{@proof_type.titleize} proof file is missing"
-    end
+    return if @proof.attached? || @proof.nil?
+
+    redirect_to admin_application_path(@application), alert: "#{@proof_type.titleize} proof file is missing"
   end
 
   def create
@@ -45,11 +43,9 @@ class Admin::ProofReviewsController < ApplicationController
     @proof_review.admin = current_user
 
     if @proof_review.save
-      redirect_to admin_application_path(@application),
-        notice: "Proof review completed successfully"
+      redirect_to admin_application_path(@application), notice: 'Proof review completed successfully'
     else
-      render :new, status: :unprocessable_entity,
-        alert: "Proof review failed to save"
+      render :new, status: :unprocessable_entity, alert: 'Proof review failed to save'
     end
   end
 
@@ -58,13 +54,13 @@ class Admin::ProofReviewsController < ApplicationController
   def set_application
     @application = Application.find(params[:application_id])
   rescue ActiveRecord::RecordNotFound
-    redirect_to admin_applications_path, alert: "Application not found"
+    redirect_to admin_applications_path, alert: 'Application not found'
   end
 
   def set_proof_review
     @proof_review = @application.proof_reviews.find(params[:id])
   rescue ActiveRecord::RecordNotFound
-    redirect_to admin_application_path(@application), alert: "Review not found"
+    redirect_to admin_application_path(@application), alert: 'Review not found'
   end
 
   def proof_review_params
@@ -72,11 +68,11 @@ class Admin::ProofReviewsController < ApplicationController
   end
 
   def next_proof_for_review
-    return "residency" if params[:proof_type] == "income" &&
+    return 'residency' if params[:proof_type] == 'income' &&
       @application.residency_proof.attached? &&
       @application.residency_proof_status_not_reviewed?
 
-    return "income" if params[:proof_type] == "residency" &&
+    return 'income' if params[:proof_type] == 'residency' &&
       @application.income_proof.attached? &&
       @application.income_proof_status_not_reviewed?
 
@@ -84,16 +80,16 @@ class Admin::ProofReviewsController < ApplicationController
   end
 
   def require_admin!
-    unless current_user&.admin?
-      flash[:alert] = "You are not authorized to perform this action"
-      redirect_to root_path
-    end
+    return if current_user&.admin?
+
+    flash[:alert] = "You are not authorized to perform this action"
+    redirect_to root_path
   end
 
   def ensure_reviewable_status
-    unless @application.proofs_reviewable?
-      redirect_to admin_application_path(@application),
-        alert: "Application is not in a reviewable state"
-    end
+    return if @application.proofs_reviewable?
+
+    redirect_to admin_application_path(@application), alert: "Application is not in a reviewable state"
   end
+
 end

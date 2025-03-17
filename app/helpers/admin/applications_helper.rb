@@ -1,9 +1,9 @@
 module Admin::ApplicationsHelper
   def toggle_direction(column)
     if params[:sort] == column
-      params[:direction] == "asc" ? "desc" : "asc"
+      params[:direction] == 'asc' ? 'desc' : 'asc'
     else
-      "asc"
+      'asc'
     end
   end
 end

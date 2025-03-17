@@ -5,36 +5,9 @@ class PostmarkEmailTracker
   def self.fetch_status(message_id)
     with_retries do
       client = Postmark::ApiClient.new(ENV.fetch('POSTMARK_API_TOKEN'))
-      
-      # Get message details
-      begin
-        message = client.get_message(message_id)
-        status = message['Status']
-        delivered_at = message['DeliveredAt'] ? Time.parse(message['DeliveredAt']) : nil
-      rescue => e
-        Rails.logger.error("Error fetching message details: #{e.message}")
-        status = 'error'
-        delivered_at = nil
-      end
-      
-      # Get open information
-      begin
-        opens_response = client.get_message_opens(message_id, count: 1, offset: 0)
-        first_open = opens_response['Opens'].first if opens_response['Opens'].present?
-        
-        if first_open
-          opened_at = Time.parse(first_open['ReceivedAt'])
-          open_details = first_open
-        else
-          opened_at = nil
-          open_details = nil
-        end
-      rescue => e
-        Rails.logger.error("Error fetching message opens: #{e.message}")
-        opened_at = nil
-        open_details = nil
-      end
-      
+      status, delivered_at = fetch_message_details(client, message_id)
+      opened_at, open_details = fetch_open_info(client, message_id)
+
       {
         status: status,
         delivered_at: delivered_at,
@@ -44,7 +17,33 @@ class PostmarkEmailTracker
     end
   end
 
-  private
+  def self.fetch_message_details(client, message_id)
+    begin
+      message = client.get_message(message_id)
+      status = message['Status']
+      delivered_at = message['DeliveredAt'] ? Time.parse(message['DeliveredAt']) : nil
+      [status, delivered_at]
+    rescue StandardError => e
+      Rails.logger.error("Error fetching message details: #{e.message}")
+      ['error', nil]
+    end
+  end
+
+  def self.fetch_open_info(client, message_id)
+    begin
+      opens_response = client.get_message_opens(message_id, count: 1, offset: 0)
+      if opens_response['Opens'].present?
+        first_open = opens_response['Opens'].first
+        opened_at = Time.parse(first_open['ReceivedAt'])
+        [opened_at, first_open]
+      else
+        [nil, nil]
+      end
+    rescue StandardError => e
+      Rails.logger.error("Error fetching message opens: #{e.message}")
+      [nil, nil]
+    end
+  end
 
   def self.with_retries
     retries = 0
@@ -66,4 +65,6 @@ class PostmarkEmailTracker
       end
     end
   end
+
+  private_class_method :with_retries, :fetch_message_details, :fetch_open_info
 end

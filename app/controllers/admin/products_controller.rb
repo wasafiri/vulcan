@@ -1,6 +1,6 @@
 class Admin::ProductsController < ApplicationController
   before_action :require_admin!
-  before_action :set_product, only: [ :show, :edit, :update, :archive, :unarchive ]
+  before_action :set_product, only: %i[show edit update archive unarchive]
   include Pagy::Backend
 
   def index

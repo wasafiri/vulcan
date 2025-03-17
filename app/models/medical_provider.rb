@@ -1,2 +1,1 @@
-class MedicalProvider < User
-end
+class MedicalProvider < User; end

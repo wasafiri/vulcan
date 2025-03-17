@@ -1,6 +1,6 @@
 class ApplicationNote < ApplicationRecord
   belongs_to :application
-  belongs_to :admin, class_name: "User"
+  belongs_to :admin, class_name: 'User'
 
   validates :content, presence: true
 

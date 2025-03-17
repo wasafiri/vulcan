@@ -18,7 +18,7 @@ class EmailTemplateRenderer
   rescue ArgumentError => e
     log_error("Variable validation failed: #{e.message}")
     fallback_template
-  rescue => e
+  rescue StandardError => e
     log_error("Unexpected error rendering template: #{e.message}")
     fallback_template
   end
@@ -40,21 +40,21 @@ class EmailTemplateRenderer
     @vars.each do |key, value|
       body.gsub!("%{#{key}}", value.to_s)
     end
-    [ template.subject, body ]
+    [template.subject, body]
   end
 
   def fallback_template
-    [ "Application Update", generate_fallback_content ]
+    ['Application Update', generate_fallback_content]
   end
 
   def generate_fallback_content
     case @template_name
-    when "proof_rejection"
-      "Your application requires attention. Please log in to your account for details."
-    when "medical_provider_request"
-      "A medical certification is needed for a patient's application."
+    when 'proof_rejection'
+      'Your application requires attention. Please log in to your account for details.'
+    when 'medical_provider_request'
+      'A medical certification is needed.'
     else
-      "Please check your application status online."
+      'Please check your application status online.'
     end
   end
 

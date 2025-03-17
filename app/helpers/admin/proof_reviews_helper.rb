@@ -1,19 +1,19 @@
 module Admin::ProofReviewsHelper
   def proof_review_label(status)
     case status.to_s
-    when "not_reviewed" then "Needs Review"
+    when 'not_reviewed' then 'Needs Review'
     else status.to_s.humanize
     end
   end
 
   def review_status_label(status)
     case status.to_s
-    when "not_reviewed"
-      "Needs Review"
-    when "approved"
-      "Approved"
-    when "rejected"
-      "Rejected"
+    when 'not_reviewed'
+      'Needs Review'
+    when 'approved'
+      'Approved'
+    when 'rejected'
+      'Rejected'
     else
       status.to_s.titleize
     end
@@ -21,10 +21,10 @@ module Admin::ProofReviewsHelper
 
   def proof_type_label(proof_type)
     case proof_type.to_s
-    when "income"
-      "Proof of Income"
-    when "residency"
-      "Proof of Residency"
+    when 'income'
+      'Proof of Income'
+    when 'residency'
+      'Proof of Residency'
     else
       proof_type.to_s.titleize
     end
@@ -33,11 +33,11 @@ module Admin::ProofReviewsHelper
   def review_alert_class(days_waiting)
     case
     when days_waiting >= 3
-      "bg-red-50 text-red-700"
+      'bg-red-50 text-red-700'
     when days_waiting >= 2
-      "bg-yellow-50 text-yellow-700"
+      'bg-yellow-50 text-yellow-700'
     else
-      "bg-blue-50 text-blue-700"
+      'bg-blue-50 text-blue-700'
     end
   end
 
@@ -56,7 +56,7 @@ module Admin::ProofReviewsHelper
   end
 
   def proof_file_icon(proof)
-    if proof.content_type.start_with?("image/")
+    if proof.content_type.start_with?('image/')
       '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -74,15 +74,15 @@ module Admin::ProofReviewsHelper
     return if remaining > 3
 
     if remaining.zero?
-      content_tag(:div, class: "bg-red-50 p-4 rounded-md") do
-        content_tag(:p, class: "text-sm text-red-700") do
+      content_tag(:div, class: 'bg-red-50 p-4 rounded-md') do
+        content_tag(:p, class: 'text-sm text-red-700') do
           "This application has reached the maximum number of rejections.
            Further rejections will archive the application."
         end
       end
     else
-      content_tag(:div, class: "bg-yellow-50 p-4 rounded-md") do
-        content_tag(:p, class: "text-sm text-yellow-700") do
+      content_tag(:div, class: 'bg-yellow-50 p-4 rounded-md') do
+        content_tag(:p, class: 'text-sm text-yellow-700') do
           "Warning: #{remaining} #{'rejection'.pluralize(remaining)} remaining
            before application is automatically archived."
         end

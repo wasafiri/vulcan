@@ -20,9 +20,8 @@ module ConstituentPortal
 
       # Get training sessions information
       @training_sessions = @active_application&.training_sessions || []
-      @max_training_sessions = Policy.get("max_training_sessions") || 3
+      @max_training_sessions = Policy.get('max_training_sessions') || 3
       @remaining_training_sessions = @max_training_sessions - @training_sessions.count if @active_application
-
     end
 
     private
@@ -36,7 +35,7 @@ module ConstituentPortal
     def calculate_waiting_period_months
       return nil unless @active_application
 
-      waiting_period_years = Policy.get("waiting_period_years") || 3
+      waiting_period_years = Policy.get('waiting_period_years') || 3
       waiting_period_end_date = @active_application.application_date + waiting_period_years.years
 
       # Calculate months between now and waiting period end date
@@ -44,7 +43,7 @@ module ConstituentPortal
                          (waiting_period_end_date.month - Time.current.month)
 
       # Return 0 if waiting period has passed
-      [ months_remaining, 0 ].max
+      [months_remaining, 0].max
     end
   end
 end

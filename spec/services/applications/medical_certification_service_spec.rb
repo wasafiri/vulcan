@@ -55,9 +55,8 @@ RSpec.describe Applications::MedicalCertificationService do
       end
 
       it 'does not update the application' do
-        expect { service.request_certification }.not_to change {
-          application.reload.medical_certification_status
-        }
+        expect { service.request_certification }
+          .not_to(change { application.reload.medical_certification_status })
       end
     end
 

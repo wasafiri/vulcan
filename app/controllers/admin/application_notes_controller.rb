@@ -6,7 +6,7 @@ class Admin::ApplicationNotesController < Admin::BaseController
     @note.admin = current_user
 
     if @note.save
-      redirect_to admin_application_path(@application), notice: "Note added successfully."
+      redirect_to admin_application_path(@application), notice: 'Note added successfully.'
     else
       redirect_to admin_application_path(@application), alert: "Failed to add note: #{@note.errors.full_messages.join(', ')}"
     end

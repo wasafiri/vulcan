@@ -15,15 +15,15 @@ class Event < ApplicationRecord
   end
 
   # Scope for finding events by metadata key/value
-  scope :with_metadata, ->(key, value) {
-    where("metadata @> ?", { key => value }.to_json)
-  }
+  scope :with_metadata, lambda do |key, value|
+    where('metadata @> ?', { key => value }.to_json)
+  end
 
   private
 
   def validate_metadata_structure
     unless metadata.is_a?(Hash)
-      errors.add(:metadata, "must be a JSON object")
+      errors.add(:metadata, 'must be a JSON object')
     end
   end
 end

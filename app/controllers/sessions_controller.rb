@@ -12,53 +12,21 @@ class SessionsController < ApplicationController
 
   def create
     user = User.find_by(email: params[:email])
-
     if user&.authenticate(params[:password])
-      @session = user.sessions.new(
-        user_agent: request.user_agent,
-        ip_address: request.remote_ip
-      )
-
-      if @session.save
-        cookies.signed[:session_token] = {
-          value: @session.session_token,
-          httponly: true,
-          secure: Rails.env.production?
-        }
-
-        user.track_sign_in!(request.remote_ip)
-
-        redirect_path = case user
-        when Admin
-          admin_applications_path
-        when Constituent
-          constituent_dashboard_path
-        when Evaluator
-          evaluators_dashboard_path
-        when Vendor
-          vendor_dashboard_path
-        else
-          root_path
-        end
-
-        redirect_to redirect_path, notice: "Signed in successfully"
-      else
-        redirect_to sign_in_path(email_hint: params[:email]),
-          alert: "Unable to create session"
-      end
+      create_and_handle_session(user)
     else
-      redirect_to sign_in_path(email_hint: params[:email]),
-        alert: "Invalid email or password"
+      handle_invalid_credentials
     end
   end
 
   def destroy
-    if session = current_user&.sessions&.find_by(session_token: cookies.signed[:session_token])
+    session = current_user&.sessions&.find_by(session_token: cookies.signed[:session_token])
+    if session
       session.destroy
       cookies.delete(:session_token)
-      redirect_to sign_in_path, notice: "Signed out successfully"
+      redirect_to sign_in_path, notice: 'Signed out successfully'
     else
-      redirect_to sign_in_path, alert: "No active session"
+      redirect_to sign_in_path, alert: 'No active session'
     end
   end
 
@@ -81,5 +49,41 @@ class SessionsController < ApplicationController
     else
       root_path
     end
+  end
+
+  def create_and_handle_session(user)
+    @session = user.sessions.new(
+      user_agent: request.user_agent,
+      ip_address: request.remote_ip
+    )
+    if @session.save
+      cookies.signed[:session_token] = session_cookie_options(@session.session_token)
+      user.track_sign_in!(request.remote_ip)
+      redirect_to dashboard_for(user), notice: 'Signed in successfully'
+    else
+      redirect_to sign_in_path(email_hint: params[:email]), alert: 'Unable to create session'
+    end
+  end
+
+  def session_cookie_options(token)
+    {
+      value: token,
+      httponly: true,
+      secure: Rails.env.production?
+    }
+  end
+
+  def dashboard_for(user)
+    case user
+    when Admin then admin_applications_path
+    when Constituent then constituent_dashboard_path
+    when Evaluator then evaluators_dashboard_path
+    when Vendor then vendor_dashboard_path
+    else root_path
+    end
+  end
+
+  def handle_invalid_credentials
+    redirect_to sign_in_path(email_hint: params[:email]), alert: 'Invalid email or password'
   end
 end

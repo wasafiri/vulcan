@@ -15,7 +15,7 @@ class Applications::ProofReviewer
 
     # Create the proof review and update application status in a transaction
     ApplicationRecord.transaction do
-      Rails.logger.info "Creating proof review record"
+      Rails.logger.info 'Creating proof review record'
       @proof_review = @application.proof_reviews.create!(
         admin: @admin,
         proof_type: @proof_type_key,
@@ -27,7 +27,7 @@ class Applications::ProofReviewer
 
       # Update application status directly
       update_application_status
-      Rails.logger.info "Updated application status"
+      Rails.logger.info 'Updated application status'
     end
 
     # Return true to indicate success
@@ -45,9 +45,9 @@ class Applications::ProofReviewer
     Rails.logger.info "Updating application status for proof_type: #{@proof_type_key}, status: #{@status_key}"
 
     case @proof_type_key
-    when "income"
+    when 'income'
       @application.update!(income_proof_status: @status_key)
-    when "residency"
+    when 'residency'
       @application.update!(residency_proof_status: @status_key)
     end
   end

@@ -8,7 +8,7 @@ class Admin < User
   def method_missing(method, *args, &block)
     Users::Admin.instance_method(method).bind(self).call(*args, &block) if Users::Admin.instance_methods.include?(method)
   end
-  
+
   def can_manage_users?
     true
   end

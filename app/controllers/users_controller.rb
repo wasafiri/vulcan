@@ -1,6 +1,6 @@
 class UsersController < ApplicationController
   before_action :authenticate_user!
-  helper_method :after_update_path  # Add this line to make the method available to views
+  helper_method :after_update_path # Add this line to make the method available to views
 
   def edit
     @user = current_user
@@ -9,8 +9,8 @@ class UsersController < ApplicationController
   def update
     @user = current_user
     if @user.update(user_params)
-      flash[:notice] = "Profile successfully updated"
-      redirect_to after_update_path(@user)  # Add @user as argument
+      flash[:notice] = 'Profile successfully updated'
+      redirect_to after_update_path(@user) # Add @user as argument
     else
       render :edit, status: :unprocessable_entity
     end

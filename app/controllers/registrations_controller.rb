@@ -1,9 +1,9 @@
 class RegistrationsController < ApplicationController
   # Require authentication for all actions except new and create
-  skip_before_action :authenticate_user!, only: [ :new, :create ]
+  skip_before_action :authenticate_user!, only: %i[new create]
 
   # Set the current user for actions that require authentication
-  before_action :set_user, only: [ :edit, :update, :destroy ]
+  before_action :set_user, only: %i[edit update destroy]
 
   # GET /sign_up
   def new
@@ -12,7 +12,7 @@ class RegistrationsController < ApplicationController
 
   def create
     @user = User.new(registration_params)
-    @user.type = "Constituent"
+    @user.type = 'Constituent'
     @user.force_password_change = true
 
     if @user.save
@@ -22,7 +22,7 @@ class RegistrationsController < ApplicationController
       )
       cookies.signed[:session_token] = { value: @session.session_token, httponly: true, permanent: true }
       @user.track_sign_in!(request.remote_ip)
-      redirect_to root_path, notice: "Account created successfully. Welcome!"
+      redirect_to root_path, notice: 'Account created successfully. Welcome!'
     else
       render :new, status: :unprocessable_entity
     end
@@ -31,17 +31,15 @@ class RegistrationsController < ApplicationController
   # GET /edit_registration
   def edit
     @user = current_user
-    unless @user
-      redirect_to sign_in_path, alert: "You need to sign in to access this page."
-    end
+    redirect_to sign_in_path, alert: 'You need to sign in to access this page.' unless @user
   end
 
   # PATCH/PUT /update_registration
   def update
     if @user.update(registration_params)
-      redirect_to root_path, notice: "Your account was successfully updated."
+      redirect_to root_path, notice: 'Your account was successfully updated.'
     else
-      flash.now[:alert] = "There was a problem updating your account."
+      flash.now[:alert] = 'There was a problem updating your account.'
       render :edit
     end
   end
@@ -50,9 +48,9 @@ class RegistrationsController < ApplicationController
   def destroy
     if @user.destroy
       session[:user_id] = nil
-      redirect_to sign_in_path, notice: "Your account has been deleted."
+      redirect_to sign_in_path, notice: 'Your account has been deleted.'
     else
-      redirect_to edit_registration_path, alert: "There was a problem deleting your account."
+      redirect_to edit_registration_path, alert: 'There was a problem deleting your account.'
     end
   end
 
@@ -61,9 +59,7 @@ class RegistrationsController < ApplicationController
   # Use callbacks to share common setup or constraints between actions.
   def set_user
     @user = current_user
-    unless @user
-      redirect_to sign_in_path, alert: "You need to sign in to access this page."
-    end
+    redirect_to sign_in_path, alert: 'You need to sign in to access this page.' unless @user
   end
 
   def registration_params

@@ -1,20 +1,20 @@
 class EmailTemplate < ApplicationRecord
-  belongs_to :updated_by, class_name: "User", optional: true
+  belongs_to :updated_by, class_name: 'User', optional: true
 
   validates :name, presence: true, uniqueness: true
   validates :subject, :body, presence: true
   validate :validate_variables_in_body
 
   AVAILABLE_TEMPLATES = {
-    "proof_rejection" => {
+    'proof_rejection' => {
       required_vars: %w[constituent_name proof_type rejection_reason],
       optional_vars: %w[admin_name application_id]
     },
-    "proof_approval" => {
+    'proof_approval' => {
       required_vars: %w[constituent_name proof_type],
       optional_vars: %w[admin_name application_id]
     },
-    "medical_provider_request" => {
+    'medical_provider_request' => {
       required_vars: %w[provider_name constituent_name],
       optional_vars: %w[application_id]
     }
@@ -33,7 +33,7 @@ class EmailTemplate < ApplicationRecord
       body_with_vars.gsub!("%{#{key}}", value.to_s)
     end
 
-    [ subject, body_with_vars ]
+    [subject, body_with_vars]
   end
 
   def render_with_tracking(variables, current_user)
@@ -47,8 +47,8 @@ class EmailTemplate < ApplicationRecord
       ip_address: Current.ip_address
     )
 
-    [ rendered_subject, rendered_body ]
-  rescue => e
+    [rendered_subject, rendered_body]
+  rescue StandardError
     Event.create!(
       user: current_user,
       action: "email_template_error",
@@ -75,7 +75,7 @@ class EmailTemplate < ApplicationRecord
     missing_vars = required_vars - vars.keys.map(&:to_s)
 
     if missing_vars.any?
-      raise ArgumentError, "Missing required variables: #{missing_vars.join(", ")}"
+      raise ArgumentError, "Missing required variables: #{missing_vars.join(', ')}"
     end
   end
 end

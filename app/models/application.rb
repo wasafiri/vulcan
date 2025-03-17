@@ -365,17 +365,17 @@ class Application < ApplicationRecord
   def log_status_change
     # Guard clause to prevent infinite recursion
     return if @logging_status_change
-    
+
     # Use Current.user if available, otherwise use the application's user
     # This ensures the method works in both controller contexts and test environments
     acting_user = Current.user || user
 
     # Skip event creation if no user is available
     return unless acting_user
-    
+
     # Set flag to prevent reentry
     @logging_status_change = true
-    
+
     begin
       Event.create!(
         user: acting_user,
@@ -399,10 +399,10 @@ class Application < ApplicationRecord
   def schedule_admin_notifications
     # Only run in production or staging to avoid test failures
     return if Rails.env.test?
-    
+
     # Skip if no needs_review_since or it didn't change
     return unless needs_review_since_changed? && needs_review_since.present?
-    
+
     NotifyAdminsJob.perform_later(self)
   end
 
@@ -492,7 +492,7 @@ class Application < ApplicationRecord
 
     false
   end
-  
+
   def proof_status_consistency
     # Check if approved proofs have attachments
     if income_proof_status_approved? && !income_proof.attached?
@@ -505,11 +505,11 @@ class Application < ApplicationRecord
       Rails.logger.warn "Application #{id}: Residency proof marked as approved but no file is attached"
     end
   end
-  
+
   def proof_attachment_integrity
     # Skip this validation during paper application process
     return if Thread.current[:paper_application_context]
-    
+
     # Check if attached proofs have appropriate status
     # Give a grace period for newly created attachments
     if income_proof.attached? && income_proof_status_not_reviewed?
@@ -524,7 +524,7 @@ class Application < ApplicationRecord
         Rails.logger.warn "Application #{id}: Income proof blob missing created_at timestamp"
       end
     end
-    
+
     if residency_proof.attached? && residency_proof_status_not_reviewed?
       # Check if blob exists and has a created_at timestamp
       if residency_proof.blob && residency_proof.blob.created_at

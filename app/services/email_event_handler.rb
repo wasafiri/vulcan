@@ -6,9 +6,9 @@ class EmailEventHandler
 
   def process
     case @event_type
-    when "bounce"
+    when 'bounce'
       handle_bounce
-    when "complaint"
+    when 'complaint'
       handle_complaint
     else
       Rails.logger.warn("Unhandled email event type: #{@event_type}")
@@ -35,7 +35,7 @@ class EmailEventHandler
 
     # Create an audit event
     Event.create!(
-      action: "email_bounced",
+      action: 'email_bounced',
       metadata: {
         provider_email_id: provider_email.id,
         bounce_type: bounce_data[:type]

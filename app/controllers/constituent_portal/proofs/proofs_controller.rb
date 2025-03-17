@@ -55,7 +55,7 @@ class ConstituentPortal::Proofs::ProofsController < ApplicationController
         flash[:alert] = "Please wait before submitting another proof"
         flash.keep(:alert)
         redirect_to resubmit_proof_document_constituent_portal_application_path(@application)
-      rescue => e
+      rescue StandardError => e
         Rails.logger.error "ERROR IN RESUBMIT: #{e.class.name}: #{e.message}"
         Rails.logger.error e.backtrace.join("\n")
         raise

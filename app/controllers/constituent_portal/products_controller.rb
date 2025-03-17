@@ -8,8 +8,7 @@ class ConstituentPortal::ProductsController < ApplicationController
     @products = current_user.products.active.ordered_by_name
   end
 
-  def show
-  end
+  def show; end
 
   private
 
@@ -18,8 +17,8 @@ class ConstituentPortal::ProductsController < ApplicationController
   end
 
   def require_constituent!
-    unless current_user&.constituent?
-      redirect_to root_path, alert: "Access denied. Constituent-only area."
-    end
+    return if current_user&.constituent?
+
+    redirect_to root_path, alert: 'Access denied. Constituent-only area.'
   end
 end

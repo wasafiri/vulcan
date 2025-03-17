@@ -8,8 +8,8 @@ class ApplicationStatus
     Notification.create!(
       recipient: @application.user,
       actor: actor,
-      action: "application_sent_back",
-      metadata: { reason: "Additional information required." },
+      action: 'application_sent_back',
+      metadata: { reason: 'Additional information required.' },
       notifiable: @application
     )
   end

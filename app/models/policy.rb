@@ -8,6 +8,7 @@ class Policy < ApplicationRecord
 
   has_many :policy_changes
   attr_accessor :updated_by
+
   after_update :log_change
 
   RATE_LIMIT_KEYS = %w[
