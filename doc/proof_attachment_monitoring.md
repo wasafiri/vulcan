@@ -2,6 +2,8 @@
 
 This document describes the proof attachment monitoring system that tracks and reports on the success/failure rates of document uploads in the application.
 
+**Note: This document has been updated to reflect the standardized attachment process introduced in [Proof Attachment Standardization](proof_attachment_standardization.md).**
+
 ## Overview
 
 The proof attachment monitoring system tracks all proof submissions (both successful and failed) through the `ProofSubmissionAudit` model. This data is then analyzed daily by a scheduled job to identify potential issues with the attachment process and alert administrators when failure rates exceed acceptable thresholds.

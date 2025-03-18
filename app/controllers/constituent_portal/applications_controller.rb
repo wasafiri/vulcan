@@ -32,33 +32,45 @@ module ConstituentPortal
       @application = current_user.applications.new
     end
 
-    def create
-      # Build the application with merged parameters.
+  def create
+    # Extract user attributes from params
+    user_attrs = extract_user_attributes(params)
+    
+    # This will hold our application
+    @application = nil
+    
+    success = ActiveRecord::Base.transaction do
+      # Step 1: Update and save user attributes FIRST
+      unless update_user_attributes(user_attrs)
+        # User update failed, add errors
+        @application = current_user.applications.new(filtered_application_params)
+        @application.errors.merge!(current_user.errors)
+        return false
+      end
+      
+      # Force reload the user after successfully saving attributes
+      current_user.reload
+      
+      # Step 2: Now create the application with the updated user
       @application = current_user.applications.new(filtered_application_params)
       set_initial_application_attributes(@application)
-      user_attrs = extract_user_attributes(params)
-
+      
+      # Log for debugging 
       debug_application_info(@application, params)
-
-      success = ActiveRecord::Base.transaction do
-        if update_user_attributes(user_attrs)
-          # Force reload the associated user so validations see the updated values.
-          @application.user = current_user.reload
-          if @application.valid?
-            @application.save!
-            true
-          else
-            @application.errors.merge!(current_user.errors)
-            false
-          end
-        else
-          @application.errors.merge!(current_user.errors)
-          false
-        end
-      rescue ActiveRecord::RecordInvalid => e
-        Rails.logger.error "Transaction failed: #{e.message}"
+      
+      # Step 3: Validate and save the application
+      if @application.valid?
+        @application.save!
+        true
+      else
+        # Application validation failed
+        Rails.logger.debug "Application validation errors: #{@application.errors.full_messages}"
         false
       end
+    rescue ActiveRecord::RecordInvalid => e
+      Rails.logger.error "Transaction failed: #{e.message}"
+      false
+    end
 
       if success
         log_guardian_event if current_user.is_guardian? && @application.persisted?
@@ -162,29 +174,69 @@ module ConstituentPortal
       end
     end
 
-    def upload_documents
-      @application = current_user.applications.find(params[:id])
-      if params[:documents].present?
+  def upload_documents
+    @application = current_user.applications.find(params[:id])
+    if params[:documents].present?
+      success = ActiveRecord::Base.transaction do
+        # Track which proofs were processed for better user feedback
+        processed_proofs = []
+        
         params[:documents].each do |document_type, file|
           case document_type
           when "income_proof"
-            @application.income_proof.attach(file)
+            # Use the shared ProofAttachmentService for consistency with paper applications
+            result = ProofAttachmentService.attach_proof(
+              application: @application,
+              proof_type: :income,
+              blob_or_file: file,
+              status: :not_reviewed, # Default status for constituent uploads
+              admin: nil, # No admin for constituent uploads
+              submission_method: :web,
+              metadata: { 
+                ip_address: request.remote_ip
+              }
+            )
+            return false unless result[:success]
+            processed_proofs << "income"
+            
           when "residency_proof"
-            @application.residency_proof.attach(file)
+            # Use the shared ProofAttachmentService for consistency with paper applications
+            result = ProofAttachmentService.attach_proof(
+              application: @application,
+              proof_type: :residency,
+              blob_or_file: file,
+              status: :not_reviewed, # Default status for constituent uploads
+              admin: nil, # No admin for constituent uploads
+              submission_method: :web,
+              metadata: { 
+                ip_address: request.remote_ip
+              }
+            )
+            return false unless result[:success]
+            processed_proofs << "residency"
           end
         end
-
-        if @application.save
-          redirect_to constituent_portal_application_path(@application),
-                      notice: "Documents uploaded successfully."
-        else
-          render :edit, status: :unprocessable_entity
-        end
-      else
-        redirect_to constituent_portal_application_path(@application),
-                    alert: "Please select documents to upload."
+        
+        # We can add more complex logic here if needed, e.g. requesting review
+        @application.reload.save!
+        
+        # Store processed proofs in flash for better user feedback
+        flash[:processed_proofs] = processed_proofs
+        
+        true # Return true to indicate successful transaction
       end
+
+      if success
+        redirect_to constituent_portal_application_path(@application),
+                    notice: "Documents uploaded successfully."
+      else
+        render :edit, status: :unprocessable_entity
+      end
+    else
+      redirect_to constituent_portal_application_path(@application),
+                  alert: "Please select documents to upload."
     end
+  end
 
     def request_review
       @application = current_user.applications.find(params[:id])
@@ -458,8 +510,19 @@ module ConstituentPortal
       log_debug("Processed attributes: #{processed_attrs.inspect}")
 
       begin
-        current_user.update_columns(processed_attrs)
+        # IMPORTANT: Always ensure type is "Constituent" for the constituent? method to work
+        # This follows Rails STI conventions for role checks (see User#constituent? method)
+        if current_user.type != "Constituent" && (current_user.is_a?(Constituent) || current_user.is_a?(Users::Constituent))
+          processed_attrs[:type] = "Constituent"
+          log_debug("Ensuring user type is set to 'Constituent' (was: #{current_user.type})")
+        end
+        
+        # Use update! for reliability and consistent validation
+        current_user.update!(processed_attrs)
         current_user.reload
+        
+        log_debug("User type after update: #{current_user.type}")
+        log_debug("User is a constituent? #{current_user.constituent?}")
         log_debug("User disability status after update: hearing=#{current_user.hearing_disability}, vision=#{current_user.vision_disability}, " \
                   "speech=#{current_user.speech_disability}, mobility=#{current_user.mobility_disability}, cognition=#{current_user.cognition_disability}")
         log_debug("User has_disability_selected? returns: #{current_user.has_disability_selected?}")

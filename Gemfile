@@ -60,6 +60,7 @@ group :development, :test do
   gem "factory_bot_rails"
   gem "bullet"
   gem "jsbundling-rails"
+  gem 'better_html', '~> 2.1', '>= 2.1.1'
 end
 
 group :development do
@@ -74,7 +75,7 @@ group :test do
   # Use system testing [https://guides.rubyonrails.org/testing.html#system-testing]
   gem "capybara"
   gem "selenium-webdriver"
-  gem "webdrivers", "~> 5.2.0"  # Helps manage ChromeDriver versions (important for Apple Silicon)
+  # Removed webdrivers gem in favor of Selenium Manager (March 2025)
   gem "mocha", require: false
   gem "rails-controller-testing"
 end

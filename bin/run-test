@@ -111,7 +111,7 @@ RAILS_ENV=test bin/rails test "$@" -v
 # Print the logs for reference
 echo "=============================================="
 echo "Recent test logs:"
-tail -n 100 log/test.log 2>/dev/null || echo "No test log found"
+tail -n log/test.log 2>/dev/null || echo "No test log found"
 
 echo "=============================================="
 echo "Recent ChromeDriver logs:"

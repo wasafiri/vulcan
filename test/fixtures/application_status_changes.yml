@@ -1,0 +1,23 @@
+draft_to_in_progress:
+  application: draft_application
+  from_status: draft
+  to_status: in_progress
+  user: admin_david
+  changed_at: <%= Time.current %>
+  created_at: <%= Time.current %>
+
+in_progress_to_approved:
+  application: submitted_application
+  from_status: in_progress
+  to_status: approved
+  user: admin_david
+  changed_at: <%= 1.day.ago %>
+  created_at: <%= 1.day.ago %>
+
+needs_info_to_in_progress:
+  application: one
+  from_status: needs_information
+  to_status: in_progress
+  user: admin_david
+  changed_at: <%= 2.days.ago %>
+  created_at: <%= 2.days.ago %>

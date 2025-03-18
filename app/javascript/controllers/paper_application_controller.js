@@ -17,6 +17,19 @@ export default class extends Controller {
     this.setupRadioListeners()
     this.validateIncomeThreshold()
     this.initializeFormValidation()
+    
+    // Enable file inputs for the pre-selected "accept" options
+    this.enableFileInput('income_proof')
+    this.enableFileInput('residency_proof')
+    
+    // Make sure rejection fields are hidden
+    document.getElementById('income_proof_rejection').classList.add('hidden')
+    document.getElementById('residency_proof_rejection').classList.add('hidden')
+    
+    // Add debug info
+    console.log('Paper application controller connected')
+    console.log('Income proof radio checked:', document.getElementById('accept_income_proof').checked)
+    console.log('Residency proof radio checked:', document.getElementById('accept_residency_proof').checked)
   }
 
   setupRadioListeners() {
@@ -65,24 +78,12 @@ export default class extends Controller {
     }
   }
 
-  // Clear file input and hidden signed_id field when switching to Reject
+  // Clear file input when switching to Reject
   clearFileUpload(inputName) {
     // Clear file input
     const fileInput = document.querySelector(`input[name="${inputName}"]`)
     if (fileInput) {
       fileInput.value = ''
-    }
-    
-    // Clear hidden signed_id field
-    const signedIdInput = document.querySelector(`input[name="${inputName}_signed_id"]`)
-    if (signedIdInput) {
-      signedIdInput.value = ''
-    }
-    
-    // Reset status text if possible
-    const statusElement = document.querySelector(`#${inputName}_upload [data-upload-target="statusText"]`)
-    if (statusElement) {
-      statusElement.textContent = 'No file selected'
     }
   }
 

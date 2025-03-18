@@ -60,12 +60,25 @@ class ProofSubmissionMailbox < ApplicationMailbox
       content_type: attachment.content_type
     )
 
-    # Attach the blob to the application's proof
-    case proof_type
-    when :income
-      application.income_proof.attach(blob)
-    when :residency
-      application.residency_proof.attach(blob)
+    # Use the ProofAttachmentService to consistently handle attachments
+    result = ProofAttachmentService.attach_proof(
+      application: application,
+      proof_type: proof_type,
+      blob_or_file: blob,
+      status: :not_reviewed,
+      admin: nil,
+      submission_method: :email,
+      metadata: {
+        ip_address: "0.0.0.0",
+        email_subject: mail.subject,
+        email_from: mail.from.first,
+        inbound_email_id: inbound_email.id
+      }
+    )
+
+    unless result[:success]
+      Rails.logger.error "Failed to attach proof via email: #{result[:error]&.message}"
+      raise "Failed to attach proof: #{result[:error]&.message}"
     end
   end
 

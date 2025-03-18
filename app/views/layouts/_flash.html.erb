@@ -1,16 +1,7 @@
 <!-- app/views/layouts/_flash.html.erb -->
 <% flash.each do |key, message| %>
   <div class="mb-4">
-    <div class="
-      <% if key == "notice" %>
-        bg-green-100 border border-green-400 text-green-700
-      <% elsif key == "alert" %>
-        bg-red-100 border border-red-400 text-red-700
-      <% else %>
-        bg-blue-100 border border-blue-400 text-blue-700
-      <% end %>
-      px-4 py-3 rounded relative
-    ">
+    <div class="<%= flash_class_for(key) %> px-4 py-3 rounded relative">
       <span class="block sm:inline"><%= message %></span>
     </div>
   </div>

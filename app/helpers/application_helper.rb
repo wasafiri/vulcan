@@ -3,6 +3,14 @@ module ApplicationHelper
   include Pagy::Frontend
   include BadgeHelper
 
+  def flash_class_for(flash_type)
+    case flash_type
+    when 'notice' then 'bg-green-100 border border-green-400 text-green-700'
+    when 'alert' then 'bg-red-100 border border-red-400 text-red-700'
+    else 'bg-blue-100 border border-blue-400 text-blue-700'
+    end
+  end
+
   def dashboard_path_for(user)
     return root_path unless user
 

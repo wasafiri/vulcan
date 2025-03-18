@@ -22,7 +22,7 @@ namespace :data_integrity do
   end
 
   desc "Fix orphaned applications by assigning them to a default user or deleting them"
-  task :fix_orphaned_applications, [ :action, :default_user_email ] => :environment do |t, args|
+  task :fix_orphaned_applications, [ :action, :default_user_email ] => :environment do |_t, args|
     action = args[:action] || "report"
     default_user_email = args[:default_user_email]
 

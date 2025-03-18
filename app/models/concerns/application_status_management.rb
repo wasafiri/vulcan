@@ -14,6 +14,7 @@ module ApplicationStatusManagement
     }, validate: true
 
     after_save :handle_status_change, if: :saved_change_to_status?
+    after_save :auto_approve_if_eligible, if: :requirements_met_for_approval?
 
     enum :application_type, {
       new: 0,
@@ -116,6 +117,54 @@ module ApplicationStatusManagement
     with_lock do
       update!(medical_certification_status: :requested)
       MedicalProviderMailer.request_certification(self).deliver_later
+    end
+  end
+
+  def requirements_met_for_approval?
+    # Only run this when relevant fields have changed
+    return false unless saved_change_to_income_proof_status? || 
+                        saved_change_to_residency_proof_status? || 
+                        saved_change_to_medical_certification_status?
+    
+    # Only auto-approve applications that aren't already approved
+    return false if approved?
+    
+    # Check if all requirements are met
+    all_requirements_met?
+  end
+
+  def all_requirements_met?
+    income_proof_status_approved? && 
+    residency_proof_status_approved? && 
+    medical_certification_status_accepted?
+  end
+
+  def auto_approve_if_eligible
+    # Use update_column to avoid callbacks loop
+    update_column(:status, self.class.statuses[:approved])
+    
+    # Log the auto-approval if possible
+    begin
+      if defined?(Event) && Event.respond_to?(:create)
+        # Try to find system user or admin
+        system_user = User.find_by(email: 'system@example.com') || 
+                      User.where(type: 'Admin').first
+        
+        # Only create event if we have a valid user
+        if system_user
+          Event.create(
+            user: system_user,
+            action: 'application_auto_approved',
+            metadata: {
+              application_id: id,
+              timestamp: Time.current.iso8601
+            }
+          )
+        end
+      end
+    rescue => e
+      # Log error but don't prevent the auto-approval
+      Rails.logger.error("Failed to create event for auto-approval: #{e.message}")
     end
   end
 end

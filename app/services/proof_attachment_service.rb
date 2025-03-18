@@ -27,10 +27,11 @@ class ProofAttachmentService
     #        The file to attach - can be a direct blob, a signed_id string, or an uploaded file
     # @param status [Symbol] The status to set for the proof (:not_reviewed, :approved, :rejected)
     # @param admin [User] The admin user if this is an admin action (nil for constituent actions)
+    # @param submission_method [Symbol] The method of submission (:paper, :web, :email, etc.)
     # @param metadata [Hash] Additional metadata to store with the attachment audit
     #
     # @return [Hash] Result hash with :success, :error, and :duration_ms keys
-  def self.attach_proof(application:, proof_type:, blob_or_file:, status: :not_reviewed, admin: nil, metadata: {})
+  def self.attach_proof(application:, proof_type:, blob_or_file:, status: :not_reviewed, admin: nil, submission_method:, metadata: {})
     start_time = Time.current
     result = { success: false, error: nil, duration_ms: 0 }
 
@@ -140,7 +141,7 @@ class ProofAttachmentService
           application: application,
           user: admin || application.user,
           proof_type: proof_type,
-          submission_method: admin ? :paper : :web,
+          submission_method: submission_method,
           ip_address: metadata[:ip_address] || '0.0.0.0',
           metadata: metadata.merge(
             success: true,
@@ -163,7 +164,7 @@ class ProofAttachmentService
       result[:success] = true
     rescue StandardError => e
       # Track failure with detailed information
-      record_failure(application, proof_type, e, admin, metadata)
+      record_failure(application, proof_type, e, admin, submission_method, metadata)
       result[:error] = e
     ensure
       result[:duration_ms] = ((Time.current - start_time) * 1000).round
@@ -184,10 +185,11 @@ class ProofAttachmentService
   # @param admin [User] The admin user performing the rejection (required)
   # @param reason [String] The reason for rejection (e.g., 'unclear', 'incomplete', 'other')
   # @param notes [String, nil] Optional notes explaining the rejection
+  # @param submission_method [Symbol] The method of submission (:paper, :web, :email, etc.)
   # @param metadata [Hash] Additional metadata to store with the rejection audit
   #
   # @return [Hash] Result hash with :success, :error, and :duration_ms keys
-  def self.reject_proof_without_attachment(application:, proof_type:, admin:, reason: 'other', notes: nil, metadata: {})
+  def self.reject_proof_without_attachment(application:, proof_type:, admin:, reason: 'other', notes: nil, submission_method:, metadata: {})
     start_time = Time.current
     result = { success: false, error: nil, duration_ms: 0 }
 
@@ -206,7 +208,7 @@ class ProofAttachmentService
           application: application,
           user: admin,
           proof_type: proof_type,
-          submission_method: :paper,
+          submission_method: submission_method,
           ip_address: metadata[:ip_address] || '0.0.0.0',
           metadata: metadata.merge(
             success: true,
@@ -219,7 +221,7 @@ class ProofAttachmentService
 
       result[:success] = success
     rescue StandardError => e
-      record_failure(application, proof_type, e, admin, metadata)
+      record_failure(application, proof_type, e, admin, submission_method, metadata)
       result[:error] = e
     ensure
       result[:duration_ms] = ((Time.current - start_time) * 1000).round
@@ -229,24 +231,37 @@ class ProofAttachmentService
     result
   end
 
-  def self.record_failure(application, proof_type, error, admin, metadata)
+  def self.record_failure(application, proof_type, error, admin, submission_method, metadata)
     Rails.logger.error "Proof attachment error: #{error.message}"
     Rails.logger.error error.backtrace.join("\n")
-
-    # Record the failure for metrics and monitoring
-    ProofSubmissionAudit.create!(
-      application: application,
-      user: admin || application.user,
-      proof_type: proof_type,
-      submission_method: admin ? :paper : :web,
-      ip_address: metadata[:ip_address] || '0.0.0.0',
-      metadata: metadata.merge(
-        success: false,
-        error_class: error.class.name,
-        error_message: error.message,
-        error_backtrace: error.backtrace.first(5)
+    
+    begin
+      # Get the application's submission method if available, otherwise use the parameter
+      app_submission_method = application.submission_method.to_sym if application.submission_method.present?
+      
+      # Use application's submission method first, then fall back to parameter, then to validator
+      safe_submission_method = app_submission_method || 
+                               (submission_method.present? ? submission_method.to_sym : nil) || 
+                               SubmissionMethodValidator.validate(submission_method)
+      
+      # Record the failure for metrics and monitoring
+      ProofSubmissionAudit.create!(
+        application: application,
+        user: admin || application.user,
+        proof_type: proof_type,
+        submission_method: safe_submission_method,
+        ip_address: metadata[:ip_address] || '0.0.0.0',
+        metadata: metadata.merge(
+          success: false,
+          error_class: error.class.name,
+          error_message: error.message,
+          error_backtrace: error.backtrace.first(5)
+        )
       )
-    ) rescue nil # Don't let audit failures affect the main flow
+    rescue StandardError => e
+      # Don't let audit failures affect the main flow
+      Rails.logger.error "Failed to record audit for failure: #{e.message}"
+    end
 
     # Report to error tracking service if available
     if defined?(Honeybadger)
@@ -267,7 +282,6 @@ class ProofAttachmentService
   def self.record_metrics(result, proof_type, status)
     record_basic_logging(result, proof_type, status)
     context = build_context(result, proof_type, status)
-    notify_honeybadger(result, context)
     record_datadog_metrics(result, context, proof_type, status)
     Rails.logger.info("METRICS: proof_attachment #{context.to_json}")
   rescue StandardError => e
@@ -298,12 +312,6 @@ class ProofAttachmentService
       context[:error_backtrace] = result[:error].backtrace.first(3) if result[:error].backtrace
     end
     context
-  end
-
-  def self.notify_honeybadger(result, context)
-    return if result[:success] || !Rails.env.production? || !defined?(Honeybadger)
-
-    Honeybadger.notify('Proof attachment operation failed', context: context)
   end
 
   def self.record_datadog_metrics(result, _context, proof_type, status)

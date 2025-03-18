@@ -1,3 +1,4 @@
+
 require 'factory_bot_rails'
 require 'yaml'
 require 'active_record/fixtures'
@@ -9,12 +10,19 @@ else
     ActiveRecord::Base.transaction do
       # Optionally clear existing data.
       puts 'Clearing existing data...'
+      
+      # Clear sessions first to avoid foreign key constraint violations
+      puts "  Clearing Session records..."
+      Session.in_batches(of: 100).delete_all
+      
+      # Then clear other models
       [
-        Evaluation, ProofReview, Appointment, Notification, RoleCapability,
+        Evaluation, ProofReview, Notification, RoleCapability,
         PolicyChange, EmailTemplate, Product, Event, Policy, Application, User
       ].each do |model|
         puts "  Clearing #{model.name} records..."
-        model.in_batches.destroy_all
+        # Delete records in small batches to avoid memory issues
+        model.in_batches(of: 100).delete_all
       end
 
       # ------------------------------
@@ -181,6 +189,12 @@ else
       Application.find_each do |app|
         # Skip Rex since we already processed it
         next if rex_app && app.id == rex_app.id
+        
+        # Skip applications with missing users
+        if app.user.nil?
+          puts "  ⚠️ Skipping Application ##{app.id} - Missing user reference"
+          next
+        end
 
         puts "  Processing Application ##{app.id} (#{app.user.email})"
 

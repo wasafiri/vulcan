@@ -6,8 +6,8 @@ class Application < ApplicationRecord
   include ProofConsistencyValidation
 
   # Associations
-  belongs_to :user, class_name: 'Users::Constituent', foreign_key: :user_id
-  belongs_to :income_verified_by, 
+  belongs_to :user, class_name: 'Constituent', foreign_key: :user_id
+  belongs_to :income_verified_by,
              class_name: 'User',
              foreign_key: :income_verified_by_id, 
              optional: true

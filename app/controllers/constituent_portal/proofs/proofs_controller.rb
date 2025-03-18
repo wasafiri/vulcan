@@ -117,9 +117,9 @@ class ConstituentPortal::Proofs::ProofsController < ApplicationController
           blob_or_file: params[:"#{params[:proof_type]}_proof"],
           status: :not_reviewed,
           admin: nil,
+          submission_method: :web,
           metadata: {
             ip_address: request.remote_ip,
-            submission_method: :web,
             user_agent: request.user_agent
           }
         )

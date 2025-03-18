@@ -2,8 +2,17 @@ class ProofSubmissionAudit < ApplicationRecord
   belongs_to :application
   belongs_to :user
 
+  # Define the enum for submission_method to match SubmissionMethodValidator.VALID_METHODS
+  enum :submission_method, {
+    web: 0,
+    paper: 1,
+    email: 2,
+    unknown: 3
+  }, prefix: :submission_method
+
   validates :proof_type, presence: true
   validates :ip_address, presence: true
+  validates :submission_method, presence: true
 
   # Disable suspicious activity notification in test environment
   after_create :notify_admins_if_suspicious, unless: -> { Rails.env.test? }

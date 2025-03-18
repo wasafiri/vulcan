@@ -46,13 +46,25 @@
             <%= application.application_date.strftime("%m/%d/%Y") %>
           </td>
           <td class="px-4 py-2 text-sm text-gray-900">
-            <%= application.user&.full_name || "Unknown User" %>
+            <% if application.user.present? %>
+              <%= application.user.full_name %>
+            <% else %>
+              Unknown User
+            <% end %>
           </td>
           <td class="px-4 py-2 text-sm text-gray-900 hidden sm:table-cell">
-            <%= application.user&.phone || "No phone" %>
+            <% if application.user.present? %>
+              <%= application.user.phone || "No phone" %>
+            <% else %>
+              No phone
+            <% end %>
           </td>
           <td class="px-4 py-2 text-sm text-gray-900">
-            <%= application.user&.email || "No email" %>
+            <% if application.user.present? %>
+              <%= application.user.email || "No email" %>
+            <% else %>
+              No email
+            <% end %>
           </td>
           <td class="px-4 py-2 text-sm text-gray-900">
             <%= application_status_badge(application) %>

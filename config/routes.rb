@@ -48,6 +48,12 @@ Rails.application.routes.draw do
   namespace :admin do
     root to: "applications#index"
 
+    resources :constituents, only: [] do
+      collection do
+        get :type_check
+      end
+    end
+
     resources :paper_applications, only: [ :new, :create ] do
       collection do
         post :send_rejection_notification

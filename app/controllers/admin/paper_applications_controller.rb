@@ -1,5 +1,6 @@
 class Admin::PaperApplicationsController < Admin::BaseController
-  before_action :set_paper_application_context, only: [:create]
+  before_action :cast_boolean_params, only: [:create]
+
   def new
     @paper_application = {
       application: Application.new,
@@ -8,63 +9,35 @@ class Admin::PaperApplicationsController < Admin::BaseController
   end
 
   def create
-    # Log file upload information for debugging
+    # Debug file parameters
+    Rails.logger.debug "CONTROLLER - File params present:"
+    Rails.logger.debug "income_proof present: #{params[:income_proof].present?}"
+    Rails.logger.debug "residency_proof present: #{params[:residency_proof].present?}"
+    
+    # Debug form parameters
     if params[:income_proof].present?
-      Rails.logger.info "INCOME PROOF FILE: Class=#{params[:income_proof].class.name}, Size=#{params[:income_proof].size}"
-    else
-      Rails.logger.info "No income proof file uploaded"
+      Rails.logger.debug "income_proof class: #{params[:income_proof].class}"
+      Rails.logger.debug "income_proof filename: #{params[:income_proof].original_filename}" if params[:income_proof].respond_to?(:original_filename)
     end
     
-    if params[:residency_proof].present?
-      Rails.logger.info "RESIDENCY PROOF FILE: Class=#{params[:residency_proof].class.name}, Size=#{params[:residency_proof].size}"
-    else
-      Rails.logger.info "No residency proof file uploaded"
-    end
-
+    # Create a service instance with our parameters and current admin user
+    service_params = paper_application_params
+    
+    Rails.logger.debug "Service params before service call: #{service_params.keys.inspect}"
+    
     service = Applications::PaperApplicationService.new(
-      params: paper_application_params,
+      params: service_params,
       admin: current_user
     )
 
+    # Process the application creation
     if service.create
-      # Force reload the application to ensure attachments are visible
-      service.application.reload
-      
-      # Check if any proofs were rejected and add more detailed notice
-      if service.application.proof_reviews.where(status: :rejected).any?
-        rejected_proofs = []
-        rejected_proofs << "income" if service.application.income_proof_status_rejected?
-        rejected_proofs << "residency" if service.application.residency_proof_status_rejected?
-        
-        if rejected_proofs.any?
-          notice_message = "Paper application successfully submitted with #{rejected_proofs.length} rejected "
-          notice_message += rejected_proofs.length == 1 ? "proof" : "proofs"
-          notice_message += ": #{rejected_proofs.join(' and ')}. Notifications will be sent."
-        else
-          notice_message = "Paper application successfully submitted."
-        end
-      else
-        notice_message = "Paper application successfully submitted."
-      end
-      
-      # Double-check attachments
-      if params[:income_proof].present? && !service.application.income_proof.attached?
-        notice_message += " Warning: Income proof attachment may need review."
-      end
-      
-      if params[:residency_proof].present? && !service.application.residency_proof.attached?
-        notice_message += " Warning: Residency proof attachment may need review."
-      end
-      
-      redirect_to admin_application_path(service.application), notice: notice_message
+      # Generate appropriate success message
+      redirect_to admin_application_path(service.application), 
+                  notice: generate_success_message(service.application)
     else
-      if params[:income_proof].present? || params[:residency_proof].present?
-        # Add message about preserving attachments
-        flash.now[:alert] = "#{service.errors.first} Your uploaded files have been preserved." if service.errors.any?
-      else
-        # Regular error message
-        flash.now[:alert] = service.errors.first if service.errors.any?
-      end
+      # Display error and re-render form with existing data
+      flash.now[:alert] = service.errors.first if service.errors.any?
       
       @paper_application = {
         application: service.application || Application.new,
@@ -75,13 +48,12 @@ class Admin::PaperApplicationsController < Admin::BaseController
   end
 
   def fpl_thresholds
-    # Get FPL thresholds from the Policy model
+    # Gather FPL thresholds for JavaScript calculations
     thresholds = {}
     (1..8).each do |size|
       thresholds[size] = Policy.get("fpl_#{size}_person").to_i
     end
 
-    # Get the modifier percentage
     modifier = Policy.get("fpl_modifier_percentage").to_i
 
     render json: { thresholds: thresholds, modifier: modifier }
@@ -105,18 +77,15 @@ class Admin::PaperApplicationsController < Admin::BaseController
     }
 
     # Send the notification
-    ApplicationNotificationsMailer.income_threshold_exceeded(
-      constituent_params,
-      notification_params
-    ).deliver_later if params[:notification_method] == "email"
-
-    # If it's a letter, queue it for printing
-    if params[:notification_method] == "letter"
-      # Logic to queue a letter for printing
-      # This could be a background job or another service
-      flash[:notice] = "Rejection letter has been queued for printing."
-    else
+    if params[:notification_method] == "email"
+      ApplicationNotificationsMailer.income_threshold_exceeded(
+        constituent_params,
+        notification_params
+      ).deliver_later
       flash[:notice] = "Rejection notification has been sent via email."
+    elsif params[:notification_method] == "letter"
+      # Logic to queue a letter for printing
+      flash[:notice] = "Rejection letter has been queued for printing."
     end
 
     redirect_to admin_applications_path
@@ -124,14 +93,26 @@ class Admin::PaperApplicationsController < Admin::BaseController
 
   private
 
-  def set_paper_application_context
-    # Set thread variable to indicate we're in a paper application context
-    # This will be used by the model validations to skip certain checks
-    Thread.current[:paper_application_context] = true
+  def generate_success_message(application)
+    # Check if any proofs were rejected and add more detailed notice
+    if application.proof_reviews.where(status: :rejected).any?
+      rejected_proofs = []
+      rejected_proofs << "income" if application.income_proof_status_rejected?
+      rejected_proofs << "residency" if application.residency_proof_status_rejected?
+      
+      if rejected_proofs.any?
+        message = "Paper application successfully submitted with #{rejected_proofs.length} rejected "
+        message += rejected_proofs.length == 1 ? "proof" : "proofs"
+        message += ": #{rejected_proofs.join(' and ')}. Notifications will be sent."
+        return message
+      end
+    end
+    
+    "Paper application successfully submitted."
   end
 
   def paper_application_params
-    {
+    service_params = {
       constituent: params.require(:constituent).permit(
         :first_name,
         :last_name,
@@ -162,17 +143,63 @@ class Admin::PaperApplicationsController < Admin::BaseController
         :terms_accepted,
         :information_verified,
         :medical_release_authorized
-      ),
-      income_proof_action: params[:income_proof_action],
-      income_proof: params[:income_proof],
-      income_proof_signed_id: params[:income_proof_signed_id],
-      income_proof_rejection_reason: params[:income_proof_rejection_reason],
-      income_proof_rejection_notes: params[:income_proof_rejection_notes],
-      residency_proof_action: params[:residency_proof_action],
-      residency_proof: params[:residency_proof],
-      residency_proof_signed_id: params[:residency_proof_signed_id],
-      residency_proof_rejection_reason: params[:residency_proof_rejection_reason],
-      residency_proof_rejection_notes: params[:residency_proof_rejection_notes]
+      )
     }
+    
+    # Add proof handling parameters with string keys to match what the service expects
+    ['income', 'residency'].each do |type|
+      # First add the action parameter which controls accept/reject
+      action_key = "#{type}_proof_action"
+      service_params[action_key] = params[action_key]
+      
+      # Then add the file itself if present
+      file_key = "#{type}_proof"
+      service_params[file_key] = params[file_key] if params[file_key].present?
+      
+      # Add rejection-related parameters
+      service_params["#{type}_proof_rejection_reason"] = params["#{type}_proof_rejection_reason"]
+      service_params["#{type}_proof_rejection_notes"] = params["#{type}_proof_rejection_notes"]
+    end
+    
+    Rails.logger.debug "Final service params: #{service_params.keys.inspect}"
+    service_params
+  end
+
+  # Similar to constituent portal's approach for boolean handling
+  def cast_boolean_params
+    return unless params[:constituent] && params[:application]
+    
+    # Cast constituent boolean fields
+    boolean_fields = [
+      :hearing_disability,
+      :vision_disability,
+      :speech_disability,
+      :mobility_disability,
+      :cognition_disability,
+      :is_guardian
+    ]
+    
+    boolean_fields.each do |field|
+      next unless params[:constituent][field]
+      value = params[:constituent][field]
+      value = value.last if value.is_a?(Array)
+      params[:constituent][field] = ActiveModel::Type::Boolean.new.cast(value)
+    end
+    
+    # Cast application boolean fields
+    app_boolean_fields = [
+      :self_certify_disability,
+      :maryland_resident,
+      :terms_accepted,
+      :information_verified,
+      :medical_release_authorized
+    ]
+    
+    app_boolean_fields.each do |field|
+      next unless params[:application][field]
+      value = params[:application][field]
+      value = value.last if value.is_a?(Array)
+      params[:application][field] = ActiveModel::Type::Boolean.new.cast(value)
+    end
   end
 end
