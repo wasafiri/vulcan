@@ -211,7 +211,7 @@ if Rails.env.test?
         if driver.respond_to?(:browser) && driver.browser.respond_to?(:quit)
           begin
             driver.browser.quit
-          rescue StandardError => e quit_error
+          rescue StandardError => quit_error
             warn "CAPYBARA WARNING: Failed to quit browser: #{quit_error.message}"
           end
         end
