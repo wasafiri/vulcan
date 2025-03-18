@@ -184,6 +184,19 @@ class Application < ApplicationRecord
         location: ''
         # Initialize other required fields as needed
       )
+      
+      # Create event for audit logging
+      Event.create!(
+        user: Current.user,
+        action: 'evaluator_assigned',
+        metadata: {
+          application_id: id,
+          evaluator_id: evaluator.id,
+          evaluator_name: evaluator.full_name,
+          timestamp: Time.current.iso8601
+        }
+      )
+      
       # Send email notification to evaluator
       EvaluatorMailer.with(
         evaluation: evaluation,
@@ -202,6 +215,18 @@ class Application < ApplicationRecord
         trainer: trainer,
         status: :scheduled,
         scheduled_for: 1.week.from_now # Default to 1 week from now, can be changed later
+      )
+
+      # Create event for audit logging
+      Event.create!(
+        user: Current.user,
+        action: 'trainer_assigned',
+        metadata: {
+          application_id: id,
+          trainer_id: trainer.id,
+          trainer_name: trainer.full_name,
+          timestamp: Time.current.iso8601
+        }
       )
 
       # Create system notification for the constituent

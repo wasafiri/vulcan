@@ -216,8 +216,8 @@ module ProofManageable
   
   # Verifies that proofs have the right attachment state based on status
   def verify_proof_attachments
-    # Skip validation for new records - validation will happen when they're saved
-    return if new_record?
+    # Skip validation for new records or during specific operations
+    return if new_record? || Thread.current[:skip_proof_validation]
     
     # This validation runs for ALL applications, including paper applications
     # Log current state for diagnostics
@@ -238,9 +238,9 @@ module ProofManageable
       errors.add(:residency_proof, "must be attached when status is approved")
     end
     
-    # For non-paper applications, check that attached proofs have appropriate status
-    # (Skip this validation during paper application submission)
-    unless Thread.current[:paper_application_context]
+    # For non-paper applications, only validate the NOT_REVIEWED status when not reviewing a single proof
+    # This allows individual proofs to be reviewed independently
+    unless Thread.current[:paper_application_context] || Thread.current[:reviewing_single_proof]
       if income_proof.attached? && income_proof_status_not_reviewed?
         # Check if blob exists and has a created_at timestamp
         if income_proof.blob && income_proof.blob.created_at

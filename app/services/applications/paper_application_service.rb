@@ -30,14 +30,32 @@ module Applications
         
         # Log paper application creation specifically
         if @application.persisted?
+          submission_time = Time.current
           Event.create!(
             user: @admin,
             action: 'application_created',
             metadata: {
               application_id: @application.id,
               submission_method: 'paper',
-              timestamp: Time.current.iso8601
+              initial_status: (@application.status || 'in_progress').to_s,
+              timestamp: submission_time.iso8601
             }
+          )
+          
+          # Create a specific audit log entry for the submission timestamp
+          ProofSubmissionAudit.create!(
+            application_id: @application.id,
+            user_id: @admin.id,
+            proof_type: 'application',
+            ip_address: "0.0.0.0",
+            metadata: {
+              submission_method: 'paper',
+              timestamp: submission_time.iso8601,
+              action: 'submit'
+            },
+            submission_method: :paper,
+            created_at: submission_time,
+            updated_at: submission_time
           )
         end
         

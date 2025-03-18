@@ -1,16 +1,39 @@
-// app/javascript/controllers/guardian_controller.js
-import { Controller } from "stimulus"
+import { Controller } from "@hotwired/stimulus"
 
+// This controller manages the guardian relationship field visibility
 export default class extends Controller {
+  static targets = ["relationshipField", "checkbox", "select"]
+  
   connect() {
-    this.element.addEventListener("submit", this.validate.bind(this))
+    this.updateVisibility()
+    
+    // If we have relationship select, ensure it's required when checkbox is checked
+    if (this.hasSelectTarget) {
+      this.updateSelectRequired()
+    }
   }
-
-  validate(event) {
-    const disabilities = this.element.querySelectorAll("input[name$='_disability']:checked")
-    if (disabilities.length === 0) {
-      alert("Please select at least one disability.")
-      event.preventDefault()
+  
+  toggleVisibility() {
+    this.updateVisibility()
+    this.updateSelectRequired()
+  }
+  
+  // Show the relationship field only when the guardian checkbox is checked
+  updateVisibility() {
+    if (this.hasCheckboxTarget && this.hasRelationshipFieldTarget) {
+      if (this.checkboxTarget.checked) {
+        this.relationshipFieldTarget.classList.remove('hidden')
+      } else {
+        this.relationshipFieldTarget.classList.add('hidden')
+      }
+    }
+  }
+  
+  // Make the select field required only when the guardian checkbox is checked
+  updateSelectRequired() {
+    if (this.hasSelectTarget && this.hasCheckboxTarget) {
+      this.selectTarget.required = this.checkboxTarget.checked
+      this.selectTarget.setAttribute('aria-required', this.checkboxTarget.checked)
     }
   }
 }

@@ -105,26 +105,37 @@
         </fieldset>
 
         <!-- Guardian Information Section -->
-        <section aria-labelledby="guardian-section-title" class="space-y-4 p-4 bg-gray-50 rounded">
+        <section aria-labelledby="guardian-section-title" class="space-y-4 p-4 bg-gray-50 rounded" data-controller="guardian-controller">
           <h2 id="guardian-section-title" class="text-lg font-medium text-gray-900">Guardian Information</h2>
           <div class="flex items-start">
             <%= form.check_box :is_guardian,
                 class: "mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
-                "aria-describedby": "guardian-description" %>
+                "aria-describedby": "guardian-description",
+                data: { 
+                  guardian_controller_target: "checkbox",
+                  action: "change->guardian-controller#toggleVisibility"
+                } %>
             <%= form.label :is_guardian, "I am applying on behalf of someone under 18",
                 class: "ml-2 block text-sm text-gray-700" %>
           </div>
           <p id="guardian-description" class="text-sm text-gray-700">
             Check this box if you are a parent or legal guardian applying on behalf of a minor
           </p>
-          <div class="guardian-fields" data-controller="guardian">
+          <div class="guardian-fields <%= current_user&.is_guardian? ? '' : 'hidden' %>" data-guardian-controller-target="relationshipField">
             <%= form.label :guardian_relationship, "Relationship to Applicant",
                 class: "block text-sm font-medium text-gray-700" %>
             <%= form.select :guardian_relationship,
-                options_for_select(["Parent", "Legal Guardian"]),
+                options_for_select(["Parent", "Legal Guardian"], current_user&.guardian_relationship),
                 { include_blank: "Select Relationship" },
                 { class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500",
-                  "aria-describedby": "relationship-hint" } %>
+                  "aria-describedby": "relationship-hint",
+                  required: current_user&.is_guardian?,
+                  data: { guardian_controller_target: "select" } } %>
+            <% if @application&.errors&.include?(:guardian_relationship) || current_user&.errors&.include?(:guardian_relationship) %>
+              <p class="mt-1 text-sm text-red-600" role="alert">
+                Guardian relationship can't be blank when you select that you are a guardian
+              </p>
+            <% end %>
             <p id="relationship-hint" class="mt-1 text-sm text-gray-700">
               Select your relationship to the applicant if you are applying on behalf of a minor
             </p>

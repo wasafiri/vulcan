@@ -39,6 +39,22 @@ module ConstituentPortal
     # This will hold our application
     @application = nil
     
+    # First handle the user validation separately to show proper errors
+    if user_attrs[:is_guardian] && user_attrs[:guardian_relationship].blank?
+      # Pre-validate user attributes to catch guardian relationship errors
+      @application = current_user.applications.new(filtered_application_params)
+      current_user.assign_attributes(user_attrs)
+      
+      # Add the validation error explicitly
+      current_user.errors.add(:guardian_relationship, "can't be blank")
+      @application.errors.add(:guardian_relationship, "can't be blank")
+      
+      # Don't even try the transaction
+      build_medical_provider_for_form
+      render :new, status: :unprocessable_entity
+      return
+    end
+    
     success = ActiveRecord::Base.transaction do
       # Step 1: Update and save user attributes FIRST
       unless update_user_attributes(user_attrs)
@@ -85,13 +101,13 @@ module ConstituentPortal
       false
     end
 
-      if success
-        log_guardian_event if current_user.is_guardian? && @application.persisted?
-        redirect_to_app(@application)
-      else
-        build_medical_provider_for_form
-        render :new, status: :unprocessable_entity
-      end
+    if success
+      log_guardian_event if current_user.is_guardian? && @application.persisted?
+      redirect_to_app(@application)
+    else
+      build_medical_provider_for_form
+      render :new, status: :unprocessable_entity
+    end
   end
 
     def edit; end

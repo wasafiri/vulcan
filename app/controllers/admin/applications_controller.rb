@@ -136,6 +136,11 @@ class Admin::ApplicationsController < Admin::BaseController
 
   def update_proof_status
     reviewer = Applications::ProofReviewer.new(@application, current_user)
+    
+    # Set a thread-local variable to indicate we're reviewing a single proof
+    # This will help the validation know the context
+    Thread.current[:reviewing_single_proof] = true
+    
     begin
       Rails.logger.info "Starting proof review in controller"
       Rails.logger.info "Parameters: proof_type=#{params[:proof_type]}, status=#{params[:status]}"
@@ -188,15 +193,21 @@ class Admin::ApplicationsController < Admin::BaseController
             ]
           ).order(created_at: :desc)
 
-          # Include voucher-related events
-          voucher_events = Event.where(
-            action: [ "voucher_assigned", "voucher_redeemed", "voucher_expired", "voucher_cancelled" ],
-            metadata: { application_id: @application.id }
-          ).includes(:user).order(created_at: :desc)
+  # Include application-related events (including vouchers and application creation)
+  # Use a more flexible JSONB query to match application_id in metadata, regardless of string/integer type
+  application_events = Event.where(
+    action: [ 
+      "voucher_assigned", "voucher_redeemed", "voucher_expired", "voucher_cancelled", 
+      "application_created", "evaluator_assigned", "trainer_assigned", "application_auto_approved" 
+    ]
+  ).where("metadata->>'application_id' = ? OR metadata @> ?", 
+    @application.id.to_s, 
+    { application_id: @application.id }.to_json
+  ).includes(:user).order(created_at: :desc)
 
-          @audit_logs = (proof_reviews + status_changes + notifications + voucher_events)
-            .sort_by(&:created_at)
-            .reverse
+  @audit_logs = (proof_reviews + status_changes + notifications + application_events)
+    .sort_by(&:created_at)
+    .reverse
 
           flash.now[:notice] = "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
           # First remove all modals
@@ -293,6 +304,9 @@ class Admin::ApplicationsController < Admin::BaseController
           render turbo_stream: turbo_stream.update("flash", partial: "shared/flash")
         }
       end
+    ensure
+      # Always clear the thread-local variable to prevent affecting other operations
+      Thread.current[:reviewing_single_proof] = nil
     end
   end
 
@@ -455,15 +469,21 @@ class Admin::ApplicationsController < Admin::BaseController
       ]
     ).order(created_at: :desc)
 
-    # Include voucher-related events
-    voucher_events = Event.where(
-      action: [ "voucher_assigned", "voucher_redeemed", "voucher_expired", "voucher_cancelled" ],
-      metadata: { application_id: @application.id }
-    ).includes(:user).order(created_at: :desc)
+  # Include application-related events (including vouchers and application creation)
+  # Use a more flexible JSONB query to match application_id in metadata, regardless of string/integer type
+  application_events = Event.where(
+    action: [ 
+      "voucher_assigned", "voucher_redeemed", "voucher_expired", "voucher_cancelled", 
+      "application_created", "evaluator_assigned", "trainer_assigned", "application_auto_approved" 
+    ]
+  ).where("metadata->>'application_id' = ? OR metadata @> ?", 
+    @application.id.to_s, 
+    { application_id: @application.id }.to_json
+  ).includes(:user).order(created_at: :desc)
 
-    @audit_logs = (proof_reviews + status_changes + notifications + voucher_events)
-      .sort_by(&:created_at)
-      .reverse
+  @audit_logs = (proof_reviews + status_changes + notifications + application_events)
+    .sort_by(&:created_at)
+    .reverse
   end
 
   def apply_filters(scope, filter)
