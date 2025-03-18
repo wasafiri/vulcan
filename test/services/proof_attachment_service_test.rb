@@ -90,7 +90,7 @@ class ProofAttachmentServiceTest < ActiveSupport::TestCase
     result = nil
     
     # Use a block to catch errors raised during blob creation
-    ActiveStorage::Blob.stub :create_and_upload!, -> (*args) { raise StandardError.new("Test error") } do
+    ActiveStorage::Blob.stub :create_and_upload!, -> (_args) { raise StandardError.new("Test error") } do
       result = ProofAttachmentService.attach_proof(
         application: @application,
         proof_type: "income",

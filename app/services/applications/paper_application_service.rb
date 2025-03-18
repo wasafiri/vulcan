@@ -41,6 +41,68 @@ module Applications
 
     private
 
+    def log_proof_debug_info(type)
+      Rails.logger.debug "==== PROCESS_PROOF(#{type}) STARTED ===="
+      Rails.logger.debug "Params class: #{params.class.name}"
+      Rails.logger.debug "Params keys: #{params.keys.inspect}"
+      Rails.logger.debug "Param key as symbol: #{params[:"#{type}_proof_action"].inspect}"
+      Rails.logger.debug "Param key as string: #{params["#{type}_proof_action"].inspect}"
+      Rails.logger.debug "File param present? #{params["#{type}_proof"].present?}"
+      if params["#{type}_proof"].present?
+        Rails.logger.debug "File param type: #{params["#{type}_proof"].class.name}"
+        Rails.logger.debug "File param details: #{params["#{type}_proof"].inspect}"
+      end
+    end
+
+    def extract_proof_action(type)
+      params["#{type}_proof_action"] || params[:"#{type}_proof_action"]
+    end
+
+    def process_accept_proof(type)
+      Rails.logger.debug "Accepting #{type} proof"
+      if params["#{type}_proof"].present?
+        result = ProofAttachmentService.attach_proof(
+          application: @application,
+          proof_type: type,
+          blob_or_file: params["#{type}_proof"],
+          status: :approved,
+          admin: @admin,
+          submission_method: :paper,
+          metadata: {}
+        )
+        unless result[:success]
+          add_error("Error processing #{type} proof: #{result[:error]&.message}")
+          return false
+        end
+        Rails.logger.debug "Successfully attached #{type} proof for application #{@application.id}"
+        true
+      else
+        Rails.logger.debug "No file provided for #{type}"
+        add_error("Please upload a file for #{type} proof")
+        false
+      end
+    end
+
+    def process_reject_proof(type)
+      Rails.logger.debug "Rejecting #{type} proof"
+      result = ProofAttachmentService.reject_proof_without_attachment(
+        application: @application,
+        proof_type: type,
+        admin: @admin,
+        reason: params["#{type}_proof_rejection_reason"],
+        notes: params["#{type}_proof_rejection_notes"],
+        submission_method: :paper,
+        metadata: {}
+      )
+      unless result[:success]
+        Rails.logger.error "Error rejecting #{type} proof via service: #{result[:error]&.message}"
+        add_error("Error rejecting #{type} proof: #{result[:error]&.message}")
+        return false
+      end
+      Rails.logger.debug "Successfully rejected #{type} proof"
+      true
+    end
+
     def process_constituent
       constituent_params = params[:constituent]
       return add_error('Constituent params missing') unless constituent_params.present?
@@ -168,78 +230,26 @@ module Applications
       end
     end
 
-  def process_proof(type)
-    Rails.logger.debug "==== PROCESS_PROOF(#{type}) STARTED ===="
-    # Enhanced debugging to see what's in the params
-    Rails.logger.debug "Params class: #{params.class.name}"
-    Rails.logger.debug "Params keys: #{params.keys.inspect}"
-    Rails.logger.debug "Param key as symbol: #{params[:"#{type}_proof_action"].inspect}"
-    Rails.logger.debug "Param key as string: #{params["#{type}_proof_action"].inspect}"
-    Rails.logger.debug "File param present? #{params["#{type}_proof"].present?}"
-    Rails.logger.debug "File param type: #{params["#{type}_proof"].class.name if params["#{type}_proof"].present?}"
-    Rails.logger.debug "File param details: #{params["#{type}_proof"].inspect if params["#{type}_proof"].present?}"
-    
-    # Try both string and symbol keys to be safe
-    action = params["#{type}_proof_action"] || params[:"#{type}_proof_action"]
-    Rails.logger.debug "Action determined: #{action.inspect}"
-    
-    # Exit early if no action specified
-    unless action.in?(%w[accept reject])
-      Rails.logger.debug "No valid action for #{type}, returning true"
-      return true
-    end
+    def process_proof(type)
+      log_proof_debug_info(type)
+      action = extract_proof_action(type)
+      Rails.logger.debug "Action determined: #{action.inspect}"
 
-    if action == 'accept'
-      Rails.logger.debug "Accepting #{type} proof"
-        # Use ProofAttachmentService for file upload - same service used by constituent portal
-        if params["#{type}_proof"].present?
-          result = ProofAttachmentService.attach_proof(
-            application: @application,
-            proof_type: type,
-            blob_or_file: params["#{type}_proof"],
-            status: :approved, # Set status to approved since admin is accepting it
-            admin: @admin,
-            submission_method: :paper,
-            metadata: {} # Additional metadata if needed
-          )
-        
-        unless result[:success]
-          add_error("Error processing #{type} proof: #{result[:error]&.message}")
-          return false
-        end
-        
-        Rails.logger.debug "Successfully attached #{type} proof for application #{@application.id}"
-      else
-        Rails.logger.debug "No file provided for #{type}"
-        add_error("Please upload a file for #{type} proof")
-        return false
+      unless %w[accept reject].include?(action)
+        Rails.logger.debug "No valid action for #{type}, returning true"
+        return true
       end
-    elsif action == 'reject'
-      Rails.logger.debug "Rejecting #{type} proof"
-      # Use ProofAttachmentService for rejection
-      result = ProofAttachmentService.reject_proof_without_attachment(
-        application: @application,
-        proof_type: type,
-        admin: @admin,
-        reason: params["#{type}_proof_rejection_reason"],
-        notes: params["#{type}_proof_rejection_notes"],
-        submission_method: :paper,
-        metadata: {}
-      )
-      
-      unless result[:success]
-        Rails.logger.error "Error rejecting #{type} proof via service: #{result[:error]&.message}"
-        add_error("Error rejecting #{type} proof: #{result[:error]&.message}")
-        return false
-      end
-      
-      # Create proof review for audit purposes (already done by ProofAttachmentService)
-      Rails.logger.debug "Successfully rejected #{type} proof"
+
+      result = case action
+               when 'accept'
+                 process_accept_proof(type)
+               when 'reject'
+                 process_reject_proof(type)
+               end
+
+      Rails.logger.debug "==== PROCESS_PROOF(#{type}) COMPLETED SUCCESSFULLY ===="
+      result
     end
-    
-    Rails.logger.debug "==== PROCESS_PROOF(#{type}) COMPLETED SUCCESSFULLY ===="
-    true
-  end
 
     def create_proof_review(type, status)
       @application.proof_reviews.create!(

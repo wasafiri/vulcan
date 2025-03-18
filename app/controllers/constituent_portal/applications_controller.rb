@@ -79,7 +79,7 @@ module ConstituentPortal
         build_medical_provider_for_form
         render :new, status: :unprocessable_entity
       end
-    end
+  end
 
     def edit; end
 

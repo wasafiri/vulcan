@@ -7,7 +7,7 @@ class ProofSubmissionMailbox < ApplicationMailbox
 
   def process
     # Create an audit record for the submission
-    audit = create_audit_record
+    create_audit_record
 
     # Process each attachment
     mail.attachments.each do |attachment|
