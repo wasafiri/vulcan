@@ -162,7 +162,7 @@ module ApplicationStatusManagement
           )
         end
       end
-    rescue => e
+    rescue StandardError => e
       # Log error but don't prevent the auto-approval
       Rails.logger.error("Failed to create event for auto-approval: #{e.message}")
     end

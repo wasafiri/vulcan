@@ -23,7 +23,7 @@ begin
       puts "✓ applications_id_seq is at a safe value (#{sequence_value})"
     end
   end
-rescue => e
+rescue StandardError => e
   puts "ERROR checking sequences: #{e.message}"
 end
 
@@ -75,7 +75,7 @@ begin
   else
     puts "✓ No applications with attached residency proof and not_reviewed status"
   end
-rescue => e
+rescue StandardError => e
   puts "ERROR checking proof consistency: #{e.message}"
 end
 
@@ -103,7 +103,7 @@ begin
       puts "WARNING: residency_proof_status_check constraint is missing"
     end
   end
-rescue => e
+rescue StandardError => e
   puts "ERROR checking constraints: #{e.message}"
 end
 

@@ -11,7 +11,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
       subject: "New Training Assignment - Application ##{@application.id}",
       message_stream: "notifications"
     )
-  rescue => e
+  rescue StandardError => e
     Event.create!(
       user: @trainer,
       action: "email_delivery_error",
@@ -55,7 +55,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
       subject: subject,
       message_stream: "notifications"
     )
-  rescue => e
+  rescue StandardError => e
     Event.create!(
       user: @trainer,
       action: "email_delivery_error",
@@ -100,7 +100,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
       subject: subject,
       message_stream: "notifications"
     )
-  rescue => e
+  rescue StandardError => e
     Event.create!(
       user: @trainer,
       action: "email_delivery_error",
@@ -145,7 +145,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
       subject: subject,
       message_stream: "notifications"
     )
-  rescue => e
+  rescue StandardError => e
     Event.create!(
       user: @trainer,
       action: "email_delivery_error",
@@ -191,7 +191,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
       subject: subject,
       message_stream: "notifications"
     )
-  rescue => e
+  rescue StandardError => e
     Event.create!(
       user: @trainer,
       action: "email_delivery_error",

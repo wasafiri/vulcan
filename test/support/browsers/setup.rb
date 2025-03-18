@@ -159,7 +159,7 @@ module TestBrowsers
       # Try to update ChromeDriver
       Webdrivers::Chromedriver.update
       true
-    rescue => e
+    rescue StandardError => e
       puts "Warning: ChromeDriver update failed: #{e.message}"
       false
     end

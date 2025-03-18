@@ -25,7 +25,7 @@ Rails.application.config.after_initialize do
           Rails.logger.info "applications_id_seq (#{current_value}) already at secure high value"
         end
       end
-    rescue => e
+    rescue StandardError => e
       # Don't crash the app if there's an issue with sequence setting
       Rails.logger.error "Failed to set secure ID sequence: #{e.message}"
     end

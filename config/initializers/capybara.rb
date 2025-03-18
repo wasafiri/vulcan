@@ -156,13 +156,13 @@ if Rails.env.test?
       at_exit do
         begin
           driver.quit if driver&.browser&.respond_to?(:quit)
-        rescue => e
+        rescue StandardError => e
           Rails.logger.error "Error closing browser: #{e.message}"
         end
       end
       
       driver
-    rescue => e
+    rescue StandardError => e
       Rails.logger.error "Failed to create Chrome driver: #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
       raise
@@ -205,13 +205,13 @@ if Rails.env.test?
     module RescuableSession
       def reset_session!
         super
-      rescue => e
+      rescue StandardError => e
         warn "CAPYBARA WARNING: Failed to reset session: #{e.message}"
         # Force browser to quit and restart
         if driver.respond_to?(:browser) && driver.browser.respond_to?(:quit)
           begin
             driver.browser.quit
-          rescue => quit_error
+          rescue StandardError => e quit_error
             warn "CAPYBARA WARNING: Failed to quit browser: #{quit_error.message}"
           end
         end

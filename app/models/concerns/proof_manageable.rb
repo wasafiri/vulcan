@@ -291,7 +291,7 @@ module ProofManageable
       
       # Log success for debugging
       Rails.logger.info "Successfully set needs_review_since to #{Time.current} for application #{id}"
-    rescue => e
+    rescue StandardError => e
       # Log any errors for debugging
       Rails.logger.error "Error setting proof status to unreviewed: #{e.message}"
       Rails.logger.error e.backtrace.join("\n")

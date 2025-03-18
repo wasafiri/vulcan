@@ -65,7 +65,7 @@ class Admin::UsersController < ApplicationController
         render json: { message: "Failed to remove capability", success: false }, status: :unprocessable_entity
       end
     end
-  rescue => e
+  rescue StandardError => e
     Rails.logger.error "Error in update_capabilities: #{e.message}\n#{e.backtrace.join("\n")}"
     render json: {
       success: false,

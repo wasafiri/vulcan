@@ -14,7 +14,7 @@ begin
   # Check if the audit record has a submission_method
   audit = ProofSubmissionAudit.last
   puts "Audit submission_method: #{audit.submission_method}"
-rescue => e
+rescue StandardError => e
   puts "Error with nil submission_method: #{e.message}"
 end
 
@@ -26,6 +26,6 @@ begin
   # Check if the audit record has a submission_method
   audit2 = ProofSubmissionAudit.last
   puts "Audit2 submission_method: #{audit2.submission_method}"
-rescue => e
+rescue StandardError => e
   puts "Error with invalid submission_method: #{e.message}"
 end

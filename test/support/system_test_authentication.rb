@@ -20,7 +20,7 @@ module SystemTestAuthentication
       # Clean up authentication
       begin
         system_test_sign_out
-      rescue => e
+      rescue StandardError => e
         # Log but don't fail if cleanup has an issue
         puts "Warning: Authentication cleanup failed: #{e.message}"
       ensure
@@ -158,7 +158,7 @@ module SystemTestAuthentication
 
   def system_test_sign_out
     # Only attempt if we're actually on a page
-    return unless page.driver.browser.manage&.respond_to?(:delete_cookie)
+    return unless page.driver.browser.manage.respond_to?(:delete_cookie)
     
     # Delete cookie first to ensure clean state
     page.driver.browser.manage.delete_cookie('session_token')

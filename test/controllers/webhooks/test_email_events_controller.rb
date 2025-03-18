@@ -51,7 +51,7 @@ module Webhooks
         result = handler.process
         webhook_debug("Event processing result: #{result}")
         result
-      rescue => e
+      rescue StandardError => e
         # Log the error but don't raise it
         webhook_debug("Error processing event: #{e.message}")
         Rails.logger.error("Error processing webhook event: #{e.message}")

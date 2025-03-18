@@ -43,7 +43,7 @@ module SystemTestHelpers
         rescue Selenium::WebDriver::Error::NoSuchAlertError
           # Wait briefly and try again
           sleep 0.5
-        rescue => e
+        rescue StandardError => e
           puts "Alert handling error on attempt #{attempt+1}: #{e.message}"
           # Try a longer wait on subsequent attempts
           sleep 1
@@ -54,11 +54,11 @@ module SystemTestHelpers
       unless alert_appeared
         begin
           page.execute_script("window.alert = function() {}; window.confirm = function() { return true; };")
-        rescue => e
+        rescue StandardError => e
           puts "Failed to override alert functions with JS: #{e.message}"
         end
       end
-    rescue => e
+    rescue StandardError => e
       puts "Error in safe_accept_alert: #{e.message}"
     ensure
       # Reset timeout and wait time

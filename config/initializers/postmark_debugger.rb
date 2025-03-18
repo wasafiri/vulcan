@@ -44,7 +44,7 @@ if defined?(Postmark::HttpClient)
         result = super
         Rails.logger.info "POSTMARK SUCCESS: Email sent successfully"
         result
-      rescue => e
+      rescue StandardError => e
         Rails.logger.error "POSTMARK ERROR: #{e.class} - #{e.message}"
         raise
       end

@@ -33,7 +33,7 @@ class UpdateEmailStatusJob < ApplicationJob
       if status[:status] != 'error' && status[:opened_at].nil?
         self.class.set(wait: 24.hours).perform_later(notification_id)
       end
-    rescue => e
+    rescue StandardError => e
       Rails.logger.error("Error updating email status for notification #{notification_id}: #{e.message}")
       notification.update!(
         delivery_status: 'error',

@@ -5,7 +5,7 @@ ENV["TEST_FILE"] = "proof_uploads_test"
 
 class ProofUploadsTest < ApplicationSystemTestCase
   include ActiveJob::TestHelper
-  
+
   # Add safe timeout capabilities to prevent test from hanging
   def with_timeout(seconds = 5, &block)
     Timeout.timeout(seconds, &block)
@@ -13,20 +13,19 @@ class ProofUploadsTest < ApplicationSystemTestCase
     puts "TIMEOUT ERROR: Operation timed out after #{seconds} seconds"
     puts "Current path: #{current_path rescue 'Unknown'}"
     puts "Current URL: #{current_url rescue 'Unknown'}"
-    save_screenshot("#{self.class.name}_#{@method_name}_timeout_error.png")
     raise e
   end
 
   setup do
     puts "\n=== Starting new test setup ==="
-    
+
     # Ensure Chrome is properly set up
     chrome_binary = `ps aux | grep -i chrome`.split("\n").first
     puts "Chrome process check: #{chrome_binary}"
     
     # Use FactoryBot to create a properly configured application with rejected proofs
     @user = users(:constituent_john)
-    @valid_pdf = file_fixture("income_proof.pdf")
+    @valid_pdf = file_fixture('income_proof.pdf')
     
     # Create an application with the in_progress_with_rejected_proofs trait
     # This will automatically attach the proof files in the factory's after(:build) hook
@@ -40,12 +39,12 @@ class ProofUploadsTest < ApplicationSystemTestCase
     end
     
     # Verify application state is correct
-    assert @application.income_proof.attached?, "Income proof must be attached"
-    assert @application.rejected_income_proof?, "Income proof status must be rejected"
+    assert @application.income_proof.attached?, 'Income proof must be attached'
+    assert @application.rejected_income_proof?, 'Income proof status must be rejected'
     
     # Ensure the application belongs to our test user
     assert_equal @application.user_id, @user.id,
-                 "Application should belong to test user"
+                 'Application should belong to test user'
     
     # Check and log application state
     puts "Setup - Application ID: #{@application.id}"
@@ -56,8 +55,8 @@ class ProofUploadsTest < ApplicationSystemTestCase
     puts "Setup - Application can submit proof? #{@application.can_submit_proof?}"
     
     # Verify the minimum conditions for the test
-    assert @application.rejected_income_proof?, 
-                 "Application must have rejected income proof status for testing"
+    assert @application.rejected_income_proof?,
+                 'Application must have rejected income proof status for testing'
     
     # Use our new authentication helper with timeout
     with_timeout(15) do
@@ -74,11 +73,11 @@ class ProofUploadsTest < ApplicationSystemTestCase
       puts "  #{name}"
     end
     
-    puts "=== Setup completed successfully ==="
+    puts '=== Setup completed successfully ==='
   end
 
-  test "constituent can view proof upload form" do
-    puts "\n=== Starting proof form visibility test ==="
+  test 'constituent can view proof upload form' do
+    puts '\n=== Starting proof form visibility test ==='
     
     # Verify application state with timeout protection
     with_timeout(5) do
@@ -90,14 +89,14 @@ class ProofUploadsTest < ApplicationSystemTestCase
     end
     
     # Generate and verify the path
-    path = new_proof_constituent_portal_application_path(@application, proof_type: "income")
+    path = new_proof_constituent_portal_application_path(@application, proof_type: 'income')
     puts "Test - Path generated: #{path}"
     
     # Visit the path with timeout protection
     with_timeout(15) do
       puts "Visiting path: #{path}"
       visit path
-      puts "Visit completed"
+      puts 'Visit completed'
     end
     
     # Debug redirection - with error handling in case the browser crashed
@@ -106,14 +105,13 @@ class ProofUploadsTest < ApplicationSystemTestCase
       puts "Test - After visit - Current URL: #{current_url rescue 'Error getting URL'}"
       puts "Test - After visit - Page title: #{page.title rescue 'Error getting title'}"
       puts "Test - After visit - Flash alert: #{page.has_css?('.flash-alert') ? page.find('.flash-alert').text : 'none'}"
-    rescue => e
+    rescue StandardError => e
       puts "Error getting page info: #{e.message}"
-      save_screenshot("error_page_info.png")
     end
     
     # If we got redirected to dashboard, examine the console logs to see why
     if current_path == "/constituent_portal/dashboard"
-      puts "REDIRECTED: Checking for reasons in console logs"
+      puts 'REDIRECTED: Checking for reasons in console logs'
       
       # Check for specific errors in the console logs - these are Capybara/Chrome specific
       logs = page.driver.browser.logs.get(:browser) rescue []
@@ -132,9 +130,6 @@ class ProofUploadsTest < ApplicationSystemTestCase
     with_timeout(10) do
       wait_for_turbo
     end
-    
-    # Take a screenshot to help with debugging
-    save_screenshot("form_visibility_test.png")
     
     # Verify expected elements using semantic selectors
     with_timeout(10) do
@@ -199,51 +194,51 @@ class ProofUploadsTest < ApplicationSystemTestCase
     upload_file @valid_pdf, to: "income_proof"
     click_button "Submit"
     assert_text "Proof submitted successfully"
-    
+
     # Second upload should be rate-limited
-    visit new_proof_constituent_portal_application_path(@application, proof_type: "income")
-    upload_file @valid_pdf, to: "income_proof"
-    click_button "Submit"
-    
-    assert_text "Please wait before submitting another proof"
+    visit new_proof_constituent_portal_application_path(@application, proof_type: 'income')
+    upload_file @valid_pdf, to: 'income_proof'
+    click_button 'Submit'
+
+    assert_text 'Please wait before submitting another proof'
   end
 
-  test "constituent can cancel an upload" do
+  test 'constituent can cancel an upload' do
     visit new_proof_constituent_portal_application_path(@application, proof_type: "income")
     wait_for_turbo
-    
+
     # Start upload
-    attach_file "income_proof", @valid_pdf, visible: :all
-    
+    attach_file 'income_proof', @valid_pdf, visible: :all
+
     # Cancel button should appear
     assert_selector "[data-upload-target='cancel']", visible: true
-    click_button "Cancel Upload"
-    
+    click_button 'Cancel Upload'
+
     # Upload should be canceled
     assert_no_selector "[data-upload-target='progress']", visible: true
   end
 
-  test "upload process maintains accessibility" do
+  test 'upload process maintains accessibility' do
     visit new_proof_constituent_portal_application_path(@application, proof_type: "income")
     wait_for_turbo
-    
+
     # Verify accessibility features
     assert_selector "label[for='income_proof']"
     assert_selector "[aria-label='Upload progress']"
-    
+
     # Start upload
-    attach_file "income_proof", @valid_pdf, visible: :all
-    
+    attach_file 'income_proof', @valid_pdf, visible: :all
+
     # Verify accessible progress indication
     assert_selector "[role='progressbar']"
-    assert_selector "[aria-valuenow]"
+    assert_selector '[aria-valuenow]'
   end
 
   # Execute the original command and group errors by similarity
-  test "grouped_errors" do
+  test 'grouped_errors' do
     output = `bin/rails test test/system/constituent_portal/proof_uploads_test.rb 2>&1`
     errors = parse_output(output)
-    
+
     # Group errors by similarity
     grouped_errors = {
       "Authentication Issues (Most Common)": [
@@ -252,21 +247,21 @@ class ProofUploadsTest < ApplicationSystemTestCase
         "Authentication cookie not set correctly (#{errors[:cookies]} occurrences)",
         "User login state not preserved during test (#{errors[:state]} occurrences)"
       ],
-      
+
       "Route/Path Issues": [
         "Incorrect route helper used - 'new_proof_constituent_portal_application_path' is correct (#{errors[:route_helper]} occurrences)",
         "Path parameters not correctly passed (#{errors[:params]} occurrences)",
         "Constituent portal routes may have changed (#{errors[:routes]} occurrences)",
         "Application ID not properly resolved in route (#{errors[:app_id]} occurrences)"
       ],
-      
+
       "Element Visibility Issues": [
         "Unable to find file input field (#{errors[:field]} occurrences)",
         "Elements with expected text not found on page (#{errors[:text]} occurrences)",
         "Form elements may be hidden or conditionally displayed (#{errors[:hidden]} occurrences)",
         "Data attributes for targeting may have changed (#{errors[:data_attrs]} occurrences)"
       ],
-      
+
       "Form Submission Issues (Least Common)": [
         "Unable to interact with form elements (#{errors[:interaction]} occurrences)",
         "Form submissions not properly processed (#{errors[:submissions]} occurrences)",
@@ -274,36 +269,36 @@ class ProofUploadsTest < ApplicationSystemTestCase
         "Test file fixtures may be missing or invalid (#{errors[:fixtures]} occurrences)"
       ]
     }
-    
+
     # Output the error grouping
-    puts "\n\n========================================="
-    puts "PROOF UPLOADS TEST ERRORS GROUPED BY CATEGORY"
-    puts "=========================================\n\n"
-    
-    grouped_errors.each do |category, errors|
+    puts '\n\n========================================='
+    puts 'PROOF UPLOADS TEST ERRORS GROUPED BY CATEGORY'
+    puts '============================================\n\n'
+
+    grouped_errors.each do |category, error_list|
       puts "#{category}:"
-      puts "----------------------------"
-      errors.each_with_index do |error, i|
+      puts '----------------------------'
+      error_list.each_with_index do |error, i|
         puts "  #{i+1}. #{error}"
       end
       puts "\n"
     end
-    
-    puts "RECOMMENDATIONS:"
-    puts "----------------------------"
-    puts "1. Fix authentication mechanism in system tests first"
-    puts "2. Verify route helpers match the actual routes.rb definitions"
-    puts "3. Update selectors to match the actual DOM structure"
-    puts "4. Implement proper file upload handling using Capybara's visible: :all option"
-    puts "5. Consider using WebMock/VCR for external services in tests"
-    puts "\n=========================================\n\n"
-    
+
+    puts 'RECOMMENDATIONS:'
+    puts '----------------------------'
+    puts '1. Fix authentication mechanism in system tests first'
+    puts '2. Verify route helpers match the actual routes.rb definitions'
+    puts '3. Update selectors to match the actual DOM structure'
+    puts '4. Implement proper file upload handling using Capybara visible: :all option'
+    puts '5. Consider using WebMock/VCR for external services in tests'
+    puts '\n=========================================\n\n'
+
     # This test is for display only, so we'll assert a simple truth
-    assert true, "This test simply outputs a grouped error list"
+    assert true, 'This test simply outputs a grouped error list'
   end
-  
+
   private
-  
+
   def parse_output(output)
     error_counts = {
       redirects: output.scan(/redirected to|redirecting to/).count,

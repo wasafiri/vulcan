@@ -27,7 +27,7 @@ class MedicalProviderMailer < ApplicationMailer
           @notification.update(message_id: message_id)
           UpdateEmailStatusJob.set(wait: 1.minute).perform_later(@notification.id)
         end
-      rescue => e
+      rescue StandardError => e
         Rails.logger.error("Failed to record message ID: #{e.message}")
       end
     end

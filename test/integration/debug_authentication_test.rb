@@ -201,7 +201,7 @@ class DebugAuthenticationTest < ActionDispatch::IntegrationTest
       begin
         current_user = @controller.send(:current_user)
         puts "current_user method returned: #{current_user.inspect}"
-      rescue => e
+      rescue StandardError => e
         puts "Error accessing current_user method: #{e.message}"
       end
     end

@@ -182,7 +182,7 @@ namespace :notification_tracking do
         Notification.where(id: ids_to_remove).delete_all
         total_removed += ids_to_remove.size
         puts "  Removed #{ids_to_remove.size} duplicate notifications"
-      rescue => e
+      rescue StandardError => e
         puts "  ERROR removing duplicates: #{e.message}"
       end
     end
@@ -203,7 +203,7 @@ namespace :notification_tracking do
       else
         puts "Application counter is already correct: #{application.medical_certification_request_count}"
       end
-    rescue => e
+    rescue StandardError => e
       puts "ERROR checking application counter: #{e.message}"
     end
     
