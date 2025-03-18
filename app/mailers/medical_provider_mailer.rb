@@ -10,14 +10,14 @@ class MedicalProviderMailer < ApplicationMailer
       message_stream: "outbound"
     }
 
-    # Send the mail and get the response
-    response = mail(mail_options)
+    # Send the mail through ActionMailer
+    message = mail(mail_options)
 
     # Record the message ID if we have a notification to track
-    if @notification.present? && response.delivery_method.is_a?(Mail::Postmark) && 
-       response.delivery_handler.response.present?
+    if @notification.present? && message.delivery_method.is_a?(Mail::Postmark) && 
+       message.delivery_handler.response.present?
       begin
-        message_id = response.delivery_handler.response['MessageID']
+        message_id = message.delivery_handler.response['MessageID']
         if message_id.present?
           @notification.update(message_id: message_id)
           UpdateEmailStatusJob.set(wait: 1.minute).perform_later(@notification.id)
@@ -26,7 +26,7 @@ class MedicalProviderMailer < ApplicationMailer
         Rails.logger.error("Failed to record message ID: #{e.message}")
       end
     end
-
-    response
+    
+    # Do not return the response object, ActionMailer expects mail() to be the last line
   end
 end
