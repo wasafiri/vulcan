@@ -1,7 +1,12 @@
 class MedicalProviderMailer < ApplicationMailer
   def request_certification(application, notification = nil)
-    @application = application
-    @constituent = application.user
+    # Ensure we have the full application with user data properly loaded
+    @application = Application.includes(:user).find(application.id)
+    @constituent = @application.user
+    
+    # Add logging to help diagnose any issues
+    Rails.logger.info "Medical certification request - Constituent: #{@constituent.id}, DOB: #{@constituent.date_of_birth.inspect}"
+    
     @notification = notification
 
     mail_options = {

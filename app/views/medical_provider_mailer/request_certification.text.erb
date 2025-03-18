@@ -11,7 +11,7 @@ Please complete and return the attached certification form.
 
 PATIENT INFORMATION:
 - Name: <%= @constituent.full_name %>
-- Date of Birth: <%= format_date(@constituent.date_of_birth, :short) %>
+- Date of Birth: <%= @constituent.date_of_birth.present? ? format_date(@constituent.date_of_birth, :short) : "Not provided" %>
 - Application ID: <%= @application.id %>
 
 Thank you for your assistance. Your prompt response will help ensure your patient receives the services they need.

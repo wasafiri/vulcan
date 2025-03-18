@@ -17,7 +17,7 @@
 <h3>Patient Information:</h3>
 <ul>
   <li><strong>Name:</strong> <%= @constituent.full_name %></li>
-  <li><strong>Date of Birth:</strong> <%= format_date(@constituent.date_of_birth, :short) %></li>
+  <li><strong>Date of Birth:</strong> <%= @constituent.date_of_birth.present? ? format_date(@constituent.date_of_birth, :short) : "Not provided" %></li>
   <li><strong>Application ID:</strong> <%= @application.id %></li>
 </ul>
 
