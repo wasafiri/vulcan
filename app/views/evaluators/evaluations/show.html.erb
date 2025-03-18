@@ -5,7 +5,7 @@
     <div class="bg-white rounded-lg shadow p-6">
       <h2 class="text-xl font-semibold mb-4">Application #<%= @evaluation.application_id %></h2>
       <p>Constituent: <%= @evaluation.constituent.full_name %></p>
-      <p>Evaluation Date: <%= evaluation.evaluation_date&.strftime("%B %d, %Y") || "No evaluation date" %> </p>
+      <p>Evaluation Date: <%= @evaluation.evaluation_date&.strftime("%B %d, %Y") || "No evaluation date" %> </p>
       <p>Evaluation Type: <%= @evaluation.evaluation_type.capitalize %></p>
       <p>Status: <%= @evaluation.status.capitalize %></p>
       <p>Location: <%= @evaluation.location %></p>
