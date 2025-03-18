@@ -28,6 +28,19 @@ module Applications
         # Send notifications as needed
         send_notifications if @application.persisted?
         
+        # Log paper application creation specifically
+        if @application.persisted?
+          Event.create!(
+            user: @admin,
+            action: 'application_created',
+            metadata: {
+              application_id: @application.id,
+              submission_method: 'paper',
+              timestamp: Time.current.iso8601
+            }
+          )
+        end
+        
         # Return success if we reach this point
         @application.persisted?
       end

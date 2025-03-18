@@ -377,6 +377,7 @@ class Application < ApplicationRecord
     @logging_status_change = true
 
     begin
+      # Enhanced event with more detailed metadata
       Event.create!(
         user: acting_user,
         action: 'application_status_changed',
@@ -384,6 +385,7 @@ class Application < ApplicationRecord
           application_id: id,
           old_status: status_before_last_save,
           new_status: status,
+          submission_method: submission_method,
           timestamp: Time.current.iso8601
         }
       )

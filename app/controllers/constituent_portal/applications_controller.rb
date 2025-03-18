@@ -61,6 +61,19 @@ module ConstituentPortal
       # Step 3: Validate and save the application
       if @application.valid?
         @application.save!
+        
+        # Log the initial application creation
+        Event.create!(
+          user: current_user,
+          action: 'application_created',
+          metadata: {
+            application_id: @application.id,
+            submission_method: 'online',
+            initial_status: @application.status,
+            timestamp: Time.current.iso8601
+          }
+        )
+        
         true
       else
         # Application validation failed

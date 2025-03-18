@@ -63,6 +63,9 @@
                       end
                     when Event
                       case log.action
+                      when "application_created"
+                        submission_method = log.metadata['submission_method']&.titleize || "Unknown"
+                        "Application Created (#{submission_method})"
                       when "voucher_assigned"
                         "Voucher Assigned"
                       when "voucher_redeemed"
@@ -137,6 +140,10 @@
                     end
                   when Event
                     case log.action
+                    when "application_created"
+                      method = log.metadata['submission_method']&.titleize || "Unknown"
+                      initial_status = log.metadata['initial_status']&.titleize || "Unknown"
+                      "Application created via #{method} method" + (initial_status.present? ? " with status: #{initial_status}" : "")
                     when "voucher_assigned"
                       "Voucher #{log.metadata['voucher_code']} assigned with value #{number_to_currency(log.metadata['initial_value'])}"
                     when "voucher_redeemed"
