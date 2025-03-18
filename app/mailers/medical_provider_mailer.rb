@@ -14,7 +14,12 @@ class MedicalProviderMailer < ApplicationMailer
     message = mail(mail_options)
 
     # Record the message ID if we have a notification to track
-    if @notification.present? && message.delivery_method.is_a?(Mail::Postmark) && 
+    if @notification.present? && 
+       message.respond_to?(:delivery_method) && 
+       message.delivery_method.is_a?(Mail::Postmark) && 
+       message.respond_to?(:delivery_handler) && 
+       message.delivery_handler.present? && 
+       message.delivery_handler.respond_to?(:response) && 
        message.delivery_handler.response.present?
       begin
         message_id = message.delivery_handler.response['MessageID']
