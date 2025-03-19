@@ -1,4 +1,4 @@
-<div class="container mx-auto px-4 py-8">
+<div class="container mx-auto px-4 py-8" data-controller="w9-review">
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-2xl font-bold">Review W9 Form</h1>
     <div class="flex space-x-2">
@@ -17,24 +17,22 @@
       </div>
       <div class="border-t border-gray-200 p-4">
         <% if @w9_form.attached? %>
-          <div class="w-full h-[600px] overflow-hidden">
-            <%# PDF Preview Implementation %>
-            <iframe 
-              src="<%= url_for(@w9_form) %>"
-              data-original-src="<%= url_for(@w9_form) %>" 
-              type="application/pdf" 
-              width="100%" 
-              height="600px"
-              class="w-full h-full"
-              data-turbo="false"
-              allow="fullscreen">
-              <p class="text-gray-500">
-                It appears your browser cannot display this PDF inline. 
-                <%= link_to "Click here to download the PDF", rails_blob_path(@w9_form, disposition: :attachment), 
-                    class: "text-indigo-600 hover:text-indigo-500",
-                    target: "_blank" %>
-              </p>
-            </iframe>
+          <div class="w-full h-[600px] overflow-hidden" data-controller="pdf-loader" data-pdf-url="<%= url_for(@w9_form) %>">
+            <%# PDF Preview Placeholder (shown initially) %>
+            <div data-pdf-loader-target="placeholder" class="flex flex-col items-center justify-center h-full bg-gray-100">
+              <div class="text-center mb-4">
+                <h3 class="text-lg font-medium text-gray-700">W9 Form Ready to Preview</h3>
+                <p class="text-sm text-gray-500">Click the button below to load the PDF preview</p>
+              </div>
+              <button data-action="click->pdf-loader#loadPdf" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                Load PDF Preview
+              </button>
+            </div>
+            
+            <%# PDF Container (hidden initially, shown after loading) %>
+            <div data-pdf-loader-target="container" class="hidden h-full">
+              <%# PDF will be loaded here by the controller %>
+            </div>
           </div>
           <div class="mt-4 flex justify-center">
             <%= link_to "Open in New Tab", rails_blob_path(@w9_form, disposition: "inline"), target: "_blank", class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
@@ -56,7 +54,7 @@
         </p>
       </div>
       <div class="border-t border-gray-200 p-4">
-        <%= form_with(model: [@vendor, @w9_review], url: admin_vendor_w9_reviews_path(@vendor), local: true, class: "space-y-6", id: "review-form") do |f| %>
+        <%= form_with(model: [@vendor, @w9_review], url: admin_vendor_w9_reviews_path(@vendor), local: true, class: "space-y-6", id: "review-form", data: { w9_review_target: "form" }) do |f| %>
           <% if @w9_review.errors.any? %>
             <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
               <div class="flex">
@@ -81,10 +79,10 @@
             </div>
           <% end %>
 
-          <%= f.hidden_field :status, id: "w9_review_status" %>
+          <%= f.hidden_field :status, id: "w9_review_status", data: { w9_review_target: "status" } %>
 
           <!-- Rejection Reason (only applicable if rejecting) -->
-          <div class="rejection-reason hidden">
+          <div class="rejection-reason hidden" data-w9-review-target="rejectionReason">
             <div>
               <label class="block text-sm font-medium text-gray-700">Rejection Reason</label>
               <div class="mt-2 space-y-4">
@@ -125,10 +123,10 @@
           <div class="pt-5">
             <div class="flex justify-end">
               <%= link_to "Cancel", admin_vendor_path(@vendor), class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 mr-3" %>
-              <button type="button" id="approve-btn" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+              <button type="button" data-w9-review-target="approveButton" data-action="click->w9-review#approve" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                 Approve
               </button>
-              <button type="button" id="reject-btn" class="ml-2 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+              <button type="button" data-w9-review-target="rejectButton" data-action="click->w9-review#reject" class="ml-2 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
                 Reject
               </button>
             </div>
@@ -138,44 +136,3 @@
     </div>
   </div>
 </div>
-
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    const approveBtn = document.getElementById('approve-btn');
-    const rejectBtn = document.getElementById('reject-btn');
-    const reviewForm = document.getElementById('review-form');
-    const statusField = document.getElementById('w9_review_status');
-    const rejectionReasonDiv = document.querySelector('.rejection-reason');
-    const rejectionReasonCodeRadios = document.querySelectorAll('input[name="w9_review[rejection_reason_code]"]');
-    const rejectionReasonTextarea = document.getElementById('w9_review_rejection_reason');
-
-    approveBtn.addEventListener('click', function() {
-      statusField.value = 'approved';
-      reviewForm.submit();
-    });
-
-    rejectBtn.addEventListener('click', function() {
-      // If rejection fields are not visible, show them and change button text
-      if (rejectionReasonDiv.classList.contains('hidden')) {
-        rejectionReasonDiv.classList.remove('hidden');
-        rejectBtn.textContent = 'Confirm Reject';
-        // Optionally, focus the first radio button
-        const firstRadio = rejectionReasonDiv.querySelector('input[type="radio"]');
-        if (firstRadio) { firstRadio.focus(); }
-      } else {
-        // Validate rejection fields
-        let reasonCodeSelected = false;
-        rejectionReasonCodeRadios.forEach(radio => {
-          if (radio.checked) { reasonCodeSelected = true; }
-        });
-        const reasonText = rejectionReasonTextarea ? rejectionReasonTextarea.value.trim() : '';
-        if (!reasonCodeSelected || reasonText === '') {
-          alert('Please select a rejection reason and provide a detailed explanation.');
-        } else {
-          statusField.value = 'rejected';
-          reviewForm.submit();
-        }
-      }
-    });
-  });
-</script>

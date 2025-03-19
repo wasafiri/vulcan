@@ -1,26 +1,34 @@
-one:
-  application: approved_application
-  code: ABCD12345678
-  initial_value: 500.00
-  remaining_value: 300.00
-  status: active
-  issued_at: <%= 2.months.ago %>
-  last_used_at: <%= 1.month.ago %>
+# Voucher fixtures for testing
 
-expired:
+# Voucher processed by vendor_raz
+vendor_raz_voucher:
+  code: "ABC123XYZ789"
   application: approved_application
-  code: EFGH87654321
+  vendor_id: <%= ActiveRecord::FixtureSet.identify(:vendor_raz) %>
+  initial_value: 500.00
+  remaining_value: 250.00
+  status: active
+  issued_at: <%= Time.current %>
+  last_used_at: <%= Time.current - 1.day %>
+
+# Voucher that shouldn't be visible to vendor_raz (not processed by them)
+kenneth_voucher:
+  code: "UX6XE6BT9QEY"
+  application: submitted_application
+  vendor_id: null
   initial_value: 500.00
   remaining_value: 500.00
-  status: expired
-  issued_at: <%= 13.months.ago %>
+  status: active
+  issued_at: <%= Time.current %>
+  last_used_at: null
 
-fully_redeemed:
+# Another voucher that shouldn't be visible to vendor_raz
+steven_voucher:
+  code: "TW8SZQIMNBKT"
   application: approved_application
-  code: IJKL98765432
-  initial_value: 300.00
-  remaining_value: 0.00
-  status: redeemed
-  issued_at: <%= 3.months.ago %>
-  last_used_at: <%= 2.weeks.ago %>
-  vendor: vendor_raz
+  vendor_id: null
+  initial_value: 500.00
+  remaining_value: 500.00
+  status: active
+  issued_at: <%= Time.current %>
+  last_used_at: null

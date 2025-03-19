@@ -1,6 +1,7 @@
 class Vendor::DashboardController < Vendor::BaseController
   def show
     @recent_transactions = current_user.latest_transactions
+                                      .includes(:voucher, voucher_transaction_products: :product)
     @pending_invoice_total = current_user.pending_transaction_total
     @monthly_totals = current_user.total_transactions_by_period(6.months.ago, Time.current)
     @needs_w9 = !current_user.w9_form.attached?

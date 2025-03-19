@@ -27,11 +27,12 @@
     </div>
   </div>
 
-  <% if @vouchers.present? %>
-    <div class="bg-white rounded-lg shadow">
-      <div class="bg-gray-50 px-4 py-3 border-b rounded-t-lg">
-        <h2 class="text-xl font-semibold text-gray-900">Recently Processed Vouchers</h2>
-      </div>
+  <div class="bg-white rounded-lg shadow">
+    <div class="bg-gray-50 px-4 py-3 border-b rounded-t-lg">
+      <h2 class="text-xl font-semibold text-gray-900">Your Processed Vouchers</h2>
+    </div>
+    
+    <% if @vouchers.present? %>
       <div class="p-6">
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200">
@@ -70,8 +71,13 @@
           </table>
         </div>
       </div>
-    </div>
-  <% end %>
+    <% else %>
+      <div class="p-6 text-center">
+        <p class="text-gray-700 mb-4">You haven't processed any vouchers yet.</p>
+        <p class="text-gray-600">When you process vouchers, they will appear here for reference.</p>
+      </div>
+    <% end %>
+  </div>
 </div>
 
 <script>

@@ -78,7 +78,7 @@
                 <%= button_to "Sign Out",
                     sign_out_path,
                     method: :delete,
-                    class: "mt-1 block w-full text-left px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md",
+                    class: "px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
                     aria: { label: "Sign out of your account" } %>
               </div>
             <% else %>
@@ -129,37 +129,13 @@
                 when Vendor then vendor_dashboard_path
                 else admin_applications_path
                 end),
-                class: "mt-2 block w-full text-left px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md",
+                class: "mt-2 block w-full px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
                 role: "menuitem",
                 aria: { label: "Go to your dashboard" } %>
-                
-            <% if current_user&.type == "Trainer" || current_user&.has_capability?(:can_train) || current_user&.admin? %>
-              <% 
-                # For admins and trainers, use the same logic as the desktop version for consistency
-                training_requests_count = 
-                  if current_user.admin?
-                    # Include all pending statuses, matching desktop view
-                    @my_training_requests_count || TrainingSession.where(trainer_id: current_user.id, status: [:requested, :scheduled, :confirmed]).count
-                  else
-                    TrainingSession.where(trainer_id: current_user.id, status: :requested).count
-                  end
-              %>
-              <%= link_to trainers_dashboard_path,
-                  class: "block w-full text-left px-4 py-3 text-base font-medium text-indigo-600 hover:text-indigo-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md",
-                  role: "menuitem",
-                  aria: { label: "View your training sessions" } do %>
-                My Training Sessions
-                <% if training_requests_count > 0 %>
-                  <span class="ml-1 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800">
-                    <%= training_requests_count %>
-                  </span>
-                <% end %>
-              <% end %>
-            <% end %>
             <%= button_to "Sign Out",
                 sign_out_path,
                 method: :delete,
-                class: "mt-1 block w-full text-left px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md",
+                class: "mt-1 block w-full px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
                 aria: { label: "Sign out of your account" } %>
           </div>
         <% else %>

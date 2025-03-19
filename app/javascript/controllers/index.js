@@ -12,6 +12,8 @@ import ReportsToggleController from "./reports_toggle_controller"
 import ReportsChartController from "./reports_chart_controller"
 import VisibilityController from "./visibility_controller"
 import DateRangeController from "./date_range_controller"
+import W9ReviewController from "./w9_review_controller"
+import PdfLoaderController from "./pdf_loader_controller"
 
 application.register("role-select", RoleSelectController)
 application.register("modal", ModalController)
@@ -26,3 +28,5 @@ application.register("reports-toggle", ReportsToggleController)
 application.register("reports-chart", ReportsChartController)
 application.register("visibility", VisibilityController)
 application.register("date-range", DateRangeController)
+application.register("w9-review", W9ReviewController)
+application.register("pdf-loader", PdfLoaderController)

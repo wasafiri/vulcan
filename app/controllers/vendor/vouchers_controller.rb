@@ -5,9 +5,22 @@ class Vendor::VouchersController < Vendor::BaseController
   before_action :set_voucher, only: [:redeem, :process_redemption]
 
   def index
-    scope = Voucher.where(status: :active)
-                   .includes(:vendor, :application)
-                   .order(created_at: :desc)
+    # Handle voucher code if submitted via query parameter
+    if params[:code].present?
+      voucher = Voucher.find_by(code: params[:code])
+      
+      if voucher.present?
+        # Redirect to the redemption page for the voucher
+        redirect_to redeem_vendor_voucher_path(voucher.code) and return
+      else
+        flash.now[:alert] = "Invalid voucher code. Please try again."
+      end
+    end
+    
+    # Only show vouchers that have been processed by this vendor
+    scope = current_user.vouchers
+                     .includes(:application)
+                     .order(last_used_at: :desc)
     @pagy, @vouchers = pagy(scope, items: 25)
   end
 
