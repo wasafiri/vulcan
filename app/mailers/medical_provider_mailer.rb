@@ -11,6 +11,8 @@ class MedicalProviderMailer < ApplicationMailer
 
     mail_options = {
       to: @application.medical_provider_email,
+      from: "info@mdmat.org",
+      reply_to: "medical-cert@mdmat.org",
       subject: "Disability Certification Request for #{@constituent.full_name}",
       message_stream: "outbound"
     }
