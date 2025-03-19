@@ -10,6 +10,14 @@ class Admin::InvoicesController < Admin::BaseController
 
     scope = apply_filters(scope)
     @pagy, @invoices = pagy(scope, items: 25)
+    
+    # Get vendor totals for current period (uninvoiced transactions)
+    @vendor_totals = Vendor.active
+      .joins(:voucher_transactions)
+      .where(voucher_transactions: { invoice_id: nil, status: VoucherTransaction.statuses[:transaction_completed] })
+      .group('users.id, users.business_name')
+      .select('users.id, users.business_name, SUM(voucher_transactions.amount) as total_amount, COUNT(DISTINCT voucher_transactions.id) as transaction_count')
+      .order('total_amount DESC')
 
     respond_to do |format|
       format.html

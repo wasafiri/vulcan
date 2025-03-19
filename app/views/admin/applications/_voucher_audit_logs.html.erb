@@ -1,20 +1,85 @@
 <div class="space-y-4">
-  <% events = Event.where(
-      action: ["voucher_assigned", "voucher_redeemed", "voucher_expired", "voucher_cancelled"],
-      metadata: { application_id: @application.id }
-    ).order(created_at: :desc) %>
+  <% 
+    # Using PostgreSQL JSONB operators to correctly query the metadata field
+    # metadata->>'application_id' for string comparison with application ID
+    application_id_string = @application.id.to_s
+    application_id_json = { application_id: @application.id }.to_json
+    
+    events = Event.where(
+      action: ["voucher_assigned", "voucher_redeemed", "voucher_expired", "voucher_cancelled"]
+    ).where(
+      "metadata->>'application_id' = ? OR metadata @> ?", 
+      application_id_string, 
+      application_id_json
+    ).order(created_at: :desc)
+    
+    # Also find voucher transactions for fallback - helps with existing transactions
+    # before events were implemented, and also provides redundancy
+    if @application.vouchers.any?
+      voucher_ids = @application.vouchers.pluck(:id)
+      voucher_codes = @application.vouchers.pluck(:code)
+    end
+  %>
 
-  <% if events.any? %>
+  <% if events.any? || @application.vouchers.any? %>
     <div class="flow-root">
       <ul role="list" class="-mb-8">
-        <% events.each do |event| %>
+        <% 
+          # Create activity items for all events
+          activity_items = events.map do |event|
+            {
+              type: :event,
+              event: event,
+              timestamp: event.created_at,
+              action: event.action,
+              metadata: event.metadata
+            }
+          end
+          
+          # Add transactions data if we have vouchers
+          if @application.vouchers.any?
+            # Get all transactions for these vouchers
+            transactions = VoucherTransaction.where(voucher_id: voucher_ids)
+                             .where(transaction_type: :redemption)
+                             .includes(:vendor)
+                             .order(processed_at: :desc)
+            
+            # Only add transactions that don't already have events
+            transaction_items = transactions.map do |txn|
+              # Check if there's already an event for this transaction
+              unless events.any? { |e| e.metadata['transaction_id'].to_s == txn.id.to_s }
+                {
+                  type: :transaction,
+                  transaction: txn,
+                  timestamp: txn.processed_at,
+                  action: 'voucher_redeemed',
+                  voucher_code: txn.voucher.code,
+                  amount: txn.amount,
+                  vendor_name: txn.vendor&.business_name
+                }
+              end
+            end.compact
+            
+            # Combine all activity items
+            activity_items.concat(transaction_items)
+          end
+          
+          # Sort by timestamp descending
+          activity_items.sort_by! { |item| item[:timestamp] }.reverse!
+          
+          # Render each activity item
+          activity_items.each_with_index do |item, index|
+            is_last = index == activity_items.length - 1 
+        %>
           <li>
-            <div class="relative pb-8">
-              <span class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+            <div class="relative pb-8 <%= 'pb-0' if is_last %>">
+              <% unless is_last %>
+                <span class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+              <% end %>
               <div class="relative flex space-x-3">
                 <div>
                   <span class="h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white
-                    <%= case event.action
+                    <%= case item[:action]
                       when "voucher_assigned" then "bg-green-500"
                       when "voucher_redeemed" then "bg-blue-500"
                       when "voucher_expired" then "bg-yellow-500"
@@ -27,22 +92,26 @@
                 </div>
                 <div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
                   <div>
-                    <p class="text-sm text-gray-500">
-                      <%= case event.action
-                        when "voucher_assigned"
-                          "Voucher #{event.metadata['voucher_code']} assigned with value #{number_to_currency(event.metadata['initial_value'])}"
-                        when "voucher_redeemed"
-                          "Voucher #{event.metadata['voucher_code']} redeemed for #{number_to_currency(event.metadata['amount'])} at #{event.metadata['vendor_name']}"
-                        when "voucher_expired"
-                          "Voucher #{event.metadata['voucher_code']} expired with unused value #{number_to_currency(event.metadata['unused_value'])}"
-                        when "voucher_cancelled"
-                          "Voucher #{event.metadata['voucher_code']} cancelled"
-                        end %>
+                    <p class="text-sm text-gray-700">
+                      <% if item[:type] == :event %>
+                        <% case item[:action]
+                          when "voucher_assigned" %>
+                            Voucher <%= item[:metadata]['voucher_code'] %> assigned with value <%= number_to_currency(item[:metadata]['initial_value']) %>
+                          <% when "voucher_redeemed" %>
+                            Voucher <%= item[:metadata]['voucher_code'] %> redeemed for <%= number_to_currency(item[:metadata]['amount']) %> at <%= item[:metadata]['vendor_name'] %>
+                          <% when "voucher_expired" %>
+                            Voucher <%= item[:metadata]['voucher_code'] %> expired with unused value <%= number_to_currency(item[:metadata]['unused_value']) %>
+                          <% when "voucher_cancelled" %>
+                            Voucher <%= item[:metadata]['voucher_code'] %> cancelled
+                          <% end %>
+                      <% elsif item[:type] == :transaction %>
+                        Voucher <%= item[:voucher_code] %> redeemed for <%= number_to_currency(item[:amount]) %> at <%= item[:vendor_name] %>
+                      <% end %>
                     </p>
                   </div>
                   <div class="whitespace-nowrap text-right text-sm text-gray-500">
-                    <time datetime="<%= event.created_at.iso8601 %>">
-                      <%= event.created_at.strftime("%B %d, %Y at %I:%M %p") %>
+                    <time datetime="<%= item[:timestamp].iso8601 %>">
+                      <%= item[:timestamp].strftime("%B %d, %Y at %I:%M %p") %>
                     </time>
                   </div>
                 </div>

@@ -86,42 +86,18 @@ class Voucher < ApplicationRecord
     return false unless can_redeem?(amount)
 
     transaction do
-      # Create transaction record
-      txn = transactions.create!(
-        vendor: vendor,
-        amount: amount,
-        transaction_type: :redemption,
-        status: :transaction_completed,
-        processed_at: Time.current,
-        reference_number: generate_reference_number
-      )
+      # Create the transaction record
+      txn = create_redemption_transaction(amount, vendor, generate_reference_number)
+      
+      # Process any products that were purchased
+      process_product_data(product_data, txn) if product_data.present?
 
-      # Associate products with the transaction
-      if product_data.present?
-        product_data.each do |product_id, quantity|
-          product = Product.find(product_id)
-          txn.voucher_transaction_products.create!(
-            product: product,
-            quantity: quantity.to_i
-          )
+      # Update voucher state
+      update_voucher_after_redemption(amount, vendor)
 
-          # Associate products with the application
-          application.products << product unless application.products.include?(product)
-        end
-      end
-
-      # Update remaining value and vendor
-      self.remaining_value -= amount
-      self.last_used_at = Time.current
-      self.vendor = vendor
-
-      # Update status if fully redeemed
-      self.status = :redeemed if remaining_value.zero?
-
-      save!
-
-      # Send notification
-      VoucherNotificationsMailer.voucher_redeemed(txn).deliver_later
+      # Send notifications and create audit event
+      notify_voucher_redemption(txn)
+      log_redemption_event(vendor, amount, txn, product_data)
 
       txn
     end
@@ -165,6 +141,91 @@ class Voucher < ApplicationRecord
   end
 
   private
+
+  # Create the transaction record
+  def create_redemption_transaction(amount, vendor, reference_number)
+    transactions.create!(
+      vendor: vendor,
+      amount: amount,
+      transaction_type: :redemption,
+      status: :transaction_completed,
+      processed_at: Time.current,
+      reference_number: reference_number
+    )
+  end
+
+  # Handle product data
+  def process_product_data(product_data, transaction)
+    product_data.each do |product_id, quantity|
+      product = Product.find(product_id)
+      
+      # Create transaction product record
+      transaction.voucher_transaction_products.create!(
+        product: product,
+        quantity: quantity.to_i
+      )
+
+      # Associate product with the application if not already associated
+      associate_product_with_application(product)
+    end
+  end
+
+  # Associate product with the application
+  def associate_product_with_application(product)
+    application.products << product unless application.products.include?(product)
+  end
+
+  # Update the voucher's state after redemption
+  def update_voucher_after_redemption(amount, vendor)
+    self.remaining_value -= amount
+    self.last_used_at = Time.current
+    self.vendor = vendor
+    
+    # Update status if fully redeemed
+    self.status = :redeemed if remaining_value.zero?
+    
+    save!
+  end
+
+  # Send the redemption notification
+  def notify_voucher_redemption(transaction)
+    VoucherNotificationsMailer.voucher_redeemed(transaction).deliver_later
+  end
+
+  # Create an event record for voucher redemption
+  # This method is fault-tolerant - if it fails, it logs the error but doesn't raise an exception
+  def log_redemption_event(vendor, amount, transaction, product_data)
+    begin
+      events.create!(
+        user: vendor,
+        action: "voucher_redeemed",
+        metadata: {
+          application_id: application.id,
+          voucher_code: code,
+          amount: amount,
+          vendor_name: vendor.business_name || "Unknown vendor",
+          transaction_id: transaction.id,
+          remaining_value: remaining_value,
+          products: format_product_data_for_event(product_data)
+        }
+      )
+    rescue StandardError => e
+      # Log the error but don't raise - this ensures the transaction still completes
+      Rails.logger.error("Failed to log voucher redemption event: #{e.message}")
+      Rails.logger.error(e.backtrace.join("\n")) if e.backtrace
+      # Return nil but don't raise exception
+      nil
+    end
+  end
+
+  # Format product data for event metadata
+  def format_product_data_for_event(product_data)
+    return nil unless product_data.present?
+    
+    product_data.map do |id, qty|
+      { id: id, quantity: qty }
+    end
+  end
 
   def send_assigned_notification
     VoucherNotificationsMailer.voucher_assigned(self).deliver_later
