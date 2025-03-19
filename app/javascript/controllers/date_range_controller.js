@@ -1,26 +1,21 @@
 import { Controller } from "@hotwired/stimulus"
 
+// This controller handles the toggling of custom date range fields
+// When "Custom Range" is selected in the date range dropdown
 export default class extends Controller {
-  static targets = [ "customRange" ]
+  static targets = ["customRange"]
 
   connect() {
-    this.toggleCustomRange({ target: { value: this.element.querySelector("select").value } })
+    // Check if custom range is already selected on page load
+    this.toggleCustomRange({ target: this.element.querySelector('[name="date_range"]') })
   }
 
   toggleCustomRange(event) {
-    const isCustom = event.target.value === "custom"
+    const selectElement = event.target
+    const isCustomRange = selectElement && selectElement.value === "custom"
+    
     this.customRangeTargets.forEach(element => {
-      element.style.display = isCustom ? "block" : "none"
-      
-      // Make fields required only when visible
-      const input = element.querySelector("input")
-      if (input) {
-        if (isCustom) {
-          input.setAttribute("required", "")
-        } else {
-          input.removeAttribute("required")
-        }
-      }
+      element.style.display = isCustomRange ? "" : "none"
     })
   }
 }

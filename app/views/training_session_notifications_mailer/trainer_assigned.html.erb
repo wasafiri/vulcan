@@ -32,6 +32,6 @@
 
 <p>Please begin the training process by contacting the constituent to schedule a training session.</p>
 
-<p>A training session has been tentatively scheduled for <%= @training_session.scheduled_for.strftime("%B %d, %Y at %I:%M %p") %>, but you may reschedule this with the constituent as needed.</p>
+<p><%= training_session_schedule_text(@training_session) %></p>
 
 <%= render 'shared/mailers/footer' %>

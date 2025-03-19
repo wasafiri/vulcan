@@ -187,6 +187,29 @@ Rails.application.routes.draw do
     end
   end
 
+  namespace :trainers do
+    resource :dashboard, only: [:show], controller: :dashboards
+    resources :training_sessions do
+      member do
+        patch :update_status
+        post :complete
+        post :schedule
+        post :reschedule
+      end
+
+      collection do
+        # Status filters
+        get :requested
+        get :scheduled
+        get :completed
+        get :needs_followup
+        
+        # Scope+status filters (mine vs all)
+        get 'filter(/:scope)(/:status)', to: 'training_sessions#filter', as: :filtered
+      end
+    end
+  end
+
   namespace :vendor do
     resource :dashboard, only: [ :show ], controller: :dashboard
     # IMPORTANT: The controller must be explicitly specified as :profiles

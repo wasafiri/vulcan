@@ -197,9 +197,13 @@
                         <div class="text-sm text-gray-500">
                           <%= event.action.titleize %>
                           by
-                          <%= link_to event.user.full_name,
-                              [:admin, event.user],
-                              class: "font-medium text-gray-900" %>
+                          <% if event.user.is_a?(Admin) %>
+                            <span class="font-medium text-gray-900"><%= event.user.full_name %></span>
+                          <% else %>
+                            <%= link_to event.user.full_name,
+                                [:admin, event.user],
+                                class: "font-medium text-gray-900" %>
+                          <% end %>
                         </div>
                         <div class="mt-1 text-sm text-gray-500">
                           <%= event.created_at.strftime("%B %d, %Y %I:%M %p") %>

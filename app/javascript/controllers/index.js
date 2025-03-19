@@ -11,6 +11,7 @@ import ApplicationFormController from "./application_form_controller"
 import ReportsToggleController from "./reports_toggle_controller"
 import ReportsChartController from "./reports_chart_controller"
 import VisibilityController from "./visibility_controller"
+import DateRangeController from "./date_range_controller"
 
 application.register("role-select", RoleSelectController)
 application.register("modal", ModalController)
@@ -24,3 +25,4 @@ application.register("application-form", ApplicationFormController)
 application.register("reports-toggle", ReportsToggleController)
 application.register("reports-chart", ReportsChartController)
 application.register("visibility", VisibilityController)
+application.register("date-range", DateRangeController)

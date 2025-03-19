@@ -161,4 +161,16 @@ module MailerHelper
       type_value.to_s
     end.humanize.downcase
   end
+  
+  # Returns the appropriate text for training session scheduling information
+  # based on whether a session has been scheduled or not
+  # @param training_session [TrainingSession] The training session
+  # @return [String] The formatted scheduling information text
+  def training_session_schedule_text(training_session)
+    if training_session.scheduled_for.present?
+      "A training session has been tentatively scheduled for #{format_date(training_session.scheduled_for, :full)}, but you may reschedule this with the constituent as needed."
+    else
+      "Please contact the constituent to schedule a training session at a mutually convenient time."
+    end
+  end
 end

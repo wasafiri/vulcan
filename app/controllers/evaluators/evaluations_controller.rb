@@ -4,7 +4,13 @@ class Evaluators::EvaluationsController < ApplicationController
   before_action :set_evaluation, except: [ :index, :new, :create, :pending, :completed ]
 
   def index
-    @evaluations = current_user.evaluations.includes(:constituent, :application).order(created_at: :desc)
+    if current_user.evaluator?
+      # For evaluators, show only their evaluations
+      @evaluations = current_user.evaluations.includes(:constituent, :application).order(created_at: :desc)
+    else
+      # For admins, show all evaluations
+      @evaluations = Evaluation.includes(:constituent, :application, :evaluator).order(created_at: :desc)
+    end
   end
 
   def pending

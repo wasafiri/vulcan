@@ -1,5 +1,6 @@
 class TrainingSession < ApplicationRecord
   include TrainingStatusManagement
+  include NotificationDelivery
 
   # Associations
   belongs_to :application
@@ -7,17 +8,30 @@ class TrainingSession < ApplicationRecord
   has_one :constituent, through: :application, source: :user
 
   # Validations
-  validates :scheduled_for, presence: true
+  validates :scheduled_for, presence: true, unless: :requested?
   validates :trainer, presence: true
   validates :application, presence: true
+  validates :reschedule_reason, presence: true, if: :rescheduling?
   validate :trainer_must_be_trainer_type
   validate :scheduled_time_must_be_future, on: :create
   validate :cannot_complete_without_notes, if: :will_save_change_to_completed_at?
 
   # Callbacks
   before_save :set_completed_at, if: :status_changed_to_completed?
-  after_save :notify_status_change, if: :saved_change_to_status?
+  before_save :ensure_status_schedule_consistency
+  after_save :deliver_notifications, if: :saved_change_to_status?
 
+  def rescheduling?
+    return false unless persisted? # New records aren't being rescheduled
+    
+    if scheduled_for_changed? && (status_changed? || scheduled?)
+      # If the date is changing and we're either changing status to scheduled or already scheduled
+      return true
+    end
+    
+    false
+  end
+  
   private
 
   def trainer_must_be_trainer_type
@@ -46,11 +60,20 @@ class TrainingSession < ApplicationRecord
     completed? && status_changed?
   end
 
-  include NotificationDelivery
-
-  private
-
   def should_deliver_notifications?
     status_changed? || saved_change_to_scheduled_for? || saved_change_to_completed_at?
+  end
+  
+  def ensure_status_schedule_consistency
+    # If setting a schedule date but still in requested status, update status
+    if scheduled_for_changed? && scheduled_for.present? && requested?
+      self.status = :scheduled
+    end
+    
+    # If removing a schedule date but still in scheduled/confirmed status, prevent it
+    if scheduled_for_changed? && scheduled_for.blank? && (scheduled? || confirmed?)
+      errors.add(:scheduled_for, "cannot be removed while status is #{status}")
+      throw(:abort)
+    end
   end
 end

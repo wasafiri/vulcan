@@ -15,6 +15,11 @@ class Admin::ApplicationsController < Admin::BaseController
     @ytd_constituents_count = Application.where("created_at >= ?", fiscal_year_start).count
     @open_applications_count = Application.active.count
     @pending_services_count = Application.where(status: :approved).count
+    
+    # Load recent notifications for the notifications section
+    @recent_notifications = Notification.includes(:actor, :notifiable)
+                                       .order(created_at: :desc)
+                                       .limit(5)
 
     # Data for Common Tasks section
     income_proofs_pending = Application.joins(:income_proof_attachment)
@@ -25,11 +30,10 @@ class Admin::ApplicationsController < Admin::BaseController
 
     @medical_certs_to_review_count = Application.where(medical_certification_status: "received").count
 
-    # Count training request notifications
-    @training_requests_count = Notification.where(action: "training_requested")
-                                         .where(notifiable_type: "Application")
-                                         .distinct
-                                         .count
+    # Count applications with pending training sessions - include admin as trainer
+    @training_requests_count = Application.joins(:training_sessions)
+      .where(training_sessions: { status: [:requested, :scheduled, :confirmed] })
+      .distinct.count
 
     # Application Pipeline data for funnel chart
     @draft_count = Application.where(status: "draft").count
@@ -504,10 +508,8 @@ class Admin::ApplicationsController < Admin::BaseController
             when "medical_certs_to_review"
               scope.where(medical_certification_status: "received")
             when "training_requests"
-            # Find applications with training_requested notifications
-              training_request_notifications = Notification.where(action: "training_requested")
-              application_ids = training_request_notifications.where(notifiable_type: "Application").pluck(:notifiable_id)
-              scope.where(id: application_ids)
+              # Use our new scope to filter applications with pending training
+              scope.with_pending_training
             else
               scope
             end

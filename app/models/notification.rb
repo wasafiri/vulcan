@@ -49,4 +49,39 @@ class Notification < ApplicationRecord
     new_metadata[key.to_s] = value
     update!(metadata: new_metadata)
   end
+  
+  # Generate a human-readable message for the notification based on its action and context
+  def message
+    case action
+    when 'medical_certification_requested'
+      "Medical certification requested for application ##{notifiable_id}"
+    when 'medical_certification_received'
+      "Medical certification received for application ##{notifiable_id}"
+    when 'medical_certification_approved'
+      "Medical certification approved for application ##{notifiable_id}"
+    when 'medical_certification_rejected'
+      "Medical certification rejected for application ##{notifiable_id}"
+    when 'proof_approved'
+      "Proof approved for application ##{notifiable_id}"
+    when 'proof_rejected'
+      "Proof rejected for application ##{notifiable_id}"
+    when 'documents_requested'
+      "Documents requested for application ##{notifiable_id}"
+    when 'review_requested'
+      "Review requested for application ##{notifiable_id}"
+    when 'trainer_assigned'
+      trainer_name = actor&.full_name || "A trainer"
+      application = notifiable
+      constituent_name = application&.constituent_full_name || "a constituent"
+      
+      # Get associated training session if it exists
+      training_session = application&.training_sessions&.where(trainer_id: actor&.id)&.last
+      status_info = training_session ? " (#{training_session.status.humanize})" : ""
+      
+      "#{trainer_name} assigned to train #{constituent_name} for Application ##{notifiable_id}#{status_info}"
+    else
+      # Default fallback using humanized action
+      "#{action.humanize} notification"
+    end
+  end
 end

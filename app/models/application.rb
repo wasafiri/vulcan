@@ -84,6 +84,24 @@ class Application < ApplicationRecord
   scope :needs_residency_review, -> { where(residency_proof_status: :not_reviewed) }
   scope :rejected_income_proofs, -> { where(income_proof_status: :rejected) }
   scope :rejected_residency_proofs, -> { where(residency_proof_status: :rejected) }
+  scope :with_pending_training, -> {
+    joins(:training_sessions).merge(TrainingSession.where(status: [:requested, :scheduled, :confirmed])).distinct
+  }
+  
+  # Scope for applications assigned to a specific trainer
+  scope :assigned_to_trainer, ->(trainer_id) {
+    joins(:training_sessions).where(training_sessions: { trainer_id: trainer_id }).distinct
+  }
+  
+  # Scope for applications with active training sessions for a specific trainer
+  scope :with_active_training_for_trainer, ->(trainer_id) {
+    joins(:training_sessions).where(
+      training_sessions: { 
+        trainer_id: trainer_id,
+        status: [:scheduled, :confirmed]
+      }
+    ).distinct
+  }
 
   # Status methods moved from controller
   def approve!
@@ -213,8 +231,8 @@ class Application < ApplicationRecord
     with_lock do
       training_session = training_sessions.create!(
         trainer: trainer,
-        status: :scheduled,
-        scheduled_for: 1.week.from_now # Default to 1 week from now, can be changed later
+        status: :requested
+        # No default scheduled_for - this will be set by the trainer after coordinating with constituent
       )
 
       # Create event for audit logging

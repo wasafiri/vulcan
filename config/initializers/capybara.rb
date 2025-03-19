@@ -30,7 +30,7 @@ if Rails.env.test?
                   'win64'
                 else
                   nil
-                end
+               end
     
     return nil unless platform
     
@@ -66,7 +66,7 @@ if Rails.env.test?
                       File.join(match, 'chrome')
                     when /win/
                       File.join(match, 'chrome.exe')
-                    end
+                   end
           
           return binary if binary && File.exist?(binary) && File.executable?(binary)
         elsif File.file?(match) && File.executable?(match)
@@ -155,7 +155,7 @@ if Rails.env.test?
       # Ensure browser is closed after tests
       at_exit do
         begin
-          driver.quit if driver&.browser&.respond_to?(:quit)
+          driver.quit if driver&.browser.respond_to?(:quit)
         rescue StandardError => e
           Rails.logger.error "Error closing browser: #{e.message}"
         end

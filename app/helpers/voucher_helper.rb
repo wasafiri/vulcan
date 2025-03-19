@@ -64,9 +64,13 @@ module VoucherHelper
   end
 
   def voucher_expiration_warning(voucher)
-    return unless voucher.active?
+    return unless voucher.voucher_active?
+    return unless voucher.expiration_date
 
-    days_until_expiry = (voucher.expiration_date - Date.current).to_i
+    # Convert to Date objects to ensure compatible types for subtraction
+    expiration_as_date = voucher.expiration_date.to_date
+    days_until_expiry = (expiration_as_date - Date.current).to_i
+    
     if days_until_expiry <= 7
       content_tag(:div, class: 'mt-1 text-sm text-red-600') do
         if days_until_expiry <= 1
@@ -79,7 +83,7 @@ module VoucherHelper
   end
 
   def voucher_usage_percentage(voucher)
-    return 100 if voucher.redeemed?
+    return 100 if voucher.voucher_redeemed?
     return 0 if voucher.initial_value.zero?
 
     ((voucher.initial_value - voucher.remaining_value) / voucher.initial_value * 100).round

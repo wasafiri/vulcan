@@ -5,9 +5,18 @@ class Admin::VouchersController < Admin::BaseController
   before_action :require_admin!
 
   def index
-    scope = Voucher.where(status: :active)
-                   .includes(:vendor, :application)
-                   .order(created_at: :desc)
+    # Calculate counts for status cards
+    @active_vouchers_count = Voucher.where(status: :active).count
+    @expiring_soon_count = Voucher.expiring_soon.count
+    @redeemed_vouchers_count = Voucher.where(status: :redeemed).count
+    @unassigned_vouchers_count = Voucher.where(status: :active, vendor_id: nil).count
+
+    # Get base scope with includes
+    scope = Voucher.includes(:vendor, :application).order(created_at: :desc)
+    
+    # Apply filters based on params
+    scope = apply_filters(scope)
+    
     @pagy, @vouchers = pagy(scope, items: 25)
 
     respond_to do |format|
@@ -52,7 +61,7 @@ class Admin::VouchersController < Admin::BaseController
   private
 
   def set_voucher
-    @voucher = Voucher.find_by(code: params[:code]) || Voucher.find_by(id: params[:id])
+    @voucher = Voucher.find_by(code: params[:code] || params[:id]) || Voucher.find_by(id: params[:id])
   end
 
   def voucher_params
@@ -64,6 +73,22 @@ class Admin::VouchersController < Admin::BaseController
   end
 
   def apply_filters(scope)
+    # First apply high-level filter from the status cards
+    scope = case params[:filter]
+            when "active"
+              scope.where(status: :active)
+            when "expiring_soon"
+              scope.expiring_soon
+            when "redeemed"
+              scope.where(status: :redeemed)
+            when "unassigned"
+              scope.where(status: :active, vendor_id: nil)
+            else
+              # If no filter selected, default to active vouchers
+              params[:filter].present? ? scope : scope.where(status: :active)
+            end
+
+    # Then apply more specific filters if provided
     scope = scope.where(status: params[:status]) if params[:status].present?
     scope = scope.where(vendor_id: params[:vendor_id]) if params[:vendor_id].present?
 
