@@ -237,7 +237,7 @@
     <section aria-labelledby="notifications-heading" class="bg-white rounded-lg shadow p-4 mb-6">
       <div class="flex items-center justify-between mb-4">
         <h2 id="notifications-heading" class="text-lg font-medium text-gray-900">Recent Notifications</h2>
-        <%= link_to notifications_path, 
+        <%= link_to notifications_path(scope: 'all'), 
             class: "text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center",
             aria: { label: "View all notifications" } do %>
           View All

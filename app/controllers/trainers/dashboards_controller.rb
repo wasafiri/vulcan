@@ -30,6 +30,6 @@ class Trainers::DashboardsController < Trainers::BaseController
                             # Show only the trainer's own sessions for trainers
                             TrainingSession.where(trainer_id: current_user.id)
                                           .includes(application: :user)
-                          end
+                           end
   end
 end

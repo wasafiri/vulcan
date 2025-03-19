@@ -1,32 +1,32 @@
 class Trainers::TrainingSessionsController < Trainers::BaseController
-  before_action :set_training_session, only: [:show, :edit, :update, :update_status, :complete, :schedule, :reschedule]
+  before_action :set_training_session, only: %i[show edit update update_status complete schedule reschedule]
 
   def index
     status_filter = params[:status]
     # Default to all sessions for admins, my sessions for trainers
-    scope_param = current_user.admin? ? "all" : "mine"
-    
+    scope_param = current_user.admin? ? 'all' : 'mine'
+
     # Apply filters
     @training_sessions = filter_sessions(scope_param, status_filter)
-    
+
     # Common setup
     @current_scope = scope_param
     @current_status = status_filter
     @pagy, @training_sessions = pagy(@training_sessions, items: 20)
   end
-  
+
   # New action for handling scope + status filtering
   def filter
-    scope_param = params[:scope] || (current_user.admin? ? "all" : "mine")
+    scope_param = params[:scope] || (current_user.admin? ? 'all' : 'mine')
     status_param = params[:status]
-    
+
     # Apply filters
     @training_sessions = filter_sessions(scope_param, status_param)
-    
+
     # Set current selections for UI state
     @current_scope = scope_param
     @current_status = status_param
-    
+
     @pagy, @training_sessions = pagy(@training_sessions, items: 20)
     render :index
   end
@@ -41,7 +41,7 @@ class Trainers::TrainingSessionsController < Trainers::BaseController
                             .includes(application: :user)
                             .order(created_at: :desc)
     end
-    
+
     @pagy, @training_sessions = pagy(scope, items: 20)
     render :index
   end
@@ -56,7 +56,7 @@ class Trainers::TrainingSessionsController < Trainers::BaseController
                             .includes(application: :user)
                             .order(scheduled_for: :asc)
     end
-    
+
     @pagy, @training_sessions = pagy(scope, items: 20)
     render :index
   end
@@ -71,7 +71,7 @@ class Trainers::TrainingSessionsController < Trainers::BaseController
                             .includes(application: :user)
                             .order(completed_at: :desc)
     end
-    
+
     @pagy, @training_sessions = pagy(scope, items: 20)
     render :index
   end
@@ -86,7 +86,7 @@ class Trainers::TrainingSessionsController < Trainers::BaseController
                             .includes(application: :user)
                             .order(updated_at: :desc)
     end
-    
+
     @pagy, @training_sessions = pagy(scope, items: 20)
     render :index
   end
@@ -98,7 +98,7 @@ class Trainers::TrainingSessionsController < Trainers::BaseController
 
   def update_status
     old_status = @training_session.status
-    
+
     # Improved error handling with specific messages for status/schedule inconsistencies
     if @training_session.update(training_session_params)
       create_status_change_event(old_status)
@@ -117,7 +117,7 @@ class Trainers::TrainingSessionsController < Trainers::BaseController
 
   def complete
     old_status = @training_session.status
-    
+
     if @training_session.update(status: :completed, completed_at: Time.current, notes: params[:notes])
       create_status_change_event(old_status)
       redirect_to trainers_training_session_path(@training_session), notice: "Training session marked as completed."
@@ -125,10 +125,10 @@ class Trainers::TrainingSessionsController < Trainers::BaseController
       render :show, status: :unprocessable_entity, alert: "Failed to complete training session: #{@training_session.errors.full_messages.to_sentence}"
     end
   end
-  
+
   def schedule
     old_status = @training_session.status
-    
+
     if @training_session.update(status: :scheduled, scheduled_for: params[:scheduled_for])
       create_status_change_event(old_status)
       redirect_to trainers_training_session_path(@training_session), notice: "Training session scheduled successfully."
@@ -136,11 +136,11 @@ class Trainers::TrainingSessionsController < Trainers::BaseController
       render :show, status: :unprocessable_entity, alert: "Failed to schedule training session: #{@training_session.errors.full_messages.to_sentence}"
     end
   end
-  
+
   def reschedule
-    old_status = @training_session.status
+    @training_session.status
     old_scheduled_for = @training_session.scheduled_for
-    
+
     if @training_session.update(
       scheduled_for: params[:scheduled_for],
       reschedule_reason: params[:reschedule_reason],
@@ -174,14 +174,14 @@ class Trainers::TrainingSessionsController < Trainers::BaseController
     else
       base_query = TrainingSession.where(trainer_id: current_user.id)
     end
-    
+
     # Apply status filter if provided
     filtered_query = if status.present?
                        base_query.where(status: status)
                      else
                        base_query
                      end
-                     
+
     # Apply appropriate order based on status
     ordered_query = case status
                     when "completed"
@@ -196,14 +196,14 @@ class Trainers::TrainingSessionsController < Trainers::BaseController
                       # Default order
                       filtered_query.order(updated_at: :desc)
                     end
-                    
+
     # Include associated models for performance
     ordered_query.includes(application: :user)
   end
 
   def set_training_session
     @training_session = TrainingSession.find(params[:id])
-    
+
     # Allow admins to access any training session, but trainers can only access their own
     unless current_user.admin? || @training_session.trainer_id == current_user.id
       redirect_to trainers_dashboard_path, alert: "You don't have access to this training session"
