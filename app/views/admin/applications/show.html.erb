@@ -31,7 +31,7 @@
     </div>
 
     <!-- Evaluation and Training Status Section -->
-    <% if @application.approved? %>
+    <% if @application.status_approved? %>
       <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="evaluation-status-title">
         <h2 id="evaluation-status-title" class="text-xl font-semibold text-gray-900 mb-4">
           Evaluation and Training Status
@@ -40,88 +40,43 @@
           <% latest_evaluation = @application.latest_evaluation %>
           
           <!-- Evaluator Section -->
-          <% if latest_evaluation.present? %>
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-              <div>
-                <h3 class="text-sm font-medium text-gray-500">Current Evaluator</h3>
-                <div class="mt-2 flex items-center space-x-2">
-                  <% if latest_evaluation.evaluator.present? %>
-                    <span class="text-sm text-gray-900"><%= latest_evaluation.evaluator.full_name %></span>
-                  <% else %>
-                    <span class="text-sm text-gray-500">No Evaluator Assigned</span>
-                  <% end %>
-                  <%= evaluation_status_badge(latest_evaluation) %>
-                </div>
-                <% if latest_evaluation.evaluation_date.present? %>
-                  <p class="text-sm text-gray-500 mt-1">
-                    Scheduled for: <%= latest_evaluation.evaluation_date.strftime("%B %d, %Y") %>
-                  </p>
-                <% end %>
-              </div>
-              <% unless latest_evaluation.completed? %>
-                <%= link_to "View Evaluation",
-                    evaluators_evaluation_path(latest_evaluation),
-                    class: "mt-4 md:mt-0 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
-              <% end %>
-            </div>
-          <% else %>
-            <div class="mb-6">
-              <h3 class="text-sm font-medium text-gray-500 mb-2">Assign Evaluator</h3>
-              <div class="flex flex-wrap gap-3">
-                <% Evaluator.available.each do |evaluator| %>
-                  <%= button_to assign_evaluator_admin_application_path(@application, evaluator_id: evaluator.id),
-                      method: :post,
-                      class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                      data: { confirm: "Are you sure you want to assign #{evaluator.full_name} as evaluator?" } do %>
-                    Assign <%= evaluator.full_name %>
-                  <% end %>
-                <% end %>
-              </div>
-            </div>
-          <% end %>
+          <%= render "assignment_section", 
+            type: "evaluator", 
+            entity: latest_evaluation, 
+            assigned_person: latest_evaluation&.evaluator, 
+            status_badge_method: :evaluation_status_badge,
+            scheduled_date: latest_evaluation&.evaluation_date,
+            scheduled_time: false,
+            view_path: latest_evaluation.present? ? evaluators_evaluation_path(latest_evaluation) : nil,
+            assign_path: ->(evaluator) { assign_evaluator_admin_application_path(@application, evaluator_id: evaluator.id) },
+            available_assignees: Evaluator.available
+          %>
           
           <!-- Trainer Section -->
-          <div class="mb-6">
-            <% if @application.training_sessions.scheduled.exists? %>
-              <!-- Display assigned trainer information -->
-              <div class="mb-4">
-                <h3 class="text-sm font-medium text-gray-500">Current Trainer</h3>
-                <div class="mt-2 flex items-center space-x-2">
-                  <% latest_training = @application.training_sessions.scheduled.order(created_at: :desc).first %>
-                  <span class="text-sm text-gray-900">Trainer: <%= latest_training.trainer.full_name %></span>
-                  <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                    Scheduled
-                  </span>
-                </div>
-                <p class="text-sm text-gray-500 mt-1">
-                  Scheduled for: <%= latest_training.scheduled_for.strftime("%B %d, %Y at %I:%M %p") %>
-                </p>
-              </div>
-            <% end %>
+          <% latest_training = @application.training_sessions.where(status: [:requested, :scheduled, :confirmed]).order(created_at: :desc).first %>
+          <% 
+            # Get trainers by type and by capability
+            trainers_by_type = User.where(type: "Trainer", status: :active)
+            trainers_by_capability = User.joins(:role_capabilities).where(role_capabilities: { capability: "can_train" }, status: :active)
             
-            <!-- Assign Trainer buttons -->
-            <h3 class="text-sm font-medium text-gray-500 mb-2">Assign Trainer</h3>
-            <div class="flex flex-wrap gap-3">
-              <% # Get trainers by type and by capability
-                 trainers_by_type = User.where(type: "Trainer", status: :active)
-                 trainers_by_capability = User.joins(:role_capabilities).where(role_capabilities: { capability: "can_train" }, status: :active)
-                 
-                 # Combine the two sets of trainers
-                 trainer_ids = trainers_by_type.pluck(:id) + trainers_by_capability.pluck(:id)
-                 trainers = User.where(id: trainer_ids.uniq)
-              %>
-              <% trainers.each do |trainer| %>
-                <%= button_to assign_trainer_admin_application_path(@application, trainer_id: trainer.id),
-                    method: :post,
-                    class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                    data: { confirm: "Are you sure you want to assign #{trainer.full_name} as trainer?" } do %>
-                  Assign <%= trainer.full_name %>
-                <% end %>
-              <% end %>
-            </div>
-          </div>
+            # Combine the two sets of trainers
+            trainer_ids = trainers_by_type.pluck(:id) + trainers_by_capability.pluck(:id)
+            trainers = User.where(id: trainer_ids.uniq)
+          %>
+          
+          <%= render "assignment_section", 
+            type: "trainer", 
+            entity: latest_training, 
+            assigned_person: latest_training&.trainer, 
+            status_badge_method: :training_session_status_badge,
+            scheduled_date: latest_training&.scheduled_for,
+            scheduled_time: true,
+            view_path: latest_training.present? ? trainers_training_session_path(latest_training) : nil,
+            assign_path: ->(trainer) { assign_trainer_admin_application_path(@application, trainer_id: trainer.id) },
+            available_assignees: trainers
+          %>
         </div>
-        <% if latest_evaluation&.completed? %>
+        <% if latest_evaluation&.status_completed? %>
           <div>
             <h3 class="text-sm font-medium text-gray-500 mb-2">Training Sessions</h3>
             <% if @application.training_sessions.any? %>
@@ -133,7 +88,7 @@
                       <%= training_session_status_badge(session) %>
                     </div>
                     <div class="flex space-x-2 mt-2 md:mt-0">
-                      <% if session.scheduled? %>
+                      <% if session.status_scheduled? %>
                         <%= button_to complete_training_admin_application_path(@application, training_session_id: session.id),
                             method: :patch,
                             class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500",
@@ -370,7 +325,7 @@
     <%= render "modals" %>
 
     <!-- Voucher Details Section -->
-    <% if @application.approved? && @application.medical_certification_status_accepted? %>
+    <% if @application.status_approved? && @application.medical_certification_status_accepted? %>
       <%= render "voucher_details" %>
     <% end %>
 

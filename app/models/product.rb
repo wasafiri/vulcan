@@ -13,20 +13,20 @@ class Product < ApplicationRecord
   validate :device_types_must_be_valid
 
   DEVICE_TYPES = [
-    "Smartphone",
-    "Tablet",
-    "Wearable Device",
-    "Captioned Phone",
-    "Amplified Phone",
-    "Signaler",
-    "Speech Device",
-    "Smart Home Device",
-    "Cellular 911 Alerter",
-    "Switch Activated Device",
-    "Eye-Tracking System",
-    "Hands-free Device",
-    "Memory Aid Device",
-    "Braille Device"
+    'Smartphone',
+    'Tablet',
+    'Wearable Device',
+    'Captioned Phone',
+    'Amplified Phone',
+    'Signaler',
+    'Speech Device',
+    'Smart Home Device',
+    'Cellular 911 Alerter',
+    'Switch Activated Device',
+    'Eye-Tracking System',
+    'Hands-free Device',
+    'Memory Aid Device',
+    'Braille Device'
   ].freeze
 
   scope :active, -> { where(archived_at: nil) }
@@ -54,6 +54,7 @@ class Product < ApplicationRecord
 
   def device_types_must_be_valid
     return if device_types.nil?
+
     invalid_types = device_types - DEVICE_TYPES
     errors.add(:device_types, "contains invalid types: #{invalid_types.join(', ')}") if invalid_types.any?
   end

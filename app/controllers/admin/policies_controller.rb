@@ -1,20 +1,20 @@
 class Admin::PoliciesController < ApplicationController
   include Pagy::Backend
   before_action :require_admin!
-  before_action :set_policy, only: [ :show, :edit ]
+  before_action :set_policy, only: %i[show edit]
 
   def index
     @policies = Policy.all.order(:key)
     @recent_changes = PolicyChange.includes(:policy, :user)
-      .order(created_at: :desc)
-      .limit(10)
+                                  .order(created_at: :desc)
+                                  .limit(10)
   end
 
   def edit
     @policies = Policy.all
     @recent_changes = PolicyChange.includes(:policy, :user)
-      .order(created_at: :desc)
-      .limit(10)
+                                  .order(created_at: :desc)
+                                  .limit(10)
   end
 
   def changes
@@ -39,22 +39,19 @@ class Admin::PoliciesController < ApplicationController
 
   def update
     Policy.transaction do
-      params[:policies].each do |_key, policy_params|
+      params[:policies].each_value do |policy_params|
         policy = Policy.find(policy_params[:id])
         policy.updated_by = current_user
-
-        unless policy.update(value: policy_params[:value])
-          raise ActiveRecord::RecordInvalid.new(policy)
-        end
+        raise ::ActiveRecord::RecordInvalid, policy unless policy.update(value: policy_params[:value])
       end
 
-      redirect_to admin_policies_path, notice: "Policies updated successfully."
+      redirect_to admin_policies_path, notice: 'Policies updated successfully.'
     end
-  rescue ActiveRecord::RecordInvalid => e
+  rescue ::ActiveRecord::RecordInvalid => e
     flash[:alert] = "Failed to update policies: #{e.record.errors.full_messages.join(', ')}"
     redirect_to admin_policies_path
-  rescue ActiveRecord::RecordNotFound => e
-    flash[:alert] = "Failed to update policies: Could not find one or more policies"
+  rescue ::ActiveRecord::RecordNotFound
+    flash[:alert] = 'Failed to update policies: Could not find one or more policies'
     redirect_to admin_policies_path
   end
 
@@ -69,9 +66,9 @@ class Admin::PoliciesController < ApplicationController
   end
 
   def require_admin!
-    unless current_user&.admin?
-      redirect_to root_path, alert: "Not authorized"
-    end
+    return if current_user&.admin?
+
+    redirect_to root_path, alert: 'Not authorized'
   end
 
   def policy_params

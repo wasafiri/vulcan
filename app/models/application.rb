@@ -158,7 +158,7 @@ class Application < ApplicationRecord
   end
 
   def can_create_voucher?
-    approved? &&
+    status_approved? &&
       medical_certification_status_accepted? &&
       !vouchers.exists?
   end
@@ -202,7 +202,7 @@ class Application < ApplicationRecord
         location: ''
         # Initialize other required fields as needed
       )
-      
+
       # Create event for audit logging
       Event.create!(
         user: Current.user,
@@ -214,7 +214,7 @@ class Application < ApplicationRecord
           timestamp: Time.current.iso8601
         }
       )
-      
+
       # Send email notification to evaluator
       EvaluatorMailer.with(
         evaluation: evaluation,
@@ -222,7 +222,7 @@ class Application < ApplicationRecord
       ).new_evaluation_assigned.deliver_later
     end
     true
-  rescue ActiveRecord::RecordInvalid => e
+  rescue ::ActiveRecord::RecordInvalid => e
     Rails.logger.error "Failed to assign evaluator: #{e.message}"
     false
   end
@@ -258,7 +258,7 @@ class Application < ApplicationRecord
       TrainingSessionNotificationsMailer.trainer_assigned(training_session).deliver_later
     end
     true
-  rescue ActiveRecord::RecordInvalid => e
+  rescue ::ActiveRecord::RecordInvalid => e
     Rails.logger.error "Failed to assign trainer: #{e.message}"
     false
   end
@@ -303,7 +303,7 @@ class Application < ApplicationRecord
       end
     end
     true
-  rescue ActiveRecord::RecordInvalid => e
+  rescue ::ActiveRecord::RecordInvalid => e
     Rails.logger.error "Failed to update certification: #{e.message}"
     false
   end
@@ -317,7 +317,7 @@ class Application < ApplicationRecord
       )
     end
     true
-  rescue ActiveRecord::RecordInvalid => e
+  rescue ::ActiveRecord::RecordInvalid => e
     Rails.logger.error "[Application #{id}] Failed to schedule training: #{e.message}"
     errors.add(:base, e.message)
     false
@@ -328,7 +328,7 @@ class Application < ApplicationRecord
   end
 
   def last_evaluation_completed_at
-    evaluations.completed.order(evaluation_date: :desc).limit(1).pluck(:evaluation_date).first
+    evaluations.where(status: :completed).order(evaluation_date: :desc).limit(1).pluck(:evaluation_date).first
   end
 
   def all_evaluations

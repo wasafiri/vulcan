@@ -195,100 +195,107 @@ module ProofManageable
   private
 
   def correct_proof_mime_type
-    if residency_proof.attached? && !ALLOWED_TYPES.include?(residency_proof.content_type)
-      errors.add(:residency_proof, 'must be a PDF or an image file (jpg, jpeg, png, tiff, bmp)')
-    end
+    return unless residency_proof.attached? && !ALLOWED_TYPES.include?(residency_proof.content_type)
 
-    if income_proof.attached? && !ALLOWED_TYPES.include?(income_proof.content_type)
-      errors.add(:income_proof, 'must be a PDF or an image file (jpg, jpeg, png, tiff, bmp)')
-    end
+    errors.add(:residency_proof, 'must be a PDF or an image file (jpg, jpeg, png, tiff, bmp)')
+    return unless income_proof.attached? && !ALLOWED_TYPES.include?(income_proof.content_type)
+
+    errors.add(:income_proof, 'must be a PDF or an image file (jpg, jpeg, png, tiff, bmp)')
   end
 
   def proof_size_within_limit
-    if residency_proof.attached? && residency_proof.byte_size > MAX_FILE_SIZE
-      errors.add(:residency_proof, "is too large. Maximum size allowed is 5MB.")
-    end
-
-    if income_proof.attached? && income_proof.byte_size > MAX_FILE_SIZE
-      errors.add(:income_proof, "is too large. Maximum size allowed is 5MB.")
-    end
+    check_proof_size(:residency_proof, residency_proof)
+    check_proof_size(:income_proof, income_proof)
   end
-  
+
+  def check_proof_size(attribute, proof)
+    return unless proof.attached? && proof.byte_size > MAX_FILE_SIZE
+
+    errors.add(attribute, "is too large. Maximum size allowed is 5MB.")
+  end
+
   # Verifies that proofs have the right attachment state based on status
   def verify_proof_attachments
-    # Skip validation for new records or during specific operations
     return if new_record? || Thread.current[:skip_proof_validation]
-    
-    # This validation runs for ALL applications, including paper applications
-    # Log current state for diagnostics
+
+    log_proof_debug_info
+    validate_approved_proofs
+    validate_not_reviewed_proofs
+  end
+
+  def log_proof_debug_info
     Rails.logger.debug("Validating proof attachments for application #{id || 'new'}")
     Rails.logger.debug("Income proof status: #{income_proof_status}, attached: #{income_proof.attached?}")
     Rails.logger.debug("Residency proof status: #{residency_proof_status}, attached: #{residency_proof.attached?}")
-    
-    # Check approved proofs - they must have an attachment
-    if income_proof_status_approved? && !income_proof.attached?
-      # Log the error for debugging purposes
-      Rails.logger.error("Income proof marked as approved but no file is attached for application #{id}")
-      errors.add(:income_proof, "must be attached when status is approved")
-    end
-    
-    if residency_proof_status_approved? && !residency_proof.attached?
-      # Log the error for debugging purposes
-      Rails.logger.error("Residency proof marked as approved but no file is attached for application #{id}")
-      errors.add(:residency_proof, "must be attached when status is approved")
-    end
-    
-    # For non-paper applications, only validate the NOT_REVIEWED status when not reviewing a single proof
-    # This allows individual proofs to be reviewed independently
-    unless Thread.current[:paper_application_context] || Thread.current[:reviewing_single_proof]
-      if income_proof.attached? && income_proof_status_not_reviewed?
-        # Check if blob exists and has a created_at timestamp
-        if income_proof.blob && income_proof.blob.created_at
-          # Only add error if it's not a brand new attachment 
-          # This allows for the initial attachment which will be marked as not_reviewed
-          if income_proof.blob.created_at < 1.minute.ago
-            Rails.logger.error("Income proof is attached but status is still not_reviewed for application #{id}")
-            errors.add(:income_proof_status, "should be updated when proof is attached")
-          end
-        else
-          Rails.logger.warn("Income proof blob missing created_at timestamp for application #{id}")
-        end
+  end
+
+  def validate_approved_proofs
+    validate_approved_proof(
+      proof: income_proof,
+      status_check_method: :income_proof_status_approved?,
+      error_field: :income_proof,
+      label: 'Income proof'
+    )
+    validate_approved_proof(
+      proof: residency_proof,
+      status_check_method: :residency_proof_status_approved?,
+      error_field: :residency_proof,
+      label: 'Residency proof'
+    )
+  end
+
+  def validate_approved_proof(proof:, status_check_method:, error_field:, label:)
+    return unless send(status_check_method) && !proof.attached?
+
+    Rails.logger.error("#{label} marked as approved but no file is attached for application #{id}")
+    errors.add(error_field, 'must be attached when status is approved')
+  end
+
+  def validate_not_reviewed_proofs
+    # Skip this set of validations for paper applications or when reviewing a single proof
+    return if Thread.current[:paper_application_context] || Thread.current[:reviewing_single_proof]
+
+    validate_not_reviewed_proof(
+      proof: income_proof,
+      status_check_method: :income_proof_status_not_reviewed?,
+      error_field: :income_proof_status,
+      label: 'Income proof'
+    )
+    validate_not_reviewed_proof(
+      proof: residency_proof,
+      status_check_method: :residency_proof_status_not_reviewed?,
+      error_field: :residency_proof_status,
+      label: 'Residency proof'
+    )
+  end
+
+  def validate_not_reviewed_proof(proof:, status_check_method:, error_field:, label:)
+    return unless proof.attached? && send(status_check_method)
+
+    if proof.blob && proof.blob.created_at
+      if proof.blob.created_at < 1.minute.ago
+        Rails.logger.error("#{label} is attached but status is still not_reviewed for application #{id}")
+        errors.add(error_field, "should be updated when proof is attached")
       end
-      
-      if residency_proof.attached? && residency_proof_status_not_reviewed?
-        # Check if blob exists and has a created_at timestamp
-        if residency_proof.blob && residency_proof.blob.created_at
-          # Only add error if it's not a brand new attachment
-          if residency_proof.blob.created_at < 1.minute.ago
-            Rails.logger.error("Residency proof is attached but status is still not_reviewed for application #{id}")
-            errors.add(:residency_proof_status, "should be updated when proof is attached")
-          end
-        else
-          Rails.logger.warn("Residency proof blob missing created_at timestamp for application #{id}")
-        end
-      end
+    else
+      Rails.logger.warn("#{label} blob missing created_at timestamp for application #{id}")
     end
-    
-    # We deliberately do NOT validate attachments for rejected proofs
-    # This is because paper applications can be rejected without any file attachment
-    # In the case of paper applications, the rejection happens at the point of submission
-    # For online applications, the rejected proof may still have an attachment, but it's not required
   end
 
   def set_proof_status_to_unreviewed
     # Guard clause to prevent infinite recursion
     return if @setting_proof_status
-    
+
     # Only proceed if proofs are attached
     return unless income_proof.attached? || residency_proof.attached?
-    
+
     begin
       # Set flag to prevent reentry
       @setting_proof_status = true
-      
+
       # Use update_column to avoid triggering callbacks again
       update_column(:needs_review_since, Time.current)
-      
+
       # Log success for debugging
       Rails.logger.info "Successfully set needs_review_since to #{Time.current} for application #{id}"
     rescue StandardError => e
@@ -300,15 +307,15 @@ module ProofManageable
       @setting_proof_status = false
     end
   end
-  
+
   def notify_admins_of_new_proofs
     # Skip if there's no change to needs_review_since or it's blank
     return unless needs_review_since_changed? && needs_review_since.present?
-    
+
     # Schedule the job to notify admins
     NotifyAdminsJob.perform_later(self)
   end
-  
+
   def create_system_notification!(recipient:, actor:, action:)
     # Create a system-generated notification
     Notification.create!(

@@ -10,9 +10,9 @@ module TrainingStatusManagement
       cancelled: 4,     # Training was cancelled
       rescheduled: 5,   # Training has been rescheduled
       no_show: 6        # Constituent didn't show up
-    }, validate: true
+    }, prefix: true, validate: true
 
-    scope :active, -> { where(status: %i[scheduled confirmed in_progress]) }
+    scope :active, -> { where(status: %i[scheduled confirmed]) }
     scope :pending, -> { where(status: %i[scheduled confirmed]) }
     scope :completed_sessions, -> { where(status: :completed) }
     scope :needing_followup, -> { where(status: %i[no_show cancelled]) }
@@ -20,26 +20,26 @@ module TrainingStatusManagement
   end
 
   def active?
-    scheduled? || confirmed? || in_progress?
+    status_scheduled? || status_confirmed?
   end
 
   def complete?
-    completed?
+    status_completed?
   end
 
   def needs_followup?
-    no_show? || cancelled?
+    status_no_show? || status_cancelled?
   end
 
   def can_reschedule?
-    cancelled? || no_show?
+    status_cancelled? || status_no_show?
   end
 
   def can_cancel?
-    scheduled? || confirmed?
+    status_scheduled? || status_confirmed?
   end
 
   def can_complete?
-    in_progress?
+    status_scheduled? || status_confirmed?
   end
 end

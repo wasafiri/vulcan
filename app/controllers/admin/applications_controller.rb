@@ -238,13 +238,13 @@ class Admin::ApplicationsController < Admin::BaseController
                 console.log("Executing immediate modal cleanup");
                 // Remove overflow-hidden class
                 document.body.classList.remove("overflow-hidden");
-                
+
                 // Hide all modals
                 document.querySelectorAll('[data-modal-target="container"]').forEach(modal => {
                   modal.classList.add('hidden');
                   console.log("Hidden modal:", modal.id || 'unnamed modal');
                 });
-                
+
                 // Trigger cleanup on modal controllers
                 const controllers = document.querySelectorAll("[data-controller~='modal']");
                 controllers.forEach((element) => {
@@ -259,7 +259,7 @@ class Admin::ApplicationsController < Admin::BaseController
                   }
                 });
               })();
-              
+
               // Also handle when this tab becomes visible again (after letter_opener is closed)
               document.addEventListener("visibilitychange", function() {
                 if (!document.hidden) {
@@ -269,10 +269,10 @@ class Admin::ApplicationsController < Admin::BaseController
                     modal.classList.add('hidden');
                     console.log("Hidden modal on visibility change:", modal.id || 'unnamed modal');
                   });
-                  
+
                   // Remove overflow-hidden
                   document.body.classList.remove("overflow-hidden");
-                  
+
                   // Trigger cleanup on modal controllers
                   const controllers = document.querySelectorAll("[data-controller~='modal']");
                   controllers.forEach((element) => {
@@ -315,17 +315,15 @@ class Admin::ApplicationsController < Admin::BaseController
   end
 
   def process_application_status(action)
-    past_tense = { "approve" => "approved", "reject" => "rejected" }
+    past_tense = { 'approve' => 'approved', 'reject' => 'rejected' }
     if @application.send("#{action}!")
       flash[:notice] = "Application #{past_tense[action.to_s]}."
       redirect_to admin_application_path(@application)
     else
-      flash[:alert] = "Failed to #{action} Application ##{@application.id}: #{@application.errors.full_messages.to_sentence}"
-      render :show, status: :unprocessable_entity
+      handle_application_failure(action)
     end
-  rescue ActiveRecord::RecordInvalid => e
-    flash[:alert] = "Failed to #{action} Application ##{@application.id}: #{e.record.errors.full_messages.to_sentence}"
-    render :show, status: :unprocessable_entity
+  rescue ::ActiveRecord::RecordInvalid => e
+    handle_application_failure(action, e.record.errors.full_messages.to_sentence)
   end
 
   def approve
@@ -342,10 +340,10 @@ class Admin::ApplicationsController < Admin::BaseController
 
     if @application.assign_evaluator!(evaluator)
       redirect_to admin_application_path(@application),
-        notice: "Evaluator successfully assigned"
+        notice: 'Evaluator successfully assigned'
     else
       redirect_to admin_application_path(@application),
-        alert: "Failed to assign evaluator"
+        alert: 'Failed to assign evaluator'
     end
   end
 
@@ -355,10 +353,10 @@ class Admin::ApplicationsController < Admin::BaseController
 
     if @application.assign_trainer!(trainer)
       redirect_to admin_application_path(@application),
-        notice: "Trainer successfully assigned"
+        notice: 'Trainer successfully assigned'
     else
       redirect_to admin_application_path(@application),
-        alert: "Failed to assign trainer"
+        alert: 'Failed to assign trainer'
     end
   end
 
@@ -379,7 +377,7 @@ class Admin::ApplicationsController < Admin::BaseController
         notice: "Training session scheduled with #{trainer.full_name}"
     else
       redirect_to admin_application_path(@application),
-        alert: "Failed to schedule training session"
+        alert: 'Failed to schedule training session'
     end
   end
 
@@ -388,7 +386,7 @@ class Admin::ApplicationsController < Admin::BaseController
     training_session.complete!
 
     redirect_to admin_application_path(@application),
-      notice: "Training session marked as completed"
+      notice: 'Training session marked as completed'
   end
 
   def update_certification_status
@@ -399,10 +397,10 @@ class Admin::ApplicationsController < Admin::BaseController
         rejection_reason: params[:rejection_reason]
       )
       redirect_to admin_application_path(@application),
-        notice: "Medical certification status updated."
+        notice: 'Medical certification status updated.'
     else
       redirect_to admin_application_path(@application),
-        alert: "Failed to update certification status."
+        alert: 'Failed to update certification status.'
     end
   end
 
@@ -414,7 +412,7 @@ class Admin::ApplicationsController < Admin::BaseController
 
     if service.request_certification
       redirect_to admin_application_path(@application),
-        notice: "Certification request sent successfully."
+        notice: 'Certification request sent successfully.'
     else
       redirect_to admin_application_path(@application),
         alert: "Failed to process certification request: #{service.errors.join(", ")}"
@@ -433,23 +431,27 @@ class Admin::ApplicationsController < Admin::BaseController
 
   private
 
+  def handle_application_failure(action, error_message = nil)
+    error_message ||= @application.errors.full_messages.to_sentence
+    flash[:alert] = "Failed to #{action} Application ##{@application.id}: #{error_message}"
+    render :show, status: :unprocessable_entity
+  end
+
   def load_proof_history(type)
-    begin
-      {
-        reviews: @application.proof_reviews
-          .select { |r| r.proof_type.to_sym == type.to_sym }
-          .sort_by(&:reviewed_at)
-          .reverse,
-        audits: @application.proof_submission_audits
-          .select { |a| a.proof_type.to_sym == type.to_sym }
-          .sort_by(&:created_at)
-          .reverse
-      }
-    rescue StandardError => e
-      Rails.logger.error "Failed to load #{type} proof history: #{e.message}"
-      Rails.logger.error e.backtrace.join("\n")
-      { reviews: [], audits: [], error: true }
-    end
+    {
+      reviews: filter_and_sort(@application.proof_reviews, type, :reviewed_at),
+      audits:  filter_and_sort(@application.proof_submission_audits, type, :created_at)
+    }
+  rescue StandardError => e
+    Rails.logger.error "Failed to load #{type} proof history: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+    { reviews: [], audits: [], error: true }
+  end
+
+  def filter_and_sort(collection, type, sort_method)
+    collection.select { |item| item.proof_type.to_sym == type.to_sym }
+              .sort_by(&sort_method)
+              .reverse
   end
 
   def load_audit_logs
@@ -459,55 +461,53 @@ class Admin::ApplicationsController < Admin::BaseController
     proof_reviews = @application.proof_reviews.includes(admin: :role_capabilities).order(created_at: :desc)
     status_changes = @application.status_changes.includes(user: :role_capabilities).order(created_at: :desc)
     notifications = Notification.includes(actor: :role_capabilities)
-      .where(notifiable: @application)
-      .where(
-      action: %w[
-        medical_certification_requested
-        medical_certification_received
-        medical_certification_approved
-        medical_certification_rejected
-        review_requested
-        documents_requested
-        proof_approved
-        proof_rejected
-      ]
-    ).order(created_at: :desc)
+                                .where(notifiable: @application)
+                                .where(
+                                  action: %w[
+                                    medical_certification_requested
+                                    medical_certification_received
+                                    medical_certification_approved
+                                    medical_certification_rejected
+                                    review_requested
+                                    documents_requested
+                                    proof_approved
+                                    proof_rejected
+                                  ]
+                                ).order(created_at: :desc)
 
-  # Include application-related events (including vouchers and application creation)
-  # Use a more flexible JSONB query to match application_id in metadata, regardless of string/integer type
-  application_events = Event.where(
-    action: [ 
-      "voucher_assigned", "voucher_redeemed", "voucher_expired", "voucher_cancelled", 
-      "application_created", "evaluator_assigned", "trainer_assigned", "application_auto_approved" 
-    ]
-  ).where("metadata->>'application_id' = ? OR metadata @> ?", 
-    @application.id.to_s, 
-    { application_id: @application.id }.to_json
-  ).includes(:user).order(created_at: :desc)
+    # Include application-related events (including vouchers and application creation)
+    # Use a more flexible JSONB query to match application_id in metadata, regardless of string/integer type
+    application_events = Event.where(
+      action: %w[voucher_assigned voucher_redeemed voucher_expired voucher_cancelled application_created evaluator_assigned trainer_assigned application_auto_approved]
+    ).where(
+      "metadata->>'application_id' = ? OR metadata @> ?",
+      @application.id.to_s,
+      { application_id: @application.id }.to_json
+    ).includes(:user).order(created_at: :desc)
 
-  @audit_logs = (proof_reviews + status_changes + notifications + application_events)
-    .sort_by(&:created_at)
-    .reverse
+    @audit_logs = (proof_reviews + status_changes + notifications + application_events)
+                  .sort_by(&:created_at)
+                  .reverse
   end
 
   def apply_filters(scope, filter)
     # First apply any filter from params[:filter] (from the filter links)
     scope = case filter
-            when "active"
+            when 'active'
               scope.active
-            when "in_progress"
+            when 'in_progress'
               scope.where(status: :in_progress)
-            when "approved"
+            when 'approved'
               scope.where(status: :approved)
-            when "proofs_needing_review"
+            when 'proofs_needing_review'
               income_pending_ids = scope.where(income_proof_status: "not_reviewed").pluck(:id)
               residency_pending_ids = scope.where(residency_proof_status: "not_reviewed").pluck(:id)
               scope.where(id: income_pending_ids + residency_pending_ids)
-            when "awaiting_medical_response"
+            when 'awaiting_medical_response'
               scope.where(status: :awaiting_documents)
-            when "medical_certs_to_review"
+            when 'medical_certs_to_review'
               scope.where(medical_certification_status: "received")
-            when "training_requests"
+            when 'training_requests'
               # Use our new scope to filter applications with pending training
               scope.with_pending_training
             else
@@ -520,20 +520,20 @@ class Admin::ApplicationsController < Admin::BaseController
     # Apply date range filter if present
     if params[:date_range].present?
       case params[:date_range]
-      when "current_fy"
+      when 'current_fy'
         # Filter by current fiscal year
         current_fy_start = Date.new(fiscal_year, 7, 1)
         current_fy_end = Date.new(fiscal_year + 1, 6, 30)
         scope = scope.where(created_at: current_fy_start..current_fy_end)
-      when "previous_fy"
+      when 'previous_fy'
         # Filter by previous fiscal year
         previous_fy_start = Date.new(fiscal_year - 1, 7, 1)
         previous_fy_end = Date.new(fiscal_year, 6, 30)
         scope = scope.where(created_at: previous_fy_start..previous_fy_end)
-      when "last_30"
+      when 'last_30'
         # Filter by last 30 days
         scope = scope.where("created_at >= ?", 30.days.ago)
-      when "last_90"
+      when 'last_90'
         # Filter by last 90 days
         scope = scope.where("created_at >= ?", 90.days.ago)
       end
@@ -552,7 +552,7 @@ class Admin::ApplicationsController < Admin::BaseController
   end
 
   def sort_column
-    params[:sort] || "application_date"
+    params[:sort] || 'application_date'
   end
 
   def sort_direction
@@ -562,13 +562,13 @@ class Admin::ApplicationsController < Admin::BaseController
   def filter_conditions
     # Define your filter conditions based on params[:filter]
     case params[:filter]
-    when "in_progress"
+    when 'in_progress'
       { status: :in_progress }
-    when "approved"
+    when 'approved'
       { status: :approved }
-    when "proofs_needing_review"
+    when 'proofs_needing_review'
       { status: :proofs_needing_review }
-    when "awaiting_medical_response"
+    when 'awaiting_medical_response'
       { status: :awaiting_medical_response }
     else
       {}
@@ -577,11 +577,11 @@ class Admin::ApplicationsController < Admin::BaseController
 
   def set_application
     @application = Application.with_attached_income_proof
-      .with_attached_residency_proof
-      .with_attached_medical_certification
-      .find(params[:id])
+                              .with_attached_residency_proof
+                              .with_attached_medical_certification
+                              .find(params[:id])
   rescue ActiveRecord::RecordNotFound
-    redirect_to admin_applications_path, alert: "Application not found"
+    redirect_to admin_applications_path, alert: 'Application not found'
   end
 
   def application_params

@@ -1,7 +1,7 @@
 module NotificationDelivery
   extend ActiveSupport::Concern
 
-  included do
+  included do |_base|
     # Use after_commit instead of after_create_commit to ensure all changes are committed first
     # This helps prevent infinite recursion by ensuring the transaction is complete
     after_commit :deliver_notifications, on: :create

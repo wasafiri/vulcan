@@ -19,7 +19,7 @@ class Invoice < ApplicationRecord
     invoice_approved: 2,     # Approved for payment
     invoice_paid: 3,         # Payment has been processed
     invoice_cancelled: 4     # Invoice has been cancelled
-  }
+  }, prefix: true
 
   scope :unpaid, -> { where.not(status: %i[invoice_paid invoice_cancelled]) }
   scope :for_vendor, ->(vendor_id) { where(vendor_id: vendor_id) }

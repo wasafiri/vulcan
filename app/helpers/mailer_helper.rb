@@ -33,49 +33,18 @@ module MailerHelper
     status = status.to_sym if status.respond_to?(:to_sym)
     colors[status] || colors[:info]
   end
+
   # Format a date consistently across all mailers
   # @param date [Date, Time, DateTime, String] The date to format
   # @param format [Symbol] The format to use (:short, :long, :full)
   # @return [String] The formatted date
   def format_date(date, format = :long)
-    return "" if date.nil?
-    
-    # Handle string dates more carefully
-    if date.is_a?(String)
-      begin
-        # Try parsing with Time first if it has time information
-        if date.include?(':')
-          date = Time.parse(date)
-        else
-          date = Date.parse(date)
-        end
-      rescue ArgumentError, TypeError
-        # If we can't parse it as a date, return it as is
-        return date
-      end
-    end
+    return '' if date.nil?
 
-    # Now ensure we can call strftime on the date object
+    date = parse_date(date)
     return date.to_s unless date.respond_to?(:strftime)
 
-    # Ensure date is properly formatted
-    formatted_date = begin
-      case format
-      when :short
-        date.strftime("%m/%d/%Y")
-      when :long
-        date.strftime("%B %d %Y")
-      when :full
-        date.strftime("%B %d %Y at %I:%M %p")
-      else
-        date.strftime("%B %d %Y")
-      end
-    rescue StandardError => e
-      Rails.logger.error("Error formatting date: #{e.message} for date: #{date.inspect}")
-      date.to_s
-    end
-
-    formatted_date
+    format_date_str(date, format)
   end
 
   # Format a currency value consistently across all mailers
@@ -90,17 +59,17 @@ module MailerHelper
   # @param phone [String] The phone number to format
   # @return [String] The formatted phone number
   def format_phone(phone)
-    return "" if phone.blank?
+    return '' if phone.blank?
 
     # Remove all non-numeric characters
-    digits = phone.to_s.gsub(/\D/, "")
+    digits = phone.to_s.gsub(/\D/, '')
 
     # Format based on length
     case digits.length
     when 10
       "(#{digits[0..2]}) #{digits[3..5]}-#{digits[6..9]}"
     when 11
-      if digits[0] == "1"
+      if digits[0] == '1'
         "+1 (#{digits[1..3]}) #{digits[4..6]}-#{digits[7..10]}"
       else
         digits
@@ -161,7 +130,7 @@ module MailerHelper
       type_value.to_s
     end.humanize.downcase
   end
-  
+
   # Returns the appropriate text for training session scheduling information
   # based on whether a session has been scheduled or not
   # @param training_session [TrainingSession] The training session
@@ -172,5 +141,39 @@ module MailerHelper
     else
       "Please contact the constituent to schedule a training session at a mutually convenient time."
     end
+  end
+
+  # Parses a date string into a Date or Time object if possible.
+  # @param [Date, Time, DateTime, String] date the date or date string to parse
+  # @return [Date, Time, DateTime, String] the parsed date or the original value if parsing fails
+  def parse_date(date)
+    return date unless date.is_a?(String)
+
+    begin
+      date.include?(':') ? Time.parse(date) : Date.parse(date)
+    rescue ArgumentError, TypeError
+      date
+    end
+  end
+
+  # Formats a date using strftime based on the provided format.
+  #
+  # @param [Date, Time, DateTime] date the date object to format
+  # @param [Symbol] format the format type (:short, :long, :full)
+  # @return [String] the formatted date string
+  def format_date_str(date, format)
+    case format
+    when :short
+      date.strftime("%m/%d/%Y")
+    when :long
+      date.strftime("%B %d %Y")
+    when :full
+      date.strftime("%B %d %Y at %I:%M %p")
+    else
+      date.strftime("%B %d %Y")
+    end
+  rescue StandardError => e
+    Rails.logger.error("Error formatting date: #{e.message} for date: #{date.inspect}")
+    date.to_s
   end
 end

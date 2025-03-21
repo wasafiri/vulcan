@@ -20,4 +20,8 @@ Disabilities:
 
 Please begin the training process by contacting the constituent to schedule a training session.
 
+<% if @training_session.scheduled_for.present? %>
 A training session has been tentatively scheduled for <%= @training_session.scheduled_for.strftime("%B %d, %Y at %I:%M %p") %>, but you may reschedule this with the constituent as needed.
+<% else %>
+No schedule has been set yet. Please contact the constituent to arrange a suitable time for the training session.
+<% end %>

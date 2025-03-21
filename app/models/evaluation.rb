@@ -6,7 +6,7 @@ class Evaluation < ApplicationRecord
   has_and_belongs_to_many :recommended_products, class_name: 'Product', join_table: 'evaluations_products'
 
   enum :evaluation_type, { initial: 0, renewal: 1, special: 2 }
-  enum :status, { pending: 0, completed: 1 }
+  enum :status, { pending: 0, completed: 1 }, prefix: true
 
   # Simplified validations
   validates :evaluator, presence: true
@@ -21,10 +21,10 @@ class Evaluation < ApplicationRecord
             :products_tried,
             :notes,
             presence: true,
-            if: :completed?
+            if: :status_completed?
 
-  validate :validate_attendees_structure, if: :completed?
-  validate :validate_products_tried_structure, if: :completed?
+  validate :validate_attendees_structure, if: :status_completed?
+  validate :validate_products_tried_structure, if: :status_completed?
 
   # Callbacks
   after_save :update_application_record, if: :saved_change_to_status?
@@ -44,7 +44,7 @@ class Evaluation < ApplicationRecord
   private
 
   def validate_attendees_structure
-    return true unless completed?
+    return true unless status_completed?
 
     unless attendees.is_a?(Array) && attendees.all? { |attendee| attendee['name'].present? && attendee['relationship'].present? }
       errors.add(:attendees, 'must be an array of attendees with name and relationship when evaluation is completed')
@@ -52,7 +52,7 @@ class Evaluation < ApplicationRecord
   end
 
   def validate_products_tried_structure
-    return true unless completed?
+    return true unless status_completed?
 
     unless products_tried.is_a?(Array) && products_tried.all? { |product| product['product_id'].present? && product['reaction'].present? }
       errors.add(:products_tried, 'must be an array of products tried with product_id and reaction when evaluation is completed')
@@ -60,7 +60,7 @@ class Evaluation < ApplicationRecord
   end
 
   def update_application_record
-    return unless completed?
+    return unless status_completed?
 
     application.update!(
       needs_review_since: nil

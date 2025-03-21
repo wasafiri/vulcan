@@ -4,7 +4,7 @@
 class Constituent < User
   # Include methods and associations from the nested class
   include Users::ConstituentBehavior if defined?(Users::ConstituentBehavior)
-  
+
   # Associations
   has_many :applications, foreign_key: :user_id, dependent: :destroy
   has_many :evaluations, foreign_key: :constituent_id

@@ -8,7 +8,7 @@ class TrainingSession < ApplicationRecord
   has_one :constituent, through: :application, source: :user
 
   # Validations
-  validates :scheduled_for, presence: true, unless: :requested?
+  validates :scheduled_for, presence: true, unless: :status_requested?
   validates :trainer, presence: true
   validates :application, presence: true
   validates :reschedule_reason, presence: true, if: :rescheduling?
@@ -23,15 +23,15 @@ class TrainingSession < ApplicationRecord
 
   def rescheduling?
     return false unless persisted? # New records aren't being rescheduled
-    
-    if scheduled_for_changed? && (status_changed? || scheduled?)
+
+    if scheduled_for_changed? && (status_changed? || status_scheduled?)
       # If the date is changing and we're either changing status to scheduled or already scheduled
       return true
     end
-    
+
     false
   end
-  
+
   private
 
   def trainer_must_be_trainer_type
@@ -53,11 +53,11 @@ class TrainingSession < ApplicationRecord
   end
 
   def set_completed_at
-    self.completed_at = Time.current if completed? && completed_at.nil?
+    self.completed_at = Time.current if status_completed? && completed_at.nil?
   end
 
   def status_changed_to_completed?
-    completed? && status_changed?
+    status_completed? && status_changed?
   end
 
   def should_deliver_notifications?
@@ -66,12 +66,12 @@ class TrainingSession < ApplicationRecord
   
   def ensure_status_schedule_consistency
     # If setting a schedule date but still in requested status, update status
-    if scheduled_for_changed? && scheduled_for.present? && requested?
+    if scheduled_for_changed? && scheduled_for.present? && status_requested?
       self.status = :scheduled
     end
-    
+  
     # If removing a schedule date but still in scheduled/confirmed status, prevent it
-    if scheduled_for_changed? && scheduled_for.blank? && (scheduled? || confirmed?)
+    if scheduled_for_changed? && scheduled_for.blank? && (status_scheduled? || status_confirmed?)
       errors.add(:scheduled_for, "cannot be removed while status is #{status}")
       throw(:abort)
     end

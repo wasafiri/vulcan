@@ -11,7 +11,7 @@ module ApplicationStatusManagement
       reminder_sent: 5,       # Reminder sent to constituent
       awaiting_documents: 6,  # Waiting for specific documents
       archived: 7             # Historical record
-    }, validate: true
+    }, prefix: true, validate: true
 
     after_save :handle_status_change, if: :saved_change_to_status?
     after_save :auto_approve_if_eligible, if: :requirements_met_for_approval?
