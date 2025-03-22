@@ -54,6 +54,19 @@ class Admin::PoliciesControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to admin_policies_path
     assert_equal "Policies updated successfully.", flash[:notice]
   end
+  
+  def test_should_update_policy_with_array_format
+    patch admin_policies_path, params: {
+      policies: [
+        {
+          id: @policy.id,
+          value: "42"
+        }
+      ]
+    }
+    assert_redirected_to admin_policies_path
+    assert_equal "Policies updated successfully.", flash[:notice]
+  end
 
   def test_should_create_policy
     assert_difference("Policy.count") do

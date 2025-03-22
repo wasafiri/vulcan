@@ -1,11 +1,11 @@
 <div class="flex items-center space-x-4">
   <% if policy.present? %>
-    <%= hidden_field_tag "policies[#{policy.id}][id]", policy.id %>
+    <%= hidden_field_tag "policies[][id]", policy.id %>
     <label for="policies_<%= policy.id %>_value" class="block text-sm font-medium text-gray-700">
       <%= label %>
     </label>
     <div class="relative rounded-md shadow-sm w-32">
-      <%= number_field_tag "policies[#{policy.id}][value]",
+      <%= number_field_tag "policies[][value]",
           policy.value,
           class: "block w-full pl-3 pr-3 py-2 rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
           required: true,

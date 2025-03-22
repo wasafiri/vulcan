@@ -22,12 +22,12 @@
       <%= render "create_missing_policy", policy: modifier_policy, key: 'fpl_modifier_percentage', default_value: 400 %>
       <% if modifier_policy %>
         <div class="flex items-center space-x-4">
-          <%= hidden_field_tag "policies[#{modifier_policy.id}][id]", modifier_policy.id %>
+          <%= hidden_field_tag "policies[][id]", modifier_policy.id %>
           <label for="policies_<%= modifier_policy.id %>_value" class="block text-sm font-medium text-gray-700">
             FPL Modifier Percentage
           </label>
           <div class="relative rounded-md shadow-sm w-32">
-            <%= number_field_tag "policies[#{modifier_policy.id}][value]",
+            <%= number_field_tag "policies[][value]",
                 modifier_policy.value,
                 class: "block w-full pl-3 pr-8 py-2 rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
                 required: true,
@@ -69,12 +69,12 @@
               <td class="px-6 py-4 whitespace-nowrap">
                 <%= render "create_missing_policy", policy: policy, key: policy_key, default_value: default_value %>
                 <% if policy %>
-                  <%= hidden_field_tag "policies[#{policy.id}][id]", policy.id %>
+                  <%= hidden_field_tag "policies[][id]", policy.id %>
                   <div class="relative rounded-md shadow-sm w-48">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <span class="text-gray-500 sm:text-sm">$</span>
                     </div>
-                    <%= number_field_tag "policies[#{policy.id}][value]",
+                    <%= number_field_tag "policies[][value]",
                         policy.value,
                         class: "block w-full pl-7 py-2 rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
                         required: true,
@@ -170,12 +170,12 @@
               <td class="px-6 py-4 whitespace-nowrap">
                 <%= render "create_missing_policy", policy: policy, key: policy_key, default_value: 500 %>
                 <% if policy %>
-                  <%= hidden_field_tag "policies[#{policy.id}][id]", policy.id %>
+                  <%= hidden_field_tag "policies[][id]", policy.id %>
                   <div class="relative rounded-md shadow-sm w-48">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <span class="text-gray-500 sm:text-sm">$</span>
                     </div>
-                    <%= number_field_tag "policies[#{policy.id}][value]",
+                    <%= number_field_tag "policies[][value]",
                         policy.value,
                         class: "block w-full pl-7 py-2 rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
                         required: true,
@@ -214,9 +214,9 @@
                 <td class="px-6 py-4 whitespace-nowrap">
                   <%= render "create_missing_policy", policy: policy, key: key, default_value: default_value %>
                   <% if policy %>
-                    <%= hidden_field_tag "policies[#{policy.id}][id]", policy.id %>
+                    <%= hidden_field_tag "policies[][id]", policy.id %>
                     <div class="relative rounded-md shadow-sm w-48">
-                      <%= number_field_tag "policies[#{policy.id}][value]",
+                      <%= number_field_tag "policies[][value]",
                           policy.value,
                           class: "block w-full py-2 rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
                           required: true,
@@ -259,8 +259,8 @@
                 <%= policy.key.humanize %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <%= hidden_field_tag "policies[#{policy.id}][id]", policy.id %>
-                <%= number_field_tag "policies[#{policy.id}][value]",
+                <%= hidden_field_tag "policies[][id]", policy.id %>
+                <%= number_field_tag "policies[][value]",
                     policy.value,
                     class: "block w-32 rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
                     required: true,

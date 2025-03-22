@@ -1,6 +1,4 @@
-class Admin::PoliciesController < ApplicationController
-  include Pagy::Backend
-  before_action :require_admin!
+class Admin::PoliciesController < Admin::BaseController
   before_action :set_policy, only: %i[show edit]
 
   def index
@@ -39,10 +37,22 @@ class Admin::PoliciesController < ApplicationController
 
   def update
     Policy.transaction do
-      params[:policies].each_value do |policy_params|
-        policy = Policy.find(policy_params[:id])
-        policy.updated_by = current_user
-        raise ::ActiveRecord::RecordInvalid, policy unless policy.update(value: policy_params[:value])
+      policies_data = policy_params
+      
+      if policies_data.is_a?(Array)
+        # Array format
+        policies_data.each do |policy_attrs|
+          policy = Policy.find(policy_attrs[:id])
+          policy.updated_by = current_user
+          raise ::ActiveRecord::RecordInvalid, policy unless policy.update(value: policy_attrs[:value])
+        end
+      else
+        # Hash format (legacy)
+        policies_data.each_value do |policy_attrs|
+          policy = Policy.find(policy_attrs[:id])
+          policy.updated_by = current_user
+          raise ::ActiveRecord::RecordInvalid, policy unless policy.update(value: policy_attrs[:value])
+        end
       end
 
       redirect_to admin_policies_path, notice: 'Policies updated successfully.'
@@ -65,14 +75,19 @@ class Admin::PoliciesController < ApplicationController
     @policies = Policy.all
   end
 
-  def require_admin!
-    return if current_user&.admin?
-
-    redirect_to root_path, alert: 'Not authorized'
-  end
 
   def policy_params
-    params.require(:policies).permit!
+    if params[:policies].is_a?(Array)
+      # New array format
+      params.permit(policies: [:id, :value])[:policies]
+    else
+      # Legacy hash format
+      permitted_policies = {}
+      params.require(:policies).each do |id, attrs|
+        permitted_policies[id] = { id: attrs[:id], value: attrs[:value] }
+      end
+      permitted_policies
+    end
   end
 
   def create_policy_params
