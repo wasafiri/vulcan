@@ -29,7 +29,8 @@ class Vendor::ProfilesController < Vendor::BaseController
       :business_name,
       :business_tax_id,
       :w9_form,
-      :terms_accepted
+      :terms_accepted,
+      :website_url
     ).tap do |permitted_params|
       permitted_params[:terms_accepted_at] = Time.current if permitted_params.delete(:terms_accepted)
     end

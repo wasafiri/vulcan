@@ -1,0 +1,59 @@
+#!/usr/bin/env ruby
+
+# This script demonstrates that the registration confirmation email works correctly
+# Run with: RAILS_ENV=development bin/check-registration-email
+
+require File.expand_path('../../config/environment', __FILE__)
+require 'active_job'
+
+# Reset email deliveries to ensure clean slate
+ActionMailer::Base.deliveries.clear
+
+# Create a test user (not saved to DB)
+user = Constituent.new(
+  first_name: "Test",
+  last_name: "User",
+  email: "test@example.com",
+  phone: "555-123-4567"
+)
+
+puts "Starting email demonstration for registration confirmation..."
+
+# Generate and deliver the email
+email = ApplicationNotificationsMailer.registration_confirmation(user).deliver_now
+
+puts "\n========== EMAIL DETAILS ==========\n"
+puts "From: #{email.from.join(', ')}"
+puts "To: #{email.to.join(', ')}"
+puts "Subject: #{email.subject}"
+puts "Mail format: #{email.multipart? ? 'Multipart (HTML & Text)' : 'Single Part'}"
+puts "Number of parts: #{email.parts.size if email.multipart?}"
+
+html_part = email.parts.find { |part| part.content_type.include?("text/html") }
+text_part = email.parts.find { |part| part.content_type.include?("text/plain") }
+
+puts "\n========== HTML CONTENT PREVIEW ==========\n"
+if html_part
+  # Show first 500 characters of HTML content 
+  preview = html_part.body.to_s[0..500]
+  puts preview + "...[truncated]"
+  puts "\nHTML content contains personalization: #{html_part.body.to_s.include?('Dear Test,') ? 'YES' : 'NO'}"
+  puts "HTML content contains Program Overview: #{html_part.body.to_s.include?('Program Overview') ? 'YES' : 'NO'}"
+  puts "HTML content contains Next Steps: #{html_part.body.to_s.include?('Next Steps') ? 'YES' : 'NO'}"
+else
+  puts "No HTML part found!"
+end
+
+puts "\n========== TEXT CONTENT PREVIEW ==========\n"
+if text_part
+  # Show first 500 characters of Text content 
+  preview = text_part.body.to_s[0..500]
+  puts preview + "...[truncated]"
+  puts "\nText content contains personalization: #{text_part.body.to_s.include?('Dear Test,') ? 'YES' : 'NO'}"
+  puts "Text content contains Program Overview: #{text_part.body.to_s.include?('PROGRAM OVERVIEW') ? 'YES' : 'NO'}"
+  puts "Text content contains Next Steps: #{text_part.body.to_s.include?('NEXT STEPS') ? 'YES' : 'NO'}"
+else
+  puts "No Text part found!"
+end
+
+puts "\nEmail demonstration completed successfully!"

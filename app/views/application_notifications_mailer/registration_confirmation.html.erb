@@ -1,0 +1,77 @@
+<%= render partial: "shared/mailers/header", formats: [:html], locals: { title: "Welcome to the Maryland Accessible Telecommunications Program" } %>
+
+<p>Dear <%= @user.first_name %>,</p>
+
+<p>Thank you for registering with the Maryland Accessible Telecommunications Program. We're here to help Maryland residents with hearing loss, vision loss, mobility impairments, speech impairments, and cognitive impairments access telecommunications devices that meet their needs.</p>
+
+<section aria-labelledby="program-overview-heading" style="background-color: #ebf4ff; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #c3dafe;">
+  <h2 id="program-overview-heading" style="margin-top: 0; color: #434190; font-size: 1.25rem;">
+    Program Overview
+  </h2>
+  
+  <div style="color: #434190;">
+    <p>Our program provides vouchers to eligible Maryland residents to purchase accessible telecommunications products. You may be eligible if your household income is less than 400% of the federal poverty level for your family size.</p>
+  </div>
+</section>
+
+<section aria-labelledby="next-steps-heading" style="background-color: #e6fffa; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #81e6d9;">
+  <h2 id="next-steps-heading" style="margin-top: 0; color: #234e52; font-size: 1.25rem;">
+    Next Steps
+  </h2>
+  
+  <div style="color: #234e52;">
+    <p>To apply for assistance:</p>
+    <ol>
+      <li>Visit <a href="<%= @dashboard_url %>" style="color: #234e52; font-weight: bold;" aria-label="your dashboard to access your profile">your dashboard</a> to access your profile</li>
+      <li>Start a <a href="<%= @new_application_url %>" style="color: #234e52; font-weight: bold;" aria-label="new application form">new application</a></li>
+      <li>Complete all required information, including proof of residency and income</li>
+      <li>Submit your application for review</li>
+    </ol>
+    <p>Once your application is approved, you'll receive a voucher that can be used to purchase eligible devices.</p>
+  </div>
+</section>
+
+<section aria-labelledby="available-products-heading" style="background-color: #f3f4f6; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #9ca3af;">
+  <h2 id="available-products-heading" style="margin-top: 0; color: #4b5563; font-size: 1.25rem;">
+    Available Products
+  </h2>
+  
+  <div style="color: #4b5563;">
+    <p>We offer a variety of accessible telecommunications products, including:</p>
+    <ul>
+      <li>Amplified phones for individuals with hearing loss</li>
+      <li>Smartphones with accessibility features (iPhone, iPad, Pixel)</li>
+      <li>Braille and speech devices</li>
+      <li>Communication aids for speech impairments</li>
+      <li>Emergency alert systems</li>
+    </ul>
+  </div>
+</section>
+
+<section aria-labelledby="authorized-retailers-heading" style="background-color: #eef2ff; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #c7d2fe;">
+  <h2 id="authorized-retailers-heading" style="margin-top: 0; color: #4338ca; font-size: 1.25rem;">
+    Authorized Retailers
+  </h2>
+  
+  <div style="color: #4338ca;">
+    <p>You can redeem your voucher at any of these authorized vendors:</p>
+    <ul>
+      <% @active_vendors.each do |vendor| %>
+        <li>
+          <strong><%= vendor.business_name || vendor.full_name %></strong>
+          <% if vendor.website_url.present? %>
+            - <a href="<%= vendor.website_url %>" style="color: #4338ca; font-weight: bold;" target="_blank">Website</a>
+          <% end %>
+          <% if vendor.phone.present? %>
+            - Phone: <%= vendor.phone %>
+          <% end %>
+        </li>
+      <% end %>
+    </ul>
+    <p>Once your application is approved, you'll receive a voucher to purchase eligible devices through these vendors.</p>
+  </div>
+</section>
+
+<p>If you have any questions about our program or need assistance with your application, please don't hesitate to contact us.</p>
+
+<%= render partial: "shared/mailers/footer", formats: [:html], locals: { show_automated_message: true } %>

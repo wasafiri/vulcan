@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_03_18_230053) do
+ActiveRecord::Schema[8.0].define(version: 2025_03_21_224319) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -174,6 +174,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_18_230053) do
     t.string "location"
     t.jsonb "attendees", default: []
     t.jsonb "products_tried", default: []
+    t.text "reschedule_reason"
     t.index ["application_id"], name: "index_evaluations_on_application_id"
     t.index ["constituent_id"], name: "index_evaluations_on_constituent_id"
     t.index ["evaluator_id"], name: "index_evaluations_on_evaluator_id"
@@ -553,6 +554,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_18_230053) do
     t.integer "w9_rejections_count", default: 0, null: false
     t.datetime "last_w9_reminder_sent_at"
     t.boolean "force_password_change", default: false, null: false
+    t.string "website_url"
     t.index ["business_name"], name: "index_users_on_business_name"
     t.index ["business_tax_id"], name: "index_users_on_business_tax_id"
     t.index ["email"], name: "index_users_on_email", unique: true

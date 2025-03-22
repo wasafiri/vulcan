@@ -2,11 +2,13 @@ import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static targets = [
-    "proofType",    // Hidden input for proof type
-    "reasonField"   // Text area for rejection reason
+    "proofType",      // Hidden input for proof type 
+    "reasonField",    // Text area for rejection reason
+    "notesField"      // Optional text area for additional notes
   ]
 
   static values = {
+    // Income & Residency proof rejection reasons
     addressMismatchIncome: String,
     addressMismatchResidency: String,
     expiredIncome: String,
@@ -17,7 +19,15 @@ export default class extends Controller {
     wrongDocumentResidency: String,
     missingAmountIncome: String,
     exceedsThresholdIncome: String,
-    outdatedSsAwardIncome: String
+    outdatedSsAwardIncome: String,
+    
+    // Medical certification rejection reasons
+    missingProviderCredentials: String,
+    incompleteDisabilityDocumentation: String,
+    outdatedCertification: String,
+    missingSignature: String,
+    missingFunctionalLimitations: String,
+    incorrectFormUsed: String
   }
 
   connect() {
@@ -26,6 +36,10 @@ export default class extends Controller {
       this.reasonFieldTarget.value = ""
       this.reasonFieldTarget.classList.remove('border-red-500')
     }
+    
+    if (this.hasNotesFieldTarget) {
+      this.notesFieldTarget.value = ""
+    }
 
     // Listen for proof type changes
     document.addEventListener('click', (event) => {
@@ -33,30 +47,41 @@ export default class extends Controller {
         const proofType = event.target.dataset.proofType
         this.proofTypeTarget.value = proofType
         
-        // Show/hide income-only reasons based on proof type
-        const incomeOnlyReasons = document.querySelector('.income-only-reasons')
-        if (incomeOnlyReasons) {
-          if (proofType === 'income') {
-            incomeOnlyReasons.classList.remove('hidden')
-          } else {
-            incomeOnlyReasons.classList.add('hidden')
-          }
-        }
+        // Show/hide specific reason groups based on proof type
+        this.updateReasonGroupsVisibility(proofType)
       }
     })
     
-    // Initialize income-only reasons visibility based on initial proof type
-    this.updateIncomeOnlyReasonsVisibility()
+    // Initialize visibility based on initial proof type
+    this.updateReasonGroupsVisibility(this.proofTypeTarget.value)
   }
   
-  updateIncomeOnlyReasonsVisibility() {
-    const proofType = this.proofTypeTarget.value
+  updateReasonGroupsVisibility(proofType) {
+    // Handle income-only reasons
     const incomeOnlyReasons = document.querySelector('.income-only-reasons')
     if (incomeOnlyReasons) {
       if (proofType === 'income') {
         incomeOnlyReasons.classList.remove('hidden')
       } else {
         incomeOnlyReasons.classList.add('hidden')
+      }
+    }
+    
+    // Handle medical-only reasons
+    const medicalOnlyReasons = document.querySelector('.medical-only-reasons')
+    if (medicalOnlyReasons) {
+      if (proofType === 'medical') {
+        medicalOnlyReasons.classList.remove('hidden')
+        
+        // Hide income/residency groups when showing medical
+        if (incomeOnlyReasons) incomeOnlyReasons.classList.add('hidden')
+        const generalReasons = document.querySelector('.general-reasons')
+        if (generalReasons) generalReasons.classList.add('hidden')
+      } else {
+        medicalOnlyReasons.classList.add('hidden')
+        // Show general reasons for income/residency
+        const generalReasons = document.querySelector('.general-reasons')
+        if (generalReasons) generalReasons.classList.remove('hidden')
       }
     }
   }
@@ -81,15 +106,26 @@ export default class extends Controller {
       return
     }
 
-    // Get reason text from values
-    const key = `${reasonType}${proofType.charAt(0).toUpperCase() + proofType.slice(1)}`
-    const reasonText = this[`${key}Value`]
-    
-    if (reasonText) {
-      this.reasonFieldTarget.value = reasonText
-      this.reasonFieldTarget.classList.remove('border-red-500')
+    // For medical certification, we use the direct reason values
+    if (proofType === 'medical') {
+      const reasonText = this[`${reasonType}Value`]
+      if (reasonText) {
+        this.reasonFieldTarget.value = reasonText
+        this.reasonFieldTarget.classList.remove('border-red-500')
+      } else {
+        console.warn(`No predefined reason found for ${reasonType}`)
+      }
     } else {
-      console.warn(`No predefined reason found for ${key}`)
+      // For income/residency, use the composite key approach
+      const key = `${reasonType}${proofType.charAt(0).toUpperCase() + proofType.slice(1)}`
+      const reasonText = this[`${key}Value`]
+      
+      if (reasonText) {
+        this.reasonFieldTarget.value = reasonText
+        this.reasonFieldTarget.classList.remove('border-red-500')
+      } else {
+        console.warn(`No predefined reason found for ${key}`)
+      }
     }
   }
 

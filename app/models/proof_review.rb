@@ -38,7 +38,7 @@ class ProofReview < ApplicationRecord
   end
 
   def application_must_be_active
-    errors.add(:application, 'cannot be reviewed when archived') if application&.archived?
+    errors.add(:application, 'cannot be reviewed when archived') if application&.status_archived?
   end
 
   def should_validate_proof_attachment?

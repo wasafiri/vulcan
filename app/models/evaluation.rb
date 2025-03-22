@@ -1,4 +1,7 @@
 class Evaluation < ApplicationRecord
+  include EvaluationStatusManagement
+  include NotificationDelivery
+
   belongs_to :evaluator, class_name: 'Evaluator'
   belongs_to :constituent, class_name: 'Constituent'
   belongs_to :application
@@ -6,11 +9,12 @@ class Evaluation < ApplicationRecord
   has_and_belongs_to_many :recommended_products, class_name: 'Product', join_table: 'evaluations_products'
 
   enum :evaluation_type, { initial: 0, renewal: 1, special: 2 }
-  enum :status, { pending: 0, completed: 1 }, prefix: true
-
+  
   # Simplified validations
   validates :evaluator, presence: true
+  validates :reschedule_reason, presence: true, if: :rescheduling?
   validate :evaluator_must_be_evaluator_type
+  validate :scheduled_time_must_be_future, on: :create
 
   # Conditional validations for completed status
   validates :evaluation_date,
@@ -25,13 +29,17 @@ class Evaluation < ApplicationRecord
 
   validate :validate_attendees_structure, if: :status_completed?
   validate :validate_products_tried_structure, if: :status_completed?
+  validate :cannot_complete_without_notes, if: :will_save_change_to_status?
 
   # Callbacks
+  before_save :set_completed_at, if: :status_changed_to_completed?
+  before_save :ensure_status_schedule_consistency
   after_save :update_application_record, if: :saved_change_to_status?
+  after_save :deliver_notifications, if: :should_deliver_notifications?
 
   # Define method used in controller
   def request_additional_info!
-    update(status: :pending)
+    update(status: :requested)
     Notification.create!(
       recipient: constituent,
       actor: evaluator,
@@ -72,5 +80,42 @@ class Evaluation < ApplicationRecord
     return if evaluator.nil? || evaluator.type == 'Evaluator'
 
     errors.add(:evaluator, 'must be an Evaluator')
+  end
+  
+  def scheduled_time_must_be_future
+    if evaluation_datetime.present? && evaluation_datetime <= Time.current
+      errors.add(:evaluation_datetime, "must be in the future")
+    end
+  end
+
+  def cannot_complete_without_notes
+    if status_changed? && status_completed? && notes.blank?
+      errors.add(:notes, "must be provided when completing evaluation")
+    end
+  end
+
+  def set_completed_at
+    self.evaluation_date = Time.current if status_completed? && evaluation_date.nil?
+  end
+
+  def status_changed_to_completed?
+    status_completed? && status_changed?
+  end
+
+  def should_deliver_notifications?
+    status_changed? || saved_change_to_evaluation_datetime?
+  end
+  
+  def ensure_status_schedule_consistency
+    # If setting a schedule date but still in requested status, update status
+    if evaluation_datetime_changed? && evaluation_datetime.present? && status_requested?
+      self.status = :scheduled
+    end
+    
+    # If removing a schedule date but still in scheduled/confirmed status, prevent it
+    if evaluation_datetime_changed? && evaluation_datetime.blank? && (status_scheduled? || status_confirmed?)
+      errors.add(:evaluation_datetime, "cannot be removed while status is #{status}")
+      throw(:abort)
+    end
   end
 end

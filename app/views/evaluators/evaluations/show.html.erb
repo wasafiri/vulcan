@@ -1,53 +1,334 @@
-<main class="container mx-auto px-4 py-8" role="main">
-  <div class="max-w-7xl mx-auto">
-    <h1 class="text-3xl font-bold mb-6">Evaluation Details</h1>
-
-    <div class="bg-white rounded-lg shadow p-6">
-      <h2 class="text-xl font-semibold mb-4">Application #<%= @evaluation.application_id %></h2>
-      <p>Constituent: <%= @evaluation.constituent.full_name %></p>
-      <p>Evaluation Date: <%= @evaluation.evaluation_date&.strftime("%B %d, %Y") || "No evaluation date" %> </p>
-      <p>Evaluation Type: <%= @evaluation.evaluation_type.capitalize %></p>
-      <p>Status: <%= @evaluation.status.capitalize %></p>
-      <p>Location: <%= @evaluation.location %></p>
-      <p>Needs: <%= @evaluation.needs %></p>
-      <p>Notes: <%= @evaluation.notes %></p>
-
-      <h3 class="text-lg font-semibold mt-4">Attendees</h3>
-      <% if @evaluation.attendees.any? %>
-        <ul class="list-disc pl-5">
-          <% @evaluation.attendees.each do |attendee| %>
-            <li><%= "#{attendee['name']} - #{attendee['relationship']}" %></li>
-          <% end %>
-        </ul>
-      <% else %>
-        <p>No attendees listed.</p>
-      <% end %>
-
-      <h3 class="text-lg font-semibold mt-4">Products Tried by Constituent</h3>
-      <% if @evaluation.products_tried.any? %>
-        <ul class="list-disc pl-5">
-          <% @evaluation.products_tried.each do |product| %>
-            <li><%= "#{Product.find(product['product_id']).name} - #{product['reaction']}" %></li>
-          <% end %>
-        </ul>
-      <% else %>
-        <p>No products tried listed.</p>
-      <% end %>
-
-      <h3 class="text-lg font-semibold mt-4">Recommended Products</h3>
-      <% if @evaluation.recommended_product_ids.any? %>
-        <ul class="list-disc pl-5">
-          <% @evaluation.recommended_product_ids.each do |product_id| %>
-            <li><%= Product.find(product_id).name %></li>
-          <% end %>
-        </ul>
-      <% else %>
-        <p>No recommended products listed.</p>
-      <% end %>
-    </div>
-
-    <div class="mt-8">
-      <%= link_to "Edit Evaluation", edit_evaluators_evaluation_path(@evaluation), class: "text-indigo-600 hover:text-indigo-700 text-sm" %>
+<div class="container mx-auto px-4 py-8">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Evaluation Details</h1>
+    
+    <div>
+      <%= link_to "Back to Evaluations", evaluators_evaluations_path, class: "bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded inline-flex items-center" %>
     </div>
   </div>
-</main>
+
+  <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+    <div class="px-4 py-5 sm:px-6 flex justify-between items-center">
+      <div>
+        <h3 class="text-lg leading-6 font-medium text-gray-900">
+          Evaluation for <%= @evaluation.constituent.full_name %>
+        </h3>
+        <p class="mt-1 max-w-2xl text-sm text-gray-500">
+          Application #<%= @evaluation.application_id %>
+        </p>
+      </div>
+      
+      <!-- Status badge with color coding -->
+      <% status_classes = case @evaluation.status 
+         when 'scheduled' then 'bg-blue-100 text-blue-800'
+         when 'confirmed' then 'bg-green-100 text-green-800'
+         when 'completed' then 'bg-purple-100 text-purple-800'
+         when 'cancelled' then 'bg-yellow-100 text-yellow-800'
+         when 'no_show' then 'bg-red-100 text-red-800'
+         else 'bg-gray-100 text-gray-800'
+         end %>
+      
+      <span class="px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full <%= status_classes %>">
+        <%= @evaluation.status.titleize %>
+      </span>
+    </div>
+    
+    <div class="border-t border-gray-200">
+      <dl>
+        <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+          <dt class="text-sm font-medium text-gray-500">Scheduled For</dt>
+          <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+            <%= @evaluation.evaluation_datetime&.strftime("%B %d, %Y at %I:%M %p") || "Not scheduled" %>
+          </dd>
+        </div>
+
+        <% if @evaluation.evaluation_date.present? %>
+          <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+            <dt class="text-sm font-medium text-gray-500">Completed At</dt>
+            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+              <%= @evaluation.evaluation_date.strftime("%B %d, %Y at %I:%M %p") %>
+            </dd>
+          </div>
+        <% end %>
+        
+        <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+          <dt class="text-sm font-medium text-gray-500">Constituent</dt>
+          <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+            <div>
+              <p><%= @evaluation.constituent.full_name %></p>
+              <p><%= @evaluation.constituent.email %></p>
+              <p><%= @evaluation.constituent.phone %></p>
+            </div>
+          </dd>
+        </div>
+
+        <% if @evaluation.location.present? %>
+          <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+            <dt class="text-sm font-medium text-gray-500">Location</dt>
+            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+              <%= @evaluation.location %>
+            </dd>
+          </div>
+        <% end %>
+        
+        <% if @evaluation.notes.present? %>
+          <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+            <dt class="text-sm font-medium text-gray-500">Notes</dt>
+            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+              <%= simple_format(@evaluation.notes) %>
+            </dd>
+          </div>
+        <% end %>
+        
+        <% if @evaluation.needs.present? %>
+          <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+            <dt class="text-sm font-medium text-gray-500">Needs</dt>
+            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+              <%= @evaluation.needs %>
+            </dd>
+          </div>
+        <% end %>
+        
+        <% if @evaluation.attendees.any? %>
+          <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+            <dt class="text-sm font-medium text-gray-500">Attendees</dt>
+            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+              <ul class="list-disc pl-5">
+                <% @evaluation.attendees.each do |attendee| %>
+                  <li><%= "#{attendee['name']} - #{attendee['relationship']}" %></li>
+                <% end %>
+              </ul>
+            </dd>
+          </div>
+        <% end %>
+        
+        <% if @evaluation.products_tried.any? %>
+          <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+            <dt class="text-sm font-medium text-gray-500">Products Tried</dt>
+            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+              <ul class="list-disc pl-5">
+                <% @evaluation.products_tried.each do |product| %>
+                  <li><%= "#{Product.find(product['product_id']).name} - #{product['reaction']}" %></li>
+                <% end %>
+              </ul>
+            </dd>
+          </div>
+        <% end %>
+        
+        <% if @evaluation.recommended_product_ids.any? %>
+          <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+            <dt class="text-sm font-medium text-gray-500">Recommended Products</dt>
+            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+              <ul class="list-disc pl-5">
+                <% @evaluation.recommended_product_ids.each do |product_id| %>
+                  <li><%= Product.find(product_id).name %></li>
+                <% end %>
+              </ul>
+            </dd>
+          </div>
+        <% end %>
+      </dl>
+    </div>
+  </div>
+
+  <!-- Form sections for managing evaluation - Start -->
+  <div class="mt-8" data-controller="evaluation-management">
+    <% if @evaluation.evaluation_datetime.blank? %>
+      <!-- Initial Schedule Evaluation Form (only if not scheduled yet) -->
+      <div class="bg-white shadow rounded-lg mb-6">
+        <div class="px-4 py-5 sm:p-6">
+          <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+            Schedule Initial Evaluation
+          </h3>
+          
+          <%= form_with(url: schedule_evaluators_evaluation_path(@evaluation), method: :post, local: true, class: "space-y-4") do |f| %>
+            <div>
+              <%= f.label :evaluation_datetime, "Evaluation Date/Time", class: "block text-sm font-medium text-gray-700" %>
+              <%= f.datetime_local_field :evaluation_datetime, value: 1.week.from_now.strftime('%Y-%m-%dT%H:%M'), class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm", required: true %>
+              <p class="mt-1 text-sm text-gray-500">Please select a date and time for the initial evaluation session.</p>
+            </div>
+            
+            <div>
+              <%= f.label :location, "Location", class: "block text-sm font-medium text-gray-700" %>
+              <%= f.text_field :location, class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" %>
+            </div>
+            
+            <div>
+              <%= f.label :notes, "Notes", class: "block text-sm font-medium text-gray-700" %>
+              <%= f.text_area :notes, rows: 3, class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm", placeholder: "Optional scheduling notes..." %>
+            </div>
+            
+            <%= f.submit "Schedule Evaluation", class: "w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" %>
+          <% end %>
+        </div>
+      </div>
+    <% elsif @evaluation.status_scheduled? || @evaluation.status_confirmed? %>
+      <!-- Manage Evaluation Form - Combined status update and completion -->
+      <div class="bg-white shadow rounded-lg mb-6">
+        <div class="px-4 py-5 sm:p-6">
+          <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+            Manage Evaluation
+          </h3>
+          
+          <%= form_with(url: update_evaluators_evaluation_path(@evaluation), method: :patch, local: true, class: "space-y-4") do |f| %>
+            <div>
+              <%= f.label :status, "Status", class: "block text-sm font-medium text-gray-700" %>
+              <%= f.select :status, 
+                 options_for_select([
+                   ['Scheduled', 'scheduled'],
+                   ['Confirmed', 'confirmed'],
+                   ['Completed', 'completed'],
+                   ['Cancelled', 'cancelled'],
+                   ['No Show', 'no_show']
+                 ], @evaluation.status),
+                 {}, 
+                 { class: "mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md",
+                   data: { evaluation_management_target: "statusSelect", action: "change->evaluation-management#toggleFieldsBasedOnStatus" } } %>
+            </div>
+            
+            <div>
+              <%= f.label :notes, "Notes", class: "block text-sm font-medium text-gray-700" %>
+              <%= f.text_area :notes, value: @evaluation.notes, rows: 3, class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm", placeholder: "Evaluation notes..." %>
+            </div>
+            
+            <!-- Fields that are only required when completing the evaluation -->
+            <div data-evaluation-management-target="completionFields" class="<%= @evaluation.status_completed? ? '' : 'hidden' %>">
+              <div>
+                <%= f.label :location, "Location", class: "block text-sm font-medium text-gray-700" %>
+                <%= f.text_field :location, value: @evaluation.location, class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm", data: { completion_required: true } %>
+              </div>
+              
+              <div>
+                <%= f.label :needs, "Needs", class: "block text-sm font-medium text-gray-700" %>
+                <%= f.text_field :needs, value: @evaluation.needs, class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm", data: { completion_required: true } %>
+              </div>
+              
+              <div>
+                <%= f.label :attendees_field, "Attendees", class: "block text-sm font-medium text-gray-700" %>
+                <%= f.text_field :attendees_field, value: @evaluation.attendees.map { |a| "#{a['name']} - #{a['relationship']}" }.join(", "), class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm", placeholder: "Name - Relationship, Name - Relationship", data: { completion_required: true } %>
+                <p class="mt-1 text-sm text-gray-500">Format: Name - Relationship, separate multiple attendees with commas</p>
+              </div>
+              
+              <div>
+                <%= f.label :products_tried_field, "Products Tried", class: "block text-sm font-medium text-gray-700" %>
+                <%= f.select :products_tried_field, 
+                   options_for_select(Product.all.map { |p| [p.name, p.id] }, @evaluation.products_tried.map { |p| p['product_id'] }),
+                   { include_blank: 'Select products...' }, 
+                   { multiple: true, class: "mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md", data: { completion_required: true } } %>
+                <p class="mt-1 text-sm text-gray-500">Hold Ctrl/Cmd to select multiple products</p>
+              </div>
+              
+              <div>
+                <%= f.label :recommended_product_ids, "Recommended Products", class: "block text-sm font-medium text-gray-700" %>
+                <%= f.select :recommended_product_ids, 
+                   options_for_select(Product.all.map { |p| [p.name, p.id] }, @evaluation.recommended_product_ids),
+                   { include_blank: 'Select recommended products...' }, 
+                   { multiple: true, class: "mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md", data: { completion_required: true } } %>
+                <p class="mt-1 text-sm text-gray-500">Hold Ctrl/Cmd to select multiple products</p>
+              </div>
+            </div>
+            
+            <%= f.submit "Update Evaluation", class: "w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+          <% end %>
+        </div>
+      </div>
+      
+      <!-- Reschedule Evaluation Form -->
+      <div class="bg-white shadow rounded-lg mb-6">
+        <div class="px-4 py-5 sm:p-6">
+          <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+            Reschedule Evaluation
+          </h3>
+          
+          <%= form_with(url: reschedule_evaluators_evaluation_path(@evaluation), method: :post, local: true, class: "space-y-4") do |f| %>
+            <div>
+              <%= f.label :evaluation_datetime, "New Date/Time", class: "block text-sm font-medium text-gray-700" %>
+              <%= f.datetime_local_field :evaluation_datetime, value: @evaluation.evaluation_datetime&.strftime('%Y-%m-%dT%H:%M'), class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm", required: true %>
+            </div>
+            
+            <div>
+              <%= f.label :location, "Location", class: "block text-sm font-medium text-gray-700" %>
+              <%= f.text_field :location, value: @evaluation.location, class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" %>
+            </div>
+            
+            <div>
+              <%= f.label :reschedule_reason, "Reason for Rescheduling (required)", class: "block text-sm font-medium text-gray-700" %>
+              <%= f.text_area :reschedule_reason, rows: 3, class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm", required: true, placeholder: "Please provide a reason for rescheduling this evaluation session..." %>
+            </div>
+            
+            <%= f.submit "Reschedule Evaluation", class: "w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500" %>
+          <% end %>
+        </div>
+      </div>
+    <% elsif @evaluation.status_completed? %>
+      <!-- Update Evaluation Notes for Completed Sessions -->
+      <div class="bg-white shadow rounded-lg mb-6">
+        <div class="px-4 py-5 sm:p-6">
+          <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+            Update Evaluation Notes
+          </h3>
+          
+          <div class="bg-green-50 p-4 rounded-md mb-4">
+            <div class="flex">
+              <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+              </div>
+              <div class="ml-3">
+                <p class="text-sm font-medium text-green-800">
+                  This evaluation session has been completed on <%= @evaluation.evaluation_date&.strftime("%B %d, %Y") %>.
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <%= form_with(url: update_evaluators_evaluation_path(@evaluation), method: :patch, local: true, class: "space-y-4") do |f| %>
+            <%= f.hidden_field :status, value: @evaluation.status %>
+            
+            <div>
+              <%= f.label :notes, "Evaluation Notes", class: "block text-sm font-medium text-gray-700" %>
+              <%= f.text_area :notes, value: @evaluation.notes, rows: 6, class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" %>
+            </div>
+            
+            <%= f.submit "Update Notes", class: "w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+          <% end %>
+        </div>
+      </div>
+    <% else %>
+      <!-- No Show or Cancelled - Allow Rescheduling -->
+      <div class="bg-white shadow rounded-lg mb-6">
+        <div class="px-4 py-5 sm:p-6">
+          <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+            Reschedule Evaluation
+          </h3>
+          
+          <%= form_with(url: reschedule_evaluators_evaluation_path(@evaluation), method: :post, local: true, class: "space-y-4") do |f| %>
+            <div>
+              <%= f.label :evaluation_datetime, "New Date/Time", class: "block text-sm font-medium text-gray-700" %>
+              <%= f.datetime_local_field :evaluation_datetime, value: 1.week.from_now.strftime('%Y-%m-%dT%H:%M'), class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm", required: true %>
+            </div>
+            
+            <div>
+              <%= f.label :location, "Location", class: "block text-sm font-medium text-gray-700" %>
+              <%= f.text_field :location, value: @evaluation.location, class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" %>
+            </div>
+            
+            <div>
+              <%= f.label :reschedule_reason, "Reason for Rescheduling (required)", class: "block text-sm font-medium text-gray-700" %>
+              <%= f.text_area :reschedule_reason, rows: 3, class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm", required: true, placeholder: "Please provide a reason for rescheduling this evaluation session..." %>
+            </div>
+            
+            <%= f.submit "Reschedule Evaluation", class: "w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" %>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+  <!-- Form sections for managing evaluation - End -->
+  
+  <!-- Link to view the full application -->
+  <div class="mt-6 text-right">
+    <%= link_to "View Full Application", admin_application_path(@evaluation.application), class: "text-indigo-600 hover:text-indigo-900" %>
+  </div>
+</div>

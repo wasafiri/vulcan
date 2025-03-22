@@ -1,3 +1,26 @@
+<%
+  # Cache the current_user and derive all values once to avoid multiple DB queries
+  user = current_user
+  
+  # Set up navigation links once
+  navigation_links = [
+    ["Home", root_path],
+    ["About", "/about"],
+    ["Contact", "/contact"]
+  ]
+  
+  # Determine dashboard path once if user is logged in
+  if user
+    dashboard_path = case user
+      when Admin then admin_applications_path
+      when Constituent then constituent_dashboard_path
+      when Evaluator then evaluators_dashboard_path
+      when Vendor then vendor_dashboard_path
+      else admin_applications_path
+    end
+  end
+%>
+
 <header data-controller="mobile-menu" class="relative z-30">
   <nav class="bg-white shadow" role="navigation" aria-label="Main Navigation">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -42,10 +65,6 @@
         <div class="hidden md:flex md:items-center md:justify-between md:flex-1 md:ml-10">
           <nav aria-label="Primary Navigation">
             <ul class="flex space-x-4" role="menubar">
-              <% navigation_links = [
-
-              ] %>
-              
               <% navigation_links.each do |text, path| %>
                 <li role="none">
                   <%= link_to text, 
@@ -59,18 +78,12 @@
 
           <!-- Auth Links -->
           <div class="flex items-center space-x-4">
-            <% if current_user %>
+            <% if user %>
               <div class="flex items-center space-x-4">
                 <span class="text-gray-700 text-sm" aria-label="Welcome message">
-                  Hello, <%= current_user.first_name %>
+                  Hello, <%= user.first_name %>
                 </span>
-                <%= link_to (case current_user
-                    when Admin then admin_applications_path
-                    when Constituent then constituent_dashboard_path
-                    when Evaluator then evaluators_dashboard_path
-                    when Vendor then vendor_dashboard_path
-                    else admin_applications_path
-                    end),
+                <%= link_to dashboard_path,
                     class: "px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
                     aria: { label: "Go to your dashboard" } do %>
                   Dashboard
@@ -116,19 +129,13 @@
       </div>
 
       <div class="pt-4 pb-3 border-t border-gray-200">
-        <% if current_user %>
+        <% if user %>
           <div class="px-4 py-2">
             <p class="text-base font-medium text-gray-800">
-              Hello, <%= current_user.first_name %>
+              Hello, <%= user.first_name %>
             </p>
             <%= link_to "Dashboard",
-                (case current_user
-                when Admin then admin_applications_path
-                when Constituent then constituent_dashboard_path
-                when Evaluator then evaluators_dashboard_path
-                when Vendor then vendor_dashboard_path
-                else admin_applications_path
-                end),
+                dashboard_path,
                 class: "mt-2 block w-full px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
                 role: "menuitem",
                 aria: { label: "Go to your dashboard" } %>

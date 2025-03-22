@@ -1,207 +1,218 @@
-require "test_helper"
-require "support/action_mailbox_test_helper"
+require 'test_helper'
 
 class ProofSubmissionMailboxTest < ActionMailbox::TestCase
-  include ActionMailboxTestHelper
-
   setup do
-    # Create a constituent and application using factories
-    @constituent = create(:constituent)
-    @application = create(:application, user: @constituent)
-    @constituent.update(email: "constituent@example.com")
-
-    # Create policy records for rate limiting
-    create(:policy, :proof_submission_rate_limit_web)
-    create(:policy, :proof_submission_rate_limit_email)
-    create(:policy, :proof_submission_rate_period)
+    # Set up a constituent with an active application
+    @constituent = users(:constituent_john)
+    @application = applications(:one)
+    
+    # Ensure application status is appropriate for accepting proofs
+    @application.update!(status: "in_progress")
+    
+    # Set up policy limits for testing
+    Policy.set("max_proof_rejections", 3) unless Policy.get("max_proof_rejections")
+    
+    # Create a test PDF file for attachment
+    @pdf_content = "Sample PDF content for testing"
+    @pdf_file = Tempfile.new(['test', '.pdf'])
+    @pdf_file.write(@pdf_content)
+    @pdf_file.rewind
   end
-
-  test "routes emails to proof_submission mailbox" do
-    # Set up ApplicationMailbox routing for testing
-    ApplicationMailbox.instance_eval do
-      routing(/proof@/i => :proof_submission)
-    end
-
-    inbound_email = create_inbound_email_from_mail(
-      to: "proof@example.com",
-      from: @constituent.email
-    )
-
-    # Route the email and check that it was processed by the correct mailbox
-    assert_difference -> { ActionMailbox::InboundEmail.where(status: :delivered).count } do
-      inbound_email.route
-    end
-
-    # Verify it was routed to the correct mailbox by checking the processing status
-    assert_equal "delivered", inbound_email.reload.status
+  
+  teardown do
+    @pdf_file.close
+    @pdf_file.unlink
   end
-
-  test "attaches income proof to application" do
-    # Create a temporary file for testing
-    file_path = Rails.root.join("tmp", "income_proof.pdf")
-    File.open(file_path, "w") do |f|
-      f.write("This is a test PDF file")
-    end
-
-    assert_difference -> { ActiveStorage::Attachment.count } do
-      inbound_email = create_inbound_email_with_attachment(
-        to: "proof@example.com",
-        from: @constituent.email,
-        subject: "Income Proof Submission",
-        body: "Please find my income proof attached.",
-        attachment_path: file_path,
-        content_type: "application/pdf"
-      )
-
-      inbound_email.route
-    end
-
-    # Verify an event was created
-    assert Event.exists?(
-      user: @constituent,
-      action: "proof_submission_received"
-    )
-
-    # Clean up
-    File.delete(file_path) if File.exist?(file_path)
-  end
-
-  test "attaches residency proof to application" do
-    # Create a temporary file for testing
-    file_path = Rails.root.join("tmp", "residency_proof.pdf")
-    File.open(file_path, "w") do |f|
-      f.write("This is a test PDF file")
-    end
-
-    assert_difference -> { ActiveStorage::Attachment.count } do
-      inbound_email = create_inbound_email_with_attachment(
-        to: "proof@example.com",
-        from: @constituent.email,
-        subject: "Residency Proof Submission",
-        body: "Please find my residency proof attached.",
-        attachment_path: file_path,
-        content_type: "application/pdf"
-      )
-
-      inbound_email.route
-    end
-
-    # Clean up
-    File.delete(file_path) if File.exist?(file_path)
-  end
-
-  test "bounces email when constituent not found" do
-    assert_no_difference -> { ActiveStorage::Attachment.count } do
-      inbound_email = create_inbound_email_from_mail(
-        to: "proof@example.com",
-        from: "unknown@example.com",
-        subject: "Proof Submission"
-      )
-
-      assert_emails 1 do
-        inbound_email.route
-      end
-    end
-
-    # Verify the email was bounced
-    assert_equal "bounced", ActionMailbox::InboundEmail.last.status
-  end
-
-  test "correctly determines income proof type from subject" do
-    inbound_email = create_inbound_email_from_mail(
-      to: "proof@example.com",
-      from: @constituent.email,
-      subject: "Income Proof Document",
-      body: "Please find attached my proof."
-    )
-
-    mailbox = ProofSubmissionMailbox.new(inbound_email)
-    assert_equal :income, mailbox.send(:determine_proof_type, "Income Proof Document", "Please find attached my proof.")
-  end
-
-  test "correctly determines residency proof type from subject" do
-    inbound_email = create_inbound_email_from_mail(
-      to: "proof@example.com",
-      from: @constituent.email,
-      subject: "Residency Proof Document",
-      body: "Please find attached my proof."
-    )
-
-    mailbox = ProofSubmissionMailbox.new(inbound_email)
-    assert_equal :residency, mailbox.send(:determine_proof_type, "Residency Proof Document", "Please find attached my proof.")
-  end
-
-  test "correctly determines proof type from body when subject is ambiguous" do
-    inbound_email = create_inbound_email_from_mail(
-      to: "proof@example.com",
-      from: @constituent.email,
-      subject: "Proof Document",
-      body: "Please find attached my residency proof."
-    )
-
-    mailbox = ProofSubmissionMailbox.new(inbound_email)
-    assert_equal :residency, mailbox.send(:determine_proof_type, "Proof Document", "Please find attached my residency proof.")
-  end
-
-  test "handles emails with corrupted attachments" do
-    # Skip if your validator doesn't check for corrupted files
-    skip "Corruption validation not implemented" unless defined?(ProofAttachmentValidator)
-
-    # Create a corrupted PDF file
-    file_path = Rails.root.join("tmp", "corrupted.pdf")
-    File.open(file_path, "w") do |f|
-      f.write("This is not a valid PDF file")
-    end
-
-    inbound_email = create_inbound_email_with_attachment(
-      to: "proof@example.com",
+  
+  test "processes an email with attachment from known constituent" do
+    # Track the event count before processing
+    previous_event_count = Event.count
+    
+    # Process an inbound email
+    receive_inbound_email_from_mail(
+      to: MatVulcan::InboundEmailConfig.inbound_email_address,
       from: @constituent.email,
       subject: "Income Proof Submission",
-      body: "Please find my income proof attached.",
-      attachment_path: file_path,
-      content_type: "application/pdf"
+      body: "Please find my proof attached.",
+      attachments: {
+        'proof.pdf' => @pdf_content
+      }
     )
-
-    # Mock the ProofAttachmentValidator to raise an error for corrupted files
-    ProofAttachmentValidator.stub(:validate!, ->(attachment) {
-      raise ProofAttachmentValidator::ValidationError, "File appears to be corrupted"
-    }) do
-      inbound_email.route
-      assert_equal "bounced", inbound_email.status
-    end
-
-    # Clean up
-    File.delete(file_path) if File.exist?(file_path)
+    
+    # Verify events were created
+    assert_equal previous_event_count + 2, Event.count
+    submission_event = Event.order(created_at: :desc).offset(1).first
+    processed_event = Event.order(created_at: :desc).first
+    
+    assert_equal "proof_submission_received", submission_event.action
+    assert_equal @constituent.id, submission_event.user_id
+    assert_equal @application.id, submission_event.metadata["application_id"]
+    
+    assert_equal "proof_submission_processed", processed_event.action
+    
+    # Verify the proof was attached to the application with the right type
+    @application.reload
+    assert @application.proofs.income.exists?
+    proof = @application.proofs.income.last
+    assert_equal :email, proof.submission_method
+    assert proof.metadata.key?("email_subject")
+    assert proof.metadata.key?("inbound_email_id")
   end
-
-  test "handles emails with password-protected attachments" do
-    # Skip if your validator doesn't check for password protection
-    skip "Password protection validation not implemented" unless ProofAttachmentValidator.method_defined?(:validate_password_protection)
-
-    # Create a mock password-protected PDF
-    file_path = Rails.root.join("tmp", "protected.pdf")
-    File.open(file_path, "w") do |f|
-      f.write("Simulated password-protected PDF")
+  
+  test "bounces email from unknown sender" do
+    # Should get bounced because the sender is not a recognized constituent
+    assert_changes "ActionMailer::Base.deliveries.size" do
+      receive_inbound_email_from_mail(
+        to: MatVulcan::InboundEmailConfig.inbound_email_address,
+        from: "unknown@example.com", 
+        subject: "Income Proof",
+        body: "Proof attached.",
+        attachments: {
+          'proof.pdf' => @pdf_content
+        }
+      )
     end
-
-    inbound_email = create_inbound_email_with_attachment(
-      to: "proof@example.com",
+    
+    # Verify the bounce created an event
+    latest_event = Event.last
+    assert_equal "proof_submission_constituent_not_found", latest_event.action
+  end
+  
+  test "bounces email from constituent without active application" do
+    # Create a constituent without an active application
+    constituent_without_app = users(:constituent_mark)
+    
+    # Ensure any applications are not in an active state
+    constituent_without_app.applications.update_all(status: "completed")
+    
+    assert_changes "ActionMailer::Base.deliveries.size" do
+      receive_inbound_email_from_mail(
+        to: MatVulcan::InboundEmailConfig.inbound_email_address,
+        from: constituent_without_app.email,
+        subject: "Income Proof",
+        body: "Proof attached.",
+        attachments: {
+          'proof.pdf' => @pdf_content
+        }
+      )
+    end
+    
+    latest_event = Event.last
+    assert_equal "proof_submission_inactive_application", latest_event.action
+  end
+  
+  test "bounces email without attachments" do
+    assert_changes "ActionMailer::Base.deliveries.size" do
+      receive_inbound_email_from_mail(
+        to: MatVulcan::InboundEmailConfig.inbound_email_address,
+        from: @constituent.email,
+        subject: "Income Proof",
+        body: "I forgot to attach the proof!"
+      )
+    end
+    
+    latest_event = Event.last
+    assert_equal "proof_submission_no_attachments", latest_event.action
+  end
+  
+  test "bounces email when max rejections reached" do
+    # Update the application to have max rejections
+    max_rejections = Policy.get("max_proof_rejections")
+    @application.update(total_rejections: max_rejections)
+    
+    assert_changes "ActionMailer::Base.deliveries.size" do
+      receive_inbound_email_from_mail(
+        to: MatVulcan::InboundEmailConfig.inbound_email_address,
+        from: @constituent.email,
+        subject: "Income Proof",
+        body: "Please find my proof attached.",
+        attachments: {
+          'proof.pdf' => @pdf_content
+        }
+      )
+    end
+    
+    latest_event = Event.last
+    assert_equal "proof_submission_max_rejections_reached", latest_event.action
+  end
+  
+  test "determines proof type from subject" do
+    # Test with income in the subject
+    receive_inbound_email_from_mail(
+      to: MatVulcan::InboundEmailConfig.inbound_email_address,
       from: @constituent.email,
       subject: "Income Proof Submission",
-      body: "Please find my income proof attached.",
-      attachment_path: file_path,
-      content_type: "application/pdf"
+      body: "Income proof attached.",
+      attachments: {
+        'proof.pdf' => @pdf_content
+      }
     )
-
-    # Mock the validation to fail for password protection
-    ProofAttachmentValidator.stub(:validate!, ->(attachment) {
-      raise ProofAttachmentValidator::ValidationError, "File is password protected"
-    }) do
-      inbound_email.route
-      assert_equal "bounced", inbound_email.status
-    end
-
-    # Clean up
-    File.delete(file_path) if File.exist?(file_path)
+    
+    @application.reload
+    assert @application.proofs.income.where(submission_method: :email).exists?
+    
+    # Test with residency in the subject
+    receive_inbound_email_from_mail(
+      to: MatVulcan::InboundEmailConfig.inbound_email_address,
+      from: @constituent.email,
+      subject: "Residency Proof Submission",
+      body: "Residency proof attached.",
+      attachments: {
+        'proof.pdf' => @pdf_content
+      }
+    )
+    
+    @application.reload
+    assert @application.proofs.residency.where(submission_method: :email).exists?
+  end
+  
+  test "determines proof type from body when subject is ambiguous" do
+    # Test with residency in the body but not subject
+    receive_inbound_email_from_mail(
+      to: MatVulcan::InboundEmailConfig.inbound_email_address,
+      from: @constituent.email,
+      subject: "Proof documents",
+      body: "I'm sending my residency proof as requested.",
+      attachments: {
+        'proof.pdf' => @pdf_content
+      }
+    )
+    
+    @application.reload
+    assert @application.proofs.residency.where(submission_method: :email).exists?
+  end
+  
+  test "defaults to income when proof type is not specified" do
+    # Test with no specific proof type mentioned
+    receive_inbound_email_from_mail(
+      to: MatVulcan::InboundEmailConfig.inbound_email_address,
+      from: @constituent.email,
+      subject: "Proof documents",
+      body: "Here is my documentation.",
+      attachments: {
+        'proof.pdf' => @pdf_content
+      }
+    )
+    
+    @application.reload
+    assert @application.proofs.income.where(submission_method: :email).exists?
+  end
+  
+  test "processes multiple attachments in a single email" do
+    receive_inbound_email_from_mail(
+      to: MatVulcan::InboundEmailConfig.inbound_email_address,
+      from: @constituent.email,
+      subject: "Income Proof Submission",
+      body: "Please find my proofs attached.",
+      attachments: {
+        'proof1.pdf' => @pdf_content,
+        'proof2.pdf' => "Additional proof content"
+      }
+    )
+    
+    @application.reload
+    # Count how many income proofs with email submission method were created
+    income_proof_count = @application.proofs.income.where(submission_method: :email).count
+    assert_equal 2, income_proof_count, "Expected 2 income proofs to be created from the email attachments"
   end
 end

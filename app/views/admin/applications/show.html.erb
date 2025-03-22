@@ -271,11 +271,23 @@
         
         <!-- Action Buttons -->
         <div class="mt-6">
+          <% request_count = @application.medical_certification_request_count || 0 %>
+          <% latest_request = Notification.where(
+               notifiable: @application, 
+               action: "medical_certification_requested"
+             ).order(created_at: :desc).first %>
+          <% latest_reject = Notification.where(
+               notifiable: @application, 
+               action: "medical_certification_rejected"
+             ).order(created_at: :desc).first %>
+         
+          <% # Check if we have both a request and a rejection, and if the request is more recent than the rejection %>
+          <% requested_after_rejection = latest_request.present? && latest_reject.present? && latest_request.created_at > latest_reject.created_at %>
+          
           <% if @application.medical_certification_status == "not_requested" || 
                 @application.medical_certification_status == "rejected" ||
-                @application.medical_certification_status == "requested" %>
+                (@application.medical_certification_status == "requested" && !@application.medical_certification.attached?) %>
             <!-- Send Request button -->
-            <% request_count = @application.medical_certification_request_count || 0 %>
             <% button_text = request_count.zero? ? "Send Request" : "Resend Request" %>
             <%= button_to resend_medical_certification_admin_application_path(@application),
                 method: :post,
@@ -285,8 +297,10 @@
                 } do %>
               <%= button_text %>
             <% end %>
-          <% elsif @application.medical_certification_status == "received" %>
-            <!-- Review button -->
+          <% elsif @application.medical_certification_status == "received" || 
+                 (@application.medical_certification_status == "requested" && @application.medical_certification.attached?) ||
+                 requested_after_rejection %>
+            <!-- Review button - Show this when we have a certification to review OR when a new request was sent after rejection -->
             <button type="button"
                   data-action="click->modal#open"
                   data-modal-id="medicalCertificationReviewModal"
@@ -295,8 +309,9 @@
             </button>
           <% elsif @application.medical_certification.attached? && 
                   (@application.medical_certification_status == "accepted" || 
-                   @application.medical_certification_status == "approved") %>
-            <!-- View button -->
+                   @application.medical_certification_status == "approved") &&
+                  !requested_after_rejection %>
+            <!-- View button - Only show this for accepted certificates without a subsequent request -->
             <%= link_to rails_blob_path(@application.medical_certification, disposition: :inline),
                 target: "_blank",
                 rel: "noopener noreferrer",

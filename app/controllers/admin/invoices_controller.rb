@@ -35,9 +35,9 @@ class Admin::InvoicesController < Admin::BaseController
 
   def update
     if @invoice.update(invoice_params)
-      notice = if @invoice.saved_change_to_status? && @invoice.approved?
+      notice = if @invoice.saved_change_to_status? && @invoice.invoice_approved?
                  'Invoice approved successfully'
-               elsif @invoice.saved_change_to_status? && @invoice.paid?
+               elsif @invoice.saved_change_to_status? && @invoice.invoice_paid?
                  'Payment details recorded successfully'
                else
                  'Invoice updated successfully'

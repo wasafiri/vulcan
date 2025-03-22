@@ -1,79 +1,176 @@
-<main class="container mx-auto px-4 py-8" role="main">
-  <div class="max-w-7xl mx-auto">
-    <h1 class="text-3xl font-bold mb-6">Evaluator Dashboard</h1>
+<div class="container mx-auto px-4 py-8">
+  <h1 class="text-2xl font-bold mb-6">Evaluations Dashboard</h1>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <!-- Pending Evaluations Card -->
-      <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-xl font-semibold mb-4">Pending Evaluations</h2>
-        <% if @pending_evaluations.any? %>
-          <ul class="space-y-2">
-            <% @pending_evaluations.each do |evaluation| %>
-              <li>
-                <%= link_to evaluators_evaluation_path(evaluation), 
-                    class: "text-indigo-600 hover:text-indigo-700 text-sm" do %>
-                  <%= "Application ##{evaluation.application_id}" %>
-                  <span class="text-gray-500 ml-2">
-                    <%= evaluation.created_at.strftime("%B %d, %Y") %>
-                  </span>
-                <% end %>
-              </li>
-            <% end %>
-          </ul>
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <!-- Summary Cards -->
+    <div class="bg-white shadow rounded-lg p-5">
+      <h2 class="text-lg font-semibold text-gray-700 mb-3">Requested Evaluations</h2>
+      <p class="text-3xl font-bold text-purple-600"><%= @requested_evaluations.count %></p>
+      <p class="text-sm text-gray-500 mt-1">New evaluation requests</p>
+      <div class="mt-3">
+        <% if current_user.admin? %>
+          <%= link_to "View All", evaluators_evaluations_path(scope: "mine", status: "requested"), class: "inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium transition-colors duration-200 text-sm" %>
         <% else %>
-          <p class="text-gray-500 text-sm">No pending evaluations</p>
+          <%= link_to "View All", requested_evaluators_evaluations_path, class: "inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium transition-colors duration-200 text-sm" %>
         <% end %>
       </div>
-
-      <!-- Completed Evaluations Card -->
-      <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-xl font-semibold mb-4">Completed Evaluations</h2>
-        <% if @completed_evaluations.any? %>
-          <ul class="space-y-2">
-            <% @completed_evaluations.each do |evaluation| %>
-              <li>
-                <%= link_to evaluators_evaluation_path(evaluation), 
-                    class: "text-green-600 hover:text-green-700 text-sm" do %>
-                  <%= "Application ##{evaluation.application_id}" %>
-                  <span class="text-gray-500 ml-2">
-                    <%= evaluation.created_at.strftime("%B %d, %Y") %>
-                  </span>
-                <% end %>
-              </li>
-            <% end %>
-          </ul>
+    </div>
+    
+    <div class="bg-white shadow rounded-lg p-5">
+      <h2 class="text-lg font-semibold text-gray-700 mb-3">Scheduled Evaluations</h2>
+      <p class="text-3xl font-bold text-blue-600"><%= @scheduled_evaluations.count %></p>
+      <p class="text-sm text-gray-500 mt-1">Upcoming evaluations</p>
+      <div class="mt-3">
+        <% if current_user.admin? %>
+          <%= link_to "View All", evaluators_evaluations_path(scope: "mine", status: "scheduled"), class: "inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium transition-colors duration-200 text-sm" %>
         <% else %>
-          <p class="text-gray-500 text-sm">No completed evaluations</p>
-        <% end %>
-      </div>
-
-      <!-- Assigned Constituents Card -->
-      <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-xl font-semibold mb-4">Assigned Constituents</h2>
-        <% if @assigned_constituents.any? %>
-          <ul class="space-y-2">
-            <% @assigned_constituents.each do |constituent| %>
-              <li class="text-sm">
-                <%= constituent.full_name %>
-                <span class="text-gray-500 ml-2">
-                  <%= constituent.email %>
-                </span>
-              </li>
-            <% end %>
-          </ul>
-        <% else %>
-          <p class="text-gray-500 text-sm">No assigned constituents</p>
+          <%= link_to "View All", scheduled_evaluators_evaluations_path, class: "inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium transition-colors duration-200 text-sm" %>
         <% end %>
       </div>
     </div>
 
-    <!-- Recent Activity Section -->
-    <section class="mt-8">
-      <h2 class="text-2xl font-bold mb-4">Recent Activity</h2>
-      <div class="bg-white rounded-lg shadow p-6">
-        <!-- You can add a more detailed recent activity log here -->
-        <p class="text-gray-500 text-sm">No recent activity</p>
+    <div class="bg-white shadow rounded-lg p-5">
+      <h2 class="text-lg font-semibold text-gray-700 mb-3">Completed Evaluations</h2>
+      <p class="text-3xl font-bold text-green-600"><%= @completed_evaluations.count %></p>
+      <p class="text-sm text-gray-500 mt-1">Evaluations completed</p>
+      <div class="mt-3">
+        <% if current_user.admin? %>
+          <%= link_to "View All", evaluators_evaluations_path(scope: "mine", status: "completed"), class: "inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium transition-colors duration-200 text-sm" %>
+        <% else %>
+          <%= link_to "View All", completed_evaluators_evaluations_path, class: "inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium transition-colors duration-200 text-sm" %>
+        <% end %>
       </div>
-    </section>
+    </div>
+
+    <div class="bg-white shadow rounded-lg p-5">
+      <h2 class="text-lg font-semibold text-gray-700 mb-3">Needs Follow-up</h2>
+      <p class="text-3xl font-bold text-yellow-600"><%= @followup_evaluations.count %></p>
+      <p class="text-sm text-gray-500 mt-1">Cancellations and no-shows</p>
+      <div class="mt-3">
+        <% if current_user.admin? %>
+          <%= link_to "View All", evaluators_evaluations_path(scope: "mine", status: "cancelled"), class: "inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium transition-colors duration-200 text-sm" %>
+        <% else %>
+          <%= link_to "View All", needs_followup_evaluators_evaluations_path, class: "inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium transition-colors duration-200 text-sm" %>
+        <% end %>
+      </div>
+    </div>
   </div>
-</main>
+
+  <!-- Requested Evaluations -->
+  <div class="bg-white shadow rounded-lg p-6 mb-8">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-semibold">Requested Evaluations</h2>
+      <%= link_to "View All", requested_evaluators_evaluations_path, class: "text-blue-600 hover:text-blue-800" %>
+    </div>
+
+    <% if @requested_evaluations_display.any? %>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Requested Date</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Constituent</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <% @requested_evaluations_display.each do |evaluation| %>
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <%= evaluation.created_at.strftime("%B %d, %Y") %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <%= evaluation.constituent.full_name %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                    <%= evaluation.status.titleize %>
+                  </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <%= link_to "View Details", evaluators_evaluation_path(evaluation), class: "bg-indigo-600 hover:bg-indigo-700 text-white py-1 px-3 rounded-md inline-block transition-colors duration-200" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <p class="text-gray-500 text-center py-4">No requested evaluations found.</p>
+    <% end %>
+  </div>
+
+  <!-- Upcoming Evaluations -->
+  <div class="bg-white shadow rounded-lg p-6 mb-8">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-semibold">Upcoming Evaluations</h2>
+      <%= link_to "View All", scheduled_evaluators_evaluations_path, class: "text-blue-600 hover:text-blue-800" %>
+    </div>
+
+    <% if @upcoming_evaluations.any? %>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date/Time</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Constituent</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <% @upcoming_evaluations.each do |evaluation| %>
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <%= evaluation.evaluation_datetime.strftime("%B %d, %Y at %I:%M %p") %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <%= evaluation.constituent.full_name %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                    <%= evaluation.status.titleize %>
+                  </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <%= link_to "View Details", evaluators_evaluation_path(evaluation), class: "text-indigo-600 hover:text-indigo-900" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <p class="text-gray-500 text-center py-4">No upcoming evaluations scheduled.</p>
+    <% end %>
+  </div>
+
+  <!-- Recent Activity -->
+  <div class="bg-white shadow rounded-lg p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-semibold">Recent Completed Evaluations</h2>
+      <%= link_to "View All", completed_evaluators_evaluations_path, class: "text-blue-600 hover:text-blue-800" %>
+    </div>
+
+    <% if @recent_evaluations.any? %>
+      <div class="space-y-4">
+        <% @recent_evaluations.each do |evaluation| %>
+          <div class="border-b border-gray-200 pb-4 last:border-0 last:pb-0">
+            <div class="flex justify-between items-start">
+              <div>
+                <p class="font-medium"><%= evaluation.constituent.full_name %></p>
+                <p class="text-sm text-gray-500">
+                  Completed: <%= evaluation.evaluation_date&.strftime("%B %d, %Y") || "Unknown" %>
+                </p>
+              </div>
+              <%= link_to "View", evaluators_evaluation_path(evaluation), class: "text-indigo-600 hover:text-indigo-900" %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <p class="text-gray-500 text-center py-4">No completed evaluations yet.</p>
+    <% end %>
+  </div>
+</div>

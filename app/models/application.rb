@@ -54,7 +54,7 @@ class Application < ApplicationRecord
   validates :terms_accepted, :information_verified, :medical_release_authorized,
             acceptance: { accept: true }, if: :submitted?
   validates :medical_provider_name, :medical_provider_phone, :medical_provider_email,
-            presence: true, unless: :draft?
+            presence: true, unless: :status_draft?
   validates :household_size, :annual_income, presence: true
   validates :self_certify_disability, inclusion: { in: [ true, false ] }
   validates :guardian_relationship, presence: true, if: :is_guardian?
@@ -531,8 +531,8 @@ class Application < ApplicationRecord
   def validate_disability?
     # Only validate when transitioning from draft to a submitted state
     # or when already in a submitted state
-    return false if draft?
-    return true if status_changed? && status_was == 'draft'
+    return false if status_draft?
+    return true if saved_change_to_status? && status_before_last_save == 'draft'
     return true if submitted?
 
     false

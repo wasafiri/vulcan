@@ -25,24 +25,24 @@ module ApplicationHelper
   def application_status_badge(application)
     content_tag(:span,
                 badge_label_for(:application, application.status),
-                class: "px-2 py-1 text-sm font-medium rounded-full #{badge_class_for(:application, application.status)}")
+                class: "px-3 py-2 text-sm font-medium rounded-full whitespace-nowrap inline-flex items-center justify-center #{badge_class_for(:application, application.status)}")
   end
 
   def proof_status_badge(_proof_type, status)
     content_tag(:span,
                 badge_label_for(:proof, status),
-                class: "px-2 py-1 text-sm font-medium rounded-full #{badge_class_for(:proof, status)}")
+                class: "px-3 py-2 text-sm font-medium rounded-full whitespace-nowrap inline-flex items-center justify-center #{badge_class_for(:proof, status)}")
   end
 
   def evaluation_status_badge(evaluation)
     content_tag(:span,
                 badge_label_for(:evaluation, evaluation.status),
-                class: "px-2 py-1 text-sm font-medium rounded-full #{badge_class_for(:evaluation, evaluation.status)}")
+                class: "px-3 py-2 text-sm font-medium rounded-full whitespace-nowrap inline-flex items-center justify-center #{badge_class_for(:evaluation, evaluation.status)}")
   end
 
   def training_session_status_badge(session)
     content_tag(:span,
                 badge_label_for(:training_session, session.status),
-                class: "px-2 py-1 text-sm font-medium rounded-full #{badge_class_for(:training_session, session.status)}")
+                class: "px-3 py-2 text-sm font-medium rounded-full whitespace-nowrap inline-flex items-center justify-center #{badge_class_for(:training_session, session.status)}")
   end
 end

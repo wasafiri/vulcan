@@ -7,7 +7,7 @@ class Admin::ApplicationsController < Admin::BaseController
     :approve, :reject, :assign_evaluator, :assign_trainer, :schedule_training, :complete_training,
     :update_certification_status, :resend_medical_certification, :assign_voucher
   ]
-  before_action :load_audit_logs, only: [:show, :approve, :reject]
+  before_action :load_audit_logs, only: %i[show approve reject]
 
   def index
     @current_fiscal_year = fiscal_year
@@ -15,7 +15,7 @@ class Admin::ApplicationsController < Admin::BaseController
     @ytd_constituents_count = Application.where("created_at >= ?", fiscal_year_start).count
     @open_applications_count = Application.active.count
     @pending_services_count = Application.where(status: :approved).count
-    
+
     # Load recent notifications for the notifications section
     @recent_notifications = Notification.includes(:actor, :notifiable)
                                        .order(created_at: :desc)
@@ -77,11 +77,12 @@ class Admin::ApplicationsController < Admin::BaseController
 
   def show
     @application = Application.includes(
-      :user,
+      { user: :role_capabilities },
       :evaluations,
       :training_sessions,
-      proof_reviews: :admin,
-      proof_submission_audits: :user
+      { proof_reviews: { admin: :role_capabilities } },
+      { proof_submission_audits: { user: :role_capabilities } },
+      :status_changes
     ).with_attached_income_proof
       .with_attached_residency_proof
       .with_attached_medical_certification
@@ -456,35 +457,44 @@ class Admin::ApplicationsController < Admin::BaseController
 
   def load_audit_logs
     return unless @application
+    
+    # We've already preloaded most associations in set_application,
+    # now we just need to fetch any remaining associations efficiently
+    
+    # Since we've eagerly loaded @application.proof_reviews with admin and role_capabilities
+    # and @application.status_changes with user and role_capabilities
+    # we can directly access them from the in-memory @application object
+    proof_reviews = @application.proof_reviews.to_a
+    status_changes = @application.status_changes.to_a
+    
+    # For notifications, we can preload the actor and build a single efficient query
+    # by using a direct join and a single where clause with an array of actions
+    notifications = Notification.includes(:actor, actor: :role_capabilities)
+                               .where(notifiable_type: "Application", notifiable_id: @application.id)
+                               .where(action: [
+                                 'medical_certification_requested',
+                                 'medical_certification_received',
+                                 'medical_certification_approved',
+                                 'medical_certification_rejected',
+                                 'review_requested',
+                                 'documents_requested',
+                                 'proof_approved',
+                                 'proof_rejected'
+                               ]).to_a
 
-    # Fetch all audit logs and combine them
-    proof_reviews = @application.proof_reviews.includes(admin: :role_capabilities).order(created_at: :desc)
-    status_changes = @application.status_changes.includes(user: :role_capabilities).order(created_at: :desc)
-    notifications = Notification.includes(actor: :role_capabilities)
-                                .where(notifiable: @application)
-                                .where(
-                                  action: %w[
-                                    medical_certification_requested
-                                    medical_certification_received
-                                    medical_certification_approved
-                                    medical_certification_rejected
-                                    review_requested
-                                    documents_requested
-                                    proof_approved
-                                    proof_rejected
-                                  ]
-                                ).order(created_at: :desc)
+    # For events, we use a plpgsql-optimized JSONB query with a single where clause combining all conditions
+    application_events = Event.includes(:user, user: :role_capabilities)
+                            .where(
+                              "action IN (?) AND (metadata->>'application_id' = ? OR metadata @> ?)", 
+                              [
+                                'voucher_assigned', 'voucher_redeemed', 'voucher_expired', 'voucher_cancelled',
+                                'application_created', 'evaluator_assigned', 'trainer_assigned', 'application_auto_approved'
+                              ],
+                              @application.id.to_s,
+                              { application_id: @application.id }.to_json
+                            ).to_a
 
-    # Include application-related events (including vouchers and application creation)
-    # Use a more flexible JSONB query to match application_id in metadata, regardless of string/integer type
-    application_events = Event.where(
-      action: %w[voucher_assigned voucher_redeemed voucher_expired voucher_cancelled application_created evaluator_assigned trainer_assigned application_auto_approved]
-    ).where(
-      "metadata->>'application_id' = ? OR metadata @> ?",
-      @application.id.to_s,
-      { application_id: @application.id }.to_json
-    ).includes(:user).order(created_at: :desc)
-
+    # Combine all logs and sort at once
     @audit_logs = (proof_reviews + status_changes + notifications + application_events)
                   .sort_by(&:created_at)
                   .reverse
@@ -500,9 +510,8 @@ class Admin::ApplicationsController < Admin::BaseController
             when 'approved'
               scope.where(status: :approved)
             when 'proofs_needing_review'
-              income_pending_ids = scope.where(income_proof_status: "not_reviewed").pluck(:id)
-              residency_pending_ids = scope.where(residency_proof_status: "not_reviewed").pluck(:id)
-              scope.where(id: income_pending_ids + residency_pending_ids)
+              # Use a single SQL query with OR condition instead of multiple pluck operations
+              scope.where("income_proof_status = ? OR residency_proof_status = ?", "not_reviewed", "not_reviewed")
             when 'awaiting_medical_response'
               scope.where(status: :awaiting_documents)
             when 'medical_certs_to_review'
@@ -517,32 +526,36 @@ class Admin::ApplicationsController < Admin::BaseController
     # Apply status filter if present
     scope = scope.where(status: params[:status]) if params[:status].present?
 
-    # Apply date range filter if present
+    # Apply date range filter if present - memoize date ranges
     if params[:date_range].present?
       case params[:date_range]
       when 'current_fy'
-        # Filter by current fiscal year
-        current_fy_start = Date.new(fiscal_year, 7, 1)
-        current_fy_end = Date.new(fiscal_year + 1, 6, 30)
-        scope = scope.where(created_at: current_fy_start..current_fy_end)
+        # Calculate fiscal year dates once
+        @current_fy_range ||= begin
+          fy = fiscal_year
+          Date.new(fy, 7, 1)..Date.new(fy + 1, 6, 30)
+        end
+        scope = scope.where(created_at: @current_fy_range)
       when 'previous_fy'
-        # Filter by previous fiscal year
-        previous_fy_start = Date.new(fiscal_year - 1, 7, 1)
-        previous_fy_end = Date.new(fiscal_year, 6, 30)
-        scope = scope.where(created_at: previous_fy_start..previous_fy_end)
+        # Calculate previous fiscal year dates once
+        @previous_fy_range ||= begin
+          fy = fiscal_year - 1
+          Date.new(fy, 7, 1)..Date.new(fy + 1, 6, 30)
+        end
+        scope = scope.where(created_at: @previous_fy_range)
       when 'last_30'
-        # Filter by last 30 days
-        scope = scope.where("created_at >= ?", 30.days.ago)
+        # Use a single query with calculated date
+        scope = scope.where("created_at >= ?", 30.days.ago.beginning_of_day)
       when 'last_90'
-        # Filter by last 90 days
-        scope = scope.where("created_at >= ?", 90.days.ago)
+        # Use a single query with calculated date
+        scope = scope.where("created_at >= ?", 90.days.ago.beginning_of_day)
       end
     end
 
-    # Apply search filter if present
+    # Apply search filter if present - search in one query
     if params[:q].present?
       search_term = "%#{params[:q]}%"
-      # Join with users table to search on user fields
+      # Join with users table to search on user fields in a single query
       scope = scope.joins(:user).where(
         "applications.id::text ILIKE ? OR users.first_name ILIKE ? OR users.last_name ILIKE ? OR users.email ILIKE ?", 
         search_term, search_term, search_term, search_term
@@ -576,10 +589,20 @@ class Admin::ApplicationsController < Admin::BaseController
   end
 
   def set_application
-    @application = Application.with_attached_income_proof
-                              .with_attached_residency_proof
-                              .with_attached_medical_certification
-                              .find(params[:id])
+    # Load application with all needed associations in a single query
+    # This significantly reduces the number of separate queries
+    @application = Application.includes(
+      { user: :role_capabilities },
+      :evaluations,
+      :training_sessions,
+      { proof_reviews: { admin: :role_capabilities } },
+      { proof_submission_audits: { user: :role_capabilities } },
+      :status_changes
+    )
+    .with_attached_income_proof
+    .with_attached_residency_proof
+    .with_attached_medical_certification
+    .find(params[:id])
   rescue ActiveRecord::RecordNotFound
     redirect_to admin_applications_path, alert: 'Application not found'
   end

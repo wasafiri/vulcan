@@ -16,6 +16,7 @@ one:
   annual_income: 25000
   self_certify_disability: true
   needs_review_since: null
+  submission_method: web
 
 two:
   user: constituent_john
@@ -34,6 +35,7 @@ two:
   annual_income: 20000
   self_certify_disability: true
   needs_review_since: null
+  submission_method: web
 
 # Additional applications from previous fixture
 draft_application:
@@ -50,6 +52,7 @@ draft_application:
   income_proof_status: not_reviewed
   residency_proof_status: not_reviewed
   medical_certification_status: not_requested
+  submission_method: web
 
 submitted_application:
   user: constituent_kenneth
@@ -65,6 +68,7 @@ submitted_application:
   income_proof_status: approved
   residency_proof_status: approved
   medical_certification_status: received
+  submission_method: web
 
 approved_application:
   user: constituent_steven
@@ -80,6 +84,7 @@ approved_application:
   income_proof_status: approved
   residency_proof_status: approved
   medical_certification_status: accepted
+  submission_method: web
 
 submitted_proofs_pending_application:
   user: constituent_alex
@@ -95,6 +100,7 @@ submitted_proofs_pending_application:
   income_proof_status: not_reviewed
   residency_proof_status: not_reviewed
   medical_certification_status: not_requested
+  submission_method: web
 
 awaiting_medical_response_application:
   user: constituent_jane
@@ -110,6 +116,7 @@ awaiting_medical_response_application:
   income_proof_status: approved
   residency_proof_status: approved
   medical_certification_status: not_requested
+  submission_method: paper
 
 new_user_application:
   user: constituent_rex
@@ -125,3 +132,20 @@ new_user_application:
   income_proof_status: approved
   residency_proof_status: not_reviewed
   medical_certification_status: requested
+  submission_method: email
+
+wilbur_application:
+  user: constituent_wilbur
+  application_date: <%= 15.days.ago.strftime("%F %T") %>
+  status: in_progress
+  maryland_resident: true
+  annual_income: "68000"
+  household_size: 4
+  self_certify_disability: true
+  medical_provider_name: "Baltimore Medical Center"
+  medical_provider_phone: "555-444-5555"
+  medical_provider_email: "contact@baltimoremedical.com"
+  income_proof_status: approved
+  residency_proof_status: approved
+  medical_certification_status: received
+  submission_method: paper

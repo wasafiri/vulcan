@@ -11,6 +11,30 @@
       </div>
     </div>
 
+    <!-- Business Information Summary -->
+    <div class="bg-white shadow rounded-lg mb-8">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-medium text-gray-900">Business Information</h2>
+          <%= link_to "Edit Profile", edit_vendor_profile_path, class: "text-sm font-medium text-indigo-600 hover:text-indigo-500" %>
+        </div>
+        <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+          <div class="sm:col-span-3">
+            <h3 class="text-sm font-medium text-gray-500">Business Name</h3>
+            <p class="mt-1 text-sm text-gray-900"><%= current_user.business_name %></p>
+          </div>
+          <% if current_user.website_url.present? %>
+            <div class="sm:col-span-3">
+              <h3 class="text-sm font-medium text-gray-500">Website</h3>
+              <p class="mt-1 text-sm text-gray-900">
+                <%= link_to current_user.website_url, current_user.website_url, class: "text-indigo-600 hover:text-indigo-500", target: "_blank" %>
+              </p>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
     <!-- Status Alerts -->
     <% if @needs_w9 || @pending_approval %>
       <div class="mb-8">

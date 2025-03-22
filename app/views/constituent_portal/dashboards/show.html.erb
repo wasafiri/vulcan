@@ -123,7 +123,7 @@
         </div>
 
         <!-- Application Information -->
-        <% if @active_application && @active_application.approved? %>
+        <% if @active_application && @active_application.status_approved? %>
           <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <!-- Waiting Period -->
             <div class="bg-white shadow overflow-hidden sm:rounded-lg">

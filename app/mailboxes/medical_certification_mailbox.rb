@@ -25,7 +25,7 @@ class MedicalCertificationMailbox < ApplicationMailbox
   def create_audit_record
     Event.create!(
       user: application.constituent,
-      action: "medical_certification_received",
+      action: 'medical_certification_received',
       metadata: {
         application_id: application.id,
         medical_provider_id: medical_provider.id,
@@ -36,7 +36,7 @@ class MedicalCertificationMailbox < ApplicationMailbox
     )
   end
 
-  def attach_certification(attachment, audit)
+  def attach_certification(attachment, _audit)
     # Create a blob from the attachment
     blob = ActiveStorage::Blob.create_and_upload!(
       io: StringIO.new(attachment.body.decoded),
@@ -52,7 +52,7 @@ class MedicalCertificationMailbox < ApplicationMailbox
     # Notify admin of new certification submission
     Event.create!(
       user: application.constituent,
-      action: "medical_certification_received",
+      action: 'medical_certification_received',
       metadata: {
         application_id: application.id,
         medical_provider_id: medical_provider.id,
@@ -73,7 +73,7 @@ class MedicalCertificationMailbox < ApplicationMailbox
     unless medical_provider
       bounce_with_notification(
         :provider_not_found,
-        "Email sender not recognized as a registered medical provider"
+        'Email sender not recognized as a registered medical provider'
       )
     end
   end
@@ -82,7 +82,7 @@ class MedicalCertificationMailbox < ApplicationMailbox
     unless application && application.medical_certification_requested?
       bounce_with_notification(
         :invalid_certification_request,
-        "No pending certification request found for this provider"
+        'No pending certification request found for this provider'
       )
     end
   end
@@ -91,7 +91,7 @@ class MedicalCertificationMailbox < ApplicationMailbox
     if mail.attachments.empty?
       bounce_with_notification(
         :no_attachments,
-        "No attachments found in email"
+        'No attachments found in email'
       )
     end
 
@@ -110,13 +110,13 @@ class MedicalCertificationMailbox < ApplicationMailbox
   def validate_attachment(attachment)
     # Check file size
     if attachment.body.decoded.size > 10.megabytes
-      raise "File size exceeds 10MB limit"
+      raise 'File size exceeds 10MB limit'
     end
 
     # Check file type
     allowed_types = %w[application/pdf image/jpeg image/png image/gif]
     unless allowed_types.include?(attachment.content_type)
-      raise "File type not allowed. Allowed types: PDF, JPEG, PNG, GIF"
+      raise 'File type not allowed. Allowed types: PDF, JPEG, PNG, GIF'
     end
   end
 
@@ -168,7 +168,7 @@ class MedicalCertificationMailbox < ApplicationMailbox
     # If we can't find an ID, check if this is a reply to a specific request
     # This assumes you're using a mailbox hash with the application ID
     if mail.to.any? { |to| to.include?("+") }
-      mailbox_hash = mail.to.find { |to| to.include?("+") }.split("@").first.split("+").last
+      mailbox_hash = mail.to.find { |to| to.include?('+') }.split('@').first.split('+').last
       return mailbox_hash if mailbox_hash.match?(/^\d+$/)
     end
 

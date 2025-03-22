@@ -1,10 +1,12 @@
 # Configure Action Mailbox
-Rails.application.config.action_mailbox.ingress = :postmark
+provider_config = MatVulcan::InboundEmailConfig.provider_config
 
-# Set the inbound email hash for Postmark (if available)
-if Rails.application.credentials.dig(:postmark, :inbound_email_hash).present?
-  Rails.application.config.action_mailbox.postmark_inbound_email_hash =
-    Rails.application.credentials.dig(:postmark, :inbound_email_hash)
+# Configure ingress based on the selected provider
+Rails.application.config.action_mailbox.ingress = provider_config[:ingress]
+
+# Apply provider-specific configuration if needed
+if provider_config[:config_key].present? && provider_config[:config_value].present?
+  Rails.application.config.action_mailbox.send("#{provider_config[:config_key]}=", provider_config[:config_value])
 end
 
 # Configure Action Mailbox to use Postmark for inbound emails

@@ -1,6 +1,8 @@
 require "test_helper"
 
 class ApplicationNotificationsMailerTest < ActionMailer::TestCase
+  include ActiveJob::TestHelper
+  
   setup do
     @application = applications(:one)
     @user = @application.user
@@ -12,6 +14,14 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
 
     # Set a reapply date for testing max_rejections_reached
     @reapply_date = 3.years.from_now.to_date
+    
+    # Clear emails before each test for isolation
+    ActionMailer::Base.deliveries.clear
+  end
+  
+  teardown do
+    # Clean up after each test
+    ActionMailer::Base.deliveries.clear
   end
 
   test "proof_approved" do
@@ -194,5 +204,71 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     assert_includes text_part.body.to_s, "APPLICATION REJECTED"
     assert_includes text_part.body.to_s, "John"
     assert_includes text_part.body.to_s, "Income exceeds threshold"
+  end
+
+  test "registration_confirmation" do
+    # Create a test constituent
+    user = Constituent.create!(
+      first_name: "Jane",
+      last_name: "Smith",
+      email: "jane.smith@example.com",
+      phone: "555-123-4567",
+      password: "password",
+      password_confirmation: "password",
+      hearing_disability: true
+    )
+
+    # Verify email is delivered when we process the job
+    assert_difference -> { ActionMailer::Base.deliveries.size }, 1 do
+      perform_enqueued_jobs do
+        # Generate and queue the email
+        ApplicationNotificationsMailer.registration_confirmation(user).deliver_later
+      end
+    end
+
+    # Get the delivered email
+    email = ActionMailer::Base.deliveries.last
+    assert_not_nil email, "Email should have been delivered"
+    
+    # Test email attributes
+    assert_equal ["no_reply@mdmat.org"], email.from, "Email should be from no_reply@mdmat.org"
+    assert_equal [user.email], email.to, "Email should be sent to the registered user"
+    assert_equal "Welcome to the Maryland Accessible Telecommunications Program", email.subject
+    
+    # Verify email is multipart (HTML and text)
+    assert email.multipart?, "Email should be multipart"
+    assert_equal 2, email.parts.size, "Email should have exactly 2 parts (HTML and text)"
+    
+    # Verify HTML part exists and has correct content
+    html_part = email.parts.find { |part| part.content_type.include?("text/html") }
+    assert_not_nil html_part, "HTML part should exist"
+    html_content = html_part.body.to_s
+    
+    # Check for key elements in HTML content
+    assert_match(/Dear Jane,/, html_content, "Should include personalized greeting")
+    assert_match(/Program Overview/, html_content, "Should include program overview heading")
+    assert_match(/Next Steps/, html_content, "Should include next steps heading")
+    assert_match(/Available Products/, html_content, "Should include available products section")
+    assert_match(/Authorized Retailers/, html_content, "Should include authorized retailers section")
+    assert_match(/iPhone, iPad, Pixel/, html_content, "Should include smartphone examples")
+    
+    # Verify links are included but products link is removed
+    assert_match(/dashboard/, html_content, "Should include dashboard link")
+    assert_match(/application/, html_content, "Should include application link")
+    assert_no_match(/browse all available products/, html_content, "Should not include products link")
+    
+    # Verify text part exists and has correct content
+    text_part = email.parts.find { |part| part.content_type.include?("text/plain") }
+    assert_not_nil text_part, "Text part should exist"
+    text_content = text_part.body.to_s
+    
+    # Check for key elements in text content
+    assert_match(/Dear Jane,/, text_content, "Should include personalized greeting")
+    assert_match(/PROGRAM OVERVIEW/, text_content, "Should include program overview section")
+    assert_match(/NEXT STEPS/, text_content, "Should include next steps section")
+    assert_match(/AVAILABLE PRODUCTS/, text_content, "Should include available products section")
+    assert_match(/AUTHORIZED RETAILERS/, text_content, "Should include authorized retailers section")
+    assert_match(/iPhone, iPad, Pixel/, text_content, "Should include smartphone examples")
+    assert_no_match(/browse all available products/, text_content, "Should not include products link")
   end
 end

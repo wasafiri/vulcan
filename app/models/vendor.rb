@@ -17,6 +17,10 @@ class Vendor < User
     size: { less_than: 10.megabytes, message: "must be less than 10MB" },
     if: -> { w9_form.attached? }
   validates :terms_accepted_at, presence: true, if: :vendor_approved?
+  validates :website_url, 
+    format: { with: URI::DEFAULT_PARSER.make_regexp(%w[http https]), 
+             message: "must be a valid URL starting with http:// or https://" },
+    allow_blank: true
 
   enum :status, { pending: 0, approved: 1, suspended: 2 }, prefix: :vendor
 

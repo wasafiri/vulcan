@@ -176,4 +176,18 @@ class ApplicationNotificationsMailer < ApplicationMailer
       message_stream: "notifications"
     )
   end
+
+  def registration_confirmation(user)
+    @user = user
+    @dashboard_url = constituent_portal_dashboard_url(host: Rails.application.config.action_mailer.default_url_options[:host])
+    @new_application_url = new_constituent_portal_application_url(host: Rails.application.config.action_mailer.default_url_options[:host])
+    # Fetch active vendors for the new retailers section
+    @active_vendors = Vendor.active.order(:business_name)
+
+    mail(
+      to: @user.email,
+      subject: "Welcome to the Maryland Accessible Telecommunications Program",
+      message_stream: "notifications"
+    )
+  end
 end

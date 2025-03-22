@@ -214,7 +214,7 @@
                 <%= link_to "View",
                     [:admin, invoice],
                     class: "text-indigo-600 hover:text-indigo-900" %>
-                <% if invoice.approved? && !invoice.check_number %>
+                <% if invoice.invoice_status_approved? && !invoice.check_number %>
                   |
                   <%= link_to "Issue Check",
                       [:admin, invoice],

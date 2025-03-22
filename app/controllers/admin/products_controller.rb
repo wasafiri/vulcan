@@ -4,7 +4,7 @@ class Admin::ProductsController < ApplicationController
   include Pagy::Backend
 
   def index
-    scope = Product.ordered_by_name
+    scope = Product.includes(:vendors).ordered_by_name
     if params[:device_types].present?
       types = Array(params[:device_types]).select(&:present?)
       scope = scope.with_selected_types(types) if types.any?

@@ -2,17 +2,24 @@ class Trainers::TrainingSessionsController < Trainers::BaseController
   before_action :set_training_session, only: %i[show edit update update_status complete schedule reschedule]
 
   def index
-    status_filter = params[:status]
-    # Default to all sessions for admins, my sessions for trainers
-    scope_param = current_user.admin? ? 'all' : 'mine'
+    # Redirect to dashboard for main entry point
+    # If specific filters are applied, still show the filtered list
+    if params[:status].present? || params[:scope].present? || params[:filter].present?
+      status_filter = params[:status]
+      # Default to all sessions for admins, my sessions for trainers
+      scope_param = current_user.admin? ? 'all' : 'mine'
+      scope_param = params[:scope] if params[:scope].present?
 
-    # Apply filters
-    @training_sessions = filter_sessions(scope_param, status_filter)
+      # Apply filters
+      @training_sessions = filter_sessions(scope_param, status_filter)
 
-    # Common setup
-    @current_scope = scope_param
-    @current_status = status_filter
-    @pagy, @training_sessions = pagy(@training_sessions, items: 20)
+      # Common setup
+      @current_scope = scope_param
+      @current_status = status_filter
+      @pagy, @training_sessions = pagy(@training_sessions, items: 20)
+    else
+      redirect_to trainers_dashboard_path
+    end
   end
 
   # New action for handling scope + status filtering

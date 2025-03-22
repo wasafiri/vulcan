@@ -22,6 +22,10 @@ class RegistrationsController < ApplicationController
       )
       cookies.signed[:session_token] = { value: @session.session_token, httponly: true, permanent: true }
       @user.track_sign_in!(request.remote_ip)
+      
+      # Send registration confirmation email
+      ApplicationNotificationsMailer.registration_confirmation(@user).deliver_later
+      
       redirect_to root_path, notice: 'Account created successfully. Welcome!'
     else
       render :new, status: :unprocessable_entity

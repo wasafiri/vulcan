@@ -5,6 +5,7 @@ class Admin::UsersController < ApplicationController
   def index
     @users = User.includes(:role_capabilities)
                  .order(:type, :last_name, :first_name)
+                 .to_a
   end
 
   def update_role

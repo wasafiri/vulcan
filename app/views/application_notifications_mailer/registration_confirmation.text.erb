@@ -1,0 +1,42 @@
+<%= render partial: "shared/mailers/header", formats: [:text], locals: { title: "Welcome to the Maryland Accessible Telecommunications Program" } %>
+
+Dear <%= @user.first_name %>,
+
+Thank you for registering with the Maryland Accessible Telecommunications Program. We're here to help Maryland residents with hearing loss, vision loss, mobility impairments, speech impairments, and cognitive impairments access telecommunications devices that meet their needs.
+
+== PROGRAM OVERVIEW ==
+
+Our program provides vouchers to eligible Maryland residents to purchase accessible telecommunications products. You may be eligible if your household income is less than 400% of the federal poverty level for your family size.
+
+== NEXT STEPS ==
+
+To apply for assistance:
+
+1. Visit your dashboard to access your profile: <%= @dashboard_url %>
+2. Start a new application: <%= @new_application_url %>
+3. Complete all required information, including proof of residency and income
+4. Submit your application for review
+
+Once your application is approved, you'll receive a voucher that can be used to purchase eligible devices.
+
+== AVAILABLE PRODUCTS ==
+
+We offer a variety of accessible telecommunications products, including:
+* Amplified phones for individuals with hearing loss
+* Smartphones with accessibility features (iPhone, iPad, Pixel)
+* Braille and speech devices
+* Communication aids for speech impairments
+* Emergency alert systems
+
+== AUTHORIZED RETAILERS ==
+
+You can redeem your voucher at any of these authorized vendors:
+<% @active_vendors.each do |vendor| %>
+* <%= vendor.business_name || vendor.full_name %><% if vendor.website_url.present? %> - Website: <%= vendor.website_url %><% end %><% if vendor.phone.present? %> - Phone: <%= vendor.phone %><% end %>
+<% end %>
+
+Once your application is approved, you'll receive a voucher to purchase eligible devices through these vendors.
+
+If you have any questions about our program or need assistance with your application, please don't hesitate to contact us.
+
+<%= render partial: "shared/mailers/footer", formats: [:text], locals: { show_automated_message: true } %>

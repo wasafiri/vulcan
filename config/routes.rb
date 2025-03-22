@@ -178,11 +178,20 @@ Rails.application.routes.draw do
       member do
         post :submit_report
         post :request_additional_info
+        post :schedule
+        post :reschedule
       end
 
       collection do
+        # Status filters
+        get :requested
+        get :scheduled
         get :pending
         get :completed
+        get :needs_followup
+        
+        # Scope+status filters (mine vs all)
+        get 'filter(/:scope)(/:status)', to: 'evaluations#filter', as: :filtered
       end
     end
   end

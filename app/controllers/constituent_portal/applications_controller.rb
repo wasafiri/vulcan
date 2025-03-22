@@ -315,7 +315,7 @@ module ConstituentPortal
 
     def request_training
       @application = current_user.applications.find(params[:id])
-      unless @application.approved?
+      unless @application.status_approved?
         redirect_to constituent_portal_dashboard_path,
                     alert: "Only approved applications are eligible for training."
         return

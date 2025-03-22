@@ -32,3 +32,28 @@ steven_voucher:
   status: active
   issued_at: <%= Time.current %>
   last_used_at: null
+  
+# The following fixtures are referenced in voucher_transactions.yml but were missing,
+# causing foreign key constraint violations
+
+# Referenced by voucher_transaction 'one'
+one:
+  code: "TESTCODE12345"
+  application: one
+  vendor_id: <%= ActiveRecord::FixtureSet.identify(:vendor_raz) %>
+  initial_value: 500.00
+  remaining_value: 300.00
+  status: active
+  issued_at: <%= Time.current %>
+  last_used_at: <%= Time.current - 1.month %>
+
+# Referenced by voucher_transaction 'two'
+fully_redeemed:
+  code: "REDEEMEDCODE99"
+  application: two
+  vendor_id: <%= ActiveRecord::FixtureSet.identify(:vendor_raz) %>
+  initial_value: 300.00
+  remaining_value: 0.00
+  status: redeemed
+  issued_at: <%= Time.current - 1.month %>
+  last_used_at: <%= Time.current - 2.weeks %>

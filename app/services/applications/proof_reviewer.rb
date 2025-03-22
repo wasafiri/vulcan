@@ -66,7 +66,7 @@ class Applications::ProofReviewer
 
   def check_for_auto_approval
     # Only check for auto-approval if we're not already approved
-    return if @application.approved?
+    return if @application.status_approved?
     
     # Check if all requirements are met
     if @application.income_proof_status_approved? && 

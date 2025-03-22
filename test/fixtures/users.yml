@@ -124,6 +124,23 @@ constituent_kenneth:
   email_verified: true
   guardian_relationship: parent
 
+constituent_wilbur:
+  type: Constituent
+  email: wilbur.wright@example.com
+  first_name: Wilbur
+  last_name: Wright
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0008
+  date_of_birth: <%= 29.years.ago.to_date %>
+  physical_address_1: 129 Main St
+  city: Baltimore
+  state: MD
+  zip_code: 21201
+  cognition_disability: true
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+
 constituent_steven:
   type: Constituent
   email: steven.cooper@example.com
@@ -209,6 +226,22 @@ vendor_raz:
   locale: en
   email_verified: true
   status: approved
+  website_url: http://www.razmobility.com
+
+# Vendor
+vendor_teltex:
+  type: Vendor
+  email: teltex@testemail.com
+  first_name: Teltex
+  last_name: Vendor
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0007
+  date_of_birth: <%= 50.years.ago.to_date %>
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+  status: approved
+  website_url: https://teltex.com
 
 # Trainers
 trainer_jane:

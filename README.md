@@ -60,6 +60,10 @@ Vulcan is a Ruby on Rails application that facilitates Maryland Accessible Telec
 > **Note**: We **previously** planned on using ElasticEmail; we have now moved to **Postmark** for email.  
 > We also decided **not** to use Pundit for authorization.
 
+## Documentation
+
+- [Inbound Email Processing Guide](doc/inbound_email_processing_guide.md) - Setup and usage of email-based proof submission
+
 ## Prerequisites
 
 - Ruby 3.3.0 or higher

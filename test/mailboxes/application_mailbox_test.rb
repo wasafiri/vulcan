@@ -1,63 +1,47 @@
-require "test_helper"
-require "support/action_mailbox_test_helper"
+require 'test_helper'
 
 class ApplicationMailboxTest < ActionMailbox::TestCase
-  include ActionMailboxTestHelper
-
-  setup do
-    # Create a constituent and application using factories
-    @constituent = create(:constituent)
-    @application = create(:application, user: @constituent)
-    @constituent.update(email: "constituent@example.com")
-
-    # Create a medical provider using factory
-    @medical_provider = create(:medical_provider, email: "doctor@example.com")
-
-    # Create policy records for rate limiting
-    create(:policy, :proof_submission_rate_limit_web)
-    create(:policy, :proof_submission_rate_limit_email)
-    create(:policy, :proof_submission_rate_period)
-    create(:policy, :max_proof_rejections)
-
-    # Add medical certification requested flag if needed
-    unless @application.respond_to?(:medical_certification_requested?)
-      @application.define_singleton_method(:medical_certification_requested?) do
-        true
-      end
-    end
-
-    # Add rejection count method if needed
-    unless @application.respond_to?(:rejection_count)
-      @application.define_singleton_method(:rejection_count) do
-        0
-      end
-    end
-
-    # Set up ApplicationMailbox routing for testing
-    ApplicationMailbox.instance_eval do
-      routing(/proof@/i => :proof_submission)
-      routing(/medical-cert@/i => :medical_certification)
-      routing(/.+/ => :default)
+  test "routes emails to Postmark inbound address to proof submission mailbox" do
+    assert_mailbox_routed(ProofSubmissionMailbox) do
+      receive_inbound_email_from_mail(
+        to: MatVulcan::InboundEmailConfig.inbound_email_address,
+        from: "constituent@example.com",
+        subject: "Test Subject",
+        body: "Test Body"
+      )
     end
   end
-
-  test "routes emails correctly based on address" do
-    # Test that the routing patterns are set up correctly
-    router = ApplicationMailbox.router
-
-    # Get the routing patterns from the router
-    routes = router.instance_variable_get(:@routes)
-
-    # Check that the proof submission route exists
-    proof_route = routes.find { |route| route.mailbox_name == :proof_submission }
-    assert proof_route, "Proof submission route not found"
-
-    # Check that the medical certification route exists
-    medical_route = routes.find { |route| route.mailbox_name == :medical_certification }
-    assert medical_route, "Medical certification route not found"
-
-    # Check that the default route exists
-    default_route = routes.find { |route| route.mailbox_name == :default }
-    assert default_route, "Default route not found"
+  
+  test "routes proof@example.com emails to proof submission mailbox" do
+    assert_mailbox_routed(ProofSubmissionMailbox) do
+      receive_inbound_email_from_mail(
+        to: "proof@example.com",
+        from: "constituent@example.com",
+        subject: "Test Subject",
+        body: "Test Body"
+      )
+    end
+  end
+  
+  test "routes medical-cert@mdmat.org emails to medical certification mailbox" do
+    assert_mailbox_routed(MedicalCertificationMailbox) do
+      receive_inbound_email_from_mail(
+        to: "medical-cert@mdmat.org",
+        from: "doctor@example.com",
+        subject: "Medical Certification",
+        body: "Test Medical Certification"
+      )
+    end
+  end
+  
+  test "routes unmatched emails to default mailbox" do
+    assert_mailbox_routed :default do
+      receive_inbound_email_from_mail(
+        to: "unknown@example.com",
+        from: "sender@example.com",
+        subject: "Unknown Email",
+        body: "This email should go to the default mailbox"
+      )
+    end
   end
 end

@@ -77,15 +77,15 @@ module ApplicationStatusManagement
 
   # Status check methods
   def active?
-    in_progress? || needs_information? || reminder_sent? || awaiting_documents?
+    status_in_progress? || status_needs_information? || status_reminder_sent? || status_awaiting_documents?
   end
 
   def editable?
-    draft?
+    status_draft?
   end
 
   def submitted?
-    !draft?
+    !status_draft?
   end
 
   # Status update methods
@@ -127,7 +127,7 @@ module ApplicationStatusManagement
                         saved_change_to_medical_certification_status?
     
     # Only auto-approve applications that aren't already approved
-    return false if approved?
+    return false if status_approved?
     
     # Check if all requirements are met
     all_requirements_met?

@@ -1,29 +1,49 @@
-<% certification_requests = Notification.where(
-    notifiable: @application, 
-    action: "medical_certification_requested"
-  ).order(created_at: :desc) 
+<% 
+  # Fetch both certification requests and rejections
+  certification_events = Notification.where(
+    notifiable: @application,
+    action: ["medical_certification_requested", "medical_certification_rejected"]
+  ).order(created_at: :desc)
+  
+  # Count only requests for numbering purposes
+  certification_requests = certification_events.select { |e| e.action == "medical_certification_requested" }
+  request_count = certification_requests.size
 %>
 
 <div class="certification-history mt-2 pl-4 border-l-2 border-gray-200">
-  <% if certification_requests.any? %>
-    <% certification_requests.each_with_index do |request, index| %>
+  <% if certification_events.any? %>
+    <% certification_events.each_with_index do |event, index| %>
       <% 
         # Get timestamp from metadata if available, otherwise use notification created_at
         timestamp = nil
-        if request.metadata.present? && request.metadata.is_a?(Hash) && request.metadata['timestamp'].present?
+        if event.metadata.present? && event.metadata.is_a?(Hash) && event.metadata['timestamp'].present?
           begin
-            timestamp = Time.parse(request.metadata['timestamp'])
+            timestamp = Time.parse(event.metadata['timestamp'])
           rescue
-            timestamp = request.created_at
+            timestamp = event.created_at
           end
         else
-          timestamp = request.created_at
+          timestamp = event.created_at
+        end
+        
+        # Determine if this is a request or rejection
+        is_request = event.action == "medical_certification_requested"
+        
+        # For requests, get the appropriate request number (count down from total)
+        request_number = nil
+        if is_request
+          request_number = request_count - certification_requests.index { |r| r.id == event.id }
         end
       %>
       <div class="request-item mb-2">
-        <p class="text-sm text-gray-600 mb-1">
-          Request <%= certification_requests.size - index %> sent on 
-          <%= timestamp.strftime("%B %d, %Y at %I:%M %p") %>
+        <p class="text-sm <%= is_request ? 'text-gray-600' : 'text-red-600' %> mb-1">
+          <% if is_request %>
+            Request <%= request_number %> sent on 
+            <%= timestamp.strftime("%B %d, %Y at %I:%M %p") %>
+          <% else %>
+            Medical certification rejected on
+            <%= timestamp.strftime("%B %d, %Y at %I:%M %p") %>
+          <% end %>
           <% if index == 0 %>
             <span class="text-xs text-gray-500">(most recent)</span>
           <% end %>
