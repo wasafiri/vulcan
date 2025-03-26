@@ -28,9 +28,18 @@ module ConstituentPortal
       ).order(created_at: :desc)
     end
 
-    def new
-      @application = current_user.applications.new
-    end
+  def new
+    @application = current_user.applications.new
+    
+    # Pre-populate address fields from user profile
+    @address = {
+      physical_address_1: current_user.physical_address_1,
+      physical_address_2: current_user.physical_address_2,
+      city: current_user.city,
+      state: current_user.state,
+      zip_code: current_user.zip_code
+    }
+  end
 
   def create
     # Extract user attributes from params
@@ -383,7 +392,13 @@ module ConstituentPortal
         vision_disability: p[:application][:vision_disability] == "1" || p[:application][:vision_disability] == true,
         speech_disability: p[:application][:speech_disability] == "1" || p[:application][:speech_disability] == true,
         mobility_disability: p[:application][:mobility_disability] == "1" || p[:application][:mobility_disability] == true,
-        cognition_disability: p[:application][:cognition_disability] == "1" || p[:application][:cognition_disability] == true
+        cognition_disability: p[:application][:cognition_disability] == "1" || p[:application][:cognition_disability] == true,
+        # Address fields
+        physical_address_1: p[:application][:physical_address_1],
+        physical_address_2: p[:application][:physical_address_2],
+        city: p[:application][:city],
+        state: p[:application][:state],
+        zip_code: p[:application][:zip_code]
       }
     end
 
@@ -477,6 +492,12 @@ module ConstituentPortal
         :speech_disability,
         :mobility_disability,
         :cognition_disability,
+        # Address fields for updating user profile
+        :physical_address_1,
+        :physical_address_2,
+        :city,
+        :state,
+        :zip_code,
         medical_provider_attributes: [:name, :phone, :fax, :email]
       )
       if base_params[:medical_provider_attributes].present?
@@ -532,8 +553,14 @@ module ConstituentPortal
       processed_attrs[:is_guardian] = ActiveModel::Type::Boolean.new.cast(attrs[:is_guardian])
       processed_attrs[:guardian_relationship] = attrs[:guardian_relationship] if processed_attrs[:is_guardian]
 
+      # Process disability fields
       %i[hearing_disability vision_disability speech_disability mobility_disability cognition_disability].each do |attr|
         processed_attrs[attr] = ActiveModel::Type::Boolean.new.cast(attrs[attr])
+      end
+      
+      # Process address fields
+      %i[physical_address_1 physical_address_2 city state zip_code].each do |attr|
+        processed_attrs[attr] = attrs[attr] if attrs[attr].present?
       end
 
       log_debug("Processed attributes: #{processed_attrs.inspect}")
@@ -554,6 +581,7 @@ module ConstituentPortal
         log_debug("User is a constituent? #{current_user.constituent?}")
         log_debug("User disability status after update: hearing=#{current_user.hearing_disability}, vision=#{current_user.vision_disability}, " \
                   "speech=#{current_user.speech_disability}, mobility=#{current_user.mobility_disability}, cognition=#{current_user.cognition_disability}")
+        log_debug("User address after update: #{current_user.physical_address_1}, #{current_user.city}, #{current_user.state} #{current_user.zip_code}")
         log_debug("User has_disability_selected? returns: #{current_user.has_disability_selected?}")
         true
       rescue StandardError => e

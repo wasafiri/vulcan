@@ -47,6 +47,21 @@ class ApplicationNotificationsMailer < ApplicationMailer
   end
 
   def proof_approved(application, proof_review)
+    # Check if this application's constituent prefers letter communications
+    if application.user.communication_preference == 'letter'
+      all_proofs_approved = application.respond_to?(:all_proofs_approved?) && application.all_proofs_approved?
+      
+      Letters::LetterGeneratorService.new(
+        template_type: 'proof_approved',
+        data: { 
+          proof_type: proof_review.proof_type,
+          all_proofs_approved: all_proofs_approved
+        },
+        constituent: application.user,
+        application: application
+      ).queue_for_printing
+    end
+    
     prepare_email(
       application,
       proof_review,
@@ -60,14 +75,32 @@ class ApplicationNotificationsMailer < ApplicationMailer
   end
 
   def proof_rejected(application, proof_review)
+    # Calculate rejection info
+    remaining_attempts = 8 - application.total_rejections
+    reapply_date = 3.years.from_now.to_date
+    
+    # Check if this application's constituent prefers letter communications
+    if application.user.communication_preference == 'letter'
+      Letters::LetterGeneratorService.new(
+        template_type: 'proof_rejected',
+        data: { 
+          proof_type: proof_review.proof_type, 
+          rejection_reason: proof_review.rejection_reason,
+          rejection_notes: proof_review.rejection_notes
+        },
+        constituent: application.user,
+        application: application
+      ).queue_for_printing
+    end
+    
     prepare_email(
       application,
       proof_review,
       subject_template: "Document Review Update: Your %{formatted_type} documentation needs revision",
       template_name: "proof_rejected",
       extra_setup: -> {
-        @remaining_attempts = 8 - @application.total_rejections
-        @reapply_date = 3.years.from_now.to_date
+        @remaining_attempts = remaining_attempts
+        @reapply_date = reapply_date
       }
     )
   rescue StandardError => e
@@ -83,6 +116,16 @@ class ApplicationNotificationsMailer < ApplicationMailer
     @application = application
     @user = application.user
     @reapply_date = 3.years.from_now.to_date
+    
+    # Check if this application's constituent prefers letter communications
+    if @user.communication_preference == 'letter'
+      Letters::LetterGeneratorService.new(
+        template_type: 'max_rejections_reached',
+        data: { reapply_date: @reapply_date },
+        constituent: @user,
+        application: application
+      ).queue_for_printing
+    end
 
     mail_obj = mail(
       to: @user.email,
@@ -140,6 +183,15 @@ class ApplicationNotificationsMailer < ApplicationMailer
     @temp_password = temp_password
     @login_url = sign_in_url
 
+    # Create a letter if the user prefers print communications
+    if @constituent.communication_preference == 'letter'
+      Letters::LetterGeneratorService.new(
+        template_type: 'account_created',
+        data: { temp_password: temp_password },
+        constituent: @constituent
+      ).queue_for_printing
+    end
+
     mail(
       to: @constituent.email,
       subject: "Your MAT Application Account Has Been Created",
@@ -157,6 +209,15 @@ class ApplicationNotificationsMailer < ApplicationMailer
     modifier = Policy.get("fpl_modifier_percentage").to_i
     @threshold = base_fpl * (modifier / 100.0)
 
+    # Check if this is a real constituent or just params
+    if @constituent.respond_to?(:communication_preference) && @constituent.communication_preference == 'letter'
+      # Create a letter if the user prefers print communications
+      Letters::LetterGeneratorService.new(
+        template_type: 'income_threshold_exceeded',
+        constituent: @constituent
+      ).queue_for_printing
+    end
+
     mail(
       to: @constituent.email,
       subject: "Important Information About Your MAT Application",
@@ -169,6 +230,16 @@ class ApplicationNotificationsMailer < ApplicationMailer
     @application = application
     @error_type = error_type
     @message = message
+
+    # Create a letter if the user prefers print communications
+    if @constituent.communication_preference == 'letter'
+      Letters::LetterGeneratorService.new(
+        template_type: 'proof_submission_error',
+        data: { message: message },
+        constituent: @constituent,
+        application: @application
+      ).queue_for_printing
+    end
 
     mail(
       to: @constituent.email,
@@ -183,6 +254,15 @@ class ApplicationNotificationsMailer < ApplicationMailer
     @new_application_url = new_constituent_portal_application_url(host: Rails.application.config.action_mailer.default_url_options[:host])
     # Fetch active vendors for the new retailers section
     @active_vendors = Vendor.active.order(:business_name)
+
+    # Create a letter if the user prefers print communications
+    if @user.communication_preference == 'letter'
+      Letters::LetterGeneratorService.new(
+        template_type: 'registration_confirmation',
+        data: { active_vendors: @active_vendors },
+        constituent: @user
+      ).queue_for_printing
+    end
 
     mail(
       to: @user.email,

@@ -19,6 +19,9 @@ class Constituent < User
 
   DISABILITY_TYPES = %w[hearing vision speech mobility cognition].freeze
 
+  # Define enum for notification method
+  enum :communication_preference, { email: 0, letter: 1 }, default: :email
+
   # Define boolean attributes with defaults
   attribute :is_guardian, :boolean, default: false
   attribute :guardian_relationship, :string
@@ -29,6 +32,11 @@ class Constituent < User
   end
 
   validates :guardian_relationship, presence: true, if: :is_guardian
+  validates :email, presence: true, if: :requires_email?
+
+  def requires_email?
+    communication_preference == 'email'
+  end
 
   # Cast boolean values properly
   def is_guardian=(value)
@@ -68,7 +76,7 @@ class Constituent < User
 
   def must_have_at_least_one_disability
     unless hearing_disability || vision_disability || speech_disability || mobility_disability || cognition_disability
-      errors.add(:base, "At least one disability must be selected.")
+      errors.add(:base, 'At least one disability must be selected.')
     end
   end
 end

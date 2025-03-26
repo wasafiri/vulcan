@@ -11,21 +11,13 @@ class RegistrationsController < ApplicationController
   end
 
   def create
-    @user = User.new(registration_params)
-    @user.type = 'Constituent'
-    @user.force_password_change = false
+    build_user
 
     if @user.save
-      @session = @user.sessions.create!(
-        user_agent: request.user_agent,
-        ip_address: request.remote_ip
-      )
-      cookies.signed[:session_token] = { value: @session.session_token, httponly: true, permanent: true }
-      @user.track_sign_in!(request.remote_ip)
-      
-      # Send registration confirmation email
-      ApplicationNotificationsMailer.registration_confirmation(@user).deliver_later
-      
+      create_session_and_cookie
+      track_sign_in
+      send_registration_confirmation
+
       redirect_to root_path, notice: 'Account created successfully. Welcome!'
     else
       render :new, status: :unprocessable_entity
@@ -66,13 +58,58 @@ class RegistrationsController < ApplicationController
     redirect_to sign_in_path, alert: 'You need to sign in to access this page.' unless @user
   end
 
+  def build_user
+    @user = User.new(registration_params)
+    @user.type = 'Constituent'
+    @user.force_password_change = false
+    set_communication_preference
+  end
+
+  def set_communication_preference
+    return unless params[:user]&.dig(:communication_preference) == 'letter'
+
+    @user.communication_preference = :letter  # Use symbol instead of string to properly set the enum
+  end
+
+  def create_session_and_cookie
+    @session = @user.sessions.create!(
+      user_agent: request.user_agent,
+      ip_address: request.remote_ip
+    )
+    cookies.signed[:session_token] = {
+      value: @session.session_token,
+      httponly: true,
+      permanent: true
+    }
+  end
+
+  def track_sign_in
+    @user.track_sign_in!(request.remote_ip)
+  end
+
+  def send_registration_confirmation
+    if @user.communication_preference.to_s == 'email'
+      ApplicationNotificationsMailer.registration_confirmation(@user).deliver_later
+    else
+      Letters::LetterGeneratorService.new(
+        template_type: 'registration_confirmation',
+        constituent: @user,
+        data: { active_vendors: Vendor.active.all }
+      ).queue_for_printing
+    end
+  end
+
   def registration_params
     params.require(:user).permit(
       :email, :password, :password_confirmation,
       :first_name, :last_name, :middle_initial,
       :date_of_birth, :phone, :timezone, :locale,
       :hearing_disability, :vision_disability,
-      :speech_disability, :mobility_disability, :cognition_disability
+      :speech_disability, :mobility_disability, :cognition_disability,
+      :communication_preference,
+      # Address fields for letter notifications
+      :physical_address_1, :physical_address_2, 
+      :city, :state, :zip_code
     )
   end
 end

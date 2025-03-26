@@ -1,0 +1,37 @@
+<h1>Important Information About Your Application</h1>
+
+<p>We recently reviewed the documentation you submitted as part of your application for the Maryland Accessible Telecommunications Program. Unfortunately, we were unable to approve one of your submitted proofs.</p>
+
+<div class="alert-box">
+  <h2>Proof Review Results</h2>
+  <p><strong>Application ID:</strong> <%= application.application_id %></p>
+  <p><strong>Proof Type:</strong> <%= proof_type.titleize %> Documentation</p>
+  <p><strong>Status:</strong> Not Approved</p>
+  <p><strong>Reason:</strong> <%= rejection_reason %></p>
+  
+  <% if rejection_notes.present? %>
+    <h3>Additional Information</h3>
+    <p><%= rejection_notes %></p>
+  <% end %>
+</div>
+
+<h2>Next Steps</h2>
+
+<p>Please submit a different or updated proof document that meets our requirements. You can submit new documentation in any of the following ways:</p>
+
+<ul>
+  <li><strong>By Mail:</strong> Send copies (not originals) of your documents to:<br>
+    Maryland Accessible Telecommunications<br>
+    123 Main Street<br>
+    Baltimore, MD 21201
+  </li>
+  <li><strong>By Phone:</strong> Call our customer service team at 555-123-4567 for assistance with alternative documentation options</li>
+  <% if constituent.email.present? %>
+    <li><strong>By Email:</strong> You can scan or take clear photos of your documents and email them to more.info@maryland.gov</li>
+    <li><strong>Online:</strong> If you choose to use your online account, you can upload documents through our website at mdmat.org</li>
+  <% end %>
+</ul>
+
+<p>If you have any questions about this notice or need help with providing alternative documentation, please contact our customer service team using any of the methods listed above.</p>
+
+<p>We appreciate your patience and look forward to continuing the processing of your application.</p>

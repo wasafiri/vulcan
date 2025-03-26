@@ -1,49 +1,49 @@
-# FPL (Federal Poverty Level) policy settings
+# FPL (Federal Poverty Level) policy settings - 2025 Guidelines
 fpl_1_person:
   key: fpl_1_person
-  value: 15000
+  value: 15650
   created_at: <%= Time.current %>
   updated_at: <%= Time.current %>
 
 fpl_2_person:
   key: fpl_2_person
-  value: 24000
+  value: 21150
   created_at: <%= Time.current %>
   updated_at: <%= Time.current %>
 
 fpl_3_person:
   key: fpl_3_person
-  value: 30000
+  value: 26650
   created_at: <%= Time.current %>
   updated_at: <%= Time.current %>
 
 fpl_4_person:
   key: fpl_4_person
-  value: 36000
+  value: 32150
   created_at: <%= Time.current %>
   updated_at: <%= Time.current %>
 
 fpl_5_person:
   key: fpl_5_person
-  value: 42000
+  value: 37650
   created_at: <%= Time.current %>
   updated_at: <%= Time.current %>
 
 fpl_6_person:
   key: fpl_6_person
-  value: 48000
+  value: 43150
   created_at: <%= Time.current %>
   updated_at: <%= Time.current %>
 
 fpl_7_person:
   key: fpl_7_person
-  value: 54000
+  value: 48650
   created_at: <%= Time.current %>
   updated_at: <%= Time.current %>
 
 fpl_8_person:
   key: fpl_8_person
-  value: 60000
+  value: 54150
   created_at: <%= Time.current %>
   updated_at: <%= Time.current %>
 

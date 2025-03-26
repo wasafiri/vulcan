@@ -72,18 +72,18 @@ class Admin::PaperApplicationsController < Admin::BaseController
     notification_params = {
       household_size: params[:household_size],
       annual_income: params[:annual_income],
-      notification_method: params[:notification_method],
+      communication_preference: params[:communication_preference],
       additional_notes: params[:additional_notes]
     }
 
     # Send the notification
-    if params[:notification_method] == "email"
+    if params[:communication_preference] == "email"
       ApplicationNotificationsMailer.income_threshold_exceeded(
         constituent_params,
         notification_params
       ).deliver_later
       flash[:notice] = "Rejection notification has been sent via email."
-    elsif params[:notification_method] == "letter"
+    elsif params[:communication_preference] == "letter"
       # Logic to queue a letter for printing
       flash[:notice] = "Rejection letter has been queued for printing."
     end
@@ -129,7 +129,8 @@ class Admin::PaperApplicationsController < Admin::BaseController
         :vision_disability,
         :speech_disability,
         :mobility_disability,
-        :cognition_disability
+        :cognition_disability,
+        :communication_preference
       ),
       application: params.require(:application).permit(
         :household_size,

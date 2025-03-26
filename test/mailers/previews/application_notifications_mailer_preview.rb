@@ -39,7 +39,7 @@ class ApplicationNotificationsMailerPreview < ActionMailer::Preview
     notification_params = {
       household_size: 2,
       annual_income: 100000,
-      notification_method: "email",
+      communication_preference: "email",
       additional_notes: "Income exceeds threshold"
     }
 

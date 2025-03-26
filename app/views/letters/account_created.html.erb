@@ -1,0 +1,30 @@
+<h1>Maryland Accessible Telecommunications Program</h1>
+
+<p>Welcome to the Maryland Accessible Telecommunications Program. We are pleased to inform you that your application is being processed. We have created an account for you in our system that will help us track your application and services.</p>
+
+<div class="alert-box">
+  <h2>How to Contact Us</h2>
+  <p>You can communicate with us in any of the following ways:</p>
+  <ul>
+    <li><strong>By Mail:</strong> Send letters to 123 Main Street, Baltimore, MD 21201</li>
+    <li><strong>By Phone:</strong> Call our customer service team at 555-123-4567</li>
+    <% if constituent.email.present? %>
+      <li><strong>By Email:</strong> Send messages to more.info@maryland.gov</li>
+    <% end %>
+  </ul>
+</div>
+
+<% if constituent.email.present? %>
+<div class="alert-box">
+  <h2>Optional Online Access</h2>
+  <p>If you wish to access your application information online, we have created an account for you:</p>
+  <p><strong>Username/Email:</strong> <%= constituent.email %></p>
+  <p><strong>Temporary Password:</strong> <%= temp_password %></p>
+  <p>You can visit mdmat.org if you choose to use this online option. You would need to change your password when first logging in.</p>
+  <p><em>Note: Using the online system is completely optional. You can continue to receive all services and communications by mail or phone if you prefer.</em></p>
+</div>
+<% end %>
+
+<p>An administrator will contact you regarding the next steps in your application process. You do not need to take any immediate action at this time.</p>
+
+<p>Thank you for your interest in our program. We are here to assist you with your telecommunications accessibility needs.</p>

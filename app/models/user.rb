@@ -49,6 +49,7 @@ class User < ApplicationRecord
   validates :first_name, :last_name, presence: true
   validates :reset_password_token, uniqueness: true, allow_nil: true
   validate :phone_number_must_be_valid
+  validate :validate_address_for_letter_preference
 
   # Status enum
   enum :status, { inactive: 0, active: 1, suspended: 2 }, default: :active
@@ -248,5 +249,27 @@ class User < ApplicationRecord
     caps << 'can_evaluate' if evaluator? || admin?
     caps << 'can_train' if trainer? || admin?
     caps
+  end
+  
+  def validate_address_for_letter_preference
+    # Fix the comparison to use the enum correctly
+    return unless communication_preference.to_s == 'letter' || communication_preference == :letter
+    
+    # Validate that address fields are present when letter preference is selected
+    if physical_address_1.blank?
+      errors.add(:physical_address_1, 'is required when notification method is set to letter')
+    end
+    
+    if city.blank?
+      errors.add(:city, 'is required when notification method is set to letter')
+    end
+    
+    if state.blank?
+      errors.add(:state, 'is required when notification method is set to letter')
+    end
+    
+    if zip_code.blank?
+      errors.add(:zip_code, 'is required when notification method is set to letter')
+    end
   end
 end

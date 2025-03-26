@@ -1,0 +1,40 @@
+# == Schema Information
+#
+# Table name: print_queue_items
+#
+#  id              :bigint           not null, primary key
+#  letter_type     :integer          not null
+#  status          :integer          default("pending"), not null
+#  constituent_id  :bigint           not null
+#  application_id  :bigint
+#  admin_id        :bigint
+#  printed_at      :datetime
+#  created_at      :datetime         not null
+#  updated_at      :datetime         not null
+#
+
+pending_letter_1:
+  letter_type: registration_confirmation
+  status: pending
+  constituent: constituent_alex
+  application: one
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+pending_letter_2:
+  letter_type: proof_approved
+  status: pending
+  constituent: constituent_john
+  application: two
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+printed_letter:
+  letter_type: account_created
+  status: printed
+  constituent: constituent_alex
+  application: one
+  admin: admin_david
+  printed_at: <%= Time.current - 1.day %>
+  created_at: <%= Time.current - 1.day %>
+  updated_at: <%= Time.current - 1.day %>

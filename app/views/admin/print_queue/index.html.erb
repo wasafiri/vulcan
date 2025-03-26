@@ -1,0 +1,200 @@
+<div class="container mx-auto px-4 py-8">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Print Queue</h1>
+    <div>
+      <%= link_to admin_applications_path, class: "px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500" do %>
+        Back to Dashboard
+      <% end %>
+    </div>
+  </div>
+
+  <% if flash[:notice] %>
+    <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6" role="alert">
+      <%= flash[:notice] %>
+    </div>
+  <% end %>
+
+  <div class="mb-8">
+    <h2 class="text-xl font-semibold mb-4">Pending Letters (<%= @pending_letters.count %>)</h2>
+    
+    <% if @pending_letters.any? %>
+      <!-- Form with data-turbo=false to ensure file download works properly -->
+      <%= form_tag '', method: :get, id: "letters-actions-form", class: "relative", data: { turbo: false, controller: "checkbox-select-all" } do %>
+        <div class="bg-white shadow-md rounded-lg overflow-hidden mb-4">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th scope="col" class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <div class="inline-flex items-center">
+                    <input type="checkbox" id="select-all-pending" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" onclick="toggleAllCheckboxes(this)">
+                    <span class="text-xs ml-1">All</span>
+                  </div>
+                </th>
+                <th scope="col" class="pl-1 pr-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Letter Type
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Constituent
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Application
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Created
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <% @pending_letters.each do |letter| %>
+                <tr>
+                  <td class="px-2 py-4 whitespace-nowrap">
+                    <input type="checkbox" name="letter_ids[]" value="<%= letter.id %>" class="letter-checkbox h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" onclick="updateButtonState()">
+                  </td>
+                  <td class="pl-1 pr-3 py-4 whitespace-nowrap">
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                      <%= letter_type_badge_class(letter.letter_type) %>">
+                      <%= letter.letter_type.titleize %>
+                    </span>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <%= letter.constituent.full_name %>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <% if letter.application %>
+                      <%= link_to "App ##{letter.application.id}", admin_application_path(letter.application), class: "text-indigo-600 hover:text-indigo-900" %>
+                    <% else %>
+                      <span class="text-gray-500">N/A</span>
+                    <% end %>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <%= time_ago_in_words(letter.created_at) %> ago
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div class="flex space-x-2">
+                      <%= link_to admin_print_queue_path(letter, format: :pdf), class: "text-blue-600 hover:text-blue-900", target: "_blank" do %>
+                        <span>View PDF</span>
+                      <% end %>
+                      <%= button_to mark_as_printed_admin_print_queue_path(letter), method: :post, class: "text-green-600 hover:text-green-900 bg-transparent border-none cursor-pointer p-0" do %>
+                        <span>Mark Printed</span>
+                      <% end %>
+                    </div>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="flex justify-end space-x-4 mt-4">
+          <!-- Action buttons -->
+          <button type="submit" id="download-btn" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600" disabled="disabled" 
+                  onclick="document.getElementById('letters-actions-form').action='<%= download_batch_admin_print_queue_index_path %>'; document.getElementById('letters-actions-form').method='get'; document.getElementById('letters-actions-form').target='_blank';">
+            Download Selected
+          </button>
+          
+          <button type="submit" id="mark-printed-btn" class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600" disabled="disabled"
+                  onclick="document.getElementById('letters-actions-form').action='<%= mark_batch_as_printed_admin_print_queue_index_path %>'; document.getElementById('letters-actions-form').method='post';">
+            Mark Selected as Printed
+          </button>
+          <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+        </div>
+      <% end %>
+
+      <!-- Simple JavaScript without Stimulus -->
+      <script>
+        function toggleAllCheckboxes(selectAllCheckbox) {
+          const checkboxes = document.querySelectorAll('input.letter-checkbox');
+          checkboxes.forEach(checkbox => {
+            checkbox.checked = selectAllCheckbox.checked;
+          });
+          updateButtonState();
+        }
+
+        function updateButtonState() {
+          const anyChecked = Array.from(document.querySelectorAll('input.letter-checkbox')).some(cb => cb.checked);
+          document.getElementById('download-btn').disabled = !anyChecked;
+          document.getElementById('mark-printed-btn').disabled = !anyChecked;
+        }
+      </script>
+    <% else %>
+      <div class="bg-gray-50 rounded-lg p-6 text-center">
+        <p class="text-gray-500">No pending letters in the queue</p>
+      </div>
+    <% end %>
+  </div>
+
+  <div>
+    <h2 class="text-xl font-semibold mb-4">Recently Printed Letters</h2>
+    
+    <% if @printed_letters.any? %>
+      <div class="bg-white shadow-md rounded-lg overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Letter Type
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Constituent
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Application
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Printed By
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Printed On
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <% @printed_letters.each do |letter| %>
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                    <%= letter_type_badge_class(letter.letter_type) %>">
+                    <%= letter.letter_type.titleize %>
+                  </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <%= letter.constituent.full_name %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <% if letter.application %>
+                    <%= link_to "App ##{letter.application.id}", admin_application_path(letter.application), class: "text-indigo-600 hover:text-indigo-900" %>
+                  <% else %>
+                    <span class="text-gray-500">N/A</span>
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <%= letter.admin&.full_name || "Unknown" %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <%= letter.printed_at&.strftime("%B %d, %Y at %I:%M %p") %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <%= link_to admin_print_queue_path(letter, format: :pdf), class: "text-blue-600 hover:text-blue-900", target: "_blank" do %>
+                    <span>View PDF</span>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <div class="bg-gray-50 rounded-lg p-6 text-center">
+        <p class="text-gray-500">No printed letters to display</p>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<!-- No custom JavaScript needed - using Stimulus controller -->

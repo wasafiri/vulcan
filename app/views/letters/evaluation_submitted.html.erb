@@ -1,0 +1,25 @@
+<!-- Letter to confirm that an evaluation has been submitted -->
+
+<p>This letter confirms that your evaluation for the Maryland Accessible Telecommunications Program has been submitted.</p>
+
+<% if @evaluation.present? %>
+<div style="border-left: 4px solid #4299e1; padding-left: 1rem; margin: 1.5rem 0;">
+  <h3 style="color: #2b6cb0; margin-top: 0;">Evaluation Details</h3>
+  
+  <p>Evaluation Date: <%= @evaluation.created_at.strftime('%B %d, %Y') %></p>
+  
+  <% if @evaluation.equipment_recommendations.present? %>
+    <h4>Recommended Equipment:</h4>
+    <ul>
+      <% @evaluation.equipment_recommendations.each do |recommendation| %>
+        <li><%= recommendation %></li>
+      <% end %>
+    </ul>
+  <% end %>
+</div>
+<% end %>
+
+<h3>Next Steps:</h3>
+<p>You will receive a voucher for approved equipment within 10-15 business days. The voucher will include details about how to redeem it with our authorized vendors.</p>
+
+<p>If you have any questions about the evaluation or the equipment recommendations, please contact our customer service team at 555-123-4567.</p>

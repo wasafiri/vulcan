@@ -15,55 +15,14 @@ module Applications
     end
 
     def create
-      success = ActiveRecord::Base.transaction do
-        # Find or create the constituent (similar to constituent portal)
-        return false unless process_constituent
+      ActiveRecord::Base.transaction do
+        return failure('Constituent processing failed') unless process_constituent
+        return failure('Application creation failed') unless create_application
+        return failure('Proof upload failed') unless process_proof_uploads
 
-        # Create application with proper context
-        return false unless create_application
-
-        # Process file uploads (direct attachment like constituent portal)
-        return false unless process_proof_uploads
-
-        # Send notifications as needed
-        send_notifications if @application.persisted?
-        
-        # Log paper application creation specifically
-        if @application.persisted?
-          submission_time = Time.current
-          Event.create!(
-            user: @admin,
-            action: 'application_created',
-            metadata: {
-              application_id: @application.id,
-              submission_method: 'paper',
-              initial_status: (@application.status || 'in_progress').to_s,
-              timestamp: submission_time.iso8601
-            }
-          )
-          
-          # Create a specific audit log entry for the submission timestamp
-          ProofSubmissionAudit.create!(
-            application_id: @application.id,
-            user_id: @admin.id,
-            proof_type: 'application',
-            ip_address: "0.0.0.0",
-            metadata: {
-              submission_method: 'paper',
-              timestamp: submission_time.iso8601,
-              action: 'submit'
-            },
-            submission_method: :paper,
-            created_at: submission_time,
-            updated_at: submission_time
-          )
-        end
-        
-        # Return success if we reach this point
-        @application.persisted?
+        handle_successful_application if @application.persisted?
+        return @application.persisted?
       end
-
-      success
     rescue StandardError => e
       log_error(e, 'Failed to create paper application')
       @errors << e.message
@@ -71,6 +30,51 @@ module Applications
     end
 
     private
+
+    def failure(message)
+      @errors << message
+      false
+    end
+
+    def handle_successful_application
+      send_notifications
+      log_application_creation
+      log_proof_submission_audit
+    end
+
+    def log_application_creation
+      Event.create!(
+        user: @admin,
+        action: 'application_created',
+        metadata: {
+          application_id: @application.id,
+          submission_method: 'paper',
+          initial_status: (@application.status || 'in_progress').to_s,
+          timestamp: current_time.iso8601
+        }
+      )
+    end
+
+    def log_proof_submission_audit
+      ProofSubmissionAudit.create!(
+        application_id: @application.id,
+        user_id: @admin.id,
+        proof_type: 'application',
+        ip_address: '0.0.0.0',
+        metadata: {
+          submission_method: 'paper',
+          timestamp: current_time.iso8601,
+          action: 'submit'
+        },
+        submission_method: :paper,
+        created_at: current_time,
+        updated_at: current_time
+      )
+    end
+
+    def current_time
+      @current_time ||= Time.current
+    end
 
     def log_proof_debug_info(type)
       Rails.logger.debug "==== PROCESS_PROOF(#{type}) STARTED ===="
@@ -161,10 +165,14 @@ module Applications
     def create_new_constituent(attrs)
       # Ensure at least one disability flag is set for new constituents
       ensure_disability_selection(attrs)
-      
+
+      # Remove any notification_method attribute if present (column was removed in migration)
+      attrs.delete(:notification_method) if attrs.key?(:notification_method)
+      attrs.delete("notification_method") if attrs.key?("notification_method")
+
       # Generate temporary password for new accounts
       temp_password = SecureRandom.hex(8)
-      
+
       # Create the constituent using the Constituent class directly to ensure proper type
       @constituent = Constituent.new(attrs).tap do |c|
         c.password = temp_password
@@ -173,12 +181,12 @@ module Applications
         c.force_password_change = true
         # No need to set type as it will automatically be "Constituent" based on class name
       end
-      
+
       Rails.logger.debug "Creating new constituent with type: #{@constituent.type}"
 
       if @constituent.save
-        # Send account creation notification
-        ApplicationNotificationsMailer.account_created(@constituent, temp_password).deliver_later
+        # Store temp password for later notification in send_notifications
+        @temp_password = temp_password
         true
       else
         add_error("Failed to create constituent: #{@constituent.errors.full_messages.join(', ')}")
@@ -188,10 +196,10 @@ module Applications
 
     def ensure_disability_selection(attrs)
       has_any_disability = [:hearing_disability, :vision_disability, :speech_disability, 
-                          :mobility_disability, :cognition_disability].any? do |disability|
+                            :mobility_disability, :cognition_disability].any? do |disability|
         attrs[disability] == '1' || attrs[disability] == true
       end
-      
+
       # Default to hearing disability if none are selected
       attrs[:hearing_disability] = '1' unless has_any_disability
     end
@@ -199,7 +207,7 @@ module Applications
     def create_application
       # Set the paper application context flag
       Thread.current[:paper_application_context] = true
-      
+
       begin
         application_attrs = params[:application]
         return add_error('Application params missing') unless application_attrs.present?
@@ -211,21 +219,21 @@ module Applications
 
         # Ensure constituent is fresh
         @constituent.reload
-        
+
         # Build application with constituent association
         @application = @constituent.applications.new(application_attrs)
         @application.submission_method = :paper
         @application.application_date = Time.current
         @application.status = :in_progress
-        
+
         # Double check the user association
         @application.user = @constituent
-        
+
         unless @application.save
           add_error("Failed to create application: #{@application.errors.full_messages.join(', ')}")
           return false
         end
-        
+
         true
       ensure
         # Always clear the thread-local variable
@@ -236,22 +244,22 @@ module Applications
     def process_proof_uploads
       # Set paper application context again
       Thread.current[:paper_application_context] = true
-      
+
       # Enhanced debugging
       Rails.logger.debug "==== PAPER APPLICATION PROOF UPLOAD STARTED ===="
       Rails.logger.debug "Current params: #{params.inspect}"
-      
+
       begin
         # Process income proof
         Rails.logger.debug "About to process income proof"
         income_result = process_proof(:income) 
         Rails.logger.debug "Income proof processing result: #{income_result}"
-        
+
         # Process residency proof
         Rails.logger.debug "About to process residency proof"
         residency_result = process_proof(:residency)
         Rails.logger.debug "Residency proof processing result: #{residency_result}"
-        
+
         # Return true if we reach here
         Rails.logger.debug "==== PAPER APPLICATION PROOF UPLOAD FINISHED ===="
         true
@@ -295,9 +303,51 @@ module Applications
     end
 
     def send_notifications
-      @application.proof_reviews.reload.each do |review|
-        if review.status_rejected?
-          ApplicationNotificationsMailer.proof_rejected(@application, review).deliver_later
+      if @constituent.communication_preference == 'email'
+        # Send emails as before
+        @application.proof_reviews.reload.each do |review|
+          if review.status_rejected?
+            ApplicationNotificationsMailer.proof_rejected(@application, review).deliver_later
+          end
+        end
+
+        # Send account creation email for new constituents
+        if @constituent.created_at >= 5.minutes.ago
+          # Use the stored temp_password if available, otherwise generate a new one
+          temp_password = @temp_password || SecureRandom.hex(8)
+          @constituent.update(password: temp_password, password_confirmation: temp_password)
+          ApplicationNotificationsMailer.account_created(@constituent, temp_password).deliver_later
+        end
+      else
+        # Generate letters for printing instead
+
+        # Account creation letter if needed
+        if @constituent.created_at >= 5.minutes.ago
+          # Use the stored temp_password if available, otherwise generate a new one
+          temp_password = @temp_password || SecureRandom.hex(8)
+          @constituent.update(password: temp_password, password_confirmation: temp_password)
+          Letters::LetterGeneratorService.new(
+            template_type: 'account_created',
+            constituent: @constituent,
+            data: { temp_password: temp_password }
+          ).queue_for_printing
+        end
+
+        # Proof rejection letters
+        @application.proof_reviews.reload.each do |review|
+          if review.status_rejected?
+            Letters::LetterGeneratorService.new(
+              template_type: 'proof_rejected',
+              constituent: @constituent,
+              application: @application,
+              data: { 
+                proof_review: review,
+                proof_type: review.proof_type,
+                rejection_reason: review.rejection_reason,
+                rejection_notes: review.notes
+              }
+            ).queue_for_printing
+          end
         end
       end
     end
@@ -306,7 +356,7 @@ module Applications
       return false unless household_size.present? && annual_income.present?
 
       base_fpl = Policy.get("fpl_#{[household_size.to_i, 8].min}_person").to_i
-      modifier = Policy.get("fpl_modifier_percentage").to_i
+      modifier = Policy.get('fpl_modifier_percentage').to_i
       threshold = base_fpl * (modifier / 100.0)
 
       annual_income.to_f <= threshold

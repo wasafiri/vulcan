@@ -37,9 +37,6 @@ class Admin::PaperApplicationsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "should create paper application with valid data" do
-    # Get the count before the request
-    application_count_before = Application.count
-
     post admin_paper_applications_path, headers: default_headers, params: {
       constituent: {
         first_name: "John",
@@ -80,9 +77,6 @@ class Admin::PaperApplicationsControllerTest < ActionDispatch::IntegrationTest
     # Skip the ProofReview validations in this test
     ProofReview.any_instance.stubs(:save).returns(true)
     ProofReview.any_instance.stubs(:valid?).returns(true)
-
-    # Get the count before the request
-    application_count_before = Application.count
 
     post admin_paper_applications_path, headers: default_headers, params: {
       income_proof: income_proof,
@@ -132,7 +126,6 @@ class Admin::PaperApplicationsControllerTest < ActionDispatch::IntegrationTest
 
     # Get the count before the request
     application_count_before = Application.count
-    proof_review_count_before = ProofReview.count
 
     # Set the environment to test (non-production)
     Rails.env.stubs(:production?).returns(false)
@@ -297,7 +290,7 @@ class Admin::PaperApplicationsControllerTest < ActionDispatch::IntegrationTest
       phone: "555-123-4567",
       household_size: "2",
       annual_income: "100000",
-      notification_method: "email",
+      communication_prefer: "email",
       additional_notes: "Income exceeds threshold"
     }
 

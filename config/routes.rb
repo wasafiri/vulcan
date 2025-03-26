@@ -47,6 +47,16 @@ Rails.application.routes.draw do
 
   namespace :admin do
     root to: "applications#index"
+    
+    resources :print_queue, only: [:index, :show] do
+      member do
+        post :mark_as_printed
+      end
+      collection do
+        get :download_batch
+        post :mark_batch_as_printed
+      end
+    end
 
     resources :constituents, only: [] do
       collection do

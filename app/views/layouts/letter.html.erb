@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>MAT Notification</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 12pt;
+      line-height: 1.4;
+      color: #333;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      width: 100%;
+      max-width: 8.5in;
+      margin: 0 auto;
+      padding: 0.5in;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 0.5in;
+    }
+    .logo {
+      max-width: 3in;
+      height: auto;
+    }
+    .letterhead {
+      text-align: center;
+      margin-bottom: 0.25in;
+    }
+    .date {
+      text-align: right;
+      margin-bottom: 0.25in;
+    }
+    .address {
+      margin-bottom: 0.25in;
+    }
+    .content {
+      margin-bottom: 0.5in;
+    }
+    .signature {
+      margin-top: 0.5in;
+      margin-bottom: 0.25in;
+    }
+    .footer {
+      margin-top: 1in;
+      font-size: 9pt;
+      text-align: center;
+      border-top: 1px solid #ccc;
+      padding-top: 0.1in;
+    }
+    .alert-box {
+      padding: 0.15in;
+      border: 1px solid #ddd;
+      border-radius: 0.1in;
+      background-color: #f8f8f8;
+      margin: 0.25in 0;
+    }
+    h1 {
+      font-size: 18pt;
+      font-weight: bold;
+      margin-bottom: 0.25in;
+    }
+    h2 {
+      font-size: 14pt;
+      font-weight: bold;
+      margin-bottom: 0.15in;
+      margin-top: 0.25in;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="letterhead">
+        <h1>Maryland Accessible Telecommunications</h1>
+        <p>123 Main Street, Baltimore, MD 21201</p>
+        <p>Phone: 555-123-4567 | Email: more.info@maryland.gov</p>
+      </div>
+    </div>
+    
+    <div class="date">
+      <%= Date.current.strftime("%B %d, %Y") %>
+    </div>
+    
+    <div class="address">
+      <%= constituent.full_name %><br>
+      <%= constituent.physical_address_1 %><br>
+      <% if constituent.physical_address_2.present? %>
+        <%= constituent.physical_address_2 %><br>
+      <% end %>
+      <%= constituent.city %>, <%= constituent.state %> <%= constituent.zip_code %>
+    </div>
+    
+    <p>Dear <%= constituent.first_name %>,</p>
+    
+    <div class="content">
+      <%= yield %>
+    </div>
+    
+    <div class="signature">
+      <p>Sincerely,</p>
+      <p>Maryland Accessible Telecommunications</p>
+      <p>Customer Service Team</p>
+    </div>
+    
+    <div class="footer">
+      <p>Maryland Accessible Telecommunications | 123 Main Street, Baltimore, MD 21201</p>
+      <p>Phone: 555-123-4567 | Email: more.info@maryland.gov | Website: mdmat.org</p>
+    </div>
+  </div>
+</body>
+</html>

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_03_21_224319) do
+ActiveRecord::Schema[8.0].define(version: 2025_03_25_023210) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -268,6 +268,21 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_21_224319) do
     t.datetime "updated_at", null: false
     t.index ["policy_id"], name: "index_policy_changes_on_policy_id"
     t.index ["user_id"], name: "index_policy_changes_on_user_id"
+  end
+
+  create_table "print_queue_items", force: :cascade do |t|
+    t.integer "letter_type", null: false
+    t.integer "status", default: 0, null: false
+    t.bigint "constituent_id", null: false
+    t.bigint "application_id"
+    t.bigint "admin_id"
+    t.datetime "printed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["admin_id"], name: "index_print_queue_items_on_admin_id"
+    t.index ["application_id"], name: "index_print_queue_items_on_application_id"
+    t.index ["constituent_id"], name: "index_print_queue_items_on_constituent_id"
+    t.check_constraint "letter_type >= 0 AND letter_type <= 10", name: "check_print_queue_items_on_letter_type"
   end
 
   create_table "products", force: :cascade do |t|
@@ -658,6 +673,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_21_224319) do
   add_foreign_key "notifications", "users", column: "recipient_id"
   add_foreign_key "policy_changes", "policies"
   add_foreign_key "policy_changes", "users"
+  add_foreign_key "print_queue_items", "applications"
+  add_foreign_key "print_queue_items", "users", column: "admin_id"
+  add_foreign_key "print_queue_items", "users", column: "constituent_id"
   add_foreign_key "proof_reviews", "applications"
   add_foreign_key "proof_reviews", "users", column: "admin_id"
   add_foreign_key "proof_submission_audits", "applications"

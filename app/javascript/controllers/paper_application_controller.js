@@ -26,11 +26,15 @@ export default class extends Controller {
     document.getElementById('income_proof_rejection').classList.add('hidden')
     document.getElementById('residency_proof_rejection').classList.add('hidden')
     
+    // Notification method toggling is now handled by communication-preference controller
+    
     // Add debug info
     console.log('Paper application controller connected')
     console.log('Income proof radio checked:', document.getElementById('accept_income_proof').checked)
     console.log('Residency proof radio checked:', document.getElementById('accept_residency_proof').checked)
   }
+
+  // Notification method is now handled by communication-preference controller
 
   setupRadioListeners() {
     // Income proof radio buttons
@@ -101,6 +105,38 @@ export default class extends Controller {
   validateForm() {
     let isValid = true
     
+    // Validate email is present if notification method is email
+    const emailRadio = document.getElementById('communication_preference_email')
+    const letterRadio = document.getElementById('communication_preference_letter')
+    const emailField = document.querySelector('input[name="constituent[email]"]')
+    
+    if (emailRadio && emailRadio.checked && (!emailField || !emailField.value.trim())) {
+      this.showError('Email is required when Email notification method is selected')
+      isValid = false
+    }
+    
+    // If letter notification is selected, check that physical address fields are filled
+    if (letterRadio && letterRadio.checked) {
+      const addressField = document.querySelector('input[name="constituent[physical_address_1]"]')
+      const cityField = document.querySelector('input[name="constituent[city]"]')
+      const zipField = document.querySelector('input[name="constituent[zip_code]"]')
+      
+      if (!addressField || !addressField.value.trim()) {
+        this.showError('Physical address is required for mailed letter notifications')
+        isValid = false
+      }
+      
+      if (!cityField || !cityField.value.trim()) {
+        this.showError('City is required for mailed letter notifications')
+        isValid = false
+      }
+      
+      if (!zipField || !zipField.value.trim()) {
+        this.showError('ZIP code is required for mailed letter notifications')
+        isValid = false
+      }
+    }
+    
     // Validate income proof
     if (document.getElementById('accept_income_proof').checked) {
       const fileInput = document.querySelector('input[name="income_proof"]')
@@ -139,6 +175,8 @@ export default class extends Controller {
     
     return isValid
   }
+  
+  // Notification method is now handled by communication-preference controller
 
   // Show an error message at the top of the form
   showError(message) {

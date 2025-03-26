@@ -24,10 +24,10 @@
     <ol>
       <li>Visit <a href="<%= @dashboard_url %>" style="color: #234e52; font-weight: bold;" aria-label="your dashboard to access your profile">your dashboard</a> to access your profile</li>
       <li>Start a <a href="<%= @new_application_url %>" style="color: #234e52; font-weight: bold;" aria-label="new application form">new application</a></li>
-      <li>Complete all required information, including proof of residency and income</li>
+      <li>Complete all required information, including proofs of residency and income, and information for your medical provider</li>
       <li>Submit your application for review</li>
     </ol>
-    <p>Once your application is approved, you'll receive a voucher that can be used to purchase eligible devices.</p>
+    <p>Once your application is approved, you'll receive a voucher that can be used to purchase eligible devices, along with information about available devices, vendors to purchase through, and resources for training.</p>
   </div>
 </section>
 
@@ -37,13 +37,14 @@
   </h2>
   
   <div style="color: #4b5563;">
-    <p>We offer a variety of accessible telecommunications products, including:</p>
+    <p>We offer a variety of accessible telecommunications products for a range of disabilities, including:</p>
     <ul>
       <li>Amplified phones for individuals with hearing loss</li>
-      <li>Smartphones with accessibility features (iPhone, iPad, Pixel)</li>
-      <li>Braille and speech devices</li>
-      <li>Communication aids for speech impairments</li>
-      <li>Emergency alert systems</li>
+      <li>Specialized landline phones for individuals with vision loss or hearing loss</li>
+      <li>Smartphones (iPhone, iPad, Pixel) with accessibility features and applications to support multiple types of disabilities</li>
+      <li>Braille and speech devices for individuals with speech differences</li>
+      <li>Communication aids for cognitive, memory or speech differences</li>
+      <li>Visual, audible, and tactile emergency alert systems</li>
     </ul>
   </div>
 </section>
@@ -72,6 +73,6 @@
   </div>
 </section>
 
-<p>If you have any questions about our program or need assistance with your application, please don't hesitate to contact us.</p>
+<p>If you have any questions about our program or need assistance with your application, please don't hesitate to contact us at more.info@maryland.gov or 410-697-9700.</p>
 
 <%= render partial: "shared/mailers/footer", formats: [:html], locals: { show_automated_message: true } %>

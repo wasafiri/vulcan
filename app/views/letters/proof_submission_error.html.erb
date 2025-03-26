@@ -1,0 +1,19 @@
+<!-- Letter to inform the constituent about an error during proof submission -->
+
+<p>We encountered an error while processing your document submission for your Maryland Accessible Telecommunications application.</p>
+
+<div style="border-left: 4px solid #f6ad55; padding-left: 1rem; margin: 1.5rem 0;">
+  <h3 style="color: #c05621; margin-top: 0;">Error Details</h3>
+  
+  <p><%= @message || "There was a technical issue processing your document" %></p>
+</div>
+
+<h3>Next Steps:</h3>
+<p>Please try submitting your document again using one of these methods:</p>
+<ul>
+  <li>Online: Log in to your account at mdmat.org and upload the document</li>
+  <li>Email: Send to documents@mat.md.gov with your application ID in the subject line</li>
+  <li>Mail: Send to our office at 123 Main Street, Baltimore, MD 21201</li>
+</ul>
+
+<p>If you continue to experience issues, please contact our technical support team at 555-123-4567 for assistance.</p>
