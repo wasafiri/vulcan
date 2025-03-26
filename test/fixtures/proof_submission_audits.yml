@@ -1,5 +1,5 @@
 web_submission:
-  application: one
+  application: active
   user: constituent_john
   proof_type: income
   ip_address: 127.0.0.1
@@ -9,7 +9,7 @@ web_submission:
     submission_method: web
 
 email_submission:
-  application: one
+  application: approved
   user: constituent_john
   proof_type: residency
   ip_address: 127.0.0.1

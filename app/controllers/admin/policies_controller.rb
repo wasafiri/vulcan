@@ -38,7 +38,7 @@ class Admin::PoliciesController < Admin::BaseController
   def update
     Policy.transaction do
       policies_data = policy_params
-      
+
       if policies_data.is_a?(Array)
         # Array format
         policies_data.each do |policy_attrs|
@@ -75,11 +75,10 @@ class Admin::PoliciesController < Admin::BaseController
     @policies = Policy.all
   end
 
-
   def policy_params
     if params[:policies].is_a?(Array)
       # New array format
-      params.permit(policies: [:id, :value])[:policies]
+      params.permit(policies: %i[id value])[:policies]
     else
       # Legacy hash format
       permitted_policies = {}

@@ -3,7 +3,7 @@
 # Voucher processed by vendor_raz
 vendor_raz_voucher:
   code: "ABC123XYZ789"
-  application: approved_application
+  application: approved
   vendor_id: <%= ActiveRecord::FixtureSet.identify(:vendor_raz) %>
   initial_value: 500.00
   remaining_value: 250.00
@@ -14,7 +14,7 @@ vendor_raz_voucher:
 # Voucher that shouldn't be visible to vendor_raz (not processed by them)
 kenneth_voucher:
   code: "UX6XE6BT9QEY"
-  application: submitted_application
+  application: active
   vendor_id: null
   initial_value: 500.00
   remaining_value: 500.00
@@ -25,7 +25,7 @@ kenneth_voucher:
 # Another voucher that shouldn't be visible to vendor_raz
 steven_voucher:
   code: "TW8SZQIMNBKT"
-  application: approved_application
+  application: approved
   vendor_id: null
   initial_value: 500.00
   remaining_value: 500.00
@@ -39,7 +39,7 @@ steven_voucher:
 # Referenced by voucher_transaction 'one'
 one:
   code: "TESTCODE12345"
-  application: one
+  application: complete
   vendor_id: <%= ActiveRecord::FixtureSet.identify(:vendor_raz) %>
   initial_value: 500.00
   remaining_value: 300.00
@@ -50,7 +50,7 @@ one:
 # Referenced by voucher_transaction 'two'
 fully_redeemed:
   code: "REDEEMEDCODE99"
-  application: two
+  application: in_review
   vendor_id: <%= ActiveRecord::FixtureSet.identify(:vendor_raz) %>
   initial_value: 300.00
   remaining_value: 0.00

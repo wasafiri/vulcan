@@ -1,12 +1,12 @@
 income_approved:
-  application: one
+  application: active
   admin: admin_david
   proof_type: income
   status: approved
   reviewed_at: <%= Time.current %>
   
 income_rejected:
-  application: one
+  application: active
   admin: admin_david
   proof_type: income
   status: rejected
@@ -14,7 +14,7 @@ income_rejected:
   reviewed_at: <%= Time.current %>
 
 residency_approved:
-  application: one
+  application: active
   admin: admin_kevin
   proof_type: residency
   status: approved

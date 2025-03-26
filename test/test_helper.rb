@@ -11,6 +11,7 @@ require 'support/authentication_test_helper'
 require 'support/flash_test_helper'
 require 'support/form_test_helper'
 require 'support/active_storage_helper'
+require 'support/proof_test_helper'
 
 require 'support/capybara_config'
 
@@ -59,6 +60,7 @@ module ActiveSupport
     include FlashTestHelper
     include FormTestHelper
     include ActiveStorageHelper
+    include ProofTestHelper
 
     def assert_enqueued_email_with(_mailer_class, _method_name, _args: nil)
       block_result = nil

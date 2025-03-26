@@ -39,8 +39,8 @@ module Authentication
   
   def find_production_session
     if cookies.signed[:session_token].present?
-      # Include user with role_capabilities to reduce additional queries
-      Session.includes(user: :role_capabilities)
+      # Only include the user without eager loading role_capabilities
+      Session.includes(:user)
              .find_by(session_token: cookies.signed[:session_token])
     end
   end
@@ -50,14 +50,14 @@ module Authentication
 
     # Try signed cookies first
     if cookies.signed[:session_token].present?
-      session_record = Session.includes(user: :role_capabilities)
+      session_record = Session.includes(:user)
                               .find_by(session_token: cookies.signed[:session_token])
       return session_record if session_record
     end
 
     # Fall back to unsigned cookies 
     if cookies[:session_token].present?
-      session_record = Session.includes(user: :role_capabilities)
+      session_record = Session.includes(:user)
                               .find_by(session_token: cookies[:session_token])
       return session_record if session_record
     end

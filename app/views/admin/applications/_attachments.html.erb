@@ -18,8 +18,8 @@
       <% if @application.income_proof.attached? %>
         <div class="mb-3">
           <p class="text-sm text-gray-600">
-            File: <%= @application.income_proof.filename %>
-            (<%= number_to_human_size(@application.income_proof.byte_size) %>)
+            File: <%= safe_attachment_filename(@application.income_proof) %>
+            (<%= number_to_human_size(safe_attachment_byte_size(@application.income_proof)) %>)
           </p>
         </div>
       <% elsif @application.income_proof_status.in?(['approved', 'rejected']) %>
@@ -162,8 +162,8 @@
       <% if @application.residency_proof.attached? %>
         <div class="mb-3">
           <p class="text-sm text-gray-600">
-            File: <%= @application.residency_proof.filename %>
-            (<%= number_to_human_size(@application.residency_proof.byte_size) %>)
+            File: <%= safe_attachment_filename(@application.residency_proof) %>
+            (<%= number_to_human_size(safe_attachment_byte_size(@application.residency_proof)) %>)
           </p>
         </div>
       <% elsif @application.residency_proof_status.in?(['approved', 'rejected']) %>

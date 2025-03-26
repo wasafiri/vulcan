@@ -7,87 +7,37 @@ class Admin::ApplicationsController < Admin::BaseController
     :approve, :reject, :assign_evaluator, :assign_trainer, :schedule_training, :complete_training,
     :update_certification_status, :resend_medical_certification, :assign_voucher
   ]
-  before_action :load_audit_logs, only: %i[show approve reject]
+  before_action :load_audit_logs_with_service, only: %i[show approve reject]
 
   def index
-    @current_fiscal_year = fiscal_year
-    @total_users_count = User.count
-    @ytd_constituents_count = Application.where("created_at >= ?", fiscal_year_start).count
-    @open_applications_count = Application.active.count
-    @pending_services_count = Application.where(status: :approved).count
+    # Load index data using the reporting service
+    reporting_service = Applications::ReportingService.new
+    report_data = reporting_service.generate_index_data
 
-    # Load recent notifications for the notifications section
-    @recent_notifications = Notification.includes(:actor, :notifiable)
-                                       .order(created_at: :desc)
-                                       .limit(5)
+    # Assign instance variables from the report data
+    report_data.each do |key, value|
+      instance_variable_set("@#{key}", value)
+    end
 
-    # Data for Common Tasks section
-    income_proofs_pending = Application.joins(:income_proof_attachment)
-                                       .where(income_proof_status: "not_reviewed")
-    residency_proofs_pending = Application.joins(:residency_proof_attachment)
-                                          .where(residency_proof_status: "not_reviewed")
-    @proofs_needing_review_count = (income_proofs_pending.pluck(:id) + residency_proofs_pending.pluck(:id)).uniq.count
-
-    @medical_certs_to_review_count = Application.where(medical_certification_status: "received").count
-
-    # Count applications with pending training sessions - include admin as trainer
-    @training_requests_count = Application.joins(:training_sessions)
-      .where(training_sessions: { status: [:requested, :scheduled, :confirmed] })
-      .distinct.count
-
-    # Application Pipeline data for funnel chart
-    @draft_count = Application.where(status: "draft").count
-    @submitted_count = Application.where.not(status: "draft").count
-    @in_review_count = Application.where(status: [ "submitted", "in_review" ]).count
-    @approved_count = Application.where(status: "approved").count
-
-    @pipeline_chart_data = {
-      "Draft" => @draft_count,
-      "Submitted" => @submitted_count,
-      "In Review" => @in_review_count,
-      "Approved" => @approved_count
-    }
-
-    # Status Breakdown data for polar area chart
-    @draft_count = Application.where(status: "draft").count
-    @in_progress_count = Application.where(status: [ "submitted", "in_review" ]).count
-    @approved_count = Application.where(status: "approved").count
-    @rejected_count = Application.where(status: "rejected").count
-
-    @status_chart_data = {
-      "Draft" => @draft_count,
-      "In Progress" => @in_progress_count,
-      "Approved" => @approved_count,
-      "Rejected" => @rejected_count
-    }
-
-    # Get base scope with includes
+    # Get base scope – avoid using with_attached_* which triggers eager loading
     scope = Application.includes(:user)
-                       .with_attached_income_proof
-                       .with_attached_residency_proof
+                       .distinct
                        .where.not(status: [:rejected, :archived])
 
-    scope = apply_filters(scope, params[:filter])
+    # Apply filters using the filter service
+    filter_service = Applications::FilterService.new(scope, params)
+    scope = filter_service.apply_filters
 
-    @pagy, @applications = pagy(scope, items: 20)
-
-    # Always load reporting data
-    load_quick_reports_data
+    # Use pagy for pagination but apply our decorator to prevent unnecessary eager loading
+    @pagy, applications = pagy(scope, items: 20)
+    @applications = applications.map { |app| ApplicationStorageDecorator.new(app) }
   end
 
   def show
-    @application = Application.includes(
-      { user: :role_capabilities },
-      :evaluations,
-      :training_sessions,
-      { proof_reviews: { admin: :role_capabilities } },
-      { proof_submission_audits: { user: :role_capabilities } },
-      :status_changes
-    ).with_attached_income_proof
-      .with_attached_residency_proof
-      .with_attached_medical_certification
-      .find(params[:id])
-      
+    # Application already loaded by set_application with attachments
+    # Only load additional associations specifically needed by the show view
+    load_application_associations_for_show
+
     # Preload and structure proof history data
     @proof_histories = {
       income: load_proof_history(:income),
@@ -95,11 +45,34 @@ class Admin::ApplicationsController < Admin::BaseController
     }
   end
 
+  # Load only the associations that are actually needed for the show view
+  def load_application_associations_for_show
+    # Load status changes directly – they're always needed
+    ApplicationStatusChange.where(application_id: @application.id)
+                           .includes(user: :role_capabilities)
+                           .load
+
+    # Load proof reviews that are needed
+    ProofReview.where(application_id: @application.id)
+               .includes(admin: :role_capabilities)
+               .order(created_at: :desc)
+               .load
+
+    # Access user if needed (for caching, if necessary)
+    User.find_by(id: @application.user_id) if @application.user_id.present?
+
+    # Load training-related data for approved applications
+    if @application.status_approved?
+      @application.evaluations.preload(:evaluator) if @application.respond_to?(:evaluations)
+      @application.training_sessions.preload(:trainer).order(created_at: :desc) if @application.respond_to?(:training_sessions)
+    end
+  end
+
   def edit; end
 
   def update
     if @application.update(application_params)
-      redirect_to admin_application_path(@application), notice: "Application updated."
+      redirect_to admin_application_path(@application), notice: 'Application updated.'
     else
       render :edit, status: :unprocessable_entity
     end
@@ -116,21 +89,21 @@ class Admin::ApplicationsController < Admin::BaseController
   def batch_approve
     result = Application.batch_update_status(params[:ids], :approved)
     if result
-      redirect_to admin_applications_path, notice: "Applications approved."
+      redirect_to admin_applications_path, notice: 'Applications approved.'
     else
-      render json: { error: "Unable to approve applications" },
-        status: :unprocessable_entity
+      render json: { error: 'Unable to approve applications' },
+             status: :unprocessable_entity
     end
   end
 
   def batch_reject
     Application.batch_update_status(params[:ids], :rejected)
-    redirect_to admin_applications_path, notice: "Applications rejected."
+    redirect_to admin_applications_path, notice: 'Applications rejected.'
   end
 
   def request_documents
     @application.request_documents!
-    redirect_to admin_application_path(@application), notice: "Documents requested."
+    redirect_to admin_application_path(@application), notice: 'Documents requested.'
   end
 
   def review_proof
@@ -141,178 +114,31 @@ class Admin::ApplicationsController < Admin::BaseController
 
   def update_proof_status
     reviewer = Applications::ProofReviewer.new(@application, current_user)
-    
-    # Set a thread-local variable to indicate we're reviewing a single proof
-    # This will help the validation know the context
     Thread.current[:reviewing_single_proof] = true
-    
-    begin
-      Rails.logger.info "Starting proof review in controller"
-      Rails.logger.info "Parameters: proof_type=#{params[:proof_type]}, status=#{params[:status]}"
 
-      reviewer.review(
-        proof_type: params[:proof_type],
-        status: params[:status],
-        rejection_reason: params[:rejection_reason],
-        notes: params[:notes]
-      )
+    log_proof_review_start
 
-      Rails.logger.info "Proof review completed successfully"
+    reviewer.review(
+      proof_type: params[:proof_type],
+      status: params[:status],
+      rejection_reason: params[:rejection_reason],
+      notes: params[:notes]
+    )
+    Rails.logger.info 'Proof review completed successfully'
 
-      respond_to do |format|
-        format.html {
-          flash[:notice] = "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
-          redirect_to admin_application_path(@application)
-        }
-        format.turbo_stream {
-          # Reload application and fetch audit logs
-          @application = Application.includes(
-            :user,
-            :evaluations,
-            :training_sessions
-          ).with_attached_income_proof
-            .with_attached_residency_proof
-            .with_attached_medical_certification
-            .find(params[:id])
-          
-          # Load proof histories for partials
-          @proof_histories = {
-            income: load_proof_history(:income),
-            residency: load_proof_history(:residency)
-          }
-
-          proof_reviews = @application.proof_reviews.includes(admin: :role_capabilities).order(created_at: :desc)
-          status_changes = @application.status_changes.includes(user: :role_capabilities).order(created_at: :desc)
-          notifications = Notification.includes(actor: :role_capabilities)
-            .where(notifiable: @application)
-            .where(
-            action: %w[
-              medical_certification_requested
-              medical_certification_received
-              medical_certification_approved
-              medical_certification_rejected
-              review_requested
-              documents_requested
-              proof_approved
-              proof_rejected
-            ]
-          ).order(created_at: :desc)
-
-  # Include application-related events (including vouchers and application creation)
-  # Use a more flexible JSONB query to match application_id in metadata, regardless of string/integer type
-  application_events = Event.where(
-    action: [ 
-      "voucher_assigned", "voucher_redeemed", "voucher_expired", "voucher_cancelled", 
-      "application_created", "evaluator_assigned", "trainer_assigned", "application_auto_approved" 
-    ]
-  ).where("metadata->>'application_id' = ? OR metadata @> ?", 
-    @application.id.to_s, 
-    { application_id: @application.id }.to_json
-  ).includes(:user).order(created_at: :desc)
-
-  @audit_logs = (proof_reviews + status_changes + notifications + application_events)
-    .sort_by(&:created_at)
-    .reverse
-
-          flash.now[:notice] = "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
-          # First remove all modals
-          streams = [
-            turbo_stream.remove("proofRejectionModal"),
-            turbo_stream.remove("incomeProofReviewModal"),
-            turbo_stream.remove("residencyProofReviewModal"),
-            turbo_stream.remove("medicalCertificationReviewModal")
-          ]
-
-          # Then update content
-          streams.concat([
-            turbo_stream.update("flash", partial: "shared/flash"),
-            turbo_stream.update("attachments-section", partial: "attachments"),
-            turbo_stream.update("audit-logs", partial: "audit_logs"),
-            turbo_stream.update("modals", partial: "modals")
-          ])
-          
-          # Add JavaScript to immediately clean up modals and handle letter_opener return
-          streams << turbo_stream.append_all("body", 
-            tag.script(<<-JS.html_safe, type: "text/javascript")
-              // Immediate cleanup (run right away)
-              (function() {
-                console.log("Executing immediate modal cleanup");
-                // Remove overflow-hidden class
-                document.body.classList.remove("overflow-hidden");
-
-                // Hide all modals
-                document.querySelectorAll('[data-modal-target="container"]').forEach(modal => {
-                  modal.classList.add('hidden');
-                  console.log("Hidden modal:", modal.id || 'unnamed modal');
-                });
-
-                // Trigger cleanup on modal controllers
-                const controllers = document.querySelectorAll("[data-controller~='modal']");
-                controllers.forEach((element) => {
-                  try {
-                    const controller = window.Stimulus.getControllerForElementAndIdentifier(element, "modal");
-                    if (controller && typeof controller.cleanup === "function") {
-                      controller.cleanup();
-                      console.log("Modal cleanup triggered immediately after proof review");
-                    }
-                  } catch(e) {
-                    console.error("Error cleaning up modal:", e);
-                  }
-                });
-              })();
-
-              // Also handle when this tab becomes visible again (after letter_opener is closed)
-              document.addEventListener("visibilitychange", function() {
-                if (!document.hidden) {
-                  console.log("Page became visible again - cleaning up modals");
-                  // Hide all modals
-                  document.querySelectorAll('[data-modal-target="container"]').forEach(modal => {
-                    modal.classList.add('hidden');
-                    console.log("Hidden modal on visibility change:", modal.id || 'unnamed modal');
-                  });
-
-                  // Remove overflow-hidden
-                  document.body.classList.remove("overflow-hidden");
-
-                  // Trigger cleanup on modal controllers
-                  const controllers = document.querySelectorAll("[data-controller~='modal']");
-                  controllers.forEach((element) => {
-                    try {
-                      const controller = window.Stimulus.getControllerForElementAndIdentifier(element, "modal");
-                      if (controller && typeof controller.cleanup === "function") {
-                        controller.cleanup();
-                        console.log("Modal cleanup triggered on visibility change");
-                      }
-                    } catch(e) {
-                      console.error("Error cleaning up modal:", e);
-                    }
-                  });
-                }
-              }, { once: true });
-            JS
-          )
-
-          render turbo_stream: streams
-        }
-      end
-    rescue StandardError => e
-      Rails.logger.error "Failed to update proof status: #{e.message}"
-      Rails.logger.error e.backtrace.join("\n")
-
-      respond_to do |format|
-        format.html {
-          flash[:error] = "Failed to update proof status: #{e.message}"
-          render :show, status: :unprocessable_entity
-        }
-        format.turbo_stream {
-          flash.now[:error] = "Failed to update proof status: #{e.message}"
-          render turbo_stream: turbo_stream.update("flash", partial: "shared/flash")
-        }
-      end
-    ensure
-      # Always clear the thread-local variable to prevent affecting other operations
-      Thread.current[:reviewing_single_proof] = nil
+    respond_to do |format|
+      format.html { handle_html_success }
+      format.turbo_stream { handle_turbo_stream_success }
     end
+  rescue StandardError => e
+    Rails.logger.error "Failed to update proof status: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+    respond_to do |format|
+      format.html { handle_html_error(e) }
+      format.turbo_stream { handle_turbo_stream_error(e) }
+    end
+  ensure
+    Thread.current[:reviewing_single_proof] = nil
   end
 
   def process_application_status(action)
@@ -341,10 +167,10 @@ class Admin::ApplicationsController < Admin::BaseController
 
     if @application.assign_evaluator!(evaluator)
       redirect_to admin_application_path(@application),
-        notice: 'Evaluator successfully assigned'
+                  notice: 'Evaluator successfully assigned'
     else
       redirect_to admin_application_path(@application),
-        alert: 'Failed to assign evaluator'
+                  alert: 'Failed to assign evaluator'
     end
   end
 
@@ -354,17 +180,17 @@ class Admin::ApplicationsController < Admin::BaseController
 
     if @application.assign_trainer!(trainer)
       redirect_to admin_application_path(@application),
-        notice: 'Trainer successfully assigned'
+                  notice: 'Trainer successfully assigned'
     else
       redirect_to admin_application_path(@application),
-        alert: 'Failed to assign trainer'
+                  alert: 'Failed to assign trainer'
     end
   end
 
   def schedule_training
     trainer = Trainer.active.find_by(id: params[:trainer_id])
     unless trainer
-      redirect_to admin_application_path(@application), alert: "Invalid trainer selected."
+      redirect_to admin_application_path(@application), alert: 'Invalid trainer selected.'
       return
     end
 
@@ -375,10 +201,10 @@ class Admin::ApplicationsController < Admin::BaseController
 
     if training_session.persisted?
       redirect_to admin_application_path(@application),
-        notice: "Training session scheduled with #{trainer.full_name}"
+                  notice: "Training session scheduled with #{trainer.full_name}"
     else
       redirect_to admin_application_path(@application),
-        alert: 'Failed to schedule training session'
+                  alert: 'Failed to schedule training session'
     end
   end
 
@@ -387,21 +213,21 @@ class Admin::ApplicationsController < Admin::BaseController
     training_session.complete!
 
     redirect_to admin_application_path(@application),
-      notice: 'Training session marked as completed'
+                notice: 'Training session marked as completed'
   end
 
   def update_certification_status
     if @application.update_certification!(
-        certification: params[:medical_certification],
-        status: params[:status],
-        verified_by: current_user,
-        rejection_reason: params[:rejection_reason]
-      )
+         certification: params[:medical_certification],
+         status: params[:status],
+         verified_by: current_user,
+         rejection_reason: params[:rejection_reason]
+       )
       redirect_to admin_application_path(@application),
-        notice: 'Medical certification status updated.'
+                  notice: 'Medical certification status updated.'
     else
       redirect_to admin_application_path(@application),
-        alert: 'Failed to update certification status.'
+                  alert: 'Failed to update certification status.'
     end
   end
 
@@ -413,24 +239,162 @@ class Admin::ApplicationsController < Admin::BaseController
 
     if service.request_certification
       redirect_to admin_application_path(@application),
-        notice: 'Certification request sent successfully.'
+                  notice: 'Certification request sent successfully.'
     else
       redirect_to admin_application_path(@application),
-        alert: "Failed to process certification request: #{service.errors.join(", ")}"
+                  alert: "Failed to process certification request: #{service.errors.join(', ')}"
     end
   end
 
   def assign_voucher
     if @application.assign_voucher!(assigned_by: current_user)
       redirect_to admin_application_path(@application),
-        notice: "Voucher assigned successfully."
+                  notice: 'Voucher assigned successfully.'
     else
       redirect_to admin_application_path(@application),
-        alert: "Failed to assign voucher. Please ensure all requirements are met."
+                  alert: 'Failed to assign voucher. Please ensure all requirements are met.'
     end
   end
 
   private
+
+  def log_proof_review_start
+    Rails.logger.info 'Starting proof review in controller'
+    Rails.logger.info "Parameters: proof_type=#{params[:proof_type]}, status=#{params[:status]}"
+  end
+
+  def handle_html_success
+    flash[:notice] = "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
+    redirect_to admin_application_path(@application)
+  end
+
+  def handle_turbo_stream_success
+    reload_application_and_associations
+    load_proof_histories
+
+    # Use our new AuditLogBuilder service to load audit logs
+    audit_log_builder = Applications::AuditLogBuilder.new(@application)
+    @audit_logs = audit_log_builder.build_audit_logs
+
+    flash.now[:notice] = "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
+    streams = remove_modals_streams.concat(update_content_streams)
+    streams << append_cleanup_js
+
+    render turbo_stream: streams
+  end
+
+  def handle_html_error(error)
+    flash[:error] = "Failed to update proof status: #{error.message}"
+    render :show, status: :unprocessable_entity
+  end
+
+  def handle_turbo_stream_error(error)
+    flash.now[:error] = "Failed to update proof status: #{error.message}"
+    render turbo_stream: turbo_stream.update('flash', partial: 'shared/flash')
+  end
+
+  def reload_application_and_associations
+    @application = load_base_application
+    if @application.status_approved?
+      @application.evaluations.preload(:evaluator) if @application.respond_to?(:evaluations)
+      @application.training_sessions.preload(:trainer).order(created_at: :desc) if @application.respond_to?(:training_sessions)
+    end
+  end
+
+  def load_proof_histories
+    @proof_histories = {
+      income: load_proof_history(:income),
+      residency: load_proof_history(:residency)
+    }
+  end
+
+  def load_notifications
+    Notification
+      .select('id, recipient_id, actor_id, notifiable_id, notifiable_type, action, read_at, created_at, message_id, delivery_status, metadata')
+      .where(notifiable_type: 'Application', notifiable_id: @application.id)
+      .where(action: %w[medical_certification_requested medical_certification_received medical_certification_approved medical_certification_rejected review_requested documents_requested proof_approved proof_rejected])
+      .order(created_at: :desc)
+      .map { |n| NotificationDecorator.new(n) }
+  end
+
+  def load_application_events
+    Event
+      .select('id, user_id, action, created_at, metadata')
+      .includes(:user)
+      .where("action IN (?) AND (metadata->>'application_id' = ? OR metadata @> ?)",
+             %w[voucher_assigned voucher_redeemed voucher_expired voucher_cancelled application_created evaluator_assigned trainer_assigned application_auto_approved],
+             @application.id.to_s,
+             { application_id: @application.id }.to_json)
+      .order(created_at: :desc)
+  end
+
+  def remove_modals_streams
+    [
+      turbo_stream.remove('proofRejectionModal'),
+      turbo_stream.remove('incomeProofReviewModal'),
+      turbo_stream.remove('residencyProofReviewModal'),
+      turbo_stream.remove('medicalCertificationReviewModal')
+    ]
+  end
+
+  def update_content_streams
+    [
+      turbo_stream.update('flash', partial: 'shared/flash'),
+      turbo_stream.update('attachments-section', partial: 'attachments'),
+      turbo_stream.update('audit-logs', partial: 'audit_logs'),
+      turbo_stream.update('modals', partial: 'modals')
+    ]
+  end
+
+  def append_cleanup_js
+    turbo_stream.append_all('body',
+                            view_context.tag.script(cleanup_js, type: 'text/javascript'))
+  end
+
+  def cleanup_js
+    <<-JS.html_safe.strip_heredoc
+      (function() {
+        console.log('Executing immediate modal cleanup');
+        document.body.classList.remove('overflow-hidden');
+        document.querySelectorAll('[data-modal-target="container"]').forEach(function(modal) {
+          modal.classList.add('hidden');
+          console.log('Hidden modal:', modal.id || 'unnamed modal');
+        });
+        document.querySelectorAll("[data-controller~='modal']").forEach(function(element) {
+          try {
+            var controller = window.Stimulus.getControllerForElementAndIdentifier(element, 'modal');
+            if (controller && typeof controller.cleanup === 'function') {
+              controller.cleanup();
+              console.log('Modal cleanup triggered immediately after proof review');
+            }
+          } catch(e) {
+            console.error('Error cleaning up modal:', e);
+          }
+        });
+      })();
+      document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+          console.log('Page became visible again - cleaning up modals');
+          document.querySelectorAll('[data-modal-target="container"]').forEach(function(modal) {
+            modal.classList.add('hidden');
+            console.log('Hidden modal on visibility change:', modal.id || 'unnamed modal');
+          });
+          document.body.classList.remove('overflow-hidden');
+          document.querySelectorAll("[data-controller~='modal']").forEach(function(element) {
+            try {
+              var controller = window.Stimulus.getControllerForElementAndIdentifier(element, 'modal');
+              if (controller && typeof controller.cleanup === 'function') {
+                controller.cleanup();
+                console.log('Modal cleanup triggered on visibility change');
+              }
+            } catch(e) {
+              console.error('Error cleaning up modal:', e);
+            }
+          });
+        }
+      }, { once: true });
+    JS
+  end
 
   def handle_application_failure(action, error_message = nil)
     error_message ||= @application.errors.full_messages.to_sentence
@@ -455,113 +419,12 @@ class Admin::ApplicationsController < Admin::BaseController
               .reverse
   end
 
-  def load_audit_logs
+  # Load audit logs using the audit log builder service
+  def load_audit_logs_with_service
     return unless @application
-    
-    # We've already preloaded most associations in set_application,
-    # now we just need to fetch any remaining associations efficiently
-    
-    # Since we've eagerly loaded @application.proof_reviews with admin and role_capabilities
-    # and @application.status_changes with user and role_capabilities
-    # we can directly access them from the in-memory @application object
-    proof_reviews = @application.proof_reviews.to_a
-    status_changes = @application.status_changes.to_a
-    
-    # For notifications, we can preload the actor and build a single efficient query
-    # by using a direct join and a single where clause with an array of actions
-    notifications = Notification.includes(:actor, actor: :role_capabilities)
-                               .where(notifiable_type: "Application", notifiable_id: @application.id)
-                               .where(action: [
-                                 'medical_certification_requested',
-                                 'medical_certification_received',
-                                 'medical_certification_approved',
-                                 'medical_certification_rejected',
-                                 'review_requested',
-                                 'documents_requested',
-                                 'proof_approved',
-                                 'proof_rejected'
-                               ]).to_a
 
-    # For events, we use a plpgsql-optimized JSONB query with a single where clause combining all conditions
-    application_events = Event.includes(:user, user: :role_capabilities)
-                            .where(
-                              "action IN (?) AND (metadata->>'application_id' = ? OR metadata @> ?)", 
-                              [
-                                'voucher_assigned', 'voucher_redeemed', 'voucher_expired', 'voucher_cancelled',
-                                'application_created', 'evaluator_assigned', 'trainer_assigned', 'application_auto_approved'
-                              ],
-                              @application.id.to_s,
-                              { application_id: @application.id }.to_json
-                            ).to_a
-
-    # Combine all logs and sort at once
-    @audit_logs = (proof_reviews + status_changes + notifications + application_events)
-                  .sort_by(&:created_at)
-                  .reverse
-  end
-
-  def apply_filters(scope, filter)
-    # First apply any filter from params[:filter] (from the filter links)
-    scope = case filter
-            when 'active'
-              scope.active
-            when 'in_progress'
-              scope.where(status: :in_progress)
-            when 'approved'
-              scope.where(status: :approved)
-            when 'proofs_needing_review'
-              # Use a single SQL query with OR condition instead of multiple pluck operations
-              scope.where("income_proof_status = ? OR residency_proof_status = ?", "not_reviewed", "not_reviewed")
-            when 'awaiting_medical_response'
-              scope.where(status: :awaiting_documents)
-            when 'medical_certs_to_review'
-              scope.where(medical_certification_status: "received")
-            when 'training_requests'
-              # Use our new scope to filter applications with pending training
-              scope.with_pending_training
-            else
-              scope
-            end
-
-    # Apply status filter if present
-    scope = scope.where(status: params[:status]) if params[:status].present?
-
-    # Apply date range filter if present - memoize date ranges
-    if params[:date_range].present?
-      case params[:date_range]
-      when 'current_fy'
-        # Calculate fiscal year dates once
-        @current_fy_range ||= begin
-          fy = fiscal_year
-          Date.new(fy, 7, 1)..Date.new(fy + 1, 6, 30)
-        end
-        scope = scope.where(created_at: @current_fy_range)
-      when 'previous_fy'
-        # Calculate previous fiscal year dates once
-        @previous_fy_range ||= begin
-          fy = fiscal_year - 1
-          Date.new(fy, 7, 1)..Date.new(fy + 1, 6, 30)
-        end
-        scope = scope.where(created_at: @previous_fy_range)
-      when 'last_30'
-        # Use a single query with calculated date
-        scope = scope.where("created_at >= ?", 30.days.ago.beginning_of_day)
-      when 'last_90'
-        # Use a single query with calculated date
-        scope = scope.where("created_at >= ?", 90.days.ago.beginning_of_day)
-      end
-    end
-
-    # Apply search filter if present - search in one query
-    if params[:q].present?
-      search_term = "%#{params[:q]}%"
-      # Join with users table to search on user fields in a single query
-      scope = scope.joins(:user).where(
-        "applications.id::text ILIKE ? OR users.first_name ILIKE ? OR users.last_name ILIKE ? OR users.email ILIKE ?", 
-        search_term, search_term, search_term, search_term
-      )
-    end
-    scope
+    audit_log_builder = Applications::AuditLogBuilder.new(@application)
+    @audit_logs = audit_log_builder.build_audit_logs
   end
 
   def sort_column
@@ -569,7 +432,7 @@ class Admin::ApplicationsController < Admin::BaseController
   end
 
   def sort_direction
-    %w[asc desc].include?(params[:direction]) ? params[:direction] : "desc"
+    %w[asc desc].include?(params[:direction]) ? params[:direction] : 'desc'
   end
 
   def filter_conditions
@@ -588,23 +451,37 @@ class Admin::ApplicationsController < Admin::BaseController
     end
   end
 
+  # Loads an application with only the essential attachments
+  # Each specific controller action will load the additional associations it needs
   def set_application
-    # Load application with all needed associations in a single query
-    # This significantly reduces the number of separate queries
-    @application = Application.includes(
-      { user: :role_capabilities },
-      :evaluations,
-      :training_sessions,
-      { proof_reviews: { admin: :role_capabilities } },
-      { proof_submission_audits: { user: :role_capabilities } },
-      :status_changes
-    )
-    .with_attached_income_proof
-    .with_attached_residency_proof
-    .with_attached_medical_certification
-    .find(params[:id])
+    @application = load_base_application
   rescue ActiveRecord::RecordNotFound
     redirect_to admin_applications_path, alert: 'Application not found'
+  end
+
+  # Base application loader without unnecessary eager loading
+  def load_base_application
+    # Load application first, without eager loading anything
+    application = Application.find(params[:id])
+
+    # Preload the attachment metadata without loading associated models or variant records
+    attachment_ids = ActiveStorage::Attachment
+                     .where(record_type: 'Application', record_id: application.id)
+                     .select(:id, :name, :blob_id)
+                     .pluck(:id)
+
+    # Make sure blobs are accessible with all required attributes.
+    # This avoids the variant_records and preview_image_attachment eager loading,
+    # but includes service_name and other necessary attributes.
+    if attachment_ids.any?
+      ActiveStorage::Blob
+        .joins('INNER JOIN active_storage_attachments ON active_storage_blobs.id = active_storage_attachments.blob_id')
+        .where('active_storage_attachments.id IN (?)', attachment_ids)
+        .select('active_storage_blobs.id, active_storage_blobs.filename, active_storage_blobs.content_type, active_storage_blobs.byte_size, active_storage_blobs.checksum, active_storage_blobs.created_at, active_storage_blobs.service_name, active_storage_blobs.metadata')
+        .to_a
+    end
+
+    application
   end
 
   def application_params
@@ -622,95 +499,10 @@ class Admin::ApplicationsController < Admin::BaseController
   end
 
   def require_admin!
-    unless current_user&.admin?
-      redirect_to root_path, alert: "Not authorized"
-    end
+    redirect_to root_path, alert: 'Not authorized' unless current_user&.admin?
   end
 
   def set_current_attributes
     Current.set(request, current_user)
-  end
-
-  def fiscal_year
-    current_date = Date.current
-    current_date.month >= 7 ? current_date.year : current_date.year - 1
-  end
-
-  def fiscal_year_start
-    year = fiscal_year
-    Date.new(year, 7, 1)
-  end
-
-  def load_quick_reports_data
-    @current_fy = fiscal_year
-    @previous_fy = @current_fy - 1
-
-    # Current and previous fiscal year date ranges
-    @current_fy_start = Date.new(@current_fy, 7, 1)
-    @current_fy_end = Date.new(@current_fy + 1, 6, 30)
-    @previous_fy_start = Date.new(@previous_fy, 7, 1)
-    @previous_fy_end = Date.new(@current_fy, 6, 30)
-
-    # Applications data
-    @current_fy_applications = Application.where(created_at: @current_fy_start..@current_fy_end).count
-    @previous_fy_applications = Application.where(created_at: @previous_fy_start..@previous_fy_end).count
-
-    # Draft applications (started but not submitted)
-    @current_fy_draft_applications = Application.where(status: :draft, created_at: @current_fy_start..@current_fy_end).count
-    @previous_fy_draft_applications = Application.where(status: :draft, created_at: @previous_fy_start..@previous_fy_end).count
-
-    # Vouchers data
-    @current_fy_vouchers = Voucher.where(created_at: @current_fy_start..@current_fy_end).count
-    @previous_fy_vouchers = Voucher.where(created_at: @previous_fy_start..@previous_fy_end).count
-
-    # Unredeemed vouchers
-    @current_fy_unredeemed_vouchers = Voucher.where(created_at: @current_fy_start..@current_fy_end, status: :active).count
-    @previous_fy_unredeemed_vouchers = Voucher.where(created_at: @previous_fy_start..@previous_fy_end, status: :active).count
-
-    # Voucher values
-    @current_fy_voucher_value = Voucher.where(created_at: @current_fy_start..@current_fy_end).sum(:initial_value)
-    @previous_fy_voucher_value = Voucher.where(created_at: @previous_fy_start..@previous_fy_end).sum(:initial_value)
-
-    # Training sessions
-    @current_fy_trainings = TrainingSession.where(created_at: @current_fy_start..@current_fy_end).count
-    @previous_fy_trainings = TrainingSession.where(created_at: @previous_fy_start..@previous_fy_end).count
-
-    # Evaluation sessions
-    @current_fy_evaluations = Evaluation.where(created_at: @current_fy_start..@current_fy_end).count
-    @previous_fy_evaluations = Evaluation.where(created_at: @previous_fy_start..@previous_fy_end).count
-
-    # Vendor activity
-    @active_vendors = Vendor.joins(:voucher_transactions).distinct.count
-    @recent_active_vendors = Vendor.joins(:voucher_transactions)
-                                   .where("voucher_transactions.created_at >= ?", 1.month.ago)
-                                   .distinct.count
-
-    # MFR Data (previous full fiscal year)
-    @mfr_applications_approved = Application.where(created_at: @previous_fy_start..@previous_fy_end, status: :approved).count
-    @mfr_vouchers_issued = Voucher.where(created_at: @previous_fy_start..@previous_fy_end).count
-
-    # Chart data for applications
-    @applications_chart_data = {
-      current: { "Applications" => @current_fy_applications, "Draft Applications" => @current_fy_draft_applications },
-      previous: { "Applications" => @previous_fy_applications, "Draft Applications" => @previous_fy_draft_applications }
-    }
-
-    # Chart data for vouchers
-    @vouchers_chart_data = {
-      current: { "Vouchers Issued" => @current_fy_vouchers, "Unredeemed Vouchers" => @current_fy_unredeemed_vouchers },
-      previous: { "Vouchers Issued" => @previous_fy_vouchers, "Unredeemed Vouchers" => @previous_fy_unredeemed_vouchers }
-    }
-
-    # Chart data for services
-    @services_chart_data = {
-      current: { "Training Sessions" => @current_fy_trainings, "Evaluation Sessions" => @current_fy_evaluations },
-      previous: { "Training Sessions" => @previous_fy_trainings, "Evaluation Sessions" => @previous_fy_evaluations }
-    }
-
-    # Chart data for MFR
-    @mfr_chart_data = {
-      current: { "Applications Approved" => @mfr_applications_approved, "Vouchers Issued" => @mfr_vouchers_issued },
-      previous: { "Applications Approved" => 0, "Vouchers Issued" => 0 } # Empty for comparison
-    }
   end
 end

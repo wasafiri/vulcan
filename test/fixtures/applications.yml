@@ -1,151 +1,76 @@
-# Applications for proof testing
-one:
-  user: constituent_john
-  application_date: <%= Time.current %>
-  status: needs_information
-  income_proof_status: rejected
-  residency_proof_status: rejected
-  maryland_resident: true
-  terms_accepted: true
-  information_verified: true
-  medical_release_authorized: true
-  medical_provider_name: Dr. Test Provider
-  medical_provider_phone: 555-555-0003
-  medical_provider_email: provider@example.com
-  household_size: 2
-  annual_income: 25000
-  self_certify_disability: true
-  needs_review_since: null
-  submission_method: web
+# Applications Fixtures
 
-two:
-  user: constituent_john
-  application_date: <%= 2.years.ago %>
-  status: approved
-  income_proof_status: approved
-  residency_proof_status: approved
-  maryland_resident: true
-  terms_accepted: true
-  information_verified: true
-  medical_release_authorized: true
-  medical_provider_name: Dr. Past Provider
-  medical_provider_phone: 555-555-0004
-  medical_provider_email: past.provider@example.com
-  household_size: 1
-  annual_income: 20000
-  self_certify_disability: true
-  needs_review_since: null
-  submission_method: web
-
-# Additional applications from previous fixture
-draft_application:
-  user: constituent_john
-  application_date: <%= 2.days.ago.strftime("%F %T") %>
-  status: draft
-  maryland_resident: true
-  annual_income: "50000"
+active:
+  user: confirmed_user
+  status: in_progress
+  application_date: <%= Date.current %>
   household_size: 3
-  self_certify_disability: false
-  medical_provider_name: "Good Health Clinic"
-  medical_provider_phone: "555-123-4567"
-  medical_provider_email: "info@goodhealthclinic.com"
+  annual_income: 35000
   income_proof_status: not_reviewed
   residency_proof_status: not_reviewed
-  medical_certification_status: not_requested
-  submission_method: web
-
-submitted_application:
-  user: constituent_kenneth
-  application_date: <%= 1.week.ago.strftime("%F %T") %>
-  status: in_progress
   maryland_resident: true
-  annual_income: "65000"
-  household_size: 4
   self_certify_disability: true
-  medical_provider_name: "Downtown Medical"
-  medical_provider_phone: "555-987-6543"
-  medical_provider_email: "contact@downtownmed.com"
-  income_proof_status: approved
-  residency_proof_status: approved
-  medical_certification_status: received
-  submission_method: web
-
-approved_application:
-  user: constituent_steven
-  application_date: <%= 2.months.ago.strftime("%F %T") %>
-  status: approved
-  maryland_resident: true
-  annual_income: "80000"
-  household_size: 2
-  self_certify_disability: false
-  medical_provider_name: "City Health Partners"
-  medical_provider_phone: "555-111-2222"
-  medical_provider_email: "appointments@cityhealth.com"
-  income_proof_status: approved
-  residency_proof_status: approved
-  medical_certification_status: accepted
-  submission_method: web
-
-submitted_proofs_pending_application:
-  user: constituent_alex
-  application_date: <%= Time.zone.parse("2025-02-01 12:00:00").strftime("%F %T") %>
-  status: in_progress
-  maryland_resident: true
-  annual_income: "70000"
-  household_size: 3
-  self_certify_disability: false
-  medical_provider_name: "Downtown Medical"
-  medical_provider_phone: "555-987-6543"
-  medical_provider_email: "contact@downtownmed.com"
-  income_proof_status: not_reviewed
-  residency_proof_status: not_reviewed
-  medical_certification_status: not_requested
-  submission_method: web
-
-awaiting_medical_response_application:
-  user: constituent_jane
-  application_date: <%= Time.zone.parse("2025-02-15 15:30:00").strftime("%F %T") %>
-  status: awaiting_documents
-  maryland_resident: true
-  annual_income: "90000"
-  household_size: 2
-  self_certify_disability: false
-  medical_provider_name: "City Health Partners"
-  medical_provider_phone: "555-111-2222"
-  medical_provider_email: "appointments@cityhealth.com"
-  income_proof_status: approved
-  residency_proof_status: approved
-  medical_certification_status: not_requested
-  submission_method: paper
-
-new_user_application:
-  user: constituent_rex
-  application_date: <%= 3.days.ago.strftime("%F %T") %>
-  status: in_progress
-  maryland_resident: true
-  annual_income: "55000"
-  household_size: 2
-  self_certify_disability: true
-  medical_provider_name: "New Health Clinic"
-  medical_provider_phone: "555-222-3333"
-  medical_provider_email: "info@newhealthclinic.com"
-  income_proof_status: approved
-  residency_proof_status: not_reviewed
+  medical_provider_name: "Dr. Alice Smith"
+  medical_provider_phone: "555-555-5555"
+  medical_provider_email: "alice.smith@example.com"
   medical_certification_status: requested
-  submission_method: email
 
-wilbur_application:
-  user: constituent_wilbur
-  application_date: <%= 15.days.ago.strftime("%F %T") %>
-  status: in_progress
-  maryland_resident: true
-  annual_income: "68000"
-  household_size: 4
-  self_certify_disability: true
-  medical_provider_name: "Baltimore Medical Center"
-  medical_provider_phone: "555-444-5555"
-  medical_provider_email: "contact@baltimoremedical.com"
+approved:
+  user: confirmed_user2
+  status: approved
+  application_date: <%= Date.current - 30.days %>
+  household_size: 2
+  annual_income: 28000
   income_proof_status: approved
   residency_proof_status: approved
+  maryland_resident: true
+  self_certify_disability: true
+  medical_provider_name: "Dr. Bob Jones"
+  medical_provider_phone: "555-555-6666"
+  medical_provider_email: "bob.jones@example.com"
+  medical_certification_status: accepted
+
+draft:
+  user: unconfirmed_user
+  status: draft
+  application_date: <%= Date.current - 2.days %>
+  household_size: 1
+  annual_income: 22000
+  income_proof_status: not_reviewed
+  residency_proof_status: not_reviewed
+  maryland_resident: true
+  self_certify_disability: true
+  medical_provider_name: "Dr. Carol Williams"
+  medical_provider_phone: "555-555-7777"
+  medical_provider_email: "carol.williams@example.com"
+  medical_certification_status: not_requested
+
+in_review:
+  user: confirmed_user
+  status: in_review
+  application_date: <%= Date.current - 15.days %>
+  household_size: 4
+  annual_income: 42000
+  income_proof_status: not_reviewed
+  residency_proof_status: not_reviewed
+  maryland_resident: true
+  self_certify_disability: true
+  medical_provider_name: "Dr. David Brown"
+  medical_provider_phone: "555-555-8888"
+  medical_provider_email: "david.brown@example.com"
   medical_certification_status: received
-  submission_method: paper
+
+complete:
+  user: confirmed_user
+  status: approved
+  application_date: <%= Date.current - 45.days %>
+  household_size: 2
+  annual_income: 30000
+  income_proof_status: approved
+  residency_proof_status: approved
+  maryland_resident: true
+  self_certify_disability: true
+  medical_provider_name: "Dr. Eve Green"
+  medical_provider_phone: "555-555-9999"
+  medical_provider_email: "eve.green@example.com"
+  medical_certification_status: accepted

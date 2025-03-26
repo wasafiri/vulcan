@@ -1,5 +1,5 @@
 draft_to_in_progress:
-  application: draft_application
+  application: draft
   from_status: draft
   to_status: in_progress
   user: admin_david
@@ -7,7 +7,7 @@ draft_to_in_progress:
   created_at: <%= Time.current %>
 
 in_progress_to_approved:
-  application: submitted_application
+  application: active
   from_status: in_progress
   to_status: approved
   user: admin_david
@@ -15,7 +15,7 @@ in_progress_to_approved:
   created_at: <%= 1.day.ago %>
 
 needs_info_to_in_progress:
-  application: one
+  application: in_review
   from_status: needs_information
   to_status: in_progress
   user: admin_david

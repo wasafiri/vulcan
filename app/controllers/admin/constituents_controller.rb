@@ -2,7 +2,7 @@ class Admin::ConstituentsController < Admin::BaseController
   def type_check
     email = params[:email]
     constituent = Constituent.find_by(email: email)
-    
+
     if constituent
       render json: {
         id: constituent.id,
@@ -10,7 +10,7 @@ class Admin::ConstituentsController < Admin::BaseController
         class: constituent.class.name
       }
     else
-      render json: { error: "Constituent not found" }, status: :not_found
+      render json: { error: 'Constituent not found' }, status: :not_found
     end
   end
 end

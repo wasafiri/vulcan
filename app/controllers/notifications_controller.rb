@@ -11,7 +11,8 @@ class NotificationsController < ApplicationController
     
     # Get notifications based on scope
     notifications = if scope == 'all' && current_user.admin?
-                      Notification.includes(:actor, :notifiable).order(created_at: :desc)
+                      # Removed unnecessary eager loading of :actor and :notifiable
+                      Notification.order(created_at: :desc)
                     else
                       current_user.received_notifications.order(created_at: :desc)
                     end

@@ -1,7 +1,7 @@
 one:
   evaluator: evaluator_betsy
   constituent: constituent_john
-  application: one
+  application: active
   evaluation_type: initial
   status: completed
   evaluation_date: <%= Time.current %>
@@ -14,6 +14,6 @@ one:
 pending:
   evaluator: evaluator_betsy
   constituent: constituent_jane
-  application: awaiting_medical_response_application
+  application: in_review
   evaluation_type: initial
   status: pending
