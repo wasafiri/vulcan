@@ -229,11 +229,9 @@ Rails.application.routes.draw do
     end
   end
 
-  namespace :vendor do
+  # Vendor portal routes
+  namespace :vendor, module: 'vendor_portal' do
     resource :dashboard, only: [:show], controller: :dashboard
-    # IMPORTANT: The controller must be explicitly specified as :profiles
-    # Without this, Rails looks for Vendor::ProfilesController (plural) but the actual controller is Vendor::ProfilesController (singular)
-    # This has caused 404 errors in the past when vendors try to access their profile page
     resource :profile, only: %i[edit update], controller: :profiles
     resources :redemptions, only: %i[new create] do
       collection do

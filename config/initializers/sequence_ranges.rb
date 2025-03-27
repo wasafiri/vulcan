@@ -20,8 +20,10 @@ Rails.application.config.after_initialize do
           new_value = Random.rand(980_000_000..980_099_999)
 
           Rails.logger.info "Setting applications_id_seq to #{new_value} (from #{current_value}) with randomization for security"
-          ActiveRecord::Base.connection.execute(
-            "SELECT setval('applications_id_seq', #{new_value})"
+          ActiveRecord::Base.connection.exec_query(
+            "SELECT setval('applications_id_seq', $1)",
+            "Set Application Sequence",
+            [[nil, new_value]]
           )
         else
           Rails.logger.info "applications_id_seq (#{current_value}) already at secure high value"
