@@ -1,32 +1,32 @@
+# frozen_string_literal: true
+
 Rails.application.routes.draw do
   # Test routes (only in test environment)
-  if Rails.env.test?
-    get "test/auth_status", to: "test#auth_status"
-  end
-  root to: "home#index"
+  get 'test/auth_status', to: 'test#auth_status' if Rails.env.test?
+  root to: 'home#index'
 
   # Static pages
-  get "privacy", to: "pages#privacy"
-  get "terms", to: "pages#terms"
-  get "accessibility", to: "pages#accessibility"
-  get "help", to: "pages#help", as: :help
-  get "how_it_works", to: "pages#how_it_works", as: :how_it_works
-  get "eligibility", to: "pages#eligibility", as: :eligibility
-  get "apply", to: "pages#apply", as: :apply
-  get "contact", to: "pages#contact", as: :contact
+  get 'privacy', to: 'pages#privacy'
+  get 'terms', to: 'pages#terms'
+  get 'accessibility', to: 'pages#accessibility'
+  get 'help', to: 'pages#help', as: :help
+  get 'how_it_works', to: 'pages#how_it_works', as: :how_it_works
+  get 'eligibility', to: 'pages#eligibility', as: :eligibility
+  get 'apply', to: 'pages#apply', as: :apply
+  get 'contact', to: 'pages#contact', as: :contact
 
   # Authentication
-  get "sign_in", to: "sessions#new"
-  post "sign_in", to: "sessions#create"
-  delete "sign_out", to: "sessions#destroy"
-  get "sessions", to: "sessions#index"
+  get 'sign_in', to: 'sessions#new'
+  post 'sign_in', to: 'sessions#create'
+  delete 'sign_out', to: 'sessions#destroy'
+  get 'sessions', to: 'sessions#index'
 
   # Registration
-  get "sign_up", to: "registrations#new"
-  post "sign_up", to: "registrations#create"
-  resource :password, only: [ :new, :create, :edit, :update ]
-  resource :profile, only: [ :edit, :update ], controller: "users"
-  get "up", to: "rails/health#show", as: :rails_health_check
+  get 'sign_up', to: 'registrations#new'
+  post 'sign_up', to: 'registrations#create'
+  resource :password, only: %i[new create edit update]
+  resource :profile, only: %i[edit update], controller: 'users'
+  get 'up', to: 'rails/health#show', as: :rails_health_check
 
   # Notifications
   resources :notifications, only: [:index] do
@@ -46,9 +46,9 @@ Rails.application.routes.draw do
   end
 
   namespace :admin do
-    root to: "applications#index"
-    
-    resources :print_queue, only: [:index, :show] do
+    root to: 'applications#index'
+
+    resources :print_queue, only: %i[index show] do
       member do
         post :mark_as_printed
       end
@@ -64,7 +64,7 @@ Rails.application.routes.draw do
       end
     end
 
-    resources :paper_applications, only: [ :new, :create ] do
+    resources :paper_applications, only: %i[new create] do
       collection do
         post :send_rejection_notification
         get :fpl_thresholds
@@ -83,7 +83,7 @@ Rails.application.routes.draw do
       member do
         post :assign_voucher
         post :request_documents
-        post :review_proof  # if you're handling via standard POST or GET
+        post :review_proof # if you're handling via standard POST or GET
         post :update_proof_status
         patch :approve
         patch :reject
@@ -96,17 +96,17 @@ Rails.application.routes.draw do
         post :resend_medical_certification
       end
 
-      resources :notes, only: [ :create ], controller: "application_notes"
+      resources :notes, only: [:create], controller: 'application_notes'
     end
 
-    resources :constituents_dashboard, only: [ :index, :show ]
+    resources :constituents_dashboard, only: %i[index show]
 
-    resources :proof_reviews, only: [ :index, :show, :new, :create ]
-    resources :proofs, only: [ :new, :create ] do
+    resources :proof_reviews, only: %i[index show new create]
+    resources :proofs, only: %i[new create] do
       post :resubmit, on: :collection
     end
 
-    resources :policies, only: [ :index, :show, :edit, :update, :create ] do
+    resources :policies, only: %i[index show edit update create] do
       collection do
         get :changes
         patch :update
@@ -138,7 +138,7 @@ Rails.application.routes.draw do
     end
 
     resources :vendors do
-      resources :w9_reviews, only: [ :index, :show, :new, :create ]
+      resources :w9_reviews, only: %i[index show new create]
     end
 
     resources :products do
@@ -152,7 +152,7 @@ Rails.application.routes.draw do
       end
     end
 
-    resources :reports, only: [ :index, :show ] do
+    resources :reports, only: %i[index show] do
       collection do
         get :equipment_distribution
         get :evaluation_metrics
@@ -183,7 +183,7 @@ Rails.application.routes.draw do
   end
 
   namespace :evaluators do
-    resource :dashboard, only: [ :show ], controller: :dashboards
+    resource :dashboard, only: [:show], controller: :dashboards
     resources :evaluations do
       member do
         post :submit_report
@@ -199,7 +199,7 @@ Rails.application.routes.draw do
         get :pending
         get :completed
         get :needs_followup
-        
+
         # Scope+status filters (mine vs all)
         get 'filter(/:scope)(/:status)', to: 'evaluations#filter', as: :filtered
       end
@@ -222,7 +222,7 @@ Rails.application.routes.draw do
         get :scheduled
         get :completed
         get :needs_followup
-        
+
         # Scope+status filters (mine vs all)
         get 'filter(/:scope)(/:status)', to: 'training_sessions#filter', as: :filtered
       end
@@ -230,42 +230,44 @@ Rails.application.routes.draw do
   end
 
   namespace :vendor do
-    resource :dashboard, only: [ :show ], controller: :dashboard
+    resource :dashboard, only: [:show], controller: :dashboard
     # IMPORTANT: The controller must be explicitly specified as :profiles
     # Without this, Rails looks for Vendor::ProfilesController (plural) but the actual controller is Vendor::ProfilesController (singular)
     # This has caused 404 errors in the past when vendors try to access their profile page
-    resource :profile, only: [ :edit, :update ], controller: :profiles
-    resources :redemptions, only: [ :new, :create ] do
+    resource :profile, only: %i[edit update], controller: :profiles
+    resources :redemptions, only: %i[new create] do
       collection do
         get :check_voucher
         get :verify
       end
     end
-    resources :vouchers, only: [ :index ], param: :code do
+    resources :vouchers, only: [:index], param: :code do
       member do
         get :redeem
         post :process_redemption
       end
     end
-    resources :transactions, only: [ :index ] do
+    resources :transactions, only: [:index] do
       get :report, on: :collection
     end
-    resources :invoices, only: [ :index, :show ]
+    resources :invoices, only: %i[index show]
   end
 
   # Redirects from old constituent namespace to new constituent_portal namespace
-  get "/constituent/applications/:id/proofs/resubmit", to: redirect("/constituent_portal/applications/%{id}/proofs/new/income")
-  post "/constituent/applications/:id/proofs/resubmit", to: redirect("/constituent_portal/applications/%{id}/proofs/resubmit")
-  get "/constituent/applications/:id", to: redirect("/constituent_portal/applications/%{id}")
-  get "/constituent/dashboard", to: redirect("/constituent_portal/dashboard")
-  get "/constituent/applications", to: redirect("/constituent_portal/applications")
-  get "/constituent/evaluations", to: redirect("/constituent_portal/evaluations")
-  get "/constituent/devices", to: redirect("/constituent_portal/products")
+  get '/constituent/applications/:id/proofs/resubmit',
+      to: redirect('/constituent_portal/applications/%<id>s/proofs/new/income')
+  post '/constituent/applications/:id/proofs/resubmit',
+       to: redirect('/constituent_portal/applications/%<id>s/proofs/resubmit')
+  get '/constituent/applications/:id', to: redirect('/constituent_portal/applications/%<id>s')
+  get '/constituent/dashboard', to: redirect('/constituent_portal/dashboard')
+  get '/constituent/applications', to: redirect('/constituent_portal/applications')
+  get '/constituent/evaluations', to: redirect('/constituent_portal/evaluations')
+  get '/constituent/devices', to: redirect('/constituent_portal/products')
 
   # New constituent_portal namespace (replacing constituent)
   namespace :constituent_portal do
-    resource :dashboard, only: [ :show ]
-    resources :applications, path: "applications" do
+    resource :dashboard, only: [:show]
+    resources :applications, path: 'applications' do
       collection do
         get :fpl_thresholds
       end
@@ -278,21 +280,21 @@ Rails.application.routes.draw do
         post :resubmit_proof
         post :request_training
         # Define the route with a custom name
-        get "proofs/new/:proof_type", to: "proofs/proofs#new", as: :new_proof
-        post "proofs/resubmit", to: "proofs/proofs#resubmit", as: :resubmit_proof_document
-        post "proofs/direct_upload", to: "proofs/proofs#direct_upload", as: :direct_upload_proof
+        get 'proofs/new/:proof_type', to: 'proofs/proofs#new', as: :new_proof
+        post 'proofs/resubmit', to: 'proofs/proofs#resubmit', as: :resubmit_proof_document
+        post 'proofs/direct_upload', to: 'proofs/proofs#direct_upload', as: :direct_upload_proof
       end
     end
-    resources :evaluations, only: [ :index, :show ]
-    resources :products, only: [ :index, :show ]
+    resources :evaluations, only: %i[index show]
+    resources :products, only: %i[index show]
 
     # Redirect old devices routes to products
-    get "/devices", to: redirect("/constituent_portal/products")
-    get "/devices/:id", to: redirect("/constituent_portal/products/%{id}")
+    get '/devices', to: redirect('/constituent_portal/products')
+    get '/devices/:id', to: redirect('/constituent_portal/products/%<id>s')
   end
 
   namespace :webhooks do
-    resources :email_events, only: [ :create ]
-    resources :medical_certifications, only: [ :create ]
+    resources :email_events, only: [:create]
+    resources :medical_certifications, only: [:create]
   end
 end

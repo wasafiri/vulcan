@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Model for application constituents (recipients) inheriting from User
 # This class provides a flattened namespace alternative to Users::Constituent
 # for Rails STI role checking (user.constituent?)
@@ -12,9 +14,9 @@ class Constituent < User
 
   # Scopes
   scope :needs_evaluation, -> { joins(:applications).where(applications: { status: :approved }) }
-  scope :active, -> { where.not(status: [:withdrawn, :rejected, :expired]) }
-  scope :ytd, -> {
-    where("created_at >= ?", Date.new(Date.current.year >= 7 ? Date.current.year : Date.current.year - 1, 7, 1))
+  scope :active, -> { where.not(status: %i[withdrawn rejected expired]) }
+  scope :ytd, lambda {
+    where('created_at >= ?', Date.new(Date.current.year >= 7 ? Date.current.year : Date.current.year - 1, 7, 1))
   }
 
   DISABILITY_TYPES = %w[hearing vision speech mobility cognition].freeze

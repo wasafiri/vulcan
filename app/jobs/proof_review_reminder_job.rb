@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class ProofReviewReminderJob < ApplicationJob
   queue_as :default
 
@@ -9,9 +11,9 @@ class ProofReviewReminderJob < ApplicationJob
 
     # Group applications by assigned admin if applicable
     # For now, send to all admins
-    User.where(type: "Admin").find_each do |admin|
+    User.where(type: 'Admin').find_each do |admin|
       ApplicationNotificationsMailer.proof_needs_review_reminder(admin, stale_applications)
-        .deliver_later
+                                    .deliver_later
     end
   end
 end

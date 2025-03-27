@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Vouchers
   class ValueCalculator
     attr_reader :constituent

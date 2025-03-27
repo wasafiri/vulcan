@@ -1,86 +1,90 @@
-require "application_system_test_case"
+# frozen_string_literal: true
 
-class Admin::W9ReviewsTest < ApplicationSystemTestCase
-  setup do
-    @admin = create(:admin)
-    @vendor = create(:vendor, :with_w9)
-    sign_in(@admin)
-  end
+require 'application_system_test_case'
 
-  test "viewing vendor with pending W9" do
-    visit admin_vendor_path(@vendor)
+module Admin
+  class W9ReviewsTest < ApplicationSystemTestCase
+    setup do
+      @admin = create(:admin)
+      @vendor = create(:vendor, :with_w9)
+      sign_in(@admin)
+    end
 
-    assert_text "W9 Status"
-    assert_text "Pending Review"
-    assert_link "Review W9"
+    test 'viewing vendor with pending W9' do
+      visit admin_vendor_path(@vendor)
 
-    click_on "Review W9"
-    assert_current_path new_admin_vendor_w9_review_path(@vendor)
+      assert_text 'W9 Status'
+      assert_text 'Pending Review'
+      assert_link 'Review W9'
 
-    # Test that the iframe is present and has the correct attributes
-    assert_selector "iframe[data-turbo='false']"
-    assert_selector "iframe[type='application/pdf']"
-    assert_selector "iframe[src]"
-    assert_selector "iframe[data-original-src]"
+      click_on 'Review W9'
+      assert_current_path new_admin_vendor_w9_review_path(@vendor)
 
-    # Test the review form functionality
-    choose "Approve"
-    click_on "Submit Review"
+      # Test that the iframe is present and has the correct attributes
+      assert_selector "iframe[data-turbo='false']"
+      assert_selector "iframe[type='application/pdf']"
+      assert_selector 'iframe[src]'
+      assert_selector 'iframe[data-original-src]'
 
-    assert_current_path admin_vendor_path(@vendor)
-    assert_text "W9 review completed successfully"
-    assert_text "Approved"
-  end
+      # Test the review form functionality
+      choose 'Approve'
+      click_on 'Submit Review'
 
-  test "rejecting a W9 form" do
-    visit admin_vendor_path(@vendor)
-    click_on "Review W9"
+      assert_current_path admin_vendor_path(@vendor)
+      assert_text 'W9 review completed successfully'
+      assert_text 'Approved'
+    end
 
-    choose "Reject"
-    # Should show rejection reason fields
-    assert_selector ".rejection-reason", visible: true
+    test 'rejecting a W9 form' do
+      visit admin_vendor_path(@vendor)
+      click_on 'Review W9'
 
-    # Try submitting without selecting a reason
-    click_on "Submit Review"
-    assert_text "Please select a rejection reason and provide a detailed explanation"
+      choose 'Reject'
+      # Should show rejection reason fields
+      assert_selector '.rejection-reason', visible: true
 
-    # Complete the form properly
-    choose "Address Mismatch"
-    fill_in "Detailed Explanation", with: "The address on the W9 does not match our records."
-    click_on "Submit Review"
+      # Try submitting without selecting a reason
+      click_on 'Submit Review'
+      assert_text 'Please select a rejection reason and provide a detailed explanation'
 
-    assert_current_path admin_vendor_path(@vendor)
-    assert_text "W9 review completed successfully"
-    assert_text "Rejected"
+      # Complete the form properly
+      choose 'Address Mismatch'
+      fill_in 'Detailed Explanation', with: 'The address on the W9 does not match our records.'
+      click_on 'Submit Review'
 
-    # Check that the vendor status was updated
-    @vendor.reload
-    assert_equal "rejected", @vendor.w9_status
-  end
+      assert_current_path admin_vendor_path(@vendor)
+      assert_text 'W9 review completed successfully'
+      assert_text 'Rejected'
 
-  test "viewing W9 review details" do
-    review = create(:w9_review, vendor: @vendor, admin: @admin, status: :approved)
+      # Check that the vendor status was updated
+      @vendor.reload
+      assert_equal 'rejected', @vendor.w9_status
+    end
 
-    visit admin_vendor_w9_review_path(@vendor, review)
+    test 'viewing W9 review details' do
+      review = create(:w9_review, vendor: @vendor, admin: @admin, status: :approved)
 
-    # Test that the iframe is present and has the correct attributes
-    assert_selector "iframe[data-turbo='false']"
-    assert_selector "iframe[type='application/pdf']"
-    assert_selector "iframe[src]"
-    assert_selector "iframe[data-original-src]"
+      visit admin_vendor_w9_review_path(@vendor, review)
 
-    assert_text "Review Details"
-    assert_text "Approved"
-  end
+      # Test that the iframe is present and has the correct attributes
+      assert_selector "iframe[data-turbo='false']"
+      assert_selector "iframe[type='application/pdf']"
+      assert_selector 'iframe[src]'
+      assert_selector 'iframe[data-original-src]'
 
-  test "viewing rejected W9 review details" do
-    review = create(:w9_review, :rejected, vendor: @vendor, admin: @admin)
+      assert_text 'Review Details'
+      assert_text 'Approved'
+    end
 
-    visit admin_vendor_w9_review_path(@vendor, review)
+    test 'viewing rejected W9 review details' do
+      review = create(:w9_review, :rejected, vendor: @vendor, admin: @admin)
 
-    assert_text "Review Details"
-    assert_text "Rejected"
-    assert_text "Rejection Reason"
-    assert_text review.rejection_reason
+      visit admin_vendor_w9_review_path(@vendor, review)
+
+      assert_text 'Review Details'
+      assert_text 'Rejected'
+      assert_text 'Rejection Reason'
+      assert_text review.rejection_reason
+    end
   end
 end

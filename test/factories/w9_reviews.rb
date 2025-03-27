@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 FactoryBot.define do
   factory :w9_review do
     vendor
@@ -12,7 +14,7 @@ FactoryBot.define do
     trait :rejected do
       status { :rejected }
       rejection_reason_code { :address_mismatch }
-      rejection_reason { "The address on the W9 form does not match the business address." }
+      rejection_reason { 'The address on the W9 form does not match the business address.' }
     end
   end
 end

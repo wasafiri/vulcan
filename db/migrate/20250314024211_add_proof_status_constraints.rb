@@ -1,4 +1,4 @@
-class AddProofStatusConstraints < ActiveRecord::Migration[7.0]
+class AddProofStatusConstraints < 
   def up
     # Make sure income_proof_status and residency_proof_status cannot be NULL
     change_column_null :applications, :income_proof_status, false, 0  # Default to not_reviewed (0)

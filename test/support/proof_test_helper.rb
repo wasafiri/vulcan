@@ -24,28 +24,28 @@ module ProofTestHelper
       income_blob.stubs(:byte_size).with(any_parameters).returns(1024)
       income_blob.stubs(:created_at).with(any_parameters).returns(1.day.ago)
       income_blob.stubs(:filename).with(any_parameters).returns('income.pdf')
-      
+
       residency_blob = mock
       residency_blob.stubs(:content_type).with(any_parameters).returns('application/pdf')
       residency_blob.stubs(:byte_size).with(any_parameters).returns(1024)
       residency_blob.stubs(:created_at).with(any_parameters).returns(1.day.ago)
       residency_blob.stubs(:filename).with(any_parameters).returns('residency.pdf')
-      
+
       # Create attachment mocks with flexible method calls
       income_proof_mock = mock
       income_proof_mock.stubs(:attached?).with(any_parameters).returns(true)
       income_proof_mock.stubs(:blob).with(any_parameters).returns(income_blob)
       income_proof_mock.stubs(:content_type).with(any_parameters).returns('application/pdf')
-      income_proof_mock.stubs(:download).with(any_parameters).returns("fake pdf content")
+      income_proof_mock.stubs(:download).with(any_parameters).returns('fake pdf content')
       income_proof_mock.stubs(:filename).with(any_parameters).returns('income.pdf')
-      
+
       residency_proof_mock = mock
       residency_proof_mock.stubs(:attached?).with(any_parameters).returns(true)
       residency_proof_mock.stubs(:blob).with(any_parameters).returns(residency_blob)
       residency_proof_mock.stubs(:content_type).with(any_parameters).returns('application/pdf')
-      residency_proof_mock.stubs(:download).with(any_parameters).returns("fake pdf content")
+      residency_proof_mock.stubs(:download).with(any_parameters).returns('fake pdf content')
       residency_proof_mock.stubs(:filename).with(any_parameters).returns('residency.pdf')
-      
+
       # Stub methods at the Application level
       Application.any_instance.stubs(:income_proof_attached?).with(any_parameters).returns(true)
       Application.any_instance.stubs(:residency_proof_attached?).with(any_parameters).returns(true)

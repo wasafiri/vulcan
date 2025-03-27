@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Session < ApplicationRecord
   # associates the session with a user
   belongs_to :user

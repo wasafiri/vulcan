@@ -1,85 +1,87 @@
+# frozen_string_literal: true
+
 namespace :notification_tracking do
-  desc "Backfill delivery status for existing medical certification requests"
-  task :backfill, [:fix_duplicates, :app_id] => :environment do |_t, args|
+  desc 'Backfill delivery status for existing medical certification requests'
+  task :backfill, %i[fix_duplicates app_id] => :environment do |_t, args|
     # Parse arguments
     fix_duplicates = args[:fix_duplicates].to_s.downcase == 'true'
     application_id = args[:app_id]
     dry_run = ENV['DRY_RUN'].to_s.downcase == 'true'
-    
+
     # Build the query for notifications
-    query = Notification.where(action: "medical_certification_requested")
-    
+    query = Notification.where(action: 'medical_certification_requested')
+
     if application_id.present?
       puts "Targeting only Application ##{application_id}"
-      query = query.where(notifiable_type: "Application", notifiable_id: application_id)
+      query = query.where(notifiable_type: 'Application', notifiable_id: application_id)
     end
-    
+
     # First pass - identify notifications without message IDs
     backfill_query = query.where(message_id: nil)
     total_backfill = backfill_query.count
     puts "Found #{total_backfill} notifications without message IDs to process"
-    
+
     # Check for duplicates across all applications
     if fix_duplicates || dry_run
-      puts "Checking for potential duplicate notifications..."
-      
+      puts 'Checking for potential duplicate notifications...'
+
       # Group notifications by application
       duplicate_counts = {}
-      app_notifications = query.group_by { |n| n.notifiable_id }
-      
+      app_notifications = query.group_by(&:notifiable_id)
+
       app_notifications.each do |app_id, notifications|
         next unless app_id && notifications.first.notifiable.is_a?(Application)
-        
+
         # Count notifications per request_count for this application
         request_count_map = {}
         notifications.each do |notification|
-          if notification.metadata.present? && notification.metadata['request_count'].present?
-            count = notification.metadata['request_count'].to_i
-            request_count_map[count] ||= []
-            request_count_map[count] << notification.id
-          end
+          next unless notification.metadata.present? && notification.metadata['request_count'].present?
+
+          count = notification.metadata['request_count'].to_i
+          request_count_map[count] ||= []
+          request_count_map[count] << notification.id
         end
-        
+
         # Find duplicate request counts
         app_duplicates = request_count_map.select { |_, ids| ids.size > 1 }
-        if app_duplicates.any?
-          duplicate_counts[app_id] = app_duplicates
-          puts "Application ##{app_id}: Has duplicate notifications for request counts: #{app_duplicates.keys.join(', ')}"
-          
-          # Fix duplicates if requested
-          if fix_duplicates && !dry_run
-            puts "Fixing duplicates for Application ##{app_id}..."
-            total_removed = fix_duplicates_for_app(app_id, app_duplicates, notifications)
-            puts "Removed #{total_removed} duplicate notifications for Application ##{app_id}"
-          end
-        end
+        next unless app_duplicates.any?
+
+        duplicate_counts[app_id] = app_duplicates
+        puts "Application ##{app_id}: Has duplicate notifications for request counts: #{app_duplicates.keys.join(', ')}"
+
+        # Fix duplicates if requested
+        next unless fix_duplicates && !dry_run
+
+        puts "Fixing duplicates for Application ##{app_id}..."
+        total_removed = fix_duplicates_for_app(app_id, app_duplicates, notifications)
+        puts "Removed #{total_removed} duplicate notifications for Application ##{app_id}"
       end
-      
+
       puts "Found duplicates in #{duplicate_counts.keys.size} applications" if duplicate_counts.any?
       puts 'DRY RUN - No changes were made' if dry_run && duplicate_counts.any?
     end
-    
+
     # Skip actual backfill if this is just a dry run
     if dry_run
-      puts "DRY RUN - Skipping backfill operation"
+      puts 'DRY RUN - Skipping backfill operation'
       return
     end
-    
+
     # Process backfill
     processed = 0
     backfill_query.find_each do |notification|
       processed += 1
       print "Processing notification #{processed}/#{total_backfill}... "
-      
+
       # Skip if the notification doesn't have the right metadata
-      if !notification.notifiable.is_a?(Application)
-        puts "SKIPPED (not an application)"
+      unless notification.notifiable.is_a?(Application)
+        puts 'SKIPPED (not an application)'
         next
       end
-      
+
       application = notification.notifiable
-      if !application.medical_provider_email.present?
-        puts "SKIPPED (no provider email)"
+      unless application.medical_provider_email.present?
+        puts 'SKIPPED (no provider email)'
         next
       end
 
@@ -103,15 +105,13 @@ namespace :notification_tracking do
 
     # Find all notifications with message IDs
     notifications = Notification.where(
-      action: "medical_certification_requested"
+      action: 'medical_certification_requested'
     ).where.not(message_id: nil)
 
     count = 0
     notifications.find_each do |notification|
       # Skip placeholder message IDs
-      if notification.message_id.start_with?("backfilled-")
-        next
-      end
+      next if notification.message_id.start_with?('backfilled-')
 
       # Schedule an update job
       UpdateEmailStatusJob.perform_later(notification.id)
@@ -171,7 +171,7 @@ namespace :notification_tracking do
 
       # Keep the first notification (either non-backfilled or oldest)
       keep = sorted_notifications.first
-      remove = sorted_notifications[1..-1]
+      remove = sorted_notifications[1..]
 
       puts "  Keeping: ID #{keep.id} (#{keep.message_id})"
       puts "  Removing: #{remove.map(&:id).join(', ')}"

@@ -1,7 +1,9 @@
+# frozen_string_literal: true
+
 class W9Review < ApplicationRecord
   # Associations
-  belongs_to :vendor, class_name: "User"
-  belongs_to :admin, class_name: "User"
+  belongs_to :vendor, class_name: 'User'
+  belongs_to :admin, class_name: 'User'
 
   # Enums
   enum :status, { approved: 0, rejected: 1 }, prefix: true
@@ -27,7 +29,7 @@ class W9Review < ApplicationRecord
   scope :recent, -> { order(created_at: :desc) }
   scope :by_admin, ->(admin_id) { where(admin_id: admin_id) }
   scope :rejections, -> { where(status: :rejected) }
-  scope :last_3_days, -> { where("created_at > ?", 3.days.ago) }
+  scope :last_3_days, -> { where('created_at > ?', 3.days.ago) }
 
   private
 
@@ -36,11 +38,11 @@ class W9Review < ApplicationRecord
   end
 
   def admin_must_be_admin_type
-    errors.add(:admin, "must be an administrator") unless admin&.type == "Admin"
+    errors.add(:admin, 'must be an administrator') unless admin&.type == 'Admin'
   end
 
   def vendor_must_be_vendor_type
-    errors.add(:vendor, "must be a vendor") unless vendor&.type == "Vendor"
+    errors.add(:vendor, 'must be a vendor') unless vendor&.type == 'Vendor'
   end
 
   def handle_post_review_actions
@@ -59,9 +61,9 @@ class W9Review < ApplicationRecord
 
       # Send appropriate notification based on status
       if status_rejected?
-        send_notification("w9_rejected")
+        send_notification('w9_rejected')
       else
-        send_notification("w9_approved")
+        send_notification('w9_approved')
       end
     rescue StandardError => e
       Rails.logger.error "Failed to process W9 review actions: #{e.message}\n#{e.backtrace.join("\n")}"
@@ -74,7 +76,7 @@ class W9Review < ApplicationRecord
   end
 
   def send_notification(action)
-    if action == "w9_rejected"
+    if action == 'w9_rejected'
       VendorNotificationsMailer.w9_rejected(vendor, self).deliver_later
     else
       VendorNotificationsMailer.w9_approved(vendor).deliver_later
@@ -99,26 +101,22 @@ class W9Review < ApplicationRecord
         Notification.create!(
           recipient: User.admins.first,
           actor: admin,
-          action: "vendor_max_w9_rejections_warning",
+          action: 'vendor_max_w9_rejections_warning',
           notifiable: vendor
         )
       end
     end
   rescue StandardError => e
     Rails.logger.error "Failed to process max rejections: #{e.message}"
-    errors.add(:base, "Failed to process rejection limits")
+    errors.add(:base, 'Failed to process rejection limits')
     raise ActiveRecord::Rollback
   end
 
   def validate_rejection_fields
     if status_rejected?
-      if rejection_reason.blank?
-        errors.add(:rejection_reason, "must be provided when rejecting a W9")
-      end
+      errors.add(:rejection_reason, 'must be provided when rejecting a W9') if rejection_reason.blank?
 
-      if rejection_reason_code.blank?
-        errors.add(:rejection_reason_code, "must be selected when rejecting a W9")
-      end
+      errors.add(:rejection_reason_code, 'must be selected when rejecting a W9') if rejection_reason_code.blank?
     else
       # Clear rejection fields if status is not rejected
       self.rejection_reason = nil

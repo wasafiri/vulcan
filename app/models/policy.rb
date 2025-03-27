@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Policy < ApplicationRecord
   validates :key, presence: true, uniqueness: true
   validates :value, presence: true, numericality: { only_integer: true }
@@ -45,12 +47,12 @@ class Policy < ApplicationRecord
   end
 
   def self.voucher_validity_period
-    months = get("voucher_validity_period_months") || 6
+    months = get('voucher_validity_period_months') || 6
     months.months
   end
 
   def self.voucher_minimum_redemption_amount
-    get("voucher_minimum_redemption_amount") || 10
+    get('voucher_minimum_redemption_amount') || 10
   end
 
   def self.voucher_value_for_disability(disability_type)
@@ -61,25 +63,25 @@ class Policy < ApplicationRecord
   private
 
   def log_change
-    if saved_change_to_value?
-      policy_changes.create!(
-        user: updated_by,  # Changed from Current.user to updated_by
-        previous_value: value_before_last_save,
-        new_value: value
-      )
-    end
+    return unless saved_change_to_value?
+
+    policy_changes.create!(
+      user: updated_by, # Changed from Current.user to updated_by
+      previous_value: value_before_last_save,
+      new_value: value
+    )
   end
 
   validate :validate_voucher_value
 
   def validate_voucher_value
-    if VOUCHER_KEYS.include?(key)
-      if key.end_with?("_months", "_amount")
-        errors.add(:value, "must be between 1 and 12") if key.end_with?("_months") && !value.between?(1, 12)
-        errors.add(:value, "must be between 1 and 1000") if key.end_with?("_amount") && !value.between?(1, 1000)
-      else
-        errors.add(:value, "must be between 1 and 10000") unless value.between?(1, 10000)
-      end
+    return unless VOUCHER_KEYS.include?(key)
+
+    if key.end_with?('_months', '_amount')
+      errors.add(:value, 'must be between 1 and 12') if key.end_with?('_months') && !value.between?(1, 12)
+      errors.add(:value, 'must be between 1 and 1000') if key.end_with?('_amount') && !value.between?(1, 1000)
+    else
+      errors.add(:value, 'must be between 1 and 10000') unless value.between?(1, 10_000)
     end
   end
 end

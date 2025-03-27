@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module MailerHelper
   # Get the color values for a status box
   # @param status [Symbol] The status (:success, :warning, :error, :info)
@@ -5,28 +7,28 @@ module MailerHelper
   def status_box_colors(status)
     colors = {
       success: {
-        bg: "#ebf8ff",      # Light blue background
-        border: "#90cdf4",  # Medium blue border
-        text: "#2b6cb0",    # Dark blue text
-        icon: "✓"           # Success icon
+        bg: '#ebf8ff',      # Light blue background
+        border: '#90cdf4',  # Medium blue border
+        text: '#2b6cb0',    # Dark blue text
+        icon: '✓'           # Success icon
       },
       warning: {
-        bg: "#fffaf0",      # Light orange background
-        border: "#fbd38d",  # Medium orange border
-        text: "#c05621",    # Dark orange text
-        icon: "⚠"           # Warning icon
+        bg: '#fffaf0',      # Light orange background
+        border: '#fbd38d',  # Medium orange border
+        text: '#c05621',    # Dark orange text
+        icon: '⚠'           # Warning icon
       },
       error: {
-        bg: "#fff5f5",      # Light red background
-        border: "#feb2b2",  # Medium red border
-        text: "#c53030",    # Dark red text
-        icon: "✗"           # Error icon
+        bg: '#fff5f5',      # Light red background
+        border: '#feb2b2',  # Medium red border
+        text: '#c53030',    # Dark red text
+        icon: '✗'           # Error icon
       },
       info: {
-        bg: "#ebf4ff",      # Light blue background
-        border: "#c3dafe",  # Medium blue border
-        text: "#434190",    # Dark blue text
-        icon: "ℹ"           # Info icon
+        bg: '#ebf4ff',      # Light blue background
+        border: '#c3dafe',  # Medium blue border
+        text: '#434190',    # Dark blue text
+        icon: 'ℹ'           # Info icon
       }
     }
 
@@ -111,21 +113,21 @@ module MailerHelper
   # @param proof_type [String, Symbol, Integer] The proof type
   # @return [String] The formatted proof type
   def format_proof_type(proof_type)
-    return "" if proof_type.nil?
+    return '' if proof_type.nil?
 
     # If it's a ProofReview instance, get the proof_type before type cast
-    if proof_type.respond_to?(:proof_type_before_type_cast)
-      type_value = proof_type.proof_type_before_type_cast
-    else
-      type_value = proof_type
-    end
+    type_value = if proof_type.respond_to?(:proof_type_before_type_cast)
+                   proof_type.proof_type_before_type_cast
+                 else
+                   proof_type
+                 end
 
     # Convert to string and handle both symbol and integer cases
     case type_value.to_s
-    when "0", "income"
-      "income"
-    when "1", "residency"
-      "residency"
+    when '0', 'income'
+      'income'
+    when '1', 'residency'
+      'residency'
     else
       type_value.to_s
     end.humanize.downcase
@@ -137,9 +139,10 @@ module MailerHelper
   # @return [String] The formatted scheduling information text
   def training_session_schedule_text(training_session)
     if training_session.scheduled_for.present?
-      "A training session has been tentatively scheduled for #{format_date(training_session.scheduled_for, :full)}, but you may reschedule this with the constituent as needed."
+      "A training session has been tentatively scheduled for #{format_date(training_session.scheduled_for,
+                                                                           :full)}, but you may reschedule this with the constituent as needed."
     else
-      "Please contact the constituent to schedule a training session at a mutually convenient time."
+      'Please contact the constituent to schedule a training session at a mutually convenient time.'
     end
   end
 
@@ -164,13 +167,13 @@ module MailerHelper
   def format_date_str(date, format)
     case format
     when :short
-      date.strftime("%m/%d/%Y")
+      date.strftime('%m/%d/%Y')
     when :long
-      date.strftime("%B %d %Y")
+      date.strftime('%B %d %Y')
     when :full
-      date.strftime("%B %d %Y at %I:%M %p")
+      date.strftime('%B %d %Y at %I:%M %p')
     else
-      date.strftime("%B %d %Y")
+      date.strftime('%B %d %Y')
     end
   rescue StandardError => e
     Rails.logger.error("Error formatting date: #{e.message} for date: #{date.inspect}")

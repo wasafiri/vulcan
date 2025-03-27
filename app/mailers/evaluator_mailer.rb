@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class EvaluatorMailer < ApplicationMailer
   def new_evaluation_assigned
     @evaluation = params[:evaluation]
@@ -8,7 +10,7 @@ class EvaluatorMailer < ApplicationMailer
     mail(
       to: @evaluator.email,
       subject: "New Evaluation Assigned - Application ##{@application.id}",
-      message_stream: "notifications"
+      message_stream: 'notifications'
     )
   end
 
@@ -30,7 +32,7 @@ class EvaluatorMailer < ApplicationMailer
     mail(
       to: @constituent.email,
       subject: "Your Evaluation has been Submitted - Application ##{@application.id}",
-      message_stream: "notifications"
+      message_stream: 'notifications'
     )
   end
 end

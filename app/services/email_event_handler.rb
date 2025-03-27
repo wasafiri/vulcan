@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class EmailEventHandler
   def initialize(params)
     @params = params

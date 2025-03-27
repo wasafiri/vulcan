@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ProofManageable
   extend ActiveSupport::Concern
 
@@ -22,18 +24,18 @@ module ProofManageable
 
   def proof_attachments_changed?
     # Use Rails' built-in ActiveStorage detection for attachment changes
-    if respond_to?(:attachment_changes)
-      return true if attachment_changes.present? && (attachment_changes['income_proof'].present? || attachment_changes['residency_proof'].present?)
+    if respond_to?(:attachment_changes) && attachment_changes.present? && (attachment_changes['income_proof'].present? || attachment_changes['residency_proof'].present?)
+      return true
     end
 
     # For testing and older Rails versions
     return false if new_record?
 
     # Check if we recently attached these proofs
-    if respond_to?(:saved_change_to_attribute?)
+    if respond_to?(:saved_change_to_attribute?) && (saved_change_to_attribute?(:income_proof_attachment_id) ||
+                     saved_change_to_attribute?(:residency_proof_attachment_id))
       # Use saved_change_to_attribute for association changes
-      return true if saved_change_to_attribute?(:income_proof_attachment_id) ||
-                     saved_change_to_attribute?(:residency_proof_attachment_id)
+      return true
     end
 
     # Final fallback - use direct SQL detection
@@ -53,8 +55,8 @@ module ProofManageable
       # Use two different checks to handle both production and test environments
 
       # Income proof audit
-      if income_proof.attached? && 
-         ((respond_to?(:attachment_changes) && attachment_changes['income_proof'].present?) || 
+      if income_proof.attached? &&
+         ((respond_to?(:attachment_changes) && attachment_changes['income_proof'].present?) ||
           (respond_to?(:saved_change_to_attribute?) && saved_change_to_attribute?(:income_proof_attachment_id)))
         proof_submission_audits.create!(
           proof_type: 'income',
@@ -71,8 +73,8 @@ module ProofManageable
       end
 
       # Residency proof audit
-      if residency_proof.attached? && 
-         ((respond_to?(:attachment_changes) && attachment_changes['residency_proof'].present?) || 
+      if residency_proof.attached? &&
+         ((respond_to?(:attachment_changes) && attachment_changes['residency_proof'].present?) ||
           (respond_to?(:saved_change_to_attribute?) && saved_change_to_attribute?(:residency_proof_attachment_id)))
         proof_submission_audits.create!(
           proof_type: 'residency',
@@ -130,7 +132,8 @@ module ProofManageable
 
   # Special method for updating to rejected status that bypasses validations
   # This is needed for paper applications where we reject without attachment
-  def reject_proof_without_attachment!(proof_type, admin:, reason: 'other', notes: 'Rejected during application submission')
+  def reject_proof_without_attachment!(proof_type, admin:, reason: 'other',
+                                       notes: 'Rejected during application submission')
     attr_name = "#{proof_type}_proof_status"
 
     begin
@@ -147,7 +150,7 @@ module ProofManageable
         )
 
         # Then update the status directly in the database to bypass validations
-        update_column(attr_name, Application.public_send("#{attr_name.pluralize}").fetch(:rejected))
+        update_column(attr_name, Application.public_send(attr_name.pluralize.to_s).fetch(:rejected))
       end
 
       reload
@@ -211,7 +214,7 @@ module ProofManageable
   def check_proof_size(attribute, proof)
     return unless proof.attached? && proof.byte_size > MAX_FILE_SIZE
 
-    errors.add(attribute, "is too large. Maximum size allowed is 5MB.")
+    errors.add(attribute, 'is too large. Maximum size allowed is 5MB.')
   end
 
   # Verifies that proofs have the right attachment state based on status
@@ -272,10 +275,10 @@ module ProofManageable
   def validate_not_reviewed_proof(proof:, status_check_method:, error_field:, label:)
     return unless proof.attached? && send(status_check_method)
 
-    if proof.blob && proof.blob.created_at
+    if proof.blob&.created_at
       if proof.blob.created_at < 1.minute.ago
         Rails.logger.error("#{label} is attached but status is still not_reviewed for application #{id}")
-        errors.add(error_field, "should be updated when proof is attached")
+        errors.add(error_field, 'should be updated when proof is attached')
       end
     else
       Rails.logger.warn("#{label} blob missing created_at timestamp for application #{id}")

@@ -1,18 +1,17 @@
-# This is an alias to the Users::Admin class for backward compatibility
-# Future code should use Users::Admin directly
-class Admin < User
-  def self.method_missing(method, *args, &block)
-    Users::Admin.send(method, *args, &block)
-  end
+# frozen_string_literal: true
 
-  def method_missing(method, *args, &block)
-    Users::Admin.instance_method(method).bind(self).call(*args, &block) if Users::Admin.instance_methods.include?(method)
-  end
+# This file acts as a bridge between:
+# 1. The Admin module needed for namespacing (Admin::BaseController, etc.)
+# 2. The Users::Admin class needed for Single Table Inheritance
 
-  def can_manage_users?
-    true
-  end
-end
+# The Admin module is defined by the initializer 001_admin_namespace.rb
+# This ensures it's loaded early in the boot process
 
-# Explicitly load the real implementation to avoid loading order issues
+# For STI usage, redirect the 'Admin' constant to Users::Admin
+# when used in the context of User type='Admin'
+#
+# The actual mapping between type="Admin" and Users::Admin is done in
+# config/initializers/sti_type_mapping.rb using ActiveRecord hooks
+
+# Include the actual implementation
 require_dependency 'users/admin'

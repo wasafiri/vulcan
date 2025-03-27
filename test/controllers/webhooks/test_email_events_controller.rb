@@ -1,4 +1,6 @@
-require "webhook_signature"
+# frozen_string_literal: true
+
+require 'webhook_signature'
 
 module Webhooks
   # Test-specific email events controller that inherits from our test base controller
@@ -16,12 +18,12 @@ module Webhooks
 
       # Validate event-specific fields
       case params[:event]
-      when "bounce"
+      when 'bounce'
         # Validate bounce fields
         return false if params[:bounce].blank? || !params[:bounce].is_a?(ActionController::Parameters)
         return false if params[:bounce][:type].blank?
         return false if params[:bounce][:diagnostics].blank?
-      when "complaint"
+      when 'complaint'
         # Validate complaint fields
         return false if params[:complaint].blank? || !params[:complaint].is_a?(ActionController::Parameters)
         return false if params[:complaint][:type].blank?
@@ -61,7 +63,8 @@ module Webhooks
 
     # Helper method for webhook debugging
     def webhook_debug(message)
-      return unless ENV["DEBUG_WEBHOOKS"] == "true"
+      return unless ENV['DEBUG_WEBHOOKS'] == 'true'
+
       Rails.logger.debug "[WEBHOOK DEBUG] #{message}"
     end
   end

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ApplicationStatusManagement
   extend ActiveSupport::Concern
 
@@ -35,34 +37,34 @@ module ApplicationStatusManagement
     }, prefix: true
 
     # Status-related scopes
-    scope :active, -> { where(status: [ :in_progress, :needs_information, :reminder_sent, :awaiting_documents ]) }
+    scope :active, -> { where(status: %i[in_progress needs_information reminder_sent awaiting_documents]) }
     scope :draft, -> { where(status: :draft) }
     scope :submitted, -> { where.not(status: :draft) }
     scope :filter_by_status, ->(status) { where(status: status) if status.present? }
-    scope :filter_by_type, ->(filter_type) {
-       case filter_type
-       when 'proofs_needing_review'
-         where(
-           'income_proof_status = ? OR residency_proof_status = ?',
-           income_proof_statuses[:not_reviewed],
-           residency_proof_statuses[:not_reviewed]
-         )
-       when 'proofs_rejected'
-         where(
-           income_proof_status: income_proof_statuses[:rejected],
-           residency_proof_status: residency_proof_statuses[:rejected]
-         )
-       when 'awaiting_medical_response'
-         where(status: statuses[:awaiting_documents])
-       end
-     }
-     scope :sorted_by, ->(column, direction) {
+    scope :filter_by_type, lambda { |filter_type|
+      case filter_type
+      when 'proofs_needing_review'
+        where(
+          'income_proof_status = ? OR residency_proof_status = ?',
+          income_proof_statuses[:not_reviewed],
+          residency_proof_statuses[:not_reviewed]
+        )
+      when 'proofs_rejected'
+        where(
+          income_proof_status: income_proof_statuses[:rejected],
+          residency_proof_status: residency_proof_statuses[:rejected]
+        )
+      when 'awaiting_medical_response'
+        where(status: statuses[:awaiting_documents])
+      end
+    }
+    scope :sorted_by, lambda { |column, direction|
       direction = direction&.downcase == 'desc' ? 'desc' : 'asc'
 
       if column.present?
         if column.start_with?('user.')
           association = 'users'
-          column_name = column.split(".").last
+          column_name = column.split('.').last
           joins(:user).order("#{association}.#{column_name} #{direction}")
         elsif column_names.include?(column)
           order("#{column} #{direction}")
@@ -122,34 +124,34 @@ module ApplicationStatusManagement
 
   def requirements_met_for_approval?
     # Only run this when relevant fields have changed
-    return false unless saved_change_to_income_proof_status? || 
-                        saved_change_to_residency_proof_status? || 
+    return false unless saved_change_to_income_proof_status? ||
+                        saved_change_to_residency_proof_status? ||
                         saved_change_to_medical_certification_status?
-    
+
     # Only auto-approve applications that aren't already approved
     return false if status_approved?
-    
+
     # Check if all requirements are met
     all_requirements_met?
   end
 
   def all_requirements_met?
-    income_proof_status_approved? && 
-    residency_proof_status_approved? && 
-    medical_certification_status_accepted?
+    income_proof_status_approved? &&
+      residency_proof_status_approved? &&
+      medical_certification_status_accepted?
   end
 
   def auto_approve_if_eligible
     # Use update_column to avoid callbacks loop
     update_column(:status, self.class.statuses[:approved])
-    
+
     # Log the auto-approval if possible
     begin
       if defined?(Event) && Event.respond_to?(:create)
         # Try to find system user or admin
-        system_user = User.find_by(email: 'system@example.com') || 
+        system_user = User.find_by(email: 'system@example.com') ||
                       User.where(type: 'Admin').first
-        
+
         # Only create event if we have a valid user
         if system_user
           Event.create(

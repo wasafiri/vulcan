@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # This file stubs out notification delivery methods for testing
 
 # Stub NotificationJob and NotificationRetryJob

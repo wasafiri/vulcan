@@ -1,24 +1,31 @@
-class Admin::ApplicationNotesController < Admin::BaseController
-  before_action :set_application
+# frozen_string_literal: true
 
-  def create
-    @note = @application.application_notes.new(note_params)
-    @note.admin = current_user
+module Admin
+  # Manages application notes for admin users, allowing them to create and attach
+  # notes to application records for internal communication and tracking purposes
+  class ApplicationNotesController < BaseController
+    before_action :set_application
 
-    if @note.save
-      redirect_to admin_application_path(@application), notice: 'Note added successfully.'
-    else
-      redirect_to admin_application_path(@application), alert: "Failed to add note: #{@note.errors.full_messages.join(', ')}"
+    def create
+      @note = @application.application_notes.new(note_params)
+      @note.admin = current_user
+
+      if @note.save
+        redirect_to admin_application_path(@application), notice: 'Note added successfully.'
+      else
+        error_message = "Failed to add note: #{@note.errors.full_messages.join(', ')}"
+        redirect_to admin_application_path(@application), alert: error_message
+      end
     end
-  end
 
-  private
+    private
 
-  def set_application
-    @application = Application.find(params[:application_id])
-  end
+    def set_application
+      @application = Application.find(params[:application_id])
+    end
 
-  def note_params
-    params.require(:application_note).permit(:content, :internal_only)
+    def note_params
+      params.require(:application_note).permit(:content, :internal_only)
+    end
   end
 end

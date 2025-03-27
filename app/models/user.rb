@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # User model that serves as the base class for all user types in the system
 class User < ApplicationRecord
   # Class methods
@@ -58,9 +60,9 @@ class User < ApplicationRecord
   def self.capable_types_for(capability)
     case capability
     when 'can_train'
-      ['Admin', 'Trainer']
+      %w[Admin Trainer]
     when 'can_evaluate'
-      ['Admin', 'Evaluator']
+      %w[Admin Evaluator]
     else
       []
     end
@@ -172,11 +174,10 @@ class User < ApplicationRecord
     if new_capability.save
       Rails.logger.info "Successfully added capability #{capability} to user #{id}"
       reset_all_caches
-      new_capability
     else
       Rails.logger.error "Failed to add capability #{capability} to user #{id}: #{new_capability.errors.full_messages}"
-      new_capability
     end
+    new_capability
   end
 
   def cached_capabilities
@@ -189,6 +190,7 @@ class User < ApplicationRecord
 
   def remove_capability(capability)
     return true unless has_capability?(capability)
+
     role_capabilities.find_by(capability: capability)&.destroy
   end
 
@@ -250,26 +252,22 @@ class User < ApplicationRecord
     caps << 'can_train' if trainer? || admin?
     caps
   end
-  
+
   def validate_address_for_letter_preference
     # Fix the comparison to use the enum correctly
     return unless communication_preference.to_s == 'letter' || communication_preference == :letter
-    
+
     # Validate that address fields are present when letter preference is selected
     if physical_address_1.blank?
       errors.add(:physical_address_1, 'is required when notification method is set to letter')
     end
-    
-    if city.blank?
-      errors.add(:city, 'is required when notification method is set to letter')
-    end
-    
-    if state.blank?
-      errors.add(:state, 'is required when notification method is set to letter')
-    end
-    
-    if zip_code.blank?
-      errors.add(:zip_code, 'is required when notification method is set to letter')
-    end
+
+    errors.add(:city, 'is required when notification method is set to letter') if city.blank?
+
+    errors.add(:state, 'is required when notification method is set to letter') if state.blank?
+
+    return unless zip_code.blank?
+
+    errors.add(:zip_code, 'is required when notification method is set to letter')
   end
 end

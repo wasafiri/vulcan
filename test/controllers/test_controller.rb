@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class TestController < ApplicationController
   def auth_status
     render json: {

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ConstituentNamespaceHelper
   # This helper is used to load the Constituent namespace controllers
   # without conflicting with the Constituent model

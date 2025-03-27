@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class ApplicationNotificationsMailerPreview < ActionMailer::Preview
   def proof_approved
     application = Application.first
@@ -24,23 +26,23 @@ class ApplicationNotificationsMailerPreview < ActionMailer::Preview
 
   def account_created
     constituent = Constituent.first
-    temp_password = "temporary123"
+    temp_password = 'temporary123'
     ApplicationNotificationsMailer.account_created(constituent, temp_password)
   end
 
   def income_threshold_exceeded
     constituent_params = {
-      first_name: "John",
-      last_name: "Doe",
-      email: "john.doe@example.com",
-      phone: "555-123-4567"
+      first_name: 'John',
+      last_name: 'Doe',
+      email: 'john.doe@example.com',
+      phone: '555-123-4567'
     }
 
     notification_params = {
       household_size: 2,
-      annual_income: 100000,
-      communication_preference: "email",
-      additional_notes: "Income exceeds threshold"
+      annual_income: 100_000,
+      communication_preference: 'email',
+      additional_notes: 'Income exceeds threshold'
     }
 
     ApplicationNotificationsMailer.income_threshold_exceeded(constituent_params, notification_params)

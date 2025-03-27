@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class WebhookRetryJob < ApplicationJob
   queue_as :webhooks
   retry_on StandardError, wait: :exponentially_longer, attempts: 5

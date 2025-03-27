@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class RateLimit
   class ExceededError < StandardError; end
 
@@ -18,7 +20,8 @@ class RateLimit
     Rails.cache.with_local_cache do
       current_usage_count = current_usage_count()
       if current_usage_count >= @limit[:max]
-        raise ExceededError, "Rate limit exceeded for #{@action} (#{@method}): maximum #{@limit[:max]} submissions per #{@limit[:period] / 1.hour} hour(s)"
+        raise ExceededError,
+              "Rate limit exceeded for #{@action} (#{@method}): maximum #{@limit[:max]} submissions per #{@limit[:period] / 1.hour} hour(s)"
       end
 
       increment_count

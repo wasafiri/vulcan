@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Webhooks
   class MedicalCertificationsController < BaseController
     def create
@@ -42,7 +44,7 @@ module Webhooks
           application: application,
           provider_email: provider_email,
           provider_name: params[:provider_name],
-          submission_method: "webhook",
+          submission_method: 'webhook',
           metadata: certification_metadata
         )
 
@@ -53,7 +55,7 @@ module Webhooks
 
     def notify_admins(certification)
       AdminNotifier.new(
-        subject: "New Medical Certification Received",
+        subject: 'New Medical Certification Received',
         message: "Medical certification received for Application ##{certification.id}",
         level: :info
       ).notify_all

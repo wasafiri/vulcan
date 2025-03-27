@@ -3,7 +3,7 @@
 module TestBrowsers
   module Version
     # The stable Chrome for Testing version
-    CHROME_VERSION = "134.0.6998.35"
+    CHROME_VERSION = '134.0.6998.35'
 
     # Determine the platform-specific identifier for downloads
     def self.chrome_platform

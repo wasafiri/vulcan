@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Mailers
   module ApplicationNotificationsHelper
     def format_proof_type(proof_type)

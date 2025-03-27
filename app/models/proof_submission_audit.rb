@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class ProofSubmissionAudit < ApplicationRecord
   belongs_to :application
   belongs_to :user
@@ -28,7 +30,7 @@ class ProofSubmissionAudit < ApplicationRecord
     # Use Rails logger if AdminNotifier is not available
     if defined?(AdminNotifier)
       AdminNotifier.new(
-        subject: "Suspicious Proof Submission",
+        subject: 'Suspicious Proof Submission',
         message: "Multiple submissions detected from IP #{ip_address}",
         level: :warning
       ).notify_all
@@ -43,8 +45,8 @@ class ProofSubmissionAudit < ApplicationRecord
 
   def recent_submissions_from_ip
     self.class
-      .where(ip_address: ip_address)
-      .where("created_at > ?", 1.hour.ago)
-      .count
+        .where(ip_address: ip_address)
+        .where('created_at > ?', 1.hour.ago)
+        .count
   end
 end

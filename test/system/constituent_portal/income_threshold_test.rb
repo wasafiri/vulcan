@@ -1,105 +1,109 @@
-require "application_system_test_case"
+# frozen_string_literal: true
 
-class ConstituentPortal::IncomeThresholdTest < ApplicationSystemTestCase
-  setup do
-    @constituent = users(:constituent_john)
-    sign_in @constituent
+require 'application_system_test_case'
 
-    # Set up FPL policies for testing
-    Policy.find_or_create_by(key: "fpl_1_person").update(value: 15000)
-    Policy.find_or_create_by(key: "fpl_2_person").update(value: 20000)
-    Policy.find_or_create_by(key: "fpl_modifier_percentage").update(value: 400)
-  end
+module ConstituentPortal
+  class IncomeThresholdTest < ApplicationSystemTestCase
+    setup do
+      @constituent = users(:constituent_john)
+      sign_in @constituent
 
-  test "constituent cannot submit application when income exceeds threshold" do
-    visit new_constituent_portal_application_path
+      # Set up FPL policies for testing
+      Policy.find_or_create_by(key: 'fpl_1_person').update(value: 15_000)
+      Policy.find_or_create_by(key: 'fpl_2_person').update(value: 20_000)
+      Policy.find_or_create_by(key: 'fpl_modifier_percentage').update(value: 400)
+    end
 
-    # Fill in required fields
-    check "I certify that I am a resident of Maryland"
+    test 'constituent cannot submit application when income exceeds threshold' do
+      visit new_constituent_portal_application_path
 
-    # Enter household size and income that exceeds threshold
-    fill_in "Household Size", with: "2"
-    fill_in "Annual Income", with: "100000" # 100k > 400% of 20k
+      # Fill in required fields
+      check 'I certify that I am a resident of Maryland'
 
-    # Move focus to trigger validation
-    find("body").click
+      # Enter household size and income that exceeds threshold
+      fill_in 'Household Size', with: '2'
+      fill_in 'Annual Income', with: '100000' # 100k > 400% of 20k
 
-    # Warning should be visible
-    assert_selector "#income-threshold-warning:not(.hidden)", visible: true
+      # Move focus to trigger validation
+      find('body').click
 
-    # Submit button should be disabled
-    assert_selector "input[name='submit_application'][disabled]"
+      # Warning should be visible
+      assert_selector '#income-threshold-warning:not(.hidden)', visible: true
 
-    # Try to submit the form by clicking the button (should not work)
-    find("input[name='submit_application']").click
+      # Submit button should be disabled
+      assert_selector "input[name='submit_application'][disabled]"
 
-    # Should still be on the same page
-    assert_current_path new_constituent_portal_application_path
-  end
+      # Try to submit the form by clicking the button (should not work)
+      find("input[name='submit_application']").click
 
-  test "constituent can submit application when income is within threshold" do
-    visit new_constituent_portal_application_path
+      # Should still be on the same page
+      assert_current_path new_constituent_portal_application_path
+    end
 
-    # Fill in required fields
-    check "I certify that I am a resident of Maryland"
-    check "I certify that I have a disability that affects my ability to access telecommunications services"
-    check "Hearing"
+    test 'constituent can submit application when income is within threshold' do
+      visit new_constituent_portal_application_path
 
-    # Enter household size and income within threshold
-    fill_in "Household Size", with: "2"
-    fill_in "Annual Income", with: "50000" # 50k < 400% of 20k
+      # Fill in required fields
+      check 'I certify that I am a resident of Maryland'
+      check 'I certify that I have a disability that affects my ability to access telecommunications services'
+      check 'Hearing'
 
-    # Move focus to trigger validation
-    find("body").click
+      # Enter household size and income within threshold
+      fill_in 'Household Size', with: '2'
+      fill_in 'Annual Income', with: '50000' # 50k < 400% of 20k
 
-    # Warning should not be visible
-    assert_no_selector "#income-threshold-warning", visible: true
+      # Move focus to trigger validation
+      find('body').click
 
-    # Submit button should be enabled
-    assert_no_selector "input[name='submit_application'][disabled]"
+      # Warning should not be visible
+      assert_no_selector '#income-threshold-warning', visible: true
 
-    # Fill in remaining required fields
-    attach_file "Proof of Residency", Rails.root.join("test/fixtures/files/residency_proof.pdf"), visible: false
-    attach_file "Income Verification", Rails.root.join("test/fixtures/files/income_proof.pdf"), visible: false
+      # Submit button should be enabled
+      assert_no_selector "input[name='submit_application'][disabled]"
 
-    # Fill in medical provider information
-    fill_in "Name", with: "Dr. Smith"
-    fill_in "Phone", with: "5551234567"
-    fill_in "Email", with: "dr.smith@example.com"
+      # Fill in remaining required fields
+      attach_file 'Proof of Residency', Rails.root.join('test/fixtures/files/residency_proof.pdf'), visible: false
+      attach_file 'Income Verification', Rails.root.join('test/fixtures/files/income_proof.pdf'), visible: false
 
-    # Submit the application
-    click_on "Submit Application"
+      # Fill in medical provider information
+      fill_in 'Name', with: 'Dr. Smith'
+      fill_in 'Phone', with: '5551234567'
+      fill_in 'Email', with: 'dr.smith@example.com'
 
-    # Wait for the page to load and check for success message
-    assert_selector ".bg-green-100", wait: 5
-    assert_text "Application submitted successfully", wait: 5
-  end
+      # Submit the application
+      click_on 'Submit Application'
 
-  test "warning appears and disappears dynamically as income changes" do
-    visit new_constituent_portal_application_path
+      # Wait for the page to load and check for success message
+      assert_selector '.bg-green-100', wait: 5
+      assert_text 'Application submitted successfully', wait: 5
+    end
 
-    # Fill in household size
-    fill_in "Household Size", with: "2"
+    test 'warning appears and disappears dynamically as income changes' do
+      visit new_constituent_portal_application_path
 
-    # Enter income that exceeds threshold
-    fill_in "Annual Income", with: "100000" # 100k > 400% of 20k
-    find("body").click
+      # Fill in household size
+      fill_in 'Household Size', with: '2'
 
-    # Warning should be visible
-    assert_selector "#income-threshold-warning:not(.hidden)", visible: true
+      # Enter income that exceeds threshold
+      fill_in 'Annual Income', with: '100000' # 100k > 400% of 20k
+      find('body').click
 
-    # Change income to be within threshold
-    fill_in "Annual Income", with: "50000" # 50k < 400% of 20k
-    find("body").click
+      # Warning should be visible
+      assert_selector '#income-threshold-warning:not(.hidden)', visible: true
 
-    # Warning should disappear
-    assert_no_selector "#income-threshold-warning", visible: true
+      # Change income to be within threshold
+      fill_in 'Annual Income', with: '50000' # 50k < 400% of 20k
+      find('body').click
 
-    # Change income back to exceed threshold
-    fill_in "Annual Income", with: "100000" # 100k > 400% of 20k
-    find("body").click
+      # Warning should disappear
+      assert_no_selector '#income-threshold-warning', visible: true
 
-    # Warning should reappear
-    assert_selector "#income-threshold-warning:not(.hidden)", visible: true
+      # Change income back to exceed threshold
+      fill_in 'Annual Income', with: '100000' # 100k > 400% of 20k
+      find('body').click
+
+      # Warning should reappear
+      assert_selector '#income-threshold-warning:not(.hidden)', visible: true
+    end
   end
 end

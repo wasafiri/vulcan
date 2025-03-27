@@ -1,20 +1,22 @@
+# frozen_string_literal: true
+
 module Webhooks
   class EmailEventsController < BaseController
     def create
       # For testing, we need to handle the test cases correctly
       if Rails.env.test?
         # Check for test cases that should return 422
-        if params[:event] == "unknown" || params[:event] == "unknown_event" ||
-           (params[:event] == "bounce" && params[:bounce].nil?) ||
-           (params[:event] == "bounce" && params[:bounce].is_a?(String))
-          Rails.logger.debug "Test case: Invalid payload detected"
+        if params[:event] == 'unknown' || params[:event] == 'unknown_event' ||
+           (params[:event] == 'bounce' && params[:bounce].nil?) ||
+           (params[:event] == 'bounce' && params[:bounce].is_a?(String))
+          Rails.logger.debug 'Test case: Invalid payload detected'
           head :unprocessable_entity
           return
         end
 
         # Skip actual processing if MedicalProviderEmail doesn't exist
-        if !defined?(MedicalProviderEmail)
-          Rails.logger.debug "Skipping actual processing in test environment"
+        unless defined?(MedicalProviderEmail)
+          Rails.logger.debug 'Skipping actual processing in test environment'
           head :ok
           return
         end
@@ -36,9 +38,9 @@ module Webhooks
       valid = required_fields.all? { |field| params[field].present? }
 
       # Additional validation for specific event types
-      if valid && params[:event] == "bounce"
+      if valid && params[:event] == 'bounce'
         valid = params[:bounce].present? && !params[:bounce].is_a?(String)
-      elsif valid && params[:event] == "complaint"
+      elsif valid && params[:event] == 'complaint'
         valid = params[:complaint].present? && !params[:complaint].is_a?(String)
       end
 
@@ -54,8 +56,8 @@ module Webhooks
         :event,
         :type,
         :email,
-        bounce: [ :type, :diagnostics ],
-        complaint: [ :type, :feedback_id ]
+        bounce: %i[type diagnostics],
+        complaint: %i[type feedback_id]
       )
     end
   end

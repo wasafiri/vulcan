@@ -1,4 +1,6 @@
-require "test_helper"
+# frozen_string_literal: true
+
+require 'test_helper'
 
 module ConstituentPortal
   class CheckboxTest < ActionDispatch::IntegrationTest
@@ -7,22 +9,22 @@ module ConstituentPortal
       sign_in(@user)
     end
 
-    test "should handle array values for self_certify_disability" do
+    test 'should handle array values for self_certify_disability' do
       # Simulate a form submission with an array value for self_certify_disability
       post constituent_portal_applications_path, params: {
         application: {
           maryland_resident: true,
           household_size: 3,
-          annual_income: 50000,
+          annual_income: 50_000,
           self_certify_disability: checkbox_params(true), # Use our helper to simulate a checked checkbox
           hearing_disability: true
         },
         medical_provider: {
-          name: "Dr. Smith",
-          phone: "2025551234",
-          email: "drsmith@example.com"
+          name: 'Dr. Smith',
+          phone: '2025551234',
+          email: 'drsmith@example.com'
         },
-        save_draft: "Save Application"
+        save_draft: 'Save Application'
       }
 
       # Check that the application was created

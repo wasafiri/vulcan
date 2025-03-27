@@ -1,16 +1,28 @@
+# frozen_string_literal: true
+
+# Represents a constituent's application in the system
+# Manages the application lifecycle including proof submission, review,
+# medical certification, training sessions, evaluations, and voucher issuance
 class Application < ApplicationRecord
   delegate :guardian_relationship, :guardian_relationship=, to: :user, allow_nil: true
+  
+  # Concerns
   include ApplicationStatusManagement
   include NotificationDelivery
   include ProofManageable
   include ProofConsistencyValidation
+  include CertificationManagement
+  include VoucherManagement
+  include TrainingManagement
+  include EvaluationManagement
 
   # Associations
-  belongs_to :user, class_name: 'Constituent', foreign_key: :user_id
+  belongs_to :user, class_name: 'Constituent', foreign_key: :user_id, inverse_of: :applications
   belongs_to :income_verified_by,
              class_name: 'User',
-             foreign_key: :income_verified_by_id, 
-             optional: true
+             foreign_key: :income_verified_by_id,
+             optional: true,
+             inverse_of: :income_verified_applications
   has_many :training_sessions, class_name: 'TrainingSession'
   has_many :trainers, through: :training_sessions
   has_many :evaluations, dependent: :destroy
@@ -24,7 +36,8 @@ class Application < ApplicationRecord
   has_one_attached :medical_certification
   belongs_to :medical_certification_verified_by,
              class_name: 'User',
-             optional: true
+             optional: true,
+             inverse_of: :medical_certification_verified_applications
 
   # Enums
   enum :income_proof_status, {
@@ -56,54 +69,51 @@ class Application < ApplicationRecord
   validates :medical_provider_name, :medical_provider_phone, :medical_provider_email,
             presence: true, unless: :status_draft?
   validates :household_size, :annual_income, presence: true
-  validates :self_certify_disability, inclusion: { in: [ true, false ] }
+  validates :self_certify_disability, inclusion: { in: [true, false] }
   validates :guardian_relationship, presence: true, if: :is_guardian?
 
   validate :waiting_period_completed, on: :create
   validate :constituent_must_have_disability, if: :validate_disability?
-  validate :proof_status_consistency
-  validate :proof_attachment_integrity
 
-  # Callbacks - disable admin notifications in tests to avoid recursion
-  # We'll use the one defined in ProofManageable concern instead
-  # after_update :schedule_admin_notifications, if: :needs_proof_review?  
+  # Callbacks
   after_update :log_status_change, if: :saved_change_to_status?
 
   # Scopes
-  scope :search_by_last_name, ->(query) {
+  scope :search_by_last_name, lambda { |query|
     includes(:user, :proof_reviews, :training_sessions, :evaluations)
       .where('users.last_name ILIKE ?', "%#{query}%")
       .references(:users)
   }
-  scope :needs_review, -> { where(status: :needs_information) }
-  scope :incomplete, -> { where(status: :in_progress) }
-  scope :complete, -> { where(status: :approved) }
-  scope :needs_evaluation, -> { where(status: :approved) }
-  scope :needs_training, -> { where(status: :approved) }
+  
+  # Base scope for approved applications
+  scope :approved, -> { where(status: :approved) }
+  
+  # Alias scopes for approved applications
+  scope :complete, -> { approved }
+  scope :needs_evaluation, -> { approved }
+  scope :needs_training, -> { approved }
+  
   scope :needs_income_review, -> { where(income_proof_status: :not_reviewed) }
   scope :needs_residency_review, -> { where(residency_proof_status: :not_reviewed) }
   scope :rejected_income_proofs, -> { where(income_proof_status: :rejected) }
   scope :rejected_residency_proofs, -> { where(residency_proof_status: :rejected) }
-  scope :with_pending_training, -> {
-    joins(:training_sessions).merge(TrainingSession.where(status: [:requested, :scheduled, :confirmed])).distinct
+  scope :with_pending_training, lambda {
+    joins(:training_sessions).merge(TrainingSession.where(status: %i[requested scheduled confirmed])).distinct
   }
-  
-  # Scope for applications assigned to a specific trainer
-  scope :assigned_to_trainer, ->(trainer_id) {
+  scope :assigned_to_trainer, lambda { |trainer_id|
     joins(:training_sessions).where(training_sessions: { trainer_id: trainer_id }).distinct
   }
-  
-  # Scope for applications with active training sessions for a specific trainer
-  scope :with_active_training_for_trainer, ->(trainer_id) {
+  scope :with_active_training_for_trainer, lambda { |trainer_id|
     joins(:training_sessions).where(
-      training_sessions: { 
+      training_sessions: {
         trainer_id: trainer_id,
-        status: [:scheduled, :confirmed]
+        status: %i[scheduled confirmed]
       }
     ).distinct
   }
 
-  # Status methods moved from controller
+  # Status methods - using the robust implementation from the class (with events and voucher creation)
+  # (Note: these override the simpler implementations from ApplicationStatusManagement)
   def approve!
     with_lock do
       update!(status: :approved)
@@ -124,49 +134,6 @@ class Application < ApplicationRecord
   rescue StandardError => e
     Rails.logger.error "Failed to approve application #{id}: #{e.message}"
     false
-  end
-
-  def assign_voucher!(assigned_by: nil)
-    return false unless can_create_voucher?
-
-    with_lock do
-      voucher = vouchers.create!
-      Event.create!(
-        user: assigned_by || Current.user,
-        action: 'voucher_assigned',
-        metadata: {
-          application_id: id,
-          voucher_id: voucher.id,
-          voucher_code: voucher.code,
-          initial_value: voucher.initial_value,
-          timestamp: Time.current.iso8601
-        }
-      )
-
-      # Notify constituent
-      create_system_notification!(
-        recipient: user,
-        actor: assigned_by || Current.user,
-        action: 'voucher_assigned'
-      )
-
-      voucher
-    end
-  rescue StandardError => e
-    Rails.logger.error "Failed to assign voucher for application #{id}: #{e.message}"
-    false
-  end
-
-  def can_create_voucher?
-    status_approved? &&
-      medical_certification_status_accepted? &&
-      !vouchers.exists?
-  end
-
-  def create_initial_voucher
-    return unless can_create_voucher?
-
-    assign_voucher!(assigned_by: Current.user)
   end
 
   def reject!
@@ -190,156 +157,13 @@ class Application < ApplicationRecord
     end
   end
 
-  def assign_evaluator!(evaluator)
-    with_lock do
-      evaluation = evaluations.create!(
-        evaluator: evaluator,
-        constituent: user,
-        application: self,
-        evaluation_type: determine_evaluation_type,
-        evaluation_datetime: nil, # Will be set when scheduling
-        needs: '',
-        location: ''
-        # Initialize other required fields as needed
-      )
-
-      # Create event for audit logging
-      Event.create!(
-        user: Current.user,
-        action: 'evaluator_assigned',
-        metadata: {
-          application_id: id,
-          evaluator_id: evaluator.id,
-          evaluator_name: evaluator.full_name,
-          timestamp: Time.current.iso8601
-        }
-      )
-
-      # Send email notification to evaluator
-      EvaluatorMailer.with(
-        evaluation: evaluation,
-        constituent: user
-      ).new_evaluation_assigned.deliver_later
-    end
-    true
-  rescue ::ActiveRecord::RecordInvalid => e
-    Rails.logger.error "Failed to assign evaluator: #{e.message}"
-    false
-  end
-
-  def assign_trainer!(trainer)
-    with_lock do
-      training_session = training_sessions.create!(
-        trainer: trainer,
-        status: :requested
-        # No default scheduled_for - this will be set by the trainer after coordinating with constituent
-      )
-
-      # Create event for audit logging
-      Event.create!(
-        user: Current.user,
-        action: 'trainer_assigned',
-        metadata: {
-          application_id: id,
-          trainer_id: trainer.id,
-          trainer_name: trainer.full_name,
-          timestamp: Time.current.iso8601
-        }
-      )
-
-      # Create system notification for the constituent
-      create_system_notification!(
-        recipient: user,
-        actor: Current.user,
-        action: 'trainer_assigned'
-      )
-
-      # Send email notification to the trainer with constituent contact info
-      TrainingSessionNotificationsMailer.trainer_assigned(training_session).deliver_later
-    end
-    true
-  rescue ::ActiveRecord::RecordInvalid => e
-    Rails.logger.error "Failed to assign trainer: #{e.message}"
-    false
-  end
-
-  # Certification management
-  def update_certification!(certification:, status:, verified_by:, rejection_reason: nil)
-    with_lock do
-      # Attach the certification if provided
-      medical_certification.attach(certification) if certification.present?
-
-      # Update the certification status and metadata
-      attrs = {
-        medical_certification_status: status,
-        medical_certification_verified_at: Time.current,
-        medical_certification_verified_by: verified_by
-      }
-
-      # Add rejection reason if provided
-      attrs[:medical_certification_rejection_reason] = rejection_reason if status == 'rejected'
-
-      update!(attrs)
-
-      # Create notification for audit logging
-      action_mapping = {
-        'accepted' => 'medical_certification_approved',
-        'rejected' => 'medical_certification_rejected',
-        'received' => 'medical_certification_received'
-      }
-      action = action_mapping[status]
-
-      if action
-        metadata = {}
-        metadata['reason'] = rejection_reason if rejection_reason.present?
-
-        Notification.create!(
-          recipient: user,
-          actor: verified_by,
-          action: action,
-          notifiable: self,
-          metadata: metadata
-        )
-      end
-    end
-    true
-  rescue ::ActiveRecord::RecordInvalid => e
-    Rails.logger.error "Failed to update certification: #{e.message}"
-    false
-  end
-
-  def schedule_training!(trainer:, scheduled_for:)
-    with_lock do
-      training_sessions.create!(
-        trainer: trainer,
-        scheduled_for: scheduled_for,
-        status: :scheduled
-      )
-    end
-    true
-  rescue ::ActiveRecord::RecordInvalid => e
-    Rails.logger.error "[Application #{id}] Failed to schedule training: #{e.message}"
-    errors.add(:base, e.message)
-    false
-  end
-
-  def latest_evaluation
-    evaluations.order(created_at: :desc).first
-  end
-
-  def last_evaluation_completed_at
-    evaluations.where(status: :completed).order(evaluation_date: :desc).limit(1).pluck(:evaluation_date).first
-  end
-
-  def all_evaluations
-    evaluations.order(created_at: :desc)
-  end
-
   def constituent_full_name
     # Checking if user exists and has both names to avoid nil errors
-    return "#{user&.first_name} #{user&.last_name}".strip if user&.first_name || user&.last_name
-
-    'Unknown Constituent'
+    if user && (user.first_name || user.last_name)
+      "#{user.first_name} #{user.last_name}".strip
+    else
+      'Unknown Constituent'
+    end
   end
 
   # Determines the appropriate proof review button text based on proof status
@@ -398,29 +222,18 @@ class Application < ApplicationRecord
     self[:medical_provider_name]
   end
 
-  def medical_certification_requested?
-    medical_certification_requested_at.present? ||
-      medical_certification_status.in?(%w[requested received accepted rejected'])
-  end
-
   private
 
   def log_status_change
     # Guard clause to prevent infinite recursion
     return if @logging_status_change
 
-    # Use Current.user if available, otherwise use the application's user
-    # This ensures the method works in both controller contexts and test environments
     acting_user = Current.user || user
-
-    # Skip event creation if no user is available
     return unless acting_user
 
-    # Set flag to prevent reentry
     @logging_status_change = true
 
     begin
-      # Enhanced event with more detailed metadata
       Event.create!(
         user: acting_user,
         action: 'application_status_changed',
@@ -434,39 +247,32 @@ class Application < ApplicationRecord
       )
     rescue StandardError => e
       Rails.logger.error "Failed to log status change for application #{id}: #{e.message}"
-      # Don't raise the error, just log it
     ensure
-      # Always reset the flag, even if an exception occurs
       @logging_status_change = false
     end
   end
 
   def schedule_admin_notifications
-    # Only run in production or staging to avoid test failures
     return if Rails.env.test?
-
-    # Skip if no needs_review_since or it didn't change
     return unless needs_review_since_changed? && needs_review_since.present?
 
     NotifyAdminsJob.perform_later(self)
   end
 
-  def determine_evaluation_type
-    user&.evaluations&.exists? ? :follow_up : :initial
-  end
-
   def waiting_period_completed
-    return unless user
-    return if new_record?
+    return unless user && !new_record?
 
-    last_application = user&.applications&.where&.not(id: id)
-                           &.order(application_date: :desc)&.first
-    return unless last_application
+    last_app = user_applications_except_current
+    return unless last_app
 
     waiting_period = Policy.get('waiting_period_years') || 3
-    return unless last_application.application_date > waiting_period.years.ago
+    if last_app.application_date > waiting_period.years.ago
+      errors.add(:base, "You must wait #{waiting_period} years before submitting a new application.")
+    end
+  end
 
-    errors.add(:base, "You must wait #{waiting_period} years before submitting a new application.")
+  def user_applications_except_current
+    user.applications.where.not(id: id).order(application_date: :desc).first
   end
 
   def needs_proof_review?
@@ -474,16 +280,11 @@ class Application < ApplicationRecord
   end
 
   def notify_admins_of_new_proofs
-    # Return early if user is nil
     return unless user
 
-    # Fetch only the admin IDs, ensuring STI compatibility
     admin_ids = User.where(type: Admin.name).pluck(:id)
-
-    # Return early if there are no admins
     return if admin_ids.empty?
 
-    # Build the notifications array
     notifications = admin_ids.map do |admin_id|
       {
         recipient_id: admin_id,
@@ -495,7 +296,6 @@ class Application < ApplicationRecord
       }
     end
 
-    # Perform a bulk insert
     Notification.insert_all!(notifications)
   end
 
@@ -506,70 +306,21 @@ class Application < ApplicationRecord
     types
   end
 
-  def create_system_notification!(recipient:, actor:, action:)
-    Notification.create!(
-      recipient: recipient,
-      actor: actor,
-      action: action,
-      notifiable: self,
-      metadata: {
-        application_id: id,
-        timestamp: Time.current.iso8601
-      }
-    )
-  end
-
   def is_guardian?
     user&.is_guardian == true
   end
 
   def constituent_must_have_disability
     return if user&.has_disability_selected?
+
     errors.add(:base, 'At least one disability must be selected before submitting an application.')
   end
 
   def validate_disability?
-    # Only validate when transitioning from draft to a submitted state
-    # or when already in a submitted state
     return false if status_draft?
     return true if saved_change_to_status? && status_before_last_save == 'draft'
     return true if submitted?
 
     false
-  end
-
-  def proof_status_consistency
-    # Check if approved proofs have attachments
-    if income_proof_status_approved? && !income_proof.attached?
-      errors.add(:income_proof, 'must be attached when status is approved')
-      Rails.logger.warn "Application #{id}: Income proof marked as approved but no file is attached"
-    end
-
-    return unless residency_proof_status_approved? && !residency_proof.attached?
-
-    errors.add(:residency_proof, 'must be attached when status is approved')
-    Rails.logger.warn "Application #{id}: Residency proof marked as approved but no file is attached"
-  end
-
-  def proof_attachment_integrity
-    return if Thread.current[:paper_application_context]
-
-    check_proof_integrity(income_proof, :income) if income_proof_status_not_reviewed?
-    check_proof_integrity(residency_proof, :residency) if residency_proof_status_not_reviewed?
-  end
-
-  def check_proof_integrity(proof, proof_type)
-    return unless proof&.attached?
-
-    if proof&.blob&.created_at
-      # Allow brand new attachments to remain :not_reviewed for up to 1 minute
-      if proof.blob.created_at <= 1.minute.ago
-        errors.add("#{proof_type}_proof_status".to_sym,
-                   'cannot be not_reviewed when proof is attached')
-        Rails.logger.warn "Application #{id}: #{proof_type.capitalize} proof is attached but status is not_reviewed"
-      end
-    else
-      Rails.logger.warn "Application #{id}: #{proof_type.capitalize} proof blob missing created_at timestamp"
-    end
   end
 end

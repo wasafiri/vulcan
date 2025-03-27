@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class PolicyChange < ApplicationRecord
   belongs_to :policy
   belongs_to :user

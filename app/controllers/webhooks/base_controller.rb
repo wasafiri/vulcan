@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Webhooks
   class InvalidPayloadError < StandardError; end
 
@@ -16,7 +18,7 @@ module Webhooks
     end
 
     def valid_payload?
-      raise NotImplementedError, "Subclasses must implement #valid_payload?"
+      raise NotImplementedError, 'Subclasses must implement #valid_payload?'
     end
 
     def handle_invalid_payload
@@ -24,7 +26,7 @@ module Webhooks
     end
 
     def verify_webhook_signature
-      signature = request.headers["X-Webhook-Signature"]
+      signature = request.headers['X-Webhook-Signature']
 
       # Return unauthorized if signature is missing
       if signature.nil?
@@ -44,23 +46,21 @@ module Webhooks
     end
 
     def compute_signature(payload)
-      secret = Rails.application.credentials.webhook_secret || "test_webhook_secret"
+      secret = Rails.application.credentials.webhook_secret || 'test_webhook_secret'
       OpenSSL::HMAC.hexdigest(
-        "sha256",
+        'sha256',
         secret,
         payload
       )
     end
 
-    def log_webhook
+    def log_webhook(&block)
       ActiveSupport::Notifications.instrument(
-        "webhook_received",
+        'webhook_received',
         controller: self.class.name,
         action: action_name,
-        type: params[:type]
-      ) do
-        yield
-      end
+        type: params[:type], &block
+      )
     end
   end
 end

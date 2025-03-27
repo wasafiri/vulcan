@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Vendor < User
   # Products represent equipment
   has_many :products, foreign_key: :user_id
@@ -13,14 +15,14 @@ class Vendor < User
   validates :business_tax_id, presence: true
   validates :w9_form, presence: true, if: -> { vendor_approved? && !new_record? }
   validates :w9_form,
-    content_type: { in: "application/pdf", message: "must be a PDF" },
-    size: { less_than: 10.megabytes, message: "must be less than 10MB" },
-    if: -> { w9_form.attached? }
+            content_type: { in: 'application/pdf', message: 'must be a PDF' },
+            size: { less_than: 10.megabytes, message: 'must be less than 10MB' },
+            if: -> { w9_form.attached? }
   validates :terms_accepted_at, presence: true, if: :vendor_approved?
-  validates :website_url, 
-    format: { with: URI::DEFAULT_PARSER.make_regexp(%w[http https]), 
-             message: "must be a valid URL starting with http:// or https://" },
-    allow_blank: true
+  validates :website_url,
+            format: { with: URI::DEFAULT_PARSER.make_regexp(%w[http https]),
+                      message: 'must be a valid URL starting with http:// or https://' },
+            allow_blank: true
 
   enum :status, { pending: 0, approved: 1, suspended: 2 }, prefix: :vendor
 
@@ -29,7 +31,7 @@ class Vendor < User
   enum :w9_status, { not_submitted: 0, pending_review: 1, approved: 2, rejected: 3 }, prefix: :w9_status
 
   scope :active, -> { where(status: :approved) }
-  scope :with_pending_invoices, -> {
+  scope :with_pending_invoices, lambda {
     joins(:voucher_transactions)
       .where(voucher_transactions: { invoice_id: nil, status: :completed })
       .distinct
@@ -46,7 +48,7 @@ class Vendor < User
   def total_transactions_by_period(start_date, end_date)
     voucher_transactions
       .completed
-      .where("processed_at BETWEEN ? AND ?", start_date, end_date)
+      .where('processed_at BETWEEN ? AND ?', start_date, end_date)
       .group("DATE_TRUNC('month', processed_at)")
       .sum(:amount)
   end

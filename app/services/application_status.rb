@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class ApplicationStatus
   def initialize(application)
     @application = application

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'rails_helper'
 
 RSpec.describe BaseService do
@@ -18,12 +20,12 @@ RSpec.describe BaseService do
     let(:error) { StandardError.new('Test error message') }
 
     it 'logs error message' do
-      expect(Rails.logger).to receive(:error).with("BaseService error: Test error message")
+      expect(Rails.logger).to receive(:error).with('BaseService error: Test error message')
       service.send(:log_error, error)
     end
 
     it 'includes context if provided' do
-      expect(Rails.logger).to receive(:error).with("BaseService error: Test error message | Context: Additional context")
+      expect(Rails.logger).to receive(:error).with('BaseService error: Test error message | Context: Additional context')
       service.send(:log_error, error, 'Additional context')
     end
 

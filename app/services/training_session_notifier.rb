@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class TrainingSessionNotifier
   attr_reader :training_session
 
@@ -18,19 +20,19 @@ class TrainingSessionNotifier
 
   def should_send_notification?
     training_session.status_changed? ||
-    training_session.saved_change_to_scheduled_for? ||
-    training_session.saved_change_to_completed_at?
+      training_session.saved_change_to_scheduled_for? ||
+      training_session.saved_change_to_completed_at?
   end
 
   def send_email_notifications
     case training_session.status
-    when "scheduled", "confirmed"
+    when 'scheduled', 'confirmed'
       TrainingSessionNotificationsMailer.training_scheduled(training_session).deliver_later
-    when "completed"
+    when 'completed'
       TrainingSessionNotificationsMailer.training_completed(training_session).deliver_later
-    when "cancelled"
+    when 'cancelled'
       TrainingSessionNotificationsMailer.training_cancelled(training_session).deliver_later
-    when "no_show"
+    when 'no_show'
       TrainingSessionNotificationsMailer.no_show_notification(training_session).deliver_later
     end
   end
@@ -47,11 +49,11 @@ class TrainingSessionNotifier
 
   def notification_action
     case training_session.status
-    when "scheduled", "confirmed" then "training_scheduled"
-    when "completed" then "training_completed"
-    when "cancelled" then "training_cancelled"
-    when "no_show" then "training_missed"
-    else "training_updated"
+    when 'scheduled', 'confirmed' then 'training_scheduled'
+    when 'completed' then 'training_completed'
+    when 'cancelled' then 'training_cancelled'
+    when 'no_show' then 'training_missed'
+    else 'training_updated'
     end
   end
 

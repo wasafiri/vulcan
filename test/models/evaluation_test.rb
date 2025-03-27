@@ -1,4 +1,6 @@
-require "test_helper"
+# frozen_string_literal: true
+
+require 'test_helper'
 
 class EvaluationTest < ActiveSupport::TestCase
   # Uncomment and modify the test method as needed

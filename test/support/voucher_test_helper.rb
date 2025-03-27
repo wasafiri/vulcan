@@ -1,18 +1,18 @@
+# frozen_string_literal: true
+
 module VoucherTestHelper
   def create_redeemed_voucher(vendor:, amount:)
     voucher = create(:voucher, :active)
     transaction = create(:voucher_transaction,
-      voucher: voucher,
-      vendor: vendor,
-      amount: amount,
-      status: :transaction_completed
-    )
+                         voucher: voucher,
+                         vendor: vendor,
+                         amount: amount,
+                         status: :transaction_completed)
 
     # Create invoice and move through approval process
     invoice = create(:invoice, :approved,
-      vendor: vendor,
-      voucher_transactions: [ transaction ]
-    )
+                     vendor: vendor,
+                     voucher_transactions: [transaction])
     invoice.update!(
       status: :invoice_paid,
       gad_invoice_reference: "GAD-#{SecureRandom.hex(6).upcase}"
@@ -23,15 +23,12 @@ module VoucherTestHelper
   end
 
   def create_pending_invoice(vendor:, transaction_count: 3, amount: 100.00)
-    invoice = create(:invoice, :pending,
-      vendor: vendor,
-      voucher_transactions: create_list(:voucher_transaction, transaction_count,
-        vendor: vendor,
-        amount: amount,
-        status: :transaction_pending
-      )
-    )
-    invoice
+    create(:invoice, :pending,
+           vendor: vendor,
+           voucher_transactions: create_list(:voucher_transaction, transaction_count,
+                                             vendor: vendor,
+                                             amount: amount,
+                                             status: :transaction_pending))
   end
 
   def approve_and_record_payment(invoice:, gad_reference: nil)
@@ -40,15 +37,15 @@ module VoucherTestHelper
       status: :invoice_paid,
       gad_invoice_reference: gad_reference || "GAD-#{SecureRandom.hex(6).upcase}",
       check_number: "CHK#{SecureRandom.hex(4).upcase}", # Optional
-      payment_notes: "Payment processed by GAD"
+      payment_notes: 'Payment processed by GAD'
     )
     invoice
   end
 
   def sign_in_vendor(vendor)
     session = vendor.sessions.create!(
-      user_agent: "Rails Testing",
-      ip_address: "127.0.0.1"
+      user_agent: 'Rails Testing',
+      ip_address: '127.0.0.1'
     )
     cookies.signed[:session_token] = {
       value: session.session_token,
@@ -59,7 +56,7 @@ module VoucherTestHelper
 
   def assert_voucher_redeemed(voucher, amount)
     assert_equal 0, voucher.reload.remaining_value
-    assert_equal "redeemed", voucher.status
+    assert_equal 'redeemed', voucher.status
     assert_equal amount, voucher.voucher_transactions.sum(:amount)
   end
 
@@ -68,32 +65,32 @@ module VoucherTestHelper
     assert transaction.present?
     assert_equal vendor, transaction.vendor
     assert_equal amount, transaction.amount
-    assert_equal "transaction_completed", transaction.status
+    assert_equal 'transaction_completed', transaction.status
   end
 
   def assert_invoice_generated(vendor:)
     invoice = vendor.invoices.last
     assert invoice.present?
-    assert_equal "invoice_pending", invoice.status
+    assert_equal 'invoice_pending', invoice.status
     assert invoice.total_amount.positive?
     assert invoice.voucher_transactions.any?
   end
 
   def assert_valid_pdf_response
-    assert_equal "application/pdf", response.content_type
-    assert response.body.start_with?("%PDF")
+    assert_equal 'application/pdf', response.content_type
+    assert response.body.start_with?('%PDF')
   end
 
   def assert_valid_csv_response
-    assert_equal "text/csv", response.content_type
-    assert_includes response.body, "Invoice Number,Vendor,Total Amount,Status,GAD Reference"
+    assert_equal 'text/csv', response.content_type
+    assert_includes response.body, 'Invoice Number,Vendor,Total Amount,Status,GAD Reference'
   end
 
   def assert_invoice_paid(invoice)
     assert invoice.reload.invoice_paid?
     assert invoice.payment_recorded_at.present?
     assert invoice.gad_invoice_reference.present?
-    assert invoice.voucher_transactions.all? { |t| t.transaction_completed? }
+    assert(invoice.voucher_transactions.all?(&:transaction_completed?))
   end
 
   def assert_dashboard_elements
@@ -112,8 +109,8 @@ module VoucherTestHelper
 
   def sample_w9_file
     fixture_file_upload(
-      Rails.root.join("test/fixtures/files/sample_w9.txt"),
-      "text/plain"
+      Rails.root.join('test/fixtures/files/sample_w9.txt'),
+      'text/plain'
     )
   end
 

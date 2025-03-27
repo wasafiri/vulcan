@@ -1,20 +1,24 @@
-class Admin::BaseController < ApplicationController
-  include Pagy::Backend
+# frozen_string_literal: true
 
-  before_action :authenticate_user!
-  before_action :require_admin!
-  before_action :set_current_attributes
+module Admin
+  class BaseController < ApplicationController
+    include Pagy::Backend
 
-  private
+    before_action :authenticate_user!
+    before_action :require_admin!
+    before_action :set_current_attributes
 
-  def require_admin!
-    return if current_user&.admin?
+    private
 
-    redirect_to root_path, alert: 'Not authorized'
-  end
+    def require_admin!
+      return if current_user&.admin?
 
-  def set_current_attributes
-    # Always use the current_user, even in test environment
-    Current.set(request, current_user)
+      redirect_to root_path, alert: 'Not authorized'
+    end
+
+    def set_current_attributes
+      # Always use the current_user, even in test environment
+      Current.set(request, current_user)
+    end
   end
 end

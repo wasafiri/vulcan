@@ -1,12 +1,14 @@
+# frozen_string_literal: true
+
 module VoucherHelper
   # Masks the voucher code, showing only the last 3 characters
   def masked_voucher_code(code)
     return nil unless code.present?
-    
+
     # Keep only the last 3 characters visible
-    "*" * (code.length - 3) + code[-3..]
+    '*' * (code.length - 3) + code[-3..]
   end
-  
+
   def voucher_status_badge(voucher)
     case voucher.status
     when 'active'
@@ -53,7 +55,8 @@ module VoucherHelper
                 'bg-gray-100 text-gray-800'
               end
 
-    content_tag(:span, text, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium #{classes}")
+    content_tag(:span, text,
+                class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium #{classes}")
   end
 
   def voucher_amount_class(amount)
@@ -78,14 +81,14 @@ module VoucherHelper
     # Convert to Date objects to ensure compatible types for subtraction
     expiration_as_date = voucher.expiration_date.to_date
     days_until_expiry = (expiration_as_date - Date.current).to_i
-    
-    if days_until_expiry <= 7
-      content_tag(:div, class: 'mt-1 text-sm text-red-600') do
-        if days_until_expiry <= 1
-          'Expires today!'
-        else
-          "Expires in #{days_until_expiry} days"
-        end
+
+    return unless days_until_expiry <= 7
+
+    content_tag(:div, class: 'mt-1 text-sm text-red-600') do
+      if days_until_expiry <= 1
+        'Expires today!'
+      else
+        "Expires in #{days_until_expiry} days"
       end
     end
   end

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 if Rails.env.test?
   require 'capybara/rails'
   require 'selenium/webdriver'
@@ -18,41 +20,41 @@ if Rails.env.test?
   def find_chrome_for_testing_path
     # Platform detection
     platform = case RUBY_PLATFORM
-                when /darwin/
-                  if RUBY_PLATFORM.include?('arm')
-                    'mac-arm64'
-                  else
-                    'mac-x64'
-                  end
-                when /linux/
-                  'linux'
-                when /mingw|mswin/
-                  'win64'
-                else
-                  nil
+               when /darwin/
+                 if RUBY_PLATFORM.include?('arm')
+                   'mac-arm64'
+                 else
+                   'mac-x64'
+                 end
+               when /linux/
+                 'linux'
+               when /mingw|mswin/
+                 'win64'
                end
-    
+
     return nil unless platform
-    
+
     # Search paths based on platform
     search_paths = []
-    
+
     # Puppeteer paths - most reliable
     search_paths << File.join(Dir.home, '.cache', 'puppeteer', 'chrome', platform, '*')
-    
+
     # Local project paths - set by bin/setup-test-browser
-    search_paths << File.join(Rails.root, 'chrome', "*-*", "chrome-#{platform}")
-    
+    search_paths << File.join(Rails.root, 'chrome', '*-*', "chrome-#{platform}")
+
     # Mac-specific app paths
     if platform.start_with?('mac')
       app_paths = [
-        File.join(Rails.root, 'chrome', "*-*", "chrome-#{platform}", 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'),
-        File.join(Dir.home, '.cache', 'puppeteer', 'chrome', platform, '*', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'),
+        File.join(Rails.root, 'chrome', '*-*', "chrome-#{platform}", 'Google Chrome for Testing.app', 'Contents',
+                  'MacOS', 'Google Chrome for Testing'),
+        File.join(Dir.home, '.cache', 'puppeteer', 'chrome', platform, '*', 'Google Chrome for Testing.app',
+                  'Contents', 'MacOS', 'Google Chrome for Testing'),
         '/Applications/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing'
       ]
       search_paths.concat(app_paths)
     end
-    
+
     # Try each path and find the first matching file
     search_paths.each do |path|
       matches = Dir.glob(path)
@@ -60,14 +62,14 @@ if Rails.env.test?
         if File.directory?(match)
           # For directories, look for chrome/chrome.exe inside
           binary = case platform
-                    when /mac/
-                      File.join(match, 'chrome')
-                    when /linux/
-                      File.join(match, 'chrome')
-                    when /win/
-                      File.join(match, 'chrome.exe')
+                   when /mac/
+                     File.join(match, 'chrome')
+                   when /linux/
+                     File.join(match, 'chrome')
+                   when /win/
+                     File.join(match, 'chrome.exe')
                    end
-          
+
           return binary if binary && File.exist?(binary) && File.executable?(binary)
         elsif File.file?(match) && File.executable?(match)
           # Direct file match
@@ -75,16 +77,16 @@ if Rails.env.test?
         end
       end
     end
-    
+
     # Fall back to looking for Chrome for Testing binary directly
     chromedriver_output = `npx @puppeteer/browsers list chrome | grep chrome@stable | head -n 1`
     if chromedriver_output.match(/browserPath: (.+)$/)
-      chrome_path = $1.strip
+      chrome_path = Regexp.last_match(1).strip
       return chrome_path if File.exist?(chrome_path) && File.executable?(chrome_path)
     end
 
     # Fallback to standard Chrome as a last resort
-    Rails.logger.warn "No Chrome for Testing binary found, using system Chrome"
+    Rails.logger.warn 'No Chrome for Testing binary found, using system Chrome'
     nil
   end
 
@@ -92,12 +94,12 @@ if Rails.env.test?
   Capybara.register_driver :headless_chrome do |app|
     # Find an available port
     debugging_port = find_available_port
-    
+
     # Prepare Chrome options
     options = Selenium::WebDriver::Chrome::Options.new
 
     # Core settings for stability
-    options.add_argument('--headless=new')  # New headless mode
+    options.add_argument('--headless=new') # New headless mode
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
 
@@ -106,13 +108,13 @@ if Rails.env.test?
     options.add_argument('--disable-animations')
     options.add_argument('--disable-extensions')
     options.add_argument('--disable-gpu')
-    
+
     # Let Chrome handle its own process and profile management
     options.add_argument("--remote-debugging-port=#{debugging_port}")
-    
+
     # Set browser timeout to help identify hangs
     options.add_argument('--browser-timeout=60000')
-    
+
     # Extra stability options
     options.add_argument('--disable-background-networking')
     options.add_argument('--enable-features=NetworkService,NetworkServiceInProcess')
@@ -133,7 +135,7 @@ if Rails.env.test?
       options.binary = chrome_binary
       Rails.logger.info "Using Chrome for Testing binary: #{chrome_binary}"
     else
-      Rails.logger.warn "Using system Chrome (not recommended)"
+      Rails.logger.warn 'Using system Chrome (not recommended)'
     end
 
     # Set service options for better error handling
@@ -151,16 +153,14 @@ if Rails.env.test?
         service: Selenium::WebDriver::Chrome::Service.new(options: service_options),
         timeout: 30
       )
-      
+
       # Ensure browser is closed after tests
       at_exit do
-        begin
-          driver.quit if driver&.browser.respond_to?(:quit)
-        rescue StandardError => e
-          Rails.logger.error "Error closing browser: #{e.message}"
-        end
+        driver.quit if driver&.browser.respond_to?(:quit)
+      rescue StandardError => e
+        Rails.logger.error "Error closing browser: #{e.message}"
       end
-      
+
       driver
     rescue StandardError => e
       Rails.logger.error "Failed to create Chrome driver: #{e.message}"
@@ -188,18 +188,18 @@ if Rails.env.test?
     # Input and interaction settings
     config.default_set_options = { clear: :backspace }
     config.automatic_label_click = true
-    
+
     # Exponential backoff for retries
     config.enable_aria_label = true
     config.save_path = Rails.root.join('tmp/capybara')
-    
+
     # Set a shorter default wait time for this test file
     if ENV['TEST_FILE']&.include?('proof_uploads_test')
-      puts "Detected proof_uploads_test, setting shorter timeout (5s)"
+      puts 'Detected proof_uploads_test, setting shorter timeout (5s)'
       config.default_max_wait_time = 5
     end
   end
-  
+
   # Additional error recovery for system tests
   module Capybara
     module RescuableSession
@@ -218,7 +218,7 @@ if Rails.env.test?
         super # try again
       end
     end
-    
+
     class Session
       prepend RescuableSession
     end

@@ -1,25 +1,29 @@
-require "test_helper"
+# frozen_string_literal: true
 
-class Vendor::DashboardsControllerTest < ActionDispatch::IntegrationTest
-  def setup
-    @vendor = users(:vendor_raz)  # Use fixture instead of factory
+require 'test_helper'
 
-    # Set standard test headers
-    @headers = {
-      "HTTP_USER_AGENT" => "Rails Testing",
-      "REMOTE_ADDR" => "127.0.0.1"
-    }
+module Vendor
+  class DashboardsControllerTest < ActionDispatch::IntegrationTest
+    def setup
+      @vendor = users(:vendor_raz) # Use fixture instead of factory
 
-    post sign_in_path,
-      params: { email: @vendor.email, password: "password123" },
-      headers: @headers
+      # Set standard test headers
+      @headers = {
+        'HTTP_USER_AGENT' => 'Rails Testing',
+        'REMOTE_ADDR' => '127.0.0.1'
+      }
 
-    assert_response :redirect
-    follow_redirect!
-  end
+      post sign_in_path,
+           params: { email: @vendor.email, password: 'password123' },
+           headers: @headers
 
-  def test_gets_show
-    get vendor_dashboard_path
-    assert_response :success
+      assert_response :redirect
+      follow_redirect!
+    end
+
+    def test_gets_show
+      get vendor_dashboard_path
+      assert_response :success
+    end
   end
 end

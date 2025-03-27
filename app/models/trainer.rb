@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Trainer < User
   has_many :training_sessions, foreign_key: :trainer_id
   has_many :applications, through: :training_sessions

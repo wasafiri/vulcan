@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class ApplicationNotificationsMailer < ApplicationMailer
   include Rails.application.routes.url_helpers
   include Mailers::ApplicationNotificationsHelper
@@ -28,18 +30,18 @@ class ApplicationNotificationsMailer < ApplicationMailer
     @proof_review = proof_review
     @user         = application.user
 
-    extra_setup.call if extra_setup
+    extra_setup&.call
 
-    formatted_type = proof_review ? format_proof_type(proof_review.proof_type) : "document"
+    formatted_type = proof_review ? format_proof_type(proof_review.proof_type) : 'document'
     Rails.logger.info "Formatted proof type: #{formatted_type}"
 
-    subject_line = subject_template % { formatted_type: formatted_type }
+    subject_line = format(subject_template, formatted_type: formatted_type)
     mail_obj = mail(
       to: @user.email,
       subject: subject_line,
-      template_path: "application_notifications_mailer",
+      template_path: 'application_notifications_mailer',
       template_name: template_name,
-      message_stream: "notifications"
+      message_stream: 'notifications'
     )
 
     Rails.logger.info "Email body: #{mail_obj.body}"
@@ -50,10 +52,10 @@ class ApplicationNotificationsMailer < ApplicationMailer
     # Check if this application's constituent prefers letter communications
     if application.user.communication_preference == 'letter'
       all_proofs_approved = application.respond_to?(:all_proofs_approved?) && application.all_proofs_approved?
-      
+
       Letters::LetterGeneratorService.new(
         template_type: 'proof_approved',
-        data: { 
+        data: {
           proof_type: proof_review.proof_type,
           all_proofs_approved: all_proofs_approved
         },
@@ -61,12 +63,12 @@ class ApplicationNotificationsMailer < ApplicationMailer
         application: application
       ).queue_for_printing
     end
-    
+
     prepare_email(
       application,
       proof_review,
-      subject_template: "Document Review Update: Your %{formatted_type} documentation has been approved",
-      template_name: "proof_approved"
+      subject_template: 'Document Review Update: Your %<formatted_type>s documentation has been approved',
+      template_name: 'proof_approved'
     )
   rescue StandardError => e
     Rails.logger.error("Failed to send proof approval email: #{e.message}")
@@ -78,13 +80,13 @@ class ApplicationNotificationsMailer < ApplicationMailer
     # Calculate rejection info
     remaining_attempts = 8 - application.total_rejections
     reapply_date = 3.years.from_now.to_date
-    
+
     # Check if this application's constituent prefers letter communications
     if application.user.communication_preference == 'letter'
       Letters::LetterGeneratorService.new(
         template_type: 'proof_rejected',
-        data: { 
-          proof_type: proof_review.proof_type, 
+        data: {
+          proof_type: proof_review.proof_type,
           rejection_reason: proof_review.rejection_reason,
           rejection_notes: proof_review.rejection_notes
         },
@@ -92,13 +94,13 @@ class ApplicationNotificationsMailer < ApplicationMailer
         application: application
       ).queue_for_printing
     end
-    
+
     prepare_email(
       application,
       proof_review,
-      subject_template: "Document Review Update: Your %{formatted_type} documentation needs revision",
-      template_name: "proof_rejected",
-      extra_setup: -> {
+      subject_template: 'Document Review Update: Your %<formatted_type>s documentation needs revision',
+      template_name: 'proof_rejected',
+      extra_setup: lambda {
         @remaining_attempts = remaining_attempts
         @reapply_date = reapply_date
       }
@@ -116,7 +118,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
     @application = application
     @user = application.user
     @reapply_date = 3.years.from_now.to_date
-    
+
     # Check if this application's constituent prefers letter communications
     if @user.communication_preference == 'letter'
       Letters::LetterGeneratorService.new(
@@ -129,10 +131,10 @@ class ApplicationNotificationsMailer < ApplicationMailer
 
     mail_obj = mail(
       to: @user.email,
-      subject: "Important: Application Status Update",
-      template_path: "application_notifications_mailer",
-      template_name: "max_rejections_reached",
-      message_stream: "notifications"
+      subject: 'Important: Application Status Update',
+      template_path: 'application_notifications_mailer',
+      template_name: 'max_rejections_reached',
+      message_stream: 'notifications'
     )
 
     Rails.logger.info "Email body: #{mail_obj.body}"
@@ -149,23 +151,23 @@ class ApplicationNotificationsMailer < ApplicationMailer
     @host_url = Rails.application.config.action_mailer.default_url_options[:host]
     @stale_reviews = applications.select do |app|
       app.respond_to?(:needs_review_since) &&
-      app.needs_review_since.present? &&
-      app.needs_review_since < 3.days.ago
+        app.needs_review_since.present? &&
+        app.needs_review_since < 3.days.ago
     end
 
     # Only skip sending in production if there are no stale reviews
     # In test environment, we'll always send the email
     if @stale_reviews.empty? && !Rails.env.test?
-      Rails.logger.info("No stale reviews found, skipping reminder email")
+      Rails.logger.info('No stale reviews found, skipping reminder email')
       return nil
     end
 
     mail_obj = mail(
       to: @admin.email,
-      subject: "Reminder: Applications Awaiting Proof Review",
-      template_path: "application_notifications_mailer",
-      template_name: "proof_needs_review_reminder",
-      message_stream: "notifications"
+      subject: 'Reminder: Applications Awaiting Proof Review',
+      template_path: 'application_notifications_mailer',
+      template_name: 'proof_needs_review_reminder',
+      message_stream: 'notifications'
     )
 
     Rails.logger.info "Email body: #{mail_obj.body}"
@@ -194,8 +196,8 @@ class ApplicationNotificationsMailer < ApplicationMailer
 
     mail(
       to: @constituent.email,
-      subject: "Your MAT Application Account Has Been Created",
-      message_stream: "notifications"
+      subject: 'Your MAT Application Account Has Been Created',
+      message_stream: 'notifications'
     )
   end
 
@@ -205,8 +207,8 @@ class ApplicationNotificationsMailer < ApplicationMailer
 
     # Calculate the threshold for display in the email
     household_size = @notification.household_size.to_i
-    base_fpl = Policy.get("fpl_#{[ household_size, 8 ].min}_person").to_i
-    modifier = Policy.get("fpl_modifier_percentage").to_i
+    base_fpl = Policy.get("fpl_#{[household_size, 8].min}_person").to_i
+    modifier = Policy.get('fpl_modifier_percentage').to_i
     @threshold = base_fpl * (modifier / 100.0)
 
     # Check if this is a real constituent or just params
@@ -220,8 +222,8 @@ class ApplicationNotificationsMailer < ApplicationMailer
 
     mail(
       to: @constituent.email,
-      subject: "Important Information About Your MAT Application",
-      message_stream: "notifications"
+      subject: 'Important Information About Your MAT Application',
+      message_stream: 'notifications'
     )
   end
 
@@ -243,8 +245,8 @@ class ApplicationNotificationsMailer < ApplicationMailer
 
     mail(
       to: @constituent.email,
-      subject: "Error Processing Your Proof Submission",
-      message_stream: "notifications"
+      subject: 'Error Processing Your Proof Submission',
+      message_stream: 'notifications'
     )
   end
 
@@ -266,8 +268,8 @@ class ApplicationNotificationsMailer < ApplicationMailer
 
     mail(
       to: @user.email,
-      subject: "Welcome to the Maryland Accessible Telecommunications Program",
-      message_stream: "notifications"
+      subject: 'Welcome to the Maryland Accessible Telecommunications Program',
+      message_stream: 'notifications'
     )
   end
 end

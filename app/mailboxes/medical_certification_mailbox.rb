@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class MedicalCertificationMailbox < ApplicationMailbox
   before_processing :ensure_medical_provider
   before_processing :ensure_valid_certification_request
@@ -63,28 +65,30 @@ class MedicalCertificationMailbox < ApplicationMailbox
 
   def notify_constituent
     # Notify constituent that their certification has been received
+    return unless defined?(ApplicationNotificationsMailer.medical_certification_received)
+
     ApplicationNotificationsMailer.medical_certification_received(
       application.constituent,
       application
-    ).deliver_later if defined?(ApplicationNotificationsMailer.medical_certification_received)
+    ).deliver_later
   end
 
   def ensure_medical_provider
-    unless medical_provider
-      bounce_with_notification(
-        :provider_not_found,
-        'Email sender not recognized as a registered medical provider'
-      )
-    end
+    return if medical_provider
+
+    bounce_with_notification(
+      :provider_not_found,
+      'Email sender not recognized as a registered medical provider'
+    )
   end
 
   def ensure_valid_certification_request
-    unless application && application.medical_certification_requested?
-      bounce_with_notification(
-        :invalid_certification_request,
-        'No pending certification request found for this provider'
-      )
-    end
+    return if application&.medical_certification_requested?
+
+    bounce_with_notification(
+      :invalid_certification_request,
+      'No pending certification request found for this provider'
+    )
   end
 
   def validate_attachments
@@ -96,28 +100,24 @@ class MedicalCertificationMailbox < ApplicationMailbox
     end
 
     mail.attachments.each do |attachment|
-      begin
-        validate_attachment(attachment)
-      rescue StandardError => e
-        bounce_with_notification(
-          :invalid_attachment,
-          "Invalid attachment: #{e.message}"
-        )
-      end
+      validate_attachment(attachment)
+    rescue StandardError => e
+      bounce_with_notification(
+        :invalid_attachment,
+        "Invalid attachment: #{e.message}"
+      )
     end
   end
 
   def validate_attachment(attachment)
     # Check file size
-    if attachment.body.decoded.size > 10.megabytes
-      raise 'File size exceeds 10MB limit'
-    end
+    raise 'File size exceeds 10MB limit' if attachment.body.decoded.size > 10.megabytes
 
     # Check file type
     allowed_types = %w[application/pdf image/jpeg image/png image/gif]
-    unless allowed_types.include?(attachment.content_type)
-      raise 'File type not allowed. Allowed types: PDF, JPEG, PNG, GIF'
-    end
+    return if allowed_types.include?(attachment.content_type)
+
+    raise 'File type not allowed. Allowed types: PDF, JPEG, PNG, GIF'
   end
 
   def bounce_with_notification(error_type, message)
@@ -167,7 +167,7 @@ class MedicalCertificationMailbox < ApplicationMailbox
 
     # If we can't find an ID, check if this is a reply to a specific request
     # This assumes you're using a mailbox hash with the application ID
-    if mail.to.any? { |to| to.include?("+") }
+    if mail.to.any? { |to| to.include?('+') }
       mailbox_hash = mail.to.find { |to| to.include?('+') }.split('@').first.split('+').last
       return mailbox_hash if mailbox_hash.match?(/^\d+$/)
     end

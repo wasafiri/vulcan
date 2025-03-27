@@ -1,4 +1,4 @@
-class ResetApplicationSequence < ActiveRecord::Migration[7.0]
+class ResetApplicationSequence < ActiveRecord::Migration[8.0]
   def up
     # For PostgreSQL only - ensure high non-sequential IDs for security
     if ActiveRecord::Base.connection.adapter_name.downcase.include?('postgresql')

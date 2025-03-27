@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Configure Action Mailbox
 provider_config = MatVulcan::InboundEmailConfig.provider_config
 

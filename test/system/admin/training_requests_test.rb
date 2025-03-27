@@ -1,5 +1,7 @@
-require "application_system_test_case"
-require_relative "../../support/notification_delivery_stub"
+# frozen_string_literal: true
+
+require 'application_system_test_case'
+require_relative '../../support/notification_delivery_stub'
 
 module AdminNamespace
   class TrainingRequestsTest < ApplicationSystemTestCase
@@ -17,7 +19,7 @@ module AdminNamespace
       Notification.create!(
         recipient: @admin,
         actor: @constituent,
-        action: "training_requested",
+        action: 'training_requested',
         notifiable: @application,
         metadata: {
           application_id: @application.id,
@@ -35,12 +37,12 @@ module AdminNamespace
       Current.reset
     end
 
-    test "admin can view applications" do
+    test 'admin can view applications' do
       visit admin_applications_path
-      assert_selector "h1", text: "Admin Dashboard"
+      assert_selector 'h1', text: 'Admin Dashboard'
 
       # Basic verification that the page loaded
-      assert_selector ".bg-white"
+      assert_selector '.bg-white'
     end
   end
 end

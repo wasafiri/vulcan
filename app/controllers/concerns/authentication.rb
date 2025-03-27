@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Authentication
   extend ActiveSupport::Concern
 
@@ -28,7 +30,7 @@ module Authentication
   # Load and cache the current session
   def current_session
     return @current_session if defined?(@current_session)
-  
+
     @current_session = if Rails.env.test?
                          find_test_session
                        else
@@ -36,13 +38,13 @@ module Authentication
                          find_production_session
                        end
   end
-  
+
   def find_production_session
-    if cookies.signed[:session_token].present?
-      # Only include the user without eager loading role_capabilities
-      Session.includes(:user)
-             .find_by(session_token: cookies.signed[:session_token])
-    end
+    return unless cookies.signed[:session_token].present?
+
+    # Only include the user without eager loading role_capabilities
+    Session.includes(:user)
+           .find_by(session_token: cookies.signed[:session_token])
   end
 
   def find_test_session
@@ -55,7 +57,7 @@ module Authentication
       return session_record if session_record
     end
 
-    # Fall back to unsigned cookies 
+    # Fall back to unsigned cookies
     if cookies[:session_token].present?
       session_record = Session.includes(:user)
                               .find_by(session_token: cookies[:session_token])
@@ -110,6 +112,7 @@ module Authentication
     end
 
     return if current_user
+
     store_location
     redirect_to sign_in_path, alert: 'Please sign in to continue'
   end

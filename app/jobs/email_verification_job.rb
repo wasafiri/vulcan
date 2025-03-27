@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class EmailVerificationJob < ApplicationJob
   queue_as :default
 
@@ -9,7 +11,7 @@ class EmailVerificationJob < ApplicationJob
     end
 
     # Check MX records
-    domain = medical_provider_email.email.split("@").last
+    domain = medical_provider_email.email.split('@').last
     Resolv::DNS.open do |dns|
       mx_records = dns.getresources(domain, Resolv::DNS::Resource::IN::MX)
 

@@ -1,14 +1,15 @@
+# frozen_string_literal: true
+
 require 'rails_helper'
 
 RSpec.describe Applications::MedicalCertificationService do
   let(:constituent) { create(:constituent) }
-  let(:application) do 
-    create(:application, 
-      user: constituent,
-      medical_provider_name: "Dr. Smith",
-      medical_provider_email: "drsmith@example.com",
-      medical_provider_phone: "555-555-5555"
-    )
+  let(:application) do
+    create(:application,
+           user: constituent,
+           medical_provider_name: 'Dr. Smith',
+           medical_provider_email: 'drsmith@example.com',
+           medical_provider_phone: '555-555-5555')
   end
   let(:admin) { create(:admin) }
   let(:service) { described_class.new(application: application, actor: admin) }

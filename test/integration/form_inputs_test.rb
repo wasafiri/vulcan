@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "test_helper"
+require 'test_helper'
 
 # Form Inputs Integration Test
 #
@@ -17,18 +17,18 @@ class FormInputsTest < ActionDispatch::IntegrationTest
   end
 
   # Test the checkbox_params helper
-  test "checkbox_params should return correct format" do
+  test 'checkbox_params should return correct format' do
     # Test checked checkbox
     checked_params = checkbox_params(true)
-    assert_equal [ "0", "1" ], checked_params, "Checked checkbox should return ['0', '1']"
+    assert_equal %w[0 1], checked_params, "Checked checkbox should return ['0', '1']"
 
     # Test unchecked checkbox
     unchecked_params = checkbox_params(false)
-    assert_equal "0", unchecked_params, "Unchecked checkbox should return '0'"
+    assert_equal '0', unchecked_params, "Unchecked checkbox should return '0'"
   end
 
   # Test the checkboxes_params helper
-  test "checkboxes_params should handle multiple checkboxes" do
+  test 'checkboxes_params should handle multiple checkboxes' do
     # Test multiple checkboxes
     checkboxes = {
       hearing_disability: true,
@@ -39,30 +39,30 @@ class FormInputsTest < ActionDispatch::IntegrationTest
     params = checkboxes_params(checkboxes)
 
     # Verify the format
-    assert_equal [ "0", "1" ], params[:hearing_disability], "Checked checkbox should return ['0', '1']"
-    assert_equal "0", params[:vision_disability], "Unchecked checkbox should return '0'"
-    assert_equal [ "0", "1" ], params[:speech_disability], "Checked checkbox should return ['0', '1']"
+    assert_equal %w[0 1], params[:hearing_disability], "Checked checkbox should return ['0', '1']"
+    assert_equal '0', params[:vision_disability], "Unchecked checkbox should return '0'"
+    assert_equal %w[0 1], params[:speech_disability], "Checked checkbox should return ['0', '1']"
   end
 
   # Test form submission with checkbox parameters
-  test "should handle checkbox parameters in form submission" do
+  test 'should handle checkbox parameters in form submission' do
     # Submit a form with checkbox parameters
     post constituent_portal_applications_path, params: {
       application: {
         maryland_resident: checkbox_params(true),
-        household_size: "3",
-        annual_income: "50000",
+        household_size: '3',
+        annual_income: '50000',
         self_certify_disability: checkbox_params(true),
         hearing_disability: checkbox_params(true),
         vision_disability: checkbox_params(false),
         speech_disability: checkbox_params(true)
       },
       medical_provider: {
-        name: "Dr. Smith",
-        phone: "2025551234",
-        email: "drsmith@example.com"
+        name: 'Dr. Smith',
+        phone: '2025551234',
+        email: 'drsmith@example.com'
       },
-      save_draft: "Save Application"
+      save_draft: 'Save Application'
     }
 
     # Verify the form was submitted successfully
@@ -80,24 +80,24 @@ class FormInputsTest < ActionDispatch::IntegrationTest
   end
 
   # Test form submission with array values for checkboxes
-  test "should handle array values for checkboxes" do
+  test 'should handle array values for checkboxes' do
     # Submit a form with array values for checkboxes
     post constituent_portal_applications_path, params: {
       application: {
-        maryland_resident: [ "0", "1" ],
-        household_size: "3",
-        annual_income: "50000",
-        self_certify_disability: [ "0", "1" ],
-        hearing_disability: [ "0", "1" ],
-        vision_disability: "0",
-        speech_disability: [ "0", "1" ]
+        maryland_resident: %w[0 1],
+        household_size: '3',
+        annual_income: '50000',
+        self_certify_disability: %w[0 1],
+        hearing_disability: %w[0 1],
+        vision_disability: '0',
+        speech_disability: %w[0 1]
       },
       medical_provider: {
-        name: "Dr. Smith",
-        phone: "2025551234",
-        email: "drsmith@example.com"
+        name: 'Dr. Smith',
+        phone: '2025551234',
+        email: 'drsmith@example.com'
       },
-      save_draft: "Save Application"
+      save_draft: 'Save Application'
     }
 
     # Verify the form was submitted successfully
@@ -115,24 +115,24 @@ class FormInputsTest < ActionDispatch::IntegrationTest
   end
 
   # Test form submission with direct boolean values
-  test "should handle direct boolean values for checkboxes" do
+  test 'should handle direct boolean values for checkboxes' do
     # Submit a form with direct boolean values for checkboxes
     post constituent_portal_applications_path, params: {
       application: {
         maryland_resident: true,
-        household_size: "3",
-        annual_income: "50000",
+        household_size: '3',
+        annual_income: '50000',
         self_certify_disability: true,
         hearing_disability: true,
         vision_disability: false,
         speech_disability: true
       },
       medical_provider: {
-        name: "Dr. Smith",
-        phone: "2025551234",
-        email: "drsmith@example.com"
+        name: 'Dr. Smith',
+        phone: '2025551234',
+        email: 'drsmith@example.com'
       },
-      save_draft: "Save Application"
+      save_draft: 'Save Application'
     }
 
     # Verify the form was submitted successfully
@@ -150,24 +150,24 @@ class FormInputsTest < ActionDispatch::IntegrationTest
   end
 
   # Test form submission with string values for checkboxes
-  test "should handle string values for checkboxes" do
+  test 'should handle string values for checkboxes' do
     # Submit a form with string values for checkboxes
     post constituent_portal_applications_path, params: {
       application: {
-        maryland_resident: "1",
-        household_size: "3",
-        annual_income: "50000",
-        self_certify_disability: "1",
-        hearing_disability: "1",
-        vision_disability: "0",
-        speech_disability: "1"
+        maryland_resident: '1',
+        household_size: '3',
+        annual_income: '50000',
+        self_certify_disability: '1',
+        hearing_disability: '1',
+        vision_disability: '0',
+        speech_disability: '1'
       },
       medical_provider: {
-        name: "Dr. Smith",
-        phone: "2025551234",
-        email: "drsmith@example.com"
+        name: 'Dr. Smith',
+        phone: '2025551234',
+        email: 'drsmith@example.com'
       },
-      save_draft: "Save Application"
+      save_draft: 'Save Application'
     }
 
     # Verify the form was submitted successfully
@@ -185,7 +185,7 @@ class FormInputsTest < ActionDispatch::IntegrationTest
   end
 
   # Test the assert_checkbox_checked helper
-  test "assert_checkbox_checked should verify checkbox state" do
+  test 'assert_checkbox_checked should verify checkbox state' do
     # Create a form with checkboxes
     get new_constituent_portal_application_path
 
@@ -216,13 +216,13 @@ class FormInputsTest < ActionDispatch::IntegrationTest
   end
 
   # Test handling of nested checkbox parameters
-  test "should handle nested checkbox parameters" do
+  test 'should handle nested checkbox parameters' do
     # Submit a form with nested checkbox parameters
     post constituent_portal_applications_path, params: {
       application: {
         maryland_resident: checkbox_params(true),
-        household_size: "3",
-        annual_income: "50000",
+        household_size: '3',
+        annual_income: '50000',
         self_certify_disability: checkbox_params(true),
         disabilities: {
           hearing: checkbox_params(true),
@@ -231,11 +231,11 @@ class FormInputsTest < ActionDispatch::IntegrationTest
         }
       },
       medical_provider: {
-        name: "Dr. Smith",
-        phone: "2025551234",
-        email: "drsmith@example.com"
+        name: 'Dr. Smith',
+        phone: '2025551234',
+        email: 'drsmith@example.com'
       },
-      save_draft: "Save Application"
+      save_draft: 'Save Application'
     }
 
     # Verify the form was submitted successfully
@@ -257,22 +257,22 @@ class FormInputsTest < ActionDispatch::IntegrationTest
   end
 
   # Test handling of checkbox arrays
-  test "should handle checkbox arrays" do
+  test 'should handle checkbox arrays' do
     # Submit a form with checkbox arrays
     post constituent_portal_applications_path, params: {
       application: {
         maryland_resident: checkbox_params(true),
-        household_size: "3",
-        annual_income: "50000",
+        household_size: '3',
+        annual_income: '50000',
         self_certify_disability: checkbox_params(true),
-        disability_types: [ "hearing", "speech" ] # Multiple checkboxes with the same name
+        disability_types: %w[hearing speech] # Multiple checkboxes with the same name
       },
       medical_provider: {
-        name: "Dr. Smith",
-        phone: "2025551234",
-        email: "drsmith@example.com"
+        name: 'Dr. Smith',
+        phone: '2025551234',
+        email: 'drsmith@example.com'
       },
-      save_draft: "Save Application"
+      save_draft: 'Save Application'
     }
 
     # Verify the form was submitted successfully
@@ -287,9 +287,9 @@ class FormInputsTest < ActionDispatch::IntegrationTest
 
     # Verify checkbox arrays if the application supports them
     if application.respond_to?(:disability_types)
-      assert_includes application.disability_types, "hearing"
-      assert_includes application.disability_types, "speech"
-      assert_not_includes application.disability_types, "vision"
+      assert_includes application.disability_types, 'hearing'
+      assert_includes application.disability_types, 'speech'
+      assert_not_includes application.disability_types, 'vision'
     end
   end
 end

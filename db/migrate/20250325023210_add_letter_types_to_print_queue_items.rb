@@ -1,4 +1,4 @@
-class AddLetterTypesToPrintQueueItems < ActiveRecord::Migration[7.0]
+class AddLetterTypesToPrintQueueItems < ActiveRecord::Migration[8.0]
   def up
     # Safely add new enum values to letter_type
     # Current values: account_created(0), income_proof_rejected(1), residency_proof_rejected(2),

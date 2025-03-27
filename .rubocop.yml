@@ -1,5 +1,28 @@
 # Omakase Ruby styling for Rails
 
+# Load RuboCop extension libraries
+plugins:
+  - rubocop-rails
+  - rubocop-capybara
+  - rubocop-factory_bot
+
+# Target Rails version
+AllCops:
+  TargetRailsVersion: 8.0
+  NewCops: enable
+
+# Customize line length
+Layout/LineLength:
+  Max: 140
+
+# Customize class size limits
+Metrics/ClassLength:
+  Max: 200
+
+# Customize method size limits
+Metrics/MethodLength:
+  Max: 16
+
 # Overwrite or add rules to create your own house style
 #
 # # Use `[a, [b, c]]` not `[ a, [ b, c ] ]`

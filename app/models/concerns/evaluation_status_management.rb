@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module EvaluationStatusManagement
   extend ActiveSupport::Concern
 
@@ -45,12 +47,12 @@ module EvaluationStatusManagement
 
   def rescheduling?
     return false unless persisted? # New records aren't being rescheduled
-    
+
     if evaluation_datetime_changed? && (status_changed? || status_scheduled?)
       # If the date is changing and we're either changing status to scheduled or already scheduled
       return true
     end
-    
+
     false
   end
 end

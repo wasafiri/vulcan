@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class ProofSubmissionMailbox < ApplicationMailbox
   before_processing :ensure_constituent
   before_processing :ensure_active_application
@@ -27,7 +29,7 @@ class ProofSubmissionMailbox < ApplicationMailbox
   def create_audit_record
     Event.create!(
       user: constituent,
-      action: "proof_submission_received",
+      action: 'proof_submission_received',
       metadata: {
         application_id: application.id,
         inbound_email_id: inbound_email.id,
@@ -41,10 +43,10 @@ class ProofSubmissionMailbox < ApplicationMailbox
     subject = subject.downcase
     body = body.downcase
 
-    if subject.include?("income") || body.include?("income")
+    if subject.include?('income') || body.include?('income')
       :income
-    elsif subject.include?("residency") || body.include?("residency") ||
-          subject.include?("address") || body.include?("address")
+    elsif subject.include?('residency') || body.include?('residency') ||
+          subject.include?('address') || body.include?('address')
       :residency
     else
       # Default to income if we can't determine
@@ -69,24 +71,24 @@ class ProofSubmissionMailbox < ApplicationMailbox
       admin: nil,
       submission_method: :email,
       metadata: {
-        ip_address: "0.0.0.0",
+        ip_address: '0.0.0.0',
         email_subject: mail.subject,
         email_from: mail.from.first,
         inbound_email_id: inbound_email.id
       }
     )
 
-    unless result[:success]
-      Rails.logger.error "Failed to attach proof via email: #{result[:error]&.message}"
-      raise "Failed to attach proof: #{result[:error]&.message}"
-    end
+    return if result[:success]
+
+    Rails.logger.error "Failed to attach proof via email: #{result[:error]&.message}"
+    raise "Failed to attach proof: #{result[:error]&.message}"
   end
 
   def notify_admin
     # Notify admin of new proof submission
     Event.create!(
       user: constituent,
-      action: "proof_submission_processed",
+      action: 'proof_submission_processed',
       metadata: {
         application_id: application.id,
         inbound_email_id: inbound_email.id
@@ -95,21 +97,21 @@ class ProofSubmissionMailbox < ApplicationMailbox
   end
 
   def ensure_constituent
-    unless constituent
-      bounce_with_notification(
-        :constituent_not_found,
-        "Email sender not recognized as a constituent"
-      )
-    end
+    return if constituent
+
+    bounce_with_notification(
+      :constituent_not_found,
+      'Email sender not recognized as a constituent'
+    )
   end
 
   def ensure_active_application
-    unless application&.active?
-      bounce_with_notification(
-        :inactive_application,
-        "No active application found for this constituent"
-      )
-    end
+    return if application&.active?
+
+    bounce_with_notification(
+      :inactive_application,
+      'No active application found for this constituent'
+    )
   end
 
   def check_rate_limit
@@ -117,36 +119,34 @@ class ProofSubmissionMailbox < ApplicationMailbox
   rescue RateLimit::ExceededError
     bounce_with_notification(
       :rate_limit_exceeded,
-      "You have exceeded the maximum number of proof submissions allowed per hour"
+      'You have exceeded the maximum number of proof submissions allowed per hour'
     )
   end
 
   def check_max_rejections
-    if application.total_rejections >= Policy.get("max_proof_rejections")
-      bounce_with_notification(
-        :max_rejections_reached,
-        "Maximum number of proof submission attempts reached"
-      )
-    end
+    return unless application.total_rejections >= Policy.get('max_proof_rejections')
+
+    bounce_with_notification(
+      :max_rejections_reached,
+      'Maximum number of proof submission attempts reached'
+    )
   end
 
   def validate_attachments
     if mail.attachments.empty?
       bounce_with_notification(
         :no_attachments,
-        "No attachments found in email"
+        'No attachments found in email'
       )
     end
 
     mail.attachments.each do |attachment|
-      begin
-        ProofAttachmentValidator.validate!(attachment)
-      rescue ProofAttachmentValidator::ValidationError => e
-        bounce_with_notification(
-          :invalid_attachment,
-          "Invalid attachment: #{e.message}"
-        )
-      end
+      ProofAttachmentValidator.validate!(attachment)
+    rescue ProofAttachmentValidator::ValidationError => e
+      bounce_with_notification(
+        :invalid_attachment,
+        "Invalid attachment: #{e.message}"
+      )
     end
   end
 

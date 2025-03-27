@@ -1,5 +1,5 @@
 # This migration comes from action_mailbox (originally 20180917164000)
-class CreateActionMailboxTables < ActiveRecord::Migration[6.0]
+class CreateActionMailboxTables < ActiveRecord::Migration[8.0]
   def change
     create_table :action_mailbox_inbound_emails, id: primary_key_type do |t|
       t.integer :status, default: 0, null: false
@@ -13,8 +13,9 @@ class CreateActionMailboxTables < ActiveRecord::Migration[6.0]
   end
 
   private
-    def primary_key_type
-      config = Rails.configuration.generators
-      config.options[config.orm][:primary_key_type] || :primary_key
-    end
+
+  def primary_key_type
+    config = Rails.configuration.generators
+    config.options[config.orm][:primary_key_type] || :primary_key
+  end
 end

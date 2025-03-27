@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class UpdateEmailStatusJob < ApplicationJob
   queue_as :default
 
@@ -7,18 +9,18 @@ class UpdateEmailStatusJob < ApplicationJob
     return unless notification.message_id.present?
 
     # Only process certification requests
-    return unless notification.action == "medical_certification_requested" 
+    return unless notification.action == 'medical_certification_requested'
 
     begin
       status = PostmarkEmailTracker.fetch_status(notification.message_id)
-      
+
       # Update notification with delivery status
       notification.update!(
         delivery_status: status[:status],
         delivered_at: status[:delivered_at],
         opened_at: status[:opened_at]
       )
-      
+
       # Store open details in metadata
       if status[:open_details].present?
         current_metadata = notification.metadata || {}
@@ -28,7 +30,7 @@ class UpdateEmailStatusJob < ApplicationJob
           )
         )
       end
-      
+
       # Schedule a follow-up check if not yet opened
       if status[:status] != 'error' && status[:opened_at].nil?
         self.class.set(wait: 24.hours).perform_later(notification_id)

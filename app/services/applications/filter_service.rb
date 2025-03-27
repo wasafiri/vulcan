@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Applications
   class FilterService < BaseService
     attr_reader :scope, :params
@@ -68,9 +70,9 @@ module Applications
         date_range = Date.new(fy, 7, 1)..Date.new(fy + 1, 6, 30)
         scope.where(created_at: date_range)
       when 'last_30'
-        scope.where("created_at >= ?", 30.days.ago.beginning_of_day)
+        scope.where('created_at >= ?', 30.days.ago.beginning_of_day)
       when 'last_90'
-        scope.where("created_at >= ?", 90.days.ago.beginning_of_day)
+        scope.where('created_at >= ?', 90.days.ago.beginning_of_day)
       else
         scope
       end
@@ -80,7 +82,7 @@ module Applications
       search_term = "%#{params[:q]}%"
       # Join with users table to search on user fields in a single query
       scope.joins(:user).where(
-        "applications.id::text ILIKE ? OR users.first_name ILIKE ? OR users.last_name ILIKE ? OR users.email ILIKE ?", 
+        'applications.id::text ILIKE ? OR users.first_name ILIKE ? OR users.last_name ILIKE ? OR users.email ILIKE ?',
         search_term, search_term, search_term, search_term
       )
     end

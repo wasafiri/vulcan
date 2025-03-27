@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Evaluation < ApplicationRecord
   include EvaluationStatusManagement
   include NotificationDelivery
@@ -9,7 +11,7 @@ class Evaluation < ApplicationRecord
   has_and_belongs_to_many :recommended_products, class_name: 'Product', join_table: 'evaluations_products'
 
   enum :evaluation_type, { initial: 0, renewal: 1, special: 2 }
-  
+
   # Simplified validations
   validates :evaluator, presence: true
   validates :reschedule_reason, presence: true, if: :rescheduling?
@@ -54,7 +56,9 @@ class Evaluation < ApplicationRecord
   def validate_attendees_structure
     return true unless status_completed?
 
-    unless attendees.is_a?(Array) && attendees.all? { |attendee| attendee['name'].present? && attendee['relationship'].present? }
+    unless attendees.is_a?(Array) && attendees.all? do |attendee|
+      attendee['name'].present? && attendee['relationship'].present?
+    end
       errors.add(:attendees, 'must be an array of attendees with name and relationship when evaluation is completed')
     end
   end
@@ -62,8 +66,11 @@ class Evaluation < ApplicationRecord
   def validate_products_tried_structure
     return true unless status_completed?
 
-    unless products_tried.is_a?(Array) && products_tried.all? { |product| product['product_id'].present? && product['reaction'].present? }
-      errors.add(:products_tried, 'must be an array of products tried with product_id and reaction when evaluation is completed')
+    unless products_tried.is_a?(Array) && products_tried.all? do |product|
+      product['product_id'].present? && product['reaction'].present?
+    end
+      errors.add(:products_tried,
+                 'must be an array of products tried with product_id and reaction when evaluation is completed')
     end
   end
 
@@ -81,17 +88,17 @@ class Evaluation < ApplicationRecord
 
     errors.add(:evaluator, 'must be an Evaluator')
   end
-  
+
   def scheduled_time_must_be_future
-    if evaluation_datetime.present? && evaluation_datetime <= Time.current
-      errors.add(:evaluation_datetime, "must be in the future")
-    end
+    return unless evaluation_datetime.present? && evaluation_datetime <= Time.current
+
+    errors.add(:evaluation_datetime, 'must be in the future')
   end
 
   def cannot_complete_without_notes
-    if status_changed? && status_completed? && notes.blank?
-      errors.add(:notes, "must be provided when completing evaluation")
-    end
+    return unless status_changed? && status_completed? && notes.blank?
+
+    errors.add(:notes, 'must be provided when completing evaluation')
   end
 
   def set_completed_at
@@ -105,17 +112,15 @@ class Evaluation < ApplicationRecord
   def should_deliver_notifications?
     status_changed? || saved_change_to_evaluation_datetime?
   end
-  
+
   def ensure_status_schedule_consistency
     # If setting a schedule date but still in requested status, update status
-    if evaluation_datetime_changed? && evaluation_datetime.present? && status_requested?
-      self.status = :scheduled
-    end
-    
+    self.status = :scheduled if evaluation_datetime_changed? && evaluation_datetime.present? && status_requested?
+
     # If removing a schedule date but still in scheduled/confirmed status, prevent it
-    if evaluation_datetime_changed? && evaluation_datetime.blank? && (status_scheduled? || status_confirmed?)
-      errors.add(:evaluation_datetime, "cannot be removed while status is #{status}")
-      throw(:abort)
-    end
+    return unless evaluation_datetime_changed? && evaluation_datetime.blank? && (status_scheduled? || status_confirmed?)
+
+    errors.add(:evaluation_datetime, "cannot be removed while status is #{status}")
+    throw(:abort)
   end
 end

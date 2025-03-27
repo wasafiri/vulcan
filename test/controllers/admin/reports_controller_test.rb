@@ -1,25 +1,29 @@
-require "test_helper"
+# frozen_string_literal: true
 
-class Admin::ReportsControllerTest < ActionDispatch::IntegrationTest
-  def setup
-    @admin = users(:admin_david)
+require 'test_helper'
 
-    # Set standard test headers
-    @headers = {
-      "HTTP_USER_AGENT" => "Rails Testing",
-      "REMOTE_ADDR" => "127.0.0.1"
-    }
+module Admin
+  class ReportsControllerTest < ActionDispatch::IntegrationTest
+    def setup
+      @admin = users(:admin_david)
 
-    post sign_in_path,
-      params: { email: @admin.email, password: "password123" },
-      headers: @headers
+      # Set standard test headers
+      @headers = {
+        'HTTP_USER_AGENT' => 'Rails Testing',
+        'REMOTE_ADDR' => '127.0.0.1'
+      }
 
-    assert_response :redirect
-    follow_redirect!
-  end
+      post sign_in_path,
+           params: { email: @admin.email, password: 'password123' },
+           headers: @headers
 
-  def test_should_get_index
-    get admin_reports_path
-    assert_response :success
+      assert_response :redirect
+      follow_redirect!
+    end
+
+    def test_should_get_index
+      get admin_reports_path
+      assert_response :success
+    end
   end
 end

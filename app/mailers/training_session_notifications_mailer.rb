@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class TrainingSessionNotificationsMailer < ApplicationMailer
   def trainer_assigned(training_session)
     @training_session = training_session
@@ -9,18 +11,18 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     mail(
       to: @trainer.email,
       subject: "New Training Assignment - Application ##{@application.id}",
-      message_stream: "notifications"
+      message_stream: 'notifications'
     )
   rescue StandardError => e
     Event.create!(
       user: @trainer,
-      action: "email_delivery_error",
+      action: 'email_delivery_error',
       user_agent: Current.user_agent,
       ip_address: Current.ip_address,
       metadata: {
         error_message: e.message,
         error_class: e.class.name,
-        template_name: "trainer_assigned",
+        template_name: 'trainer_assigned',
         variables: {
           constituent_name: @constituent.full_name,
           trainer_name: @trainer.full_name,
@@ -37,12 +39,12 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     @constituent = training_session.constituent
     @trainer = training_session.trainer
 
-    template = EmailTemplate.find_by!(name: "training_scheduled")
+    template = EmailTemplate.find_by!(name: 'training_scheduled')
     variables = {
-      constituent_name: @constituent.full_name || "Valued Constituent",
-      trainer_name: @trainer.full_name || "Your Trainer",
-      scheduled_date: @training_session.scheduled_for.strftime("%B %d, %Y"),
-      scheduled_time: @training_session.scheduled_for.strftime("%I:%M %p"),
+      constituent_name: @constituent.full_name || 'Valued Constituent',
+      trainer_name: @trainer.full_name || 'Your Trainer',
+      scheduled_date: @training_session.scheduled_for.strftime('%B %d, %Y'),
+      scheduled_time: @training_session.scheduled_for.strftime('%I:%M %p'),
       application_id: @training_session.application.id
     }
 
@@ -51,25 +53,25 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     @rendered_body = body # Make the body available to the view
 
     mail(
-      to: @constituent.email, 
+      to: @constituent.email,
       subject: subject,
-      message_stream: "notifications"
+      message_stream: 'notifications'
     )
   rescue StandardError => e
     Event.create!(
       user: @trainer,
-      action: "email_delivery_error",
+      action: 'email_delivery_error',
       user_agent: Current.user_agent,
       ip_address: Current.ip_address,
       metadata: {
         error_message: e.message,
         error_class: e.class.name,
-        template_name: "training_scheduled",
+        template_name: 'training_scheduled',
         variables: {
           constituent_name: @constituent.full_name,
           trainer_name: @trainer.full_name,
-          scheduled_date: @training_session.scheduled_for.strftime("%B %d, %Y"),
-          scheduled_time: @training_session.scheduled_for.strftime("%I:%M %p"),
+          scheduled_date: @training_session.scheduled_for.strftime('%B %d, %Y'),
+          scheduled_time: @training_session.scheduled_for.strftime('%I:%M %p'),
           application_id: @training_session.application.id
         },
         backtrace: e.backtrace&.first(5)
@@ -83,11 +85,11 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     @constituent = training_session.constituent
     @trainer = training_session.trainer
 
-    template = EmailTemplate.find_by!(name: "training_completed")
+    template = EmailTemplate.find_by!(name: 'training_completed')
     variables = {
-      constituent_name: @constituent.full_name || "Valued Constituent",
-      trainer_name: @trainer.full_name || "Your Trainer",
-      completion_date: @training_session.completed_at.strftime("%B %d, %Y"),
+      constituent_name: @constituent.full_name || 'Valued Constituent',
+      trainer_name: @trainer.full_name || 'Your Trainer',
+      completion_date: @training_session.completed_at.strftime('%B %d, %Y'),
       application_id: @training_session.application.id
     }
 
@@ -96,24 +98,24 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     @rendered_body = body # Make the body available to the view
 
     mail(
-      to: @constituent.email, 
+      to: @constituent.email,
       subject: subject,
-      message_stream: "notifications"
+      message_stream: 'notifications'
     )
   rescue StandardError => e
     Event.create!(
       user: @trainer,
-      action: "email_delivery_error",
+      action: 'email_delivery_error',
       user_agent: Current.user_agent,
       ip_address: Current.ip_address,
       metadata: {
         error_message: e.message,
         error_class: e.class.name,
-        template_name: "training_completed",
+        template_name: 'training_completed',
         variables: {
           constituent_name: @constituent.full_name,
           trainer_name: @trainer.full_name,
-          completion_date: @training_session.completed_at.strftime("%B %d, %Y"),
+          completion_date: @training_session.completed_at.strftime('%B %d, %Y'),
           application_id: @training_session.application.id
         },
         backtrace: e.backtrace&.first(5)
@@ -127,12 +129,12 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     @constituent = training_session.constituent
     @trainer = training_session.trainer
 
-    template = EmailTemplate.find_by!(name: "training_cancelled")
+    template = EmailTemplate.find_by!(name: 'training_cancelled')
     variables = {
-      constituent_name: @constituent.full_name || "Valued Constituent",
-      trainer_name: @trainer.full_name || "Your Trainer",
-      scheduled_date: @training_session.scheduled_for.strftime("%B %d, %Y"),
-      scheduled_time: @training_session.scheduled_for.strftime("%I:%M %p"),
+      constituent_name: @constituent.full_name || 'Valued Constituent',
+      trainer_name: @trainer.full_name || 'Your Trainer',
+      scheduled_date: @training_session.scheduled_for.strftime('%B %d, %Y'),
+      scheduled_time: @training_session.scheduled_for.strftime('%I:%M %p'),
       application_id: @training_session.application.id
     }
 
@@ -141,25 +143,25 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     @rendered_body = body # Make the body available to the view
 
     mail(
-      to: @constituent.email, 
+      to: @constituent.email,
       subject: subject,
-      message_stream: "notifications"
+      message_stream: 'notifications'
     )
   rescue StandardError => e
     Event.create!(
       user: @trainer,
-      action: "email_delivery_error",
+      action: 'email_delivery_error',
       user_agent: Current.user_agent,
       ip_address: Current.ip_address,
       metadata: {
         error_message: e.message,
         error_class: e.class.name,
-        template_name: "training_cancelled",
+        template_name: 'training_cancelled',
         variables: {
           constituent_name: @constituent.full_name,
           trainer_name: @trainer.full_name,
-          scheduled_date: @training_session.scheduled_for.strftime("%B %d, %Y"),
-          scheduled_time: @training_session.scheduled_for.strftime("%I:%M %p"),
+          scheduled_date: @training_session.scheduled_for.strftime('%B %d, %Y'),
+          scheduled_time: @training_session.scheduled_for.strftime('%I:%M %p'),
           application_id: @training_session.application.id
         },
         backtrace: e.backtrace&.first(5)
@@ -173,12 +175,12 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     @constituent = training_session.constituent
     @trainer = training_session.trainer
 
-    template = EmailTemplate.find_by!(name: "training_no_show")
+    template = EmailTemplate.find_by!(name: 'training_no_show')
     variables = {
-      constituent_name: @constituent.full_name || "Valued Constituent",
-      trainer_name: @trainer.full_name || "Your Trainer",
-      missed_date: @training_session.scheduled_for.strftime("%B %d, %Y"),
-      missed_time: @training_session.scheduled_for.strftime("%I:%M %p"),
+      constituent_name: @constituent.full_name || 'Valued Constituent',
+      trainer_name: @trainer.full_name || 'Your Trainer',
+      missed_date: @training_session.scheduled_for.strftime('%B %d, %Y'),
+      missed_time: @training_session.scheduled_for.strftime('%I:%M %p'),
       application_id: @training_session.application.id
     }
 
@@ -187,25 +189,25 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     @rendered_body = body # Make the body available to the view
 
     mail(
-      to: @constituent.email, 
+      to: @constituent.email,
       subject: subject,
-      message_stream: "notifications"
+      message_stream: 'notifications'
     )
   rescue StandardError => e
     Event.create!(
       user: @trainer,
-      action: "email_delivery_error",
+      action: 'email_delivery_error',
       user_agent: Current.user_agent,
       ip_address: Current.ip_address,
       metadata: {
         error_message: e.message,
         error_class: e.class.name,
-        template_name: "training_no_show",
+        template_name: 'training_no_show',
         variables: {
           constituent_name: @constituent.full_name,
           trainer_name: @trainer.full_name,
-          missed_date: @training_session.scheduled_for.strftime("%B %d, %Y"),
-          missed_time: @training_session.scheduled_for.strftime("%I:%M %p"),
+          missed_date: @training_session.scheduled_for.strftime('%B %d, %Y'),
+          missed_time: @training_session.scheduled_for.strftime('%I:%M %p'),
           application_id: @training_session.application.id
         },
         backtrace: e.backtrace&.first(5)

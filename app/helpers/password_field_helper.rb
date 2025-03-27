@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module PasswordFieldHelper
   # Creates a password field with a visibility toggle button using Rails form helpers.
   #
@@ -20,7 +22,7 @@ module PasswordFieldHelper
     html_segments << '<div class="space-y-1">'.html_safe
     html_segments << form.label(field_name, config[:label], class: 'block text-sm font-medium text-gray-700')
     html_segments << build_field_container(form, field_name, field_options, config)
-    html_segments << (config[:hint] ? "<p class=\"text-xs text-gray-500\" id=\"#{config[:field_id]}-hint\">#{config[:hint]}</p>" : "").html_safe
+    html_segments << (config[:hint] ? "<p class=\"text-xs text-gray-500\" id=\"#{config[:field_id]}-hint\">#{config[:hint]}</p>" : '').html_safe
     html_segments << '</div>'.html_safe
 
     safe_join(html_segments)
@@ -37,15 +39,15 @@ module PasswordFieldHelper
   def extract_password_field_config(form, field_name, options)
     field_id = options[:id] || "#{form.object_name}_#{field_name}"
     {
-      label:       options.delete(:label) || field_name.to_s.humanize,
+      label: options.delete(:label) || field_name.to_s.humanize,
       placeholder: options.delete(:placeholder),
-      required:    options.delete(:required) != false,
+      required: options.delete(:required) != false,
       autocomplete: options.delete(:autocomplete) || (field_name.to_s.include?('confirmation') ? 'new-password' : 'current-password'),
-      timeout:     options.delete(:timeout) || 5000,
-      hint:        options.delete(:hint),
+      timeout: options.delete(:timeout) || 5000,
+      hint: options.delete(:hint),
       html_options: options.delete(:html_options) || {},
-      field_id:    field_id,
-      status_id:   "#{field_id}_visibility_status",
+      field_id: field_id,
+      status_id: "#{field_id}_visibility_status",
       base_classes: 'mt-1 block w-full px-4 py-2 pr-12 bg-white border border-gray-300 rounded-md ' \
                     'focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm'
     }
@@ -98,7 +100,7 @@ module PasswordFieldHelper
     container << form.password_field(field_name, field_options)
     container << build_toggle_button
     container << "<div id=\"#{config[:status_id]}\" class=\"sr-only\" aria-live=\"polite\" data-visibility-target=\"status\">Password is hidden</div>"
-    container << "</div>"
+    container << '</div>'
     container.join.html_safe
   end
 

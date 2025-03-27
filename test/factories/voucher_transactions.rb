@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 FactoryBot.define do
   factory :voucher_transaction do
     association :voucher
@@ -56,7 +58,7 @@ FactoryBot.define do
 
     # Update voucher remaining value after transaction
     after(:create) do |transaction|
-      if transaction.status == "transaction_completed"
+      if transaction.status == 'transaction_completed'
         new_remaining = transaction.voucher.remaining_value - transaction.amount
         transaction.voucher.update!(remaining_value: new_remaining)
       end

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Manages the review process for income and residency proof documents
 class ProofReview < ApplicationRecord
   # Associations
@@ -45,7 +47,7 @@ class ProofReview < ApplicationRecord
     # Don't validate proof attachment for paper submissions with rejected proofs
     # This check is the highest priority and applies in all environments
     return false if status_rejected? && submission_method_paper?
-    
+
     # Skip validation in test environment unless explicitly enabled
     return false if Rails.env.test? && ENV['VALIDATE_PROOF_ATTACHMENTS'] != 'true'
 
@@ -91,7 +93,8 @@ class ProofReview < ApplicationRecord
 
       # Send appropriate notification based on status
       if status_rejected?
-        send_notification('proof_rejected', :proof_rejected, { proof_type: proof_type, rejection_reason: rejection_reason })
+        send_notification('proof_rejected', :proof_rejected,
+                          { proof_type: proof_type, rejection_reason: rejection_reason })
       else
         send_notification('proof_approved', :proof_approved, { proof_type: proof_type })
       end

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class RoleCapability < ApplicationRecord
   belongs_to :user
 

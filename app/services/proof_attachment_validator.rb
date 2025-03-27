@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class ProofAttachmentValidator
   ALLOWED_MIME_TYPES = %w[
     application/pdf
@@ -27,15 +29,26 @@ class ProofAttachmentValidator
     raise e
   rescue StandardError => e
     Rails.logger.error("Unexpected error in proof validation: #{e.message}")
-    raise ValidationError.new(:unknown_error, "An unexpected error occurred during validation")
+    raise ValidationError.new(:unknown_error, 'An unexpected error occurred during validation')
   end
 
   def validate(attachment)
     return validation_error(:no_attachment, 'No attachment provided') if attachment.nil?
-    return validation_error(:file_too_small, "File is too small (minimum #{MIN_FILE_SIZE} bytes)") if attachment.byte_size < MIN_FILE_SIZE
-    return validation_error(:file_too_large, "File is too large (maximum #{MAX_FILE_SIZE} bytes)") if attachment.byte_size > MAX_FILE_SIZE
+
+    if attachment.byte_size < MIN_FILE_SIZE
+      return validation_error(:file_too_small,
+                              "File is too small (minimum #{MIN_FILE_SIZE} bytes)")
+    end
+    if attachment.byte_size > MAX_FILE_SIZE
+      return validation_error(:file_too_large,
+                              "File is too large (maximum #{MAX_FILE_SIZE} bytes)")
+    end
     return validation_error(:invalid_type, 'File type not allowed') unless valid_mime_type?(attachment)
-    return validation_error(:suspicious_content, 'File contains suspicious content') if potentially_malicious?(attachment)
+
+    if potentially_malicious?(attachment)
+      return validation_error(:suspicious_content,
+                              'File contains suspicious content')
+    end
 
     true
   end
@@ -53,7 +66,7 @@ class ProofAttachmentValidator
   def potentially_malicious?(attachment)
     filename = attachment.filename.to_s.downcase
     return true if suspicious_filename?(filename)
-    return true if attachment.content_type == "application/pdf" && pdf_malicious?(attachment)
+    return true if attachment.content_type == 'application/pdf' && pdf_malicious?(attachment)
 
     false
   end

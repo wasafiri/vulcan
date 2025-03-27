@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module FormComponentHelper
   def error_field_class(form, field)
     form.object.errors[field].present? ? 'border-red-500' : 'border-gray-300'

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ConstituentPortal
   class DashboardsController < ApplicationController
     before_action :authenticate_user!
@@ -27,9 +29,9 @@ module ConstituentPortal
     private
 
     def require_constituent!
-      unless current_user&.constituent?
-        redirect_to root_path, alert: "Access denied"
-      end
+      return if current_user&.constituent?
+
+      redirect_to root_path, alert: 'Access denied'
     end
 
     def calculate_waiting_period_months

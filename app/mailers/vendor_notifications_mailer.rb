@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class VendorNotificationsMailer < ApplicationMailer
   def invoice_generated(invoice)
     @invoice = invoice
@@ -9,7 +11,7 @@ class VendorNotificationsMailer < ApplicationMailer
     mail(
       to: @vendor.email,
       subject: "New Invoice Generated - #{@invoice.invoice_number}",
-      message_stream: "outbound"
+      message_stream: 'outbound'
     )
   end
 
@@ -20,7 +22,7 @@ class VendorNotificationsMailer < ApplicationMailer
     mail(
       to: @vendor.email,
       subject: "Payment Issued for Invoice #{@invoice.invoice_number}",
-      message_stream: "outbound"
+      message_stream: 'outbound'
     )
   end
 
@@ -29,8 +31,8 @@ class VendorNotificationsMailer < ApplicationMailer
 
     mail(
       to: @vendor.email,
-      subject: "W9 Form Approved",
-      message_stream: "outbound"
+      subject: 'W9 Form Approved',
+      message_stream: 'outbound'
     )
   end
 
@@ -40,8 +42,8 @@ class VendorNotificationsMailer < ApplicationMailer
 
     mail(
       to: @vendor.email,
-      subject: "W9 Form Requires Attention",
-      message_stream: "outbound"
+      subject: 'W9 Form Requires Attention',
+      message_stream: 'outbound'
     )
   end
 
@@ -51,8 +53,8 @@ class VendorNotificationsMailer < ApplicationMailer
 
     mail(
       to: @vendor.email,
-      subject: "W9 Form Expiring Soon",
-      message_stream: "outbound"
+      subject: 'W9 Form Expiring Soon',
+      message_stream: 'outbound'
     )
   end
 
@@ -61,8 +63,8 @@ class VendorNotificationsMailer < ApplicationMailer
 
     mail(
       to: @vendor.email,
-      subject: "W9 Form Has Expired - Action Required",
-      message_stream: "outbound"
+      subject: 'W9 Form Has Expired - Action Required',
+      message_stream: 'outbound'
     )
   end
 
@@ -71,7 +73,7 @@ class VendorNotificationsMailer < ApplicationMailer
   def generate_invoice_pdf
     pdf = Prawn::Document.new do |pdf|
       # Header
-      pdf.text "INVOICE", size: 24, style: :bold, align: :center
+      pdf.text 'INVOICE', size: 24, style: :bold, align: :center
       pdf.move_down 20
 
       # Invoice Details
@@ -80,44 +82,44 @@ class VendorNotificationsMailer < ApplicationMailer
       pdf.move_down 20
 
       # Vendor Information
-      pdf.text "Vendor:", style: :bold
+      pdf.text 'Vendor:', style: :bold
       pdf.text @vendor.business_name
       pdf.text @vendor.business_tax_id
       pdf.move_down 20
 
       # Period
-      pdf.text "Period:", style: :bold
+      pdf.text 'Period:', style: :bold
       pdf.text "#{@invoice.period_start.strftime('%B %d, %Y')} - #{@invoice.period_end.strftime('%B %d, %Y')}"
       pdf.move_down 20
 
       # Transactions Table
-      items = [ [ "Date", "Voucher", "Amount" ] ]
+      items = [%w[Date Voucher Amount]]
       @transactions.each do |transaction|
         items << [
-          transaction.processed_at.strftime("%Y-%m-%d"),
+          transaction.processed_at.strftime('%Y-%m-%d'),
           transaction.voucher.code,
           number_to_currency(transaction.amount)
         ]
       end
 
       pdf.table(items, header: true) do |table|
-        table.row(0).style(background_color: "CCCCCC")
+        table.row(0).style(background_color: 'CCCCCC')
         table.cells.padding = 12
-        table.column_widths = [ 150, 200, 150 ]
+        table.column_widths = [150, 200, 150]
       end
 
       pdf.move_down 20
 
       # Total
       pdf.text "Total Amount: #{number_to_currency(@invoice.total_amount)}",
-        size: 14,
-        style: :bold,
-        align: :right
+               size: 14,
+               style: :bold,
+               align: :right
 
       # Footer
       pdf.move_down 40
-      pdf.text "Please allow up to 30 days for payment processing.", size: 10
-      pdf.text "Contact support@example.com for any questions.", size: 10
+      pdf.text 'Please allow up to 30 days for payment processing.', size: 10
+      pdf.text 'Contact support@example.com for any questions.', size: 10
     end
 
     pdf.render

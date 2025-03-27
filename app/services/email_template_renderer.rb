@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class EmailTemplateRenderer
   def self.render(template_name, vars = {})
     new(template_name, vars).render

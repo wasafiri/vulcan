@@ -1,7 +1,9 @@
-require "application_system_test_case"
+# frozen_string_literal: true
+
+require 'application_system_test_case'
 
 # Set this environment variable to enable timeout optimizations for this file
-ENV["TEST_FILE"] = "proof_uploads_test"
+ENV['TEST_FILE'] = 'proof_uploads_test'
 
 class ProofUploadsTest < ApplicationSystemTestCase
   include ActiveJob::TestHelper
@@ -11,8 +13,16 @@ class ProofUploadsTest < ApplicationSystemTestCase
     Timeout.timeout(seconds, &block)
   rescue Timeout::Error => e
     puts "TIMEOUT ERROR: Operation timed out after #{seconds} seconds"
-    puts "Current path: #{current_path rescue 'Unknown'}"
-    puts "Current URL: #{current_url rescue 'Unknown'}"
+    puts "Current path: #{begin
+      current_path
+    rescue StandardError
+      'Unknown'
+    end}"
+    puts "Current URL: #{begin
+      current_url
+    rescue StandardError
+      'Unknown'
+    end}"
     raise e
   end
 
@@ -22,30 +32,30 @@ class ProofUploadsTest < ApplicationSystemTestCase
     # Ensure Chrome is properly set up
     chrome_binary = `ps aux | grep -i chrome`.split("\n").first
     puts "Chrome process check: #{chrome_binary}"
-    
+
     # Use FactoryBot to create a properly configured application with rejected proofs
     @user = users(:constituent_john)
     @valid_pdf = file_fixture('income_proof.pdf')
-    
+
     # Create an application with the in_progress_with_rejected_proofs trait
     # This will automatically attach the proof files in the factory's after(:build) hook
     @application = with_timeout(15) do
       FactoryBot.create(
-        :application, 
+        :application,
         :in_progress_with_rejected_proofs,
         user: @user,
         status: :needs_information # Override to match the specific state we need
       )
     end
-    
+
     # Verify application state is correct
     assert @application.income_proof.attached?, 'Income proof must be attached'
     assert @application.rejected_income_proof?, 'Income proof status must be rejected'
-    
+
     # Ensure the application belongs to our test user
     assert_equal @application.user_id, @user.id,
                  'Application should belong to test user'
-    
+
     # Check and log application state
     puts "Setup - Application ID: #{@application.id}"
     puts "Setup - Application user_id: #{@application.user_id}"
@@ -53,32 +63,32 @@ class ProofUploadsTest < ApplicationSystemTestCase
     puts "Setup - Application Status: #{@application.status}"
     puts "Setup - Income Proof Status: #{@application.income_proof_status}"
     puts "Setup - Application can submit proof? #{@application.can_submit_proof?}"
-    
+
     # Verify the minimum conditions for the test
     assert @application.rejected_income_proof?,
-                 'Application must have rejected income proof status for testing'
-    
+           'Application must have rejected income proof status for testing'
+
     # Use our new authentication helper with timeout
     with_timeout(15) do
       system_test_sign_in(@user)
     end
-    
+
     # Verify successful authentication
     assert_authenticated_as(@user)
-    
+
     # Print available routes for reference
     puts "--- Available route helpers containing 'proof':"
     route_names = Rails.application.routes.named_routes.names.grep(/proof/)
     route_names.each do |name|
       puts "  #{name}"
     end
-    
+
     puts '=== Setup completed successfully ==='
   end
 
   test 'constituent can view proof upload form' do
     puts '\n=== Starting proof form visibility test ==='
-    
+
     # Verify application state with timeout protection
     with_timeout(5) do
       puts "Test - Application ID: #{@application.id}"
@@ -87,113 +97,145 @@ class ProofUploadsTest < ApplicationSystemTestCase
       puts "Test - Application income proof status: #{@application.income_proof_status}"
       puts "Test - Is income proof rejected? #{@application.rejected_income_proof?}"
     end
-    
+
     # Generate and verify the path
     path = new_proof_constituent_portal_application_path(@application, proof_type: 'income')
     puts "Test - Path generated: #{path}"
-    
+
     # Visit the path with timeout protection
     with_timeout(15) do
       puts "Visiting path: #{path}"
       visit path
       puts 'Visit completed'
     end
-    
+
     # Debug redirection - with error handling in case the browser crashed
     begin
-      puts "Test - After visit - Current path: #{current_path rescue 'Error getting path'}"
-      puts "Test - After visit - Current URL: #{current_url rescue 'Error getting URL'}"
-      puts "Test - After visit - Page title: #{page.title rescue 'Error getting title'}"
+      puts "Test - After visit - Current path: #{begin
+        current_path
+      rescue StandardError
+        'Error getting path'
+      end}"
+      puts "Test - After visit - Current URL: #{begin
+        current_url
+      rescue StandardError
+        'Error getting URL'
+      end}"
+      puts "Test - After visit - Page title: #{begin
+        page.title
+      rescue StandardError
+        'Error getting title'
+      end}"
       puts "Test - After visit - Flash alert: #{page.has_css?('.flash-alert') ? page.find('.flash-alert').text : 'none'}"
     rescue StandardError => e
       puts "Error getting page info: #{e.message}"
     end
-    
+
     # If we got redirected to dashboard, examine the console logs to see why
-    if current_path == "/constituent_portal/dashboard"
+    if current_path == '/constituent_portal/dashboard'
       puts 'REDIRECTED: Checking for reasons in console logs'
-      
+
       # Check for specific errors in the console logs - these are Capybara/Chrome specific
-      logs = page.driver.browser.logs.get(:browser) rescue []
+      logs = begin
+        page.driver.browser.logs.get(:browser)
+      rescue StandardError
+        []
+      end
       puts "CONSOLE LOGS: #{logs.inspect}"
-      
+
       # Look for specific redirection reason in flash messages or page content
-      flash_alert = page.find('.flash-alert').text rescue 'No flash alert found'
+      flash_alert = begin
+        page.find('.flash-alert').text
+      rescue StandardError
+        'No flash alert found'
+      end
       puts "FLASH ALERT: #{flash_alert}"
-      
-      puts "Page contains 'Not authorized': #{page.has_text?('Not authorized') rescue 'Error checking text'}"
-      puts "Page contains 'Access denied': #{page.has_text?('Access denied') rescue 'Error checking text'}"
-      puts "Page contains 'Invalid proof type': #{page.has_text?('Invalid proof type') rescue 'Error checking text'}"
+
+      puts "Page contains 'Not authorized': #{begin
+        page.has_text?('Not authorized')
+      rescue StandardError
+        'Error checking text'
+      end}"
+      puts "Page contains 'Access denied': #{begin
+        page.has_text?('Access denied')
+      rescue StandardError
+        'Error checking text'
+      end}"
+      puts "Page contains 'Invalid proof type': #{begin
+        page.has_text?('Invalid proof type')
+      rescue StandardError
+        'Error checking text'
+      end}"
     end
-    
+
     # Wait for any Turbo navigation to complete with a shorter timeout
     with_timeout(10) do
       wait_for_turbo
     end
-    
+
     # Verify expected elements using semantic selectors
     with_timeout(10) do
-      assert_selector "h1", text: "Resubmit Income Proof"
+      assert_selector 'h1', text: 'Resubmit Income Proof'
       assert_selector "form[data-controller='upload']"
-      assert_field "income_proof", type: "file"
-      assert_button "Submit"
-      assert_text "Maximum size allowed is 5MB"
+      assert_field 'income_proof', type: 'file'
+      assert_button 'Submit'
+      assert_text 'Maximum size allowed is 5MB'
     end
-    
-    puts "=== Form visibility test completed ==="
+
+    puts '=== Form visibility test completed ==='
   end
 
-  test "constituent can upload proof document" do
-    visit new_proof_constituent_portal_application_path(@application, proof_type: "income")
+  test 'constituent can upload proof document' do
+    visit new_proof_constituent_portal_application_path(@application, proof_type: 'income')
     wait_for_turbo
-    
+
     # Use the upload_file helper method for better reliability
-    upload_file @valid_pdf, to: "income_proof"
-    
+    upload_file @valid_pdf, to: 'income_proof'
+
     # Progress bar should appear during upload
     assert_selector "[data-upload-target='progress']", visible: true
-    
+
     # Submit form
-    click_button "Submit"
-    
+    click_button 'Submit'
+
     # Verify success state
-    assert_text "Proof submitted successfully"
+    assert_text 'Proof submitted successfully'
     @application.reload
-    assert @application.income_proof.attached?, "Proof file should be attached"
-    assert_equal "not_reviewed", @application.income_proof_status, 
-                 "Proof status should be reset to not_reviewed"
+    assert @application.income_proof.attached?, 'Proof file should be attached'
+    assert_equal 'not_reviewed', @application.income_proof_status,
+                 'Proof status should be reset to not_reviewed'
   end
 
-  test "system rejects invalid file types" do
-    visit new_proof_constituent_portal_application_path(@application, proof_type: "income")
+  test 'system rejects invalid file types' do
+    visit new_proof_constituent_portal_application_path(@application, proof_type: 'income')
     wait_for_turbo
-    
+
     # Create an invalid file for testing
     invalid_file = Tempfile.new(['invalid', '.exe'])
-    invalid_file.write("This is not a valid proof file")
+    invalid_file.write('This is not a valid proof file')
     invalid_file.close
-    
+
     # Attach invalid file
-    attach_file "income_proof", invalid_file.path, visible: :all
-    click_button "Submit"
-    
+    attach_file 'income_proof', invalid_file.path, visible: :all
+    click_button 'Submit'
+
     # Verify error message
-    assert_text "must be a PDF or an image file"
-    
+    assert_text 'must be a PDF or an image file'
+
     # Clean up temporary file
     invalid_file.unlink
   end
 
-  test "system enforces rate limits" do
+  test 'system enforces rate limits' do
     # Configure rate limit for test
-    Policy.set("proof_submission_rate_limit_web", 1)
-    Policy.set("proof_submission_rate_period", 1)
-    
+    Policy.set('proof_submission_rate_limit_web', 1)
+    Policy.set('proof_submission_rate_period', 1)
+
     # First upload should succeed
-    visit new_proof_constituent_portal_application_path(@application, proof_type: "income")
-    upload_file @valid_pdf, to: "income_proof"
-    click_button "Submit"
-    assert_text "Proof submitted successfully"
+    visit new_proof_constituent_portal_application_path(@application, proof_type: 'income')
+    upload_file @valid_pdf, to: 'income_proof'
+    click_button 'Submit'
+    assert_text 'Proof submitted successfully'
 
     # Second upload should be rate-limited
     visit new_proof_constituent_portal_application_path(@application, proof_type: 'income')
@@ -204,7 +246,7 @@ class ProofUploadsTest < ApplicationSystemTestCase
   end
 
   test 'constituent can cancel an upload' do
-    visit new_proof_constituent_portal_application_path(@application, proof_type: "income")
+    visit new_proof_constituent_portal_application_path(@application, proof_type: 'income')
     wait_for_turbo
 
     # Start upload
@@ -219,7 +261,7 @@ class ProofUploadsTest < ApplicationSystemTestCase
   end
 
   test 'upload process maintains accessibility' do
-    visit new_proof_constituent_portal_application_path(@application, proof_type: "income")
+    visit new_proof_constituent_portal_application_path(@application, proof_type: 'income')
     wait_for_turbo
 
     # Verify accessibility features
@@ -279,7 +321,7 @@ class ProofUploadsTest < ApplicationSystemTestCase
       puts "#{category}:"
       puts '----------------------------'
       error_list.each_with_index do |error, i|
-        puts "  #{i+1}. #{error}"
+        puts "  #{i + 1}. #{error}"
       end
       puts "\n"
     end
@@ -318,13 +360,11 @@ class ProofUploadsTest < ApplicationSystemTestCase
       uploads: output.scan(/upload|attach/).count,
       fixtures: output.scan(/fixture|file/).count
     }
-    
+
     # Normalize counts to represent frequency
     total = error_counts.values.sum.to_f
-    if total > 0
-      error_counts.each { |k, v| error_counts[k] = ((v / total) * 10).round }
-    end
-    
+    error_counts.each { |k, v| error_counts[k] = ((v / total) * 10).round } if total.positive?
+
     error_counts
   end
 end

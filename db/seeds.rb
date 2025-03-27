@@ -1,3 +1,4 @@
+# frozen_string_literal: true
 
 require 'factory_bot_rails'
 require 'yaml'
@@ -10,11 +11,11 @@ else
     ActiveRecord::Base.transaction do
       # Optionally clear existing data.
       puts 'Clearing existing data...'
-      
+
       # Clear sessions first to avoid foreign key constraint violations
-      puts "  Clearing Session records..."
+      puts '  Clearing Session records...'
       Session.in_batches(of: 100).delete_all
-      
+
       # Then clear other models
       [
         Evaluation, ProofReview, Notification, RoleCapability,
@@ -137,13 +138,11 @@ else
       # ------------------------------
       puts 'Attaching files to applications...'
 
-      # First, process Rex Canine application specifically 
+      # First, process Rex Canine application specifically
       puts 'Processing Rex Canine application specifically...'
       rex_app = Application.joins(:user).where(users: { first_name: 'Rex', last_name: 'Canine' }).first
 
-      unless rex_app
-        puts '  ✗ Could not find Rex Canine application'
-      else
+      if rex_app
         puts "Found Rex's application ##{rex_app.id}"
         puts "  Current status - Income: #{rex_app.income_proof_status}, Residency: #{rex_app.residency_proof_status}"
         puts "  Initial state - Income attached: #{rex_app.income_proof.attached?}, Residency attached: #{rex_app.residency_proof.attached?}"
@@ -183,13 +182,15 @@ else
             puts "  ✗ Residency proof file not found at #{residency_file_path}"
           end
         end
+      else
+        puts '  ✗ Could not find Rex Canine application'
       end
 
       # Then process all other applications
       Application.find_each do |app|
         # Skip Rex since we already processed it
         next if rex_app && app.id == rex_app.id
-        
+
         # Skip applications with missing users
         if app.user.nil?
           puts "  ⚠️ Skipping Application ##{app.id} - Missing user reference"
@@ -267,13 +268,13 @@ else
         if app.income_proof.attached?
           blob = app.income_proof.blob
           disk_key = blob.key
-          disk_path = Rails.root.join('storage', disk_key[0,2], disk_key[2,2], disk_key)
+          disk_path = Rails.root.join('storage', disk_key[0, 2], disk_key[2, 2], disk_key)
 
           unless File.exist?(disk_path)
             puts "  Fixing missing income proof for Application ##{app.id}..."
 
             # Create directory structure if needed
-            dir_path = Rails.root.join('storage', disk_key[0,2], disk_key[2,2])
+            dir_path = Rails.root.join('storage', disk_key[0, 2], disk_key[2, 2])
             FileUtils.mkdir_p(dir_path)
 
             # Copy the original file to the expected location
@@ -288,13 +289,13 @@ else
         if app.residency_proof.attached?
           blob = app.residency_proof.blob
           disk_key = blob.key
-          disk_path = Rails.root.join('storage', disk_key[0,2], disk_key[2,2], disk_key)
+          disk_path = Rails.root.join('storage', disk_key[0, 2], disk_key[2, 2], disk_key)
 
           unless File.exist?(disk_path)
             puts "  Fixing missing residency proof for Application ##{app.id}..."
 
             # Create directory structure if needed
-            dir_path = Rails.root.join('storage', disk_key[0,2], disk_key[2,2])
+            dir_path = Rails.root.join('storage', disk_key[0, 2], disk_key[2, 2])
             FileUtils.mkdir_p(dir_path)
 
             # Copy the original file to the expected location
@@ -309,13 +310,13 @@ else
         if app.medical_certification.attached?
           blob = app.medical_certification.blob
           disk_key = blob.key
-          disk_path = Rails.root.join('storage', disk_key[0,2], disk_key[2,2], disk_key)
+          disk_path = Rails.root.join('storage', disk_key[0, 2], disk_key[2, 2], disk_key)
 
           unless File.exist?(disk_path)
             puts "  Fixing missing medical certification for Application ##{app.id}..."
 
             # Create directory structure if needed
-            dir_path = Rails.root.join('storage', disk_key[0,2], disk_key[2,2])
+            dir_path = Rails.root.join('storage', disk_key[0, 2], disk_key[2, 2])
             FileUtils.mkdir_p(dir_path)
 
             # Copy the original file to the expected location

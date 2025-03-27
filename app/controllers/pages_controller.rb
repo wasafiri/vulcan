@@ -1,5 +1,9 @@
+# frozen_string_literal: true
+
+# Handles rendering of static content pages for the application
 class PagesController < ApplicationController
-  skip_before_action :authenticate_user!, only: %i[help how_it_works eligibility apply contact privacy terms accessibility]
+  skip_before_action :authenticate_user!,
+                     only: %i[help how_it_works eligibility apply contact privacy terms accessibility]
 
   def help; end
 

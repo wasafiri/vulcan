@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Applications
   class AuditLogBuilder < BaseService
     attr_reader :application
@@ -29,58 +31,58 @@ module Applications
     # Load proof reviews with minimal eager loading
     def load_proof_reviews
       ProofReview
-        .select("id, application_id, admin_id, proof_type, created_at, reviewed_at, rejection_reason, notes")
+        .select('id, application_id, admin_id, proof_type, created_at, reviewed_at, rejection_reason, notes')
         .includes(admin: []) # Include the admin but not role_capabilities
         .where(application_id: application.id)
         .order(created_at: :desc)
         .to_a
     end
-    
+
     # Load status changes with minimal eager loading
     def load_status_changes
       ApplicationStatusChange
-        .select("id, application_id, user_id, from_status, to_status, created_at, metadata")
+        .select('id, application_id, user_id, from_status, to_status, created_at, metadata')
         .includes(user: []) # Include the user but not role_capabilities
         .where(application_id: application.id)
         .order(created_at: :desc)
         .to_a
     end
-    
+
     # Load notifications with no eager loading
     def load_notifications
       # For notifications, use a more optimized query and apply the decorator pattern
       # to prevent ActiveStorage eager loading on blob associations
       notifications = Notification
-        .select("id, recipient_id, actor_id, notifiable_id, notifiable_type, action, read_at, created_at, message_id, delivery_status, metadata")
-        .where(notifiable_type: "Application", notifiable_id: application.id)
-        .where(action: [
-          'medical_certification_requested',
-          'medical_certification_received',
-          'medical_certification_approved',
-          'medical_certification_rejected',
-          'review_requested',
-          'documents_requested',
-          'proof_approved',
-          'proof_rejected'
-        ])
-        .order(created_at: :desc)
-        .to_a
-        
+                      .select('id, recipient_id, actor_id, notifiable_id, notifiable_type, action, read_at, created_at, message_id, delivery_status, metadata')
+                      .where(notifiable_type: 'Application', notifiable_id: application.id)
+                      .where(action: %w[
+                               medical_certification_requested
+                               medical_certification_received
+                               medical_certification_approved
+                               medical_certification_rejected
+                               review_requested
+                               documents_requested
+                               proof_approved
+                               proof_rejected
+                             ])
+                      .order(created_at: :desc)
+                      .to_a
+
       # Use decorator pattern to avoid ActiveStorage eager loading
       notifications.map { |n| NotificationDecorator.new(n) }
     end
-    
+
     # Load application events with minimal eager loading
     def load_application_events
       # For events, use a plpgsql-optimized JSONB query with minimal includes
       Event
-        .select("id, user_id, action, created_at, metadata")
+        .select('id, user_id, action, created_at, metadata')
         .includes(:user) # Include just the user without role_capabilities
         .where(
-          "action IN (?) AND (metadata->>'application_id' = ? OR metadata @> ?)", 
-          [
-            'voucher_assigned', 'voucher_redeemed', 'voucher_expired', 'voucher_cancelled',
-            'application_created', 'evaluator_assigned', 'trainer_assigned', 'application_auto_approved'
+          "action IN (?) AND (metadata->>'application_id' = ? OR metadata @> ?)",
+          %w[
+            voucher_assigned voucher_redeemed voucher_expired voucher_cancelled
+            application_created evaluator_assigned trainer_assigned application_auto_approved
           ],
           application.id.to_s,
           { application_id: application.id }.to_json

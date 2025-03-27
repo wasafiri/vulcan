@@ -1,78 +1,80 @@
-require "application_system_test_case"
+# frozen_string_literal: true
 
-class Admin::InvoicesTest < ApplicationSystemTestCase
-  include VoucherTestHelper
+require 'application_system_test_case'
 
-  setup do
-    @admin = create(:admin)
-    @vendor = create(:vendor, :approved)
-    @invoice = create(:invoice, :pending, :with_transactions,
-      vendor: @vendor,
-      transaction_count: 2,
-      amount_per_transaction: 250.00
-    )
-    sign_in @admin
-  end
+module Admin
+  class InvoicesTest < ApplicationSystemTestCase
+    include VoucherTestHelper
 
-  test "viewing and approving invoice" do
-    visit admin_invoices_path
-    assert_selector ".invoice-row", count: 1
-    assert_selector "[data-test-id='invoice-status']", text: "Pending"
+    setup do
+      @admin = create(:admin)
+      @vendor = create(:vendor, :approved)
+      @invoice = create(:invoice, :pending, :with_transactions,
+                        vendor: @vendor,
+                        transaction_count: 2,
+                        amount_per_transaction: 250.00)
+      sign_in @admin
+    end
 
-    click_on @invoice.invoice_number
-    assert_selector "h1", text: "Invoice Details"
+    test 'viewing and approving invoice' do
+      visit admin_invoices_path
+      assert_selector '.invoice-row', count: 1
+      assert_selector "[data-test-id='invoice-status']", text: 'Pending'
 
-    click_on "Approve Invoice"
-    assert_selector "[data-test-id='invoice-status']", text: "Approved"
-    assert_text "Invoice approved successfully"
-  end
+      click_on @invoice.invoice_number
+      assert_selector 'h1', text: 'Invoice Details'
 
-  test "recording GAD payment details" do
-    @invoice.update!(status: :invoice_approved)
-    visit admin_invoice_path(@invoice)
+      click_on 'Approve Invoice'
+      assert_selector "[data-test-id='invoice-status']", text: 'Approved'
+      assert_text 'Invoice approved successfully'
+    end
 
-    fill_in "GAD Invoice Reference", with: "GAD-123456"
-    fill_in "Check Number", with: "CHK-789"
-    fill_in "Payment Notes", with: "Payment processed by GAD"
-    click_on "Record Payment"
+    test 'recording GAD payment details' do
+      @invoice.update!(status: :invoice_approved)
+      visit admin_invoice_path(@invoice)
 
-    assert_text "Payment details recorded successfully"
-    assert_invoice_paid(@invoice)
-    assert_selector "[data-test-id='gad-reference']", text: "GAD-123456"
-  end
+      fill_in 'GAD Invoice Reference', with: 'GAD-123456'
+      fill_in 'Check Number', with: 'CHK-789'
+      fill_in 'Payment Notes', with: 'Payment processed by GAD'
+      click_on 'Record Payment'
 
-  test "exporting paid invoices" do
-    # Create some paid invoices
-    create_list(:invoice, 3, :paid,
-      vendor: @vendor,
-      gad_invoice_reference: "GAD-123456"
-    )
+      assert_text 'Payment details recorded successfully'
+      assert_invoice_paid(@invoice)
+      assert_selector "[data-test-id='gad-reference']", text: 'GAD-123456'
+    end
 
-    visit admin_invoices_path
-    select "Paid", from: "Status"
-    click_on "Apply Filters"
+    test 'exporting paid invoices' do
+      # Create some paid invoices
+      create_list(:invoice, 3, :paid,
+                  vendor: @vendor,
+                  gad_invoice_reference: 'GAD-123456')
 
-    click_on "Export Batch"
-    assert_valid_csv_response
-  end
+      visit admin_invoices_path
+      select 'Paid', from: 'Status'
+      click_on 'Apply Filters'
 
-  test "requires GAD reference for payment" do
-    @invoice.update!(status: :invoice_approved)
-    visit admin_invoice_path(@invoice)
+      click_on 'Export Batch'
+      assert_valid_csv_response
+    end
 
-    # Try to record payment without GAD reference
-    fill_in "Check Number", with: "CHK-789"
-    fill_in "Payment Notes", with: "Payment processed by GAD"
-    click_on "Record Payment"
+    test 'requires GAD reference for payment' do
+      @invoice.update!(status: :invoice_approved)
+      visit admin_invoice_path(@invoice)
 
-    assert_text "GAD invoice reference can't be blank"
-    assert_selector "[data-test-id='invoice-status']", text: "Approved"
+      # Try to record payment without GAD reference
+      fill_in 'Check Number', with: 'CHK-789'
+      fill_in 'Payment Notes', with: 'Payment processed by GAD'
+      click_on 'Record Payment'
 
-    # Now add GAD reference and try again
-    fill_in "GAD Invoice Reference", with: "GAD-123456"
-    click_on "Record Payment"
+      assert_text "GAD invoice reference can't be blank"
+      assert_selector "[data-test-id='invoice-status']", text: 'Approved'
 
-    assert_invoice_paid(@invoice)
-    assert_selector "[data-test-id='gad-reference']", text: "GAD-123456"
+      # Now add GAD reference and try again
+      fill_in 'GAD Invoice Reference', with: 'GAD-123456'
+      click_on 'Record Payment'
+
+      assert_invoice_paid(@invoice)
+      assert_selector "[data-test-id='gad-reference']", text: 'GAD-123456'
+    end
   end
 end

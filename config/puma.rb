@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # This configuration file will be evaluated by Puma. The top-level methods that
 # are invoked here are part of Puma's configuration DSL. For more information
 # about methods provided by the DSL, see https://puma.io/puma/Puma/DSL.html.
@@ -24,21 +26,21 @@
 # Any libraries that use a connection pool or another resource pool should
 # be configured to provide at least as many connections as the number of
 # threads. This includes Active Record's `pool` parameter in `database.yml`.
-workers Integer(ENV["WEB_CONCURRENCY"] || 2)
-threads_count = Integer(ENV["RAILS_MAX_THREADS"] || 5)
+workers Integer(ENV['WEB_CONCURRENCY'] || 2)
+threads_count = Integer(ENV['RAILS_MAX_THREADS'] || 5)
 threads threads_count, threads_count
 
 preload_app!
 
 # Support IPv6 by binding to host `::` instead of `0.0.0.0`
-port(ENV["PORT"] || 3000, "::")
+port(ENV['PORT'] || 3000, '::')
 
 # Turn off keepalive support for better long tails response time with Router 2.0
 # Remove this line when https://github.com/puma/puma/issues/3487 is closed, and the fix is released
 enable_keep_alives(false) if respond_to?(:enable_keep_alives)
 
 rackup      DefaultRackup if defined?(DefaultRackup)
-environment ENV["RACK_ENV"] || "development"
+environment ENV['RACK_ENV'] || 'development'
 
 on_worker_boot do
   # Worker-specific setup for Rails 4.1 to 5.2, after 5.2 it's not needed
@@ -47,8 +49,8 @@ on_worker_boot do
 end
 
 # Run the Solid Queue supervisor inside of Puma for single-server deployments
-plugin :solid_queue if ENV["SOLID_QUEUE_IN_PUMA"]
+plugin :solid_queue if ENV['SOLID_QUEUE_IN_PUMA']
 
 # Specify the PID file. Defaults to tmp/pids/server.pid in development.
 # In other environments, only set the PID file if requested.
-pidfile ENV["PIDFILE"] if ENV["PIDFILE"]
+pidfile ENV['PIDFILE'] if ENV['PIDFILE']

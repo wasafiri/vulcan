@@ -1,6 +1,8 @@
+# frozen_string_literal: true
+
 module ActionMailboxTestHelper
   # Helper to create an inbound email without attachments
-  def create_inbound_email_from_mail(to:, from:, subject: "Test Email", body: "Test Body")
+  def create_inbound_email_from_mail(to:, from:, subject: 'Test Email', body: 'Test Body')
     mail = Mail.new do
       to to
       from from

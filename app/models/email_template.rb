@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class EmailTemplate < ApplicationRecord
   belongs_to :updated_by, class_name: 'User', optional: true
 

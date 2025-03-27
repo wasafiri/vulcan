@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class UsersController < ApplicationController
   before_action :authenticate_user!
   helper_method :after_update_path # Add this line to make the method available to views

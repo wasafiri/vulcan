@@ -1,11 +1,14 @@
+# frozen_string_literal: true
+
 module EmailStatusHelper
   def delivery_status_badge(notification)
     return '' unless notification.email_tracking?
 
     badge_class = notification.delivery_status_badge_class
-    status_text = notification.delivery_status || "Pending"
+    status_text = notification.delivery_status || 'Pending'
 
-    content_tag(:span, status_text, class: "ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium #{badge_class}")
+    content_tag(:span, status_text,
+                class: "ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium #{badge_class}")
   end
 
   def format_email_status(notification)
@@ -21,8 +24,8 @@ module EmailStatusHelper
         end
       elsif notification.delivered_at.present?
         safe_join([
-          content_tag(:p, "Delivered on #{notification.delivered_at.strftime('%B %d, %Y at %I:%M %p')}")
-        ])
+                    content_tag(:p, "Delivered on #{notification.delivered_at.strftime('%B %d, %Y at %I:%M %p')}")
+                  ])
       else
         content_tag(:p, 'Delivery status: Pending')
       end
@@ -53,7 +56,7 @@ module EmailStatusHelper
     end
 
     # Manual check button if not delivered and not errored
-    if notification.message_id.present? && 
+    if notification.message_id.present? &&
        !notification.delivery_status.in?(['error']) &&
        notification.opened_at.nil?
       html << content_tag(:div, class: 'mt-2') do

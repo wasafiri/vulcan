@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class ApplicationStatusChange < ApplicationRecord
   belongs_to :application
   belongs_to :user, optional: true

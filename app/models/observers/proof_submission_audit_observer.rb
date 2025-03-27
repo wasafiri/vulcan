@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Observers
   class ProofSubmissionAuditObserver
     def self.after_create(proof_submission_audit)

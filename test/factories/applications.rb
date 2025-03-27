@@ -1,12 +1,14 @@
+# frozen_string_literal: true
+
 FactoryBot.define do
   factory :application do
     # Required associations
-    association :user, factory: [ :constituent, :with_disabilities ], strategy: :create
+    association :user, factory: %i[constituent with_disabilities], strategy: :create
 
     # Base status fields with default values
     status { :in_progress }
-    income_proof_status { :not_reviewed }  # Add default value
-    residency_proof_status { :not_reviewed }  # Add default value
+    income_proof_status { :not_reviewed } # Add default value
+    residency_proof_status { :not_reviewed } # Add default value
 
     # Other required fields
     application_date { Time.current }
@@ -39,38 +41,38 @@ FactoryBot.define do
           filename: 'income_proof.pdf',
           content_type: 'application/pdf'
         )
-        
+
         # Ensure the blob has a created_at timestamp
         income_blob.update_column(:created_at, 2.minutes.ago) if income_blob.created_at.nil?
-        
+
         residency_blob = ActiveStorage::Blob.create_and_upload!(
           io: File.open(Rails.root.join('test/fixtures/files/residency_proof.pdf')),
           filename: 'residency_proof.pdf',
           content_type: 'application/pdf'
         )
-        
+
         # Ensure the blob has a created_at timestamp
         residency_blob.update_column(:created_at, 2.minutes.ago) if residency_blob.created_at.nil?
-        
+
         # Create attachment records directly without callbacks
         if application.persisted?
           # Create attachments via direct SQL if the application is already persisted
           ActiveStorage::Attachment.insert_all([
-            {
-              name: 'income_proof',
-              record_type: 'Application',
-              record_id: application.id,
-              blob_id: income_blob.id,
-              created_at: Time.current
-            },
-            {
-              name: 'residency_proof',
-              record_type: 'Application',
-              record_id: application.id,
-              blob_id: residency_blob.id,
-              created_at: Time.current
-            }
-          ])
+                                                 {
+                                                   name: 'income_proof',
+                                                   record_type: 'Application',
+                                                   record_id: application.id,
+                                                   blob_id: income_blob.id,
+                                                   created_at: Time.current
+                                                 },
+                                                 {
+                                                   name: 'residency_proof',
+                                                   record_type: 'Application',
+                                                   record_id: application.id,
+                                                   blob_id: residency_blob.id,
+                                                   created_at: Time.current
+                                                 }
+                                               ])
         else
           # Use regular attach for non-persisted applications
           application.income_proof.attach(income_blob)
@@ -163,11 +165,11 @@ FactoryBot.define do
     end
 
     trait :submitted_by_guardian do
-      association :user, factory: [ :constituent, :as_guardian ], strategy: :create
+      association :user, factory: %i[constituent as_guardian], strategy: :create
     end
 
     trait :submitted_by_legal_guardian do
-      association :user, factory: [ :constituent, :as_legal_guardian ], strategy: :create
+      association :user, factory: %i[constituent as_legal_guardian], strategy: :create
     end
   end
 end

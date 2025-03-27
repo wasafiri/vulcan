@@ -1,4 +1,6 @@
-require "test_helper"
+# frozen_string_literal: true
+
+require 'test_helper'
 
 class W9ReviewTest < ActiveSupport::TestCase
   setup do
@@ -6,7 +8,7 @@ class W9ReviewTest < ActiveSupport::TestCase
     @admin = create(:admin)
   end
 
-  test "valid approved review" do
+  test 'valid approved review' do
     review = W9Review.new(
       vendor: @vendor,
       admin: @admin,
@@ -16,7 +18,7 @@ class W9ReviewTest < ActiveSupport::TestCase
     assert review.valid?
   end
 
-  test "valid rejected review" do
+  test 'valid rejected review' do
     review = W9Review.new(
       vendor: @vendor,
       admin: @admin,
@@ -28,38 +30,38 @@ class W9ReviewTest < ActiveSupport::TestCase
     assert review.valid?
   end
 
-  test "rejected review requires rejection reason" do
+  test 'rejected review requires rejection reason' do
     review = W9Review.new(
       vendor: @vendor,
       admin: @admin,
       status: :rejected,
       rejection_reason_code: :address_mismatch,
-      rejection_reason: "",
+      rejection_reason: '',
       reviewed_at: Time.current
     )
     assert_not review.valid?
-    assert_includes review.errors[:rejection_reason], "must be provided when rejecting a W9"
+    assert_includes review.errors[:rejection_reason], 'must be provided when rejecting a W9'
   end
 
-  test "rejected review requires rejection reason code" do
+  test 'rejected review requires rejection reason code' do
     review = W9Review.new(
       vendor: @vendor,
       admin: @admin,
       status: :rejected,
-      rejection_reason: "Invalid information",
+      rejection_reason: 'Invalid information',
       reviewed_at: Time.current
     )
     assert_not review.valid?
-    assert_includes review.errors[:rejection_reason_code], "must be selected when rejecting a W9"
+    assert_includes review.errors[:rejection_reason_code], 'must be selected when rejecting a W9'
   end
 
-  test "approved review clears rejection fields" do
+  test 'approved review clears rejection fields' do
     review = W9Review.new(
       vendor: @vendor,
       admin: @admin,
       status: :approved,
       rejection_reason_code: :address_mismatch,
-      rejection_reason: "Should be cleared",
+      rejection_reason: 'Should be cleared',
       reviewed_at: Time.current
     )
     review.valid?
@@ -67,8 +69,8 @@ class W9ReviewTest < ActiveSupport::TestCase
     assert_nil review.rejection_reason_code
   end
 
-  test "creating approved review updates vendor status" do
-    assert_equal "pending_review", @vendor.w9_status
+  test 'creating approved review updates vendor status' do
+    assert_equal 'pending_review', @vendor.w9_status
 
     W9Review.create!(
       vendor: @vendor,
@@ -78,11 +80,11 @@ class W9ReviewTest < ActiveSupport::TestCase
     )
 
     @vendor.reload
-    assert_equal "approved", @vendor.w9_status
+    assert_equal 'approved', @vendor.w9_status
   end
 
-  test "creating rejected review updates vendor status" do
-    assert_equal "pending_review", @vendor.w9_status
+  test 'creating rejected review updates vendor status' do
+    assert_equal 'pending_review', @vendor.w9_status
 
     W9Review.create!(
       vendor: @vendor,
@@ -94,10 +96,10 @@ class W9ReviewTest < ActiveSupport::TestCase
     )
 
     @vendor.reload
-    assert_equal "rejected", @vendor.w9_status
+    assert_equal 'rejected', @vendor.w9_status
   end
 
-  test "admin must be an admin type" do
+  test 'admin must be an admin type' do
     non_admin = create(:vendor)
     review = W9Review.new(
       vendor: @vendor,
@@ -106,10 +108,10 @@ class W9ReviewTest < ActiveSupport::TestCase
       reviewed_at: Time.current
     )
     assert_not review.valid?
-    assert_includes review.errors[:admin], "must be an administrator"
+    assert_includes review.errors[:admin], 'must be an administrator'
   end
 
-  test "vendor must be a vendor type" do
+  test 'vendor must be a vendor type' do
     non_vendor = create(:admin)
     review = W9Review.new(
       vendor: non_vendor,
@@ -118,10 +120,10 @@ class W9ReviewTest < ActiveSupport::TestCase
       reviewed_at: Time.current
     )
     assert_not review.valid?
-    assert_includes review.errors[:vendor], "must be a vendor"
+    assert_includes review.errors[:vendor], 'must be a vendor'
   end
 
-  test "reviewed_at is set automatically on create" do
+  test 'reviewed_at is set automatically on create' do
     review = W9Review.new(
       vendor: @vendor,
       admin: @admin,
@@ -132,7 +134,7 @@ class W9ReviewTest < ActiveSupport::TestCase
     assert_not_nil review.reviewed_at
   end
 
-  test "status must be present" do
+  test 'status must be present' do
     review = W9Review.new(
       vendor: @vendor,
       admin: @admin,

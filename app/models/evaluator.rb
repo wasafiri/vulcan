@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Evaluator < User
   has_many :evaluations, foreign_key: :evaluator_id, dependent: :restrict_with_error
   has_many :assigned_constituents,

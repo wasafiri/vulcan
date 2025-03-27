@@ -1,9 +1,11 @@
-require "bcrypt"
+# frozen_string_literal: true
+
+require 'bcrypt'
 
 module TestPasswordHelper
   # Default plain-text password used in tests
   def default_password
-    "password123"
+    'password123'
   end
 
   # Generates the password digest using User.digest

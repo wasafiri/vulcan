@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 FactoryBot.define do
   factory :voucher do
     code { SecureRandom.alphanumeric(12).upcase }
@@ -33,8 +35,8 @@ FactoryBot.define do
 
       after(:create) do |voucher, evaluator|
         create_list(:voucher_transaction, evaluator.transaction_count,
-          voucher: voucher,
-          vendor: voucher.vendor)
+                    voucher: voucher,
+                    vendor: voucher.vendor)
       end
     end
   end

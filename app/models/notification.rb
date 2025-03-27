@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Notification < ApplicationRecord
   belongs_to :recipient, class_name: 'User'
   belongs_to :actor, class_name: 'User', optional: true
@@ -41,6 +43,7 @@ class Notification < ApplicationRecord
 
   def email_error_message
     return nil unless delivery_status == 'error'
+
     metadata&.dig('error_message') || 'Unknown error'
   end
 
@@ -49,7 +52,7 @@ class Notification < ApplicationRecord
     new_metadata[key.to_s] = value
     update!(metadata: new_metadata)
   end
-  
+
   # Generate a human-readable message for the notification based on its action and context
   def message
     case action
@@ -70,14 +73,14 @@ class Notification < ApplicationRecord
     when 'review_requested'
       "Review requested for application ##{notifiable_id}"
     when 'trainer_assigned'
-      trainer_name = actor&.full_name || "A trainer"
+      trainer_name = actor&.full_name || 'A trainer'
       application = notifiable
-      constituent_name = application&.constituent_full_name || "a constituent"
-      
+      constituent_name = application&.constituent_full_name || 'a constituent'
+
       # Get associated training session if it exists
       training_session = application&.training_sessions&.where(trainer_id: actor&.id)&.last
-      status_info = training_session ? " (#{training_session.status.humanize})" : ""
-      
+      status_info = training_session ? " (#{training_session.status.humanize})" : ''
+
       "#{trainer_name} assigned to train #{constituent_name} for Application ##{notifiable_id}#{status_info}"
     else
       # Default fallback using humanized action

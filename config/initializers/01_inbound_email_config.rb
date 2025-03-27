@@ -1,33 +1,35 @@
+# frozen_string_literal: true
+
 # Centralized configuration for all inbound email processing
 module MatVulcan
   module InboundEmailConfig
     # Store provider information
     mattr_accessor :provider
-    @@provider = (ENV['INBOUND_EMAIL_PROVIDER'] || 
-                 Rails.application.credentials.dig(:inbound_email, :provider) || 
-                 :postmark).to_sym  # Default provider
-    
+    @@provider = (ENV['INBOUND_EMAIL_PROVIDER'] ||
+                 Rails.application.credentials.dig(:inbound_email, :provider) ||
+                 :postmark).to_sym # Default provider
+
     # Store all inbound email configuration in one place
     mattr_accessor :inbound_email_address
-    @@inbound_email_address = ENV['INBOUND_EMAIL_ADDRESS'] || 
-                              Rails.application.credentials.dig(:inbound_email, :address) || 
+    @@inbound_email_address = ENV['INBOUND_EMAIL_ADDRESS'] ||
+                              Rails.application.credentials.dig(:inbound_email, :address) ||
                               'af7eff0e94107d69e60ac99b335358b1@inbound.postmarkapp.com'
-    
+
     # Extract the hash part (everything before @) for routing
     def self.inbound_email_hash
       inbound_email_address.split('@').first
     end
-    
+
     # Extract the domain part for domain-based routing
     def self.inbound_email_domain
       inbound_email_address.split('@').last
     end
-    
+
     # Helper method to determine if we're using a specific provider
     def self.using?(provider_name)
       provider.to_sym == provider_name.to_sym
     end
-    
+
     # Provider-specific configuration
     def self.provider_config
       case provider

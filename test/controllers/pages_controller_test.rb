@@ -1,4 +1,6 @@
-require "test_helper"
+# frozen_string_literal: true
+
+require 'test_helper'
 
 class PagesControllerTest < ActionDispatch::IntegrationTest
   def test_should_get_how_it_works

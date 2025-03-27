@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module FormHelper
   def us_states_options
     [

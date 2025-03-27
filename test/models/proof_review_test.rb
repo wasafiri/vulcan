@@ -1,4 +1,6 @@
-require "test_helper"
+# frozen_string_literal: true
+
+require 'test_helper'
 
 class ProofReviewTest < ActiveSupport::TestCase
   def setup
@@ -6,14 +8,12 @@ class ProofReviewTest < ActiveSupport::TestCase
     @application = create(:application, :in_progress)
 
     # Ensure test files exist
-    fixture_dir = Rails.root.join("test", "fixtures", "files")
+    fixture_dir = Rails.root.join('test', 'fixtures', 'files')
     FileUtils.mkdir_p(fixture_dir)
 
-    [ "test_proof.pdf", "test_income_proof.pdf", "test_residency_proof.pdf" ].each do |filename|
+    ['test_proof.pdf', 'test_income_proof.pdf', 'test_residency_proof.pdf'].each do |filename|
       file_path = fixture_dir.join(filename)
-      unless File.exist?(file_path)
-        File.write(file_path, "test content for #{filename}")
-      end
+      File.write(file_path, "test content for #{filename}") unless File.exist?(file_path)
     end
 
     # Attach proofs to the application
@@ -23,30 +23,29 @@ class ProofReviewTest < ActiveSupport::TestCase
   # Helper method to attach test proofs to an application
   def attach_test_proofs(application)
     # Attach income proof
-    income_proof_path = Rails.root.join("test", "fixtures", "files", "test_income_proof.pdf")
+    income_proof_path = Rails.root.join('test', 'fixtures', 'files', 'test_income_proof.pdf')
     application.income_proof.attach(
       io: File.open(income_proof_path),
-      filename: "test_income_proof.pdf",
-      content_type: "application/pdf"
+      filename: 'test_income_proof.pdf',
+      content_type: 'application/pdf'
     )
 
     # Attach residency proof
-    residency_proof_path = Rails.root.join("test", "fixtures", "files", "test_residency_proof.pdf")
+    residency_proof_path = Rails.root.join('test', 'fixtures', 'files', 'test_residency_proof.pdf')
     application.residency_proof.attach(
       io: File.open(residency_proof_path),
-      filename: "test_residency_proof.pdf",
-      content_type: "application/pdf"
+      filename: 'test_residency_proof.pdf',
+      content_type: 'application/pdf'
     )
   end
 
   def test_valid_proof_review
     proof_review = build(:proof_review,
-      application: @application,
-      admin: @admin,
-      proof_type: :income,
-      status: :approved,
-      reviewed_at: Time.current
-    )
+                         application: @application,
+                         admin: @admin,
+                         proof_type: :income,
+                         status: :approved,
+                         reviewed_at: Time.current)
 
     assert proof_review.valid?
   end
@@ -57,18 +56,17 @@ class ProofReviewTest < ActiveSupport::TestCase
 
     assert_includes proof_review.errors[:proof_type], "can't be blank"
     assert_includes proof_review.errors[:status], "can't be blank"
-    assert_includes proof_review.errors[:admin], "must exist"
-    assert_includes proof_review.errors[:application], "must exist"
+    assert_includes proof_review.errors[:admin], 'must exist'
+    assert_includes proof_review.errors[:application], 'must exist'
   end
 
   def test_requires_rejection_reason_when_rejected
     proof_review = build(:proof_review,
-      application: @application,
-      admin: @admin,
-      proof_type: :income,
-      status: :rejected,
-      rejection_reason: nil
-    )
+                         application: @application,
+                         admin: @admin,
+                         proof_type: :income,
+                         status: :rejected,
+                         rejection_reason: nil)
 
     assert_not proof_review.valid?
     assert_includes proof_review.errors[:rejection_reason], "can't be blank"
@@ -78,12 +76,11 @@ class ProofReviewTest < ActiveSupport::TestCase
     @application.update!(income_proof_status: :not_reviewed)
 
     # Create the proof review
-    proof_review = build(:proof_review,
-      application: @application,
-      admin: @admin,
-      proof_type: :income,
-      status: :approved
-    )
+    build(:proof_review,
+          application: @application,
+          admin: @admin,
+          proof_type: :income,
+          status: :approved)
 
     # Manually update the application status
     @application.update!(income_proof_status: :approved)
@@ -97,18 +94,17 @@ class ProofReviewTest < ActiveSupport::TestCase
     @application.update!(total_rejections: 8)
 
     # Skip the email sending for this test to avoid the strftime error
-    mail_mock = mock()
-    mail_mock.expects(:deliver_now).never  # Explicitly state we don't expect this to be called
+    mail_mock = mock
+    mail_mock.expects(:deliver_now).never # Explicitly state we don't expect this to be called
     ApplicationNotificationsMailer.stubs(:proof_rejected).returns(mail_mock)
 
     # Create the proof review
-    proof_review = build(:proof_review,
-      application: @application,
-      admin: @admin,
-      proof_type: :income,
-      status: :rejected,
-      rejection_reason: "Final rejection"
-    )
+    build(:proof_review,
+          application: @application,
+          admin: @admin,
+          proof_type: :income,
+          status: :rejected,
+          rejection_reason: 'Final rejection')
 
     # Manually update the application status since we're skipping callbacks
     @application.update!(status: :archived)
@@ -121,33 +117,32 @@ class ProofReviewTest < ActiveSupport::TestCase
     application = create(:application, :archived)
 
     proof_review = build(:proof_review,
-      application: application,
-      admin: @admin,
-      proof_type: :income,
-      status: :approved
-    )
+                         application: application,
+                         admin: @admin,
+                         proof_type: :income,
+                         status: :approved)
 
     assert_not proof_review.valid?
     assert_includes proof_review.errors[:application],
-                    "cannot be reviewed when archived"
+                    'cannot be reviewed when archived'
   end
 
   def test_sends_notification_on_proof_rejection
     # Skip the email sending for this test to avoid the strftime error
-    mail_mock = mock()
-    mail_mock.expects(:deliver_now).never  # Explicitly state we don't expect this to be called
+    mail_mock = mock
+    mail_mock.expects(:deliver_now).never # Explicitly state we don't expect this to be called
     ApplicationNotificationsMailer.stubs(:proof_rejected).returns(mail_mock)
 
     # Create a notification manually since we're skipping callbacks
     notification = Notification.new(
       recipient: @application.user,
       actor: @admin,
-      action: "proof_rejected",
+      action: 'proof_rejected',
       notifiable: @application,
-      metadata: { proof_type: "income", rejection_reason: "Invalid documentation" }
+      metadata: { proof_type: 'income', rejection_reason: 'Invalid documentation' }
     )
 
-    assert_difference "Notification.count" do
+    assert_difference 'Notification.count' do
       notification.save!
     end
   end

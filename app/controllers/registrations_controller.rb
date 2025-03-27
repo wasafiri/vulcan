@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class RegistrationsController < ApplicationController
   # Require authentication for all actions except new and create
   skip_before_action :authenticate_user!, only: %i[new create]
@@ -68,7 +70,7 @@ class RegistrationsController < ApplicationController
   def set_communication_preference
     return unless params[:user]&.dig(:communication_preference) == 'letter'
 
-    @user.communication_preference = :letter  # Use symbol instead of string to properly set the enum
+    @user.communication_preference = :letter # Use symbol instead of string to properly set the enum
   end
 
   def create_session_and_cookie
@@ -108,7 +110,7 @@ class RegistrationsController < ApplicationController
       :speech_disability, :mobility_disability, :cognition_disability,
       :communication_preference,
       # Address fields for letter notifications
-      :physical_address_1, :physical_address_2, 
+      :physical_address_1, :physical_address_2,
       :city, :state, :zip_code
     )
   end

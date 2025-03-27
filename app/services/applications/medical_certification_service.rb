@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Applications
   class MedicalCertificationService < BaseService
     attr_reader :application, :actor
@@ -73,7 +75,7 @@ module Applications
       end
 
       # No duplicate found, create a new notification
-      notification = Notification.create!(
+      Notification.create!(
         recipient: application.user,
         actor: actor,
         action: 'medical_certification_requested',
@@ -87,7 +89,6 @@ module Applications
       )
 
       # Return the notification for use in email tracking
-      notification
     rescue StandardError => e
       # Log but don't fail the process
       log_error(e, 'Failed to create notification')

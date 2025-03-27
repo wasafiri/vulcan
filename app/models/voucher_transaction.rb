@@ -1,13 +1,15 @@
+# frozen_string_literal: true
+
 class VoucherTransaction < ApplicationRecord
   belongs_to :voucher
-  belongs_to :vendor, class_name: "User"
+  belongs_to :vendor, class_name: 'User'
   belongs_to :invoice, optional: true
 
   has_many :voucher_transaction_products, dependent: :destroy
   has_many :products, through: :voucher_transaction_products
 
   validates :amount, presence: true,
-    numericality: { greater_than: 0 }
+                     numericality: { greater_than: 0 }
   validates :reference_number, presence: true, uniqueness: true
   validates :processed_at, presence: true
   validate :amount_within_voucher_limit, if: :redemption?
@@ -15,7 +17,7 @@ class VoucherTransaction < ApplicationRecord
   before_validation :set_processed_at, on: :create
 
   enum :transaction_type, {
-    redemption: 0,      # Standard redemption of voucher value
+    redemption: 0, # Standard redemption of voucher value
     refund: 1,         # Refund of previously redeemed amount
     adjustment: 2      # Administrative adjustment
   }, default: :redemption
@@ -30,7 +32,7 @@ class VoucherTransaction < ApplicationRecord
   scope :completed, -> { where(status: :transaction_completed) }
   scope :pending_invoice, -> { completed.where(invoice_id: nil) }
   scope :for_vendor, ->(vendor_id) { where(vendor_id: vendor_id) }
-  scope :in_date_range, ->(start_date, end_date) {
+  scope :in_date_range, lambda { |start_date, end_date|
     where(processed_at: start_date.beginning_of_day..end_date.end_of_day)
   }
 
@@ -49,9 +51,9 @@ class VoucherTransaction < ApplicationRecord
   def self.daily_totals(start_date, end_date, vendor_id = nil)
     scope = completed.in_date_range(start_date, end_date)
     scope = scope.where(vendor_id: vendor_id) if vendor_id
-    scope.group("DATE(processed_at)")
-      .sum(:amount)
-      .transform_values { |v| BigDecimal(v.to_s).to_i }
+    scope.group('DATE(processed_at)')
+         .sum(:amount)
+         .transform_values { |v| BigDecimal(v.to_s).to_i }
   end
 
   def amount=(value)
@@ -64,7 +66,7 @@ class VoucherTransaction < ApplicationRecord
     return true unless voucher && amount && redemption?
 
     if BigDecimal(amount.to_s) > BigDecimal(voucher.remaining_value.to_s)
-      errors.add(:amount, "exceeds remaining voucher value")
+      errors.add(:amount, 'exceeds remaining voucher value')
       false
     else
       true

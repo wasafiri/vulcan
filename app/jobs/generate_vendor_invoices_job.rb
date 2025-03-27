@@ -1,14 +1,16 @@
+# frozen_string_literal: true
+
 class GenerateVendorInvoicesJob < ApplicationJob
   queue_as :default
 
   def perform
     # Find vendors with uninvoiced transactions
     vendor_ids = VoucherTransaction
-      .completed
-      .where(invoice_id: nil)
-      .select(:vendor_id)
-      .distinct
-      .pluck(:vendor_id)
+                 .completed
+                 .where(invoice_id: nil)
+                 .select(:vendor_id)
+                 .distinct
+                 .pluck(:vendor_id)
 
     vendor_ids.each do |vendor_id|
       # Calculate date range for this invoice
@@ -18,10 +20,10 @@ class GenerateVendorInvoicesJob < ApplicationJob
 
       # Get all completed, uninvoiced transactions for this vendor in date range
       transactions = VoucherTransaction
-        .completed
-        .where(invoice_id: nil)
-        .where(vendor_id: vendor_id)
-        .where(processed_at: start_date..end_date)
+                     .completed
+                     .where(invoice_id: nil)
+                     .where(vendor_id: vendor_id)
+                     .where(processed_at: start_date..end_date)
 
       next if transactions.empty?
 
@@ -42,7 +44,7 @@ class GenerateVendorInvoicesJob < ApplicationJob
         # Create event
         invoice.events.create!(
           user: nil,
-          action: "generated",
+          action: 'generated',
           metadata: {
             transaction_count: transactions.count,
             total_amount: invoice.total_amount,
@@ -70,10 +72,10 @@ class GenerateVendorInvoicesJob < ApplicationJob
   private
 
   def generate_invoice_number
-    date_part = Time.current.strftime("%Y%m")
-    sequence = (Invoice.where("invoice_number LIKE ?", "INV-#{date_part}-%").count + 1)
-      .to_s
-      .rjust(4, "0")
+    date_part = Time.current.strftime('%Y%m')
+    sequence = (Invoice.where('invoice_number LIKE ?', "INV-#{date_part}-%").count + 1)
+               .to_s
+               .rjust(4, '0')
 
     "INV-#{date_part}-#{sequence}"
   end

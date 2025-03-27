@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class DefaultMailbox < ApplicationMailbox
   def process
     # Log the unrouted email

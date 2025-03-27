@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Evaluations
   class SubmissionService
     def initialize(evaluation, params)
@@ -28,8 +30,8 @@ module Evaluations
         :notes,
         :status,
         recommended_product_ids: [],
-        attendees: [ :name, :relationship ],
-        products_tried: [ :product_id, :reaction ]
+        attendees: %i[name relationship],
+        products_tried: %i[product_id reaction]
       )
     end
 

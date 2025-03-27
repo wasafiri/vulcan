@@ -1,4 +1,6 @@
-require "application_system_test_case"
+# frozen_string_literal: true
+
+require 'application_system_test_case'
 
 module AdminTests
   class GuardianProofReviewTest < ApplicationSystemTestCase
@@ -8,41 +10,41 @@ module AdminTests
 
       # Sign in as admin
       visit sign_in_path
-      fill_in "Email Address", with: @admin.email
-      fill_in "Password", with: "password123"
-      click_button "Sign In"
-      assert_text "Dashboard" # Verify we're signed in
+      fill_in 'Email Address', with: @admin.email
+      fill_in 'Password', with: 'password123'
+      click_button 'Sign In'
+      assert_text 'Dashboard' # Verify we're signed in
     end
 
-    test "displays guardian alert in income proof review modal" do
+    test 'displays guardian alert in income proof review modal' do
       visit admin_application_path(@application)
 
       # Open the income proof review modal
       find("[data-action='click->modal#open'][data-modal-id='incomeProofReviewModal']").click
 
       # Verify the guardian alert is displayed
-      within "#incomeProofReviewModal" do
-        assert_text "Guardian Application"
-        assert_text "This application was submitted by a parent on behalf of a minor"
-        assert_text "Please verify this relationship when reviewing these proof documents"
+      within '#incomeProofReviewModal' do
+        assert_text 'Guardian Application'
+        assert_text 'This application was submitted by a parent on behalf of a minor'
+        assert_text 'Please verify this relationship when reviewing these proof documents'
       end
     end
 
-    test "displays guardian alert in residency proof review modal" do
+    test 'displays guardian alert in residency proof review modal' do
       visit admin_application_path(@application)
 
       # Open the residency proof review modal
       find("[data-action='click->modal#open'][data-modal-id='residencyProofReviewModal']").click
 
       # Verify the guardian alert is displayed
-      within "#residencyProofReviewModal" do
-        assert_text "Guardian Application"
-        assert_text "This application was submitted by a parent on behalf of a minor"
-        assert_text "Please verify this relationship when reviewing these proof documents"
+      within '#residencyProofReviewModal' do
+        assert_text 'Guardian Application'
+        assert_text 'This application was submitted by a parent on behalf of a minor'
+        assert_text 'Please verify this relationship when reviewing these proof documents'
       end
     end
 
-    test "does not display guardian alert for non-guardian applications" do
+    test 'does not display guardian alert for non-guardian applications' do
       # Create a regular application (not from a guardian)
       regular_constituent = create(:constituent, is_guardian: false, guardian_relationship: nil)
       regular_application = create(:application, :in_progress_with_pending_proofs, user: regular_constituent)
@@ -53,10 +55,10 @@ module AdminTests
       find("[data-action='click->modal#open'][data-modal-id='incomeProofReviewModal']").click
 
       # Verify the guardian alert is not displayed
-      within "#incomeProofReviewModal" do
-        assert_no_text "Guardian Application"
-        assert_no_text "This application was submitted by a"
-        assert_no_text "on behalf of a minor"
+      within '#incomeProofReviewModal' do
+        assert_no_text 'Guardian Application'
+        assert_no_text 'This application was submitted by a'
+        assert_no_text 'on behalf of a minor'
       end
 
       # Close the modal
@@ -66,10 +68,10 @@ module AdminTests
       find("[data-action='click->modal#open'][data-modal-id='residencyProofReviewModal']").click
 
       # Verify the guardian alert is not displayed
-      within "#residencyProofReviewModal" do
-        assert_no_text "Guardian Application"
-        assert_no_text "This application was submitted by a"
-        assert_no_text "on behalf of a minor"
+      within '#residencyProofReviewModal' do
+        assert_no_text 'Guardian Application'
+        assert_no_text 'This application was submitted by a'
+        assert_no_text 'on behalf of a minor'
       end
     end
   end

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # test/factories/sequences.rb
 FactoryBot.define do
   unless FactoryBot.factories.registered?(:email)

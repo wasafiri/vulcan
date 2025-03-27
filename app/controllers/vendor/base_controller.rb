@@ -1,12 +1,16 @@
-class Vendor::BaseController < ApplicationController
-  before_action :authenticate_user!
-  before_action :require_vendor!
+# frozen_string_literal: true
 
-  private
+module Vendor
+  class BaseController < ApplicationController
+    before_action :authenticate_user!
+    before_action :require_vendor!
 
-  def require_vendor!
-    unless current_user&.vendor?
-      redirect_to root_path, alert: "Access denied. Vendor-only area."
+    private
+
+    def require_vendor!
+      return if current_user&.vendor?
+
+      redirect_to root_path, alert: 'Access denied. Vendor-only area.'
     end
   end
 end

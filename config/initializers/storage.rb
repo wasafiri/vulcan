@@ -1,6 +1,8 @@
+# frozen_string_literal: true
+
 # Configure Active Storage service based on environment
 Rails.application.config.to_prepare do
-  Rails.application.config.active_storage.service = 
+  Rails.application.config.active_storage.service =
     case Rails.env
     when 'test'
       :test

@@ -1,4 +1,4 @@
-class CreateApplicationStatusChanges < ActiveRecord::Migration[7.0]
+class CreateApplicationStatusChanges < ActiveRecord::Migration[8.0]
   def change
     create_table :application_status_changes do |t|
       t.references :application, null: false, foreign_key: true

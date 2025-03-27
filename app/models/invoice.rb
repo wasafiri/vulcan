@@ -1,5 +1,7 @@
+# frozen_string_literal: true
+
 class Invoice < ApplicationRecord
-  belongs_to :vendor, class_name: "User"
+  belongs_to :vendor, class_name: 'User'
   has_many :vouchers, dependent: :nullify
   has_many :voucher_transactions, dependent: :nullify
 
@@ -23,8 +25,8 @@ class Invoice < ApplicationRecord
 
   scope :unpaid, -> { where.not(status: %i[invoice_paid invoice_cancelled]) }
   scope :for_vendor, ->(vendor_id) { where(vendor_id: vendor_id) }
-  scope :in_date_range, ->(start_date, end_date) {
-    where("start_date >= ? AND end_date <= ?", start_date, end_date)
+  scope :in_date_range, lambda { |start_date, end_date|
+    where('start_date >= ? AND end_date <= ?', start_date, end_date)
   }
   scope :needs_processing, -> { where(status: :invoice_pending) }
 
@@ -83,13 +85,11 @@ class Invoice < ApplicationRecord
   private
 
   def set_timestamps
-    if status_changed? && invoice_approved?
-      self.approved_at = Time.current
-    end
+    self.approved_at = Time.current if status_changed? && invoice_approved?
 
-    if status_changed? && invoice_paid? && gad_invoice_reference.present?
-      self.payment_recorded_at = Time.current
-    end
+    return unless status_changed? && invoice_paid? && gad_invoice_reference.present?
+
+    self.payment_recorded_at = Time.current
   end
 
   def payment_details_added?
@@ -111,9 +111,9 @@ class Invoice < ApplicationRecord
   def generate_invoice_number
     return if invoice_number.present?
 
-    date_part = Time.current.strftime("%Y%m")
-    sequence = (self.class.where("invoice_number LIKE ?", "INV-#{date_part}-%")
-      .count + 1).to_s.rjust(4, "0")
+    date_part = Time.current.strftime('%Y%m')
+    sequence = (self.class.where('invoice_number LIKE ?', "INV-#{date_part}-%")
+      .count + 1).to_s.rjust(4, '0')
 
     self.invoice_number = "INV-#{date_part}-#{sequence}"
   end
@@ -125,22 +125,22 @@ class Invoice < ApplicationRecord
   def end_date_after_start_date
     return unless start_date && end_date
 
-    if end_date <= start_date
-      errors.add(:end_date, "must be after start date")
-    end
+    return unless end_date <= start_date
+
+    errors.add(:end_date, 'must be after start date')
   end
 
   def dates_do_not_overlap_for_vendor
     return unless start_date && end_date && vendor_id
 
     overlapping = self.class
-      .where(vendor_id: vendor_id)  # Only check same vendor
-      .where.not(id: id)            # Exclude self when updating
-      .where("start_date <= ? AND end_date >= ?", end_date, start_date)
-      .exists?
+                      .where(vendor_id: vendor_id)  # Only check same vendor
+                      .where.not(id: id)            # Exclude self when updating
+                      .where('start_date <= ? AND end_date >= ?', end_date, start_date)
+                      .exists?
 
-    if overlapping
-      errors.add(:base, "Date range overlaps with an existing invoice")
-    end
+    return unless overlapping
+
+    errors.add(:base, 'Date range overlaps with an existing invoice')
   end
 end

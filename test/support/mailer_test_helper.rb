@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module MailerTestHelper
   # Helper method to stub the application needs_review_since method
   def stub_application_needs_review_since

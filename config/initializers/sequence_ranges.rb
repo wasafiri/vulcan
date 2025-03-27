@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # This initializer ensures application IDs remain high and non-sequential for security
 # High, non-sequential IDs prevent enumeration attacks and make IDs harder to guess
 Rails.application.config.after_initialize do
@@ -8,15 +10,15 @@ Rails.application.config.after_initialize do
       if ActiveRecord::Base.connection.adapter_name.downcase.include?('postgresql')
         # Get current sequence value
         current_value = ActiveRecord::Base.connection.execute(
-          "SELECT last_value FROM applications_id_seq"
-        ).first["last_value"].to_i
-        
+          'SELECT last_value FROM applications_id_seq'
+        ).first['last_value'].to_i
+
         # High IDs are preferred for security against enumeration attacks
         # If the sequence is too low, reset it with random offset
         if current_value < 980_000_000
           # Use random offset for additional non-sequentiality
-          new_value = 980_000_000 + Random.rand(100_000)
-          
+          new_value = Random.rand(980_000_000..980_099_999)
+
           Rails.logger.info "Setting applications_id_seq to #{new_value} (from #{current_value}) with randomization for security"
           ActiveRecord::Base.connection.execute(
             "SELECT setval('applications_id_seq', #{new_value})"

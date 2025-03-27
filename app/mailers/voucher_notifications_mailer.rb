@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class VoucherNotificationsMailer < ApplicationMailer
   include Rails.application.routes.url_helpers
 
@@ -13,14 +15,14 @@ class VoucherNotificationsMailer < ApplicationMailer
     @application = voucher.application
     @user = @application.user
 
-    extra_setup.call if extra_setup
+    extra_setup&.call
 
     mail_obj = mail(
       to: @user.email,
       subject: subject,
-      template_path: "voucher_notifications_mailer",
+      template_path: 'voucher_notifications_mailer',
       template_name: template_name,
-      message_stream: "notifications"
+      message_stream: 'notifications'
     )
 
     Rails.logger.info "Email body: #{mail_obj.body}"
@@ -30,8 +32,8 @@ class VoucherNotificationsMailer < ApplicationMailer
   def voucher_assigned(voucher)
     prepare_email(
       voucher,
-      template_name: "voucher_assigned",
-      subject: "Your Voucher Has Been Assigned"
+      template_name: 'voucher_assigned',
+      subject: 'Your Voucher Has Been Assigned'
     )
   rescue StandardError => e
     Rails.logger.error("Failed to send voucher assigned email: #{e.message}")
@@ -42,11 +44,11 @@ class VoucherNotificationsMailer < ApplicationMailer
   def voucher_expiring_soon(voucher)
     prepare_email(
       voucher,
-      template_name: "voucher_expiring_soon",
-      subject: "Your Voucher Will Expire Soon",
-      extra_setup: -> {
+      template_name: 'voucher_expiring_soon',
+      subject: 'Your Voucher Will Expire Soon',
+      extra_setup: lambda {
         @days_remaining = ((voucher.issued_at + Policy.voucher_validity_period) - Time.current).to_i / 1.day
-        @expiration_date = (voucher.issued_at + Policy.voucher_validity_period).strftime("%B %d, %Y")
+        @expiration_date = (voucher.issued_at + Policy.voucher_validity_period).strftime('%B %d, %Y')
       }
     )
   rescue StandardError => e
@@ -58,8 +60,8 @@ class VoucherNotificationsMailer < ApplicationMailer
   def voucher_expired(voucher)
     prepare_email(
       voucher,
-      template_name: "voucher_expired",
-      subject: "Your Voucher Has Expired"
+      template_name: 'voucher_expired',
+      subject: 'Your Voucher Has Expired'
     )
   rescue StandardError => e
     Rails.logger.error("Failed to send voucher expired email: #{e.message}")
@@ -79,10 +81,10 @@ class VoucherNotificationsMailer < ApplicationMailer
 
     mail_obj = mail(
       to: @user.email,
-      subject: "Your Voucher Has Been Redeemed",
-      template_path: "voucher_notifications_mailer",
-      template_name: "voucher_redeemed",
-      message_stream: "notifications"
+      subject: 'Your Voucher Has Been Redeemed',
+      template_path: 'voucher_notifications_mailer',
+      template_name: 'voucher_redeemed',
+      message_stream: 'notifications'
     )
 
     Rails.logger.info "Email body: #{mail_obj.body}"

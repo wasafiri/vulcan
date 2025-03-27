@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Applications
   # This service handles paper application submissions by administrators
   # It follows the same patterns as ConstituentPortal for file uploads
@@ -83,10 +85,10 @@ module Applications
       Rails.logger.debug "Param key as symbol: #{params[:"#{type}_proof_action"].inspect}"
       Rails.logger.debug "Param key as string: #{params["#{type}_proof_action"].inspect}"
       Rails.logger.debug "File param present? #{params["#{type}_proof"].present?}"
-      if params["#{type}_proof"].present?
-        Rails.logger.debug "File param type: #{params["#{type}_proof"].class.name}"
-        Rails.logger.debug "File param details: #{params["#{type}_proof"].inspect}"
-      end
+      return unless params["#{type}_proof"].present?
+
+      Rails.logger.debug "File param type: #{params["#{type}_proof"].class.name}"
+      Rails.logger.debug "File param details: #{params["#{type}_proof"].inspect}"
     end
 
     def extract_proof_action(type)
@@ -152,7 +154,7 @@ module Applications
       if @constituent
         # For existing constituent, check for active application
         if @constituent.active_application?
-          add_error("This constituent already has an active application.")
+          add_error('This constituent already has an active application.')
           return false
         end
         return true
@@ -168,7 +170,7 @@ module Applications
 
       # Remove any notification_method attribute if present (column was removed in migration)
       attrs.delete(:notification_method) if attrs.key?(:notification_method)
-      attrs.delete("notification_method") if attrs.key?("notification_method")
+      attrs.delete('notification_method') if attrs.key?('notification_method')
 
       # Generate temporary password for new accounts
       temp_password = SecureRandom.hex(8)
@@ -195,9 +197,9 @@ module Applications
     end
 
     def ensure_disability_selection(attrs)
-      has_any_disability = [:hearing_disability, :vision_disability, :speech_disability, 
-                            :mobility_disability, :cognition_disability].any? do |disability|
-        attrs[disability] == '1' || attrs[disability] == true
+      has_any_disability = %i[hearing_disability vision_disability speech_disability
+                              mobility_disability cognition_disability].any? do |disability|
+        ['1', true].include?(attrs[disability])
       end
 
       # Default to hearing disability if none are selected
@@ -246,22 +248,22 @@ module Applications
       Thread.current[:paper_application_context] = true
 
       # Enhanced debugging
-      Rails.logger.debug "==== PAPER APPLICATION PROOF UPLOAD STARTED ===="
+      Rails.logger.debug '==== PAPER APPLICATION PROOF UPLOAD STARTED ===='
       Rails.logger.debug "Current params: #{params.inspect}"
 
       begin
         # Process income proof
-        Rails.logger.debug "About to process income proof"
-        income_result = process_proof(:income) 
+        Rails.logger.debug 'About to process income proof'
+        income_result = process_proof(:income)
         Rails.logger.debug "Income proof processing result: #{income_result}"
 
         # Process residency proof
-        Rails.logger.debug "About to process residency proof"
+        Rails.logger.debug 'About to process residency proof'
         residency_result = process_proof(:residency)
         Rails.logger.debug "Residency proof processing result: #{residency_result}"
 
         # Return true if we reach here
-        Rails.logger.debug "==== PAPER APPLICATION PROOF UPLOAD FINISHED ===="
+        Rails.logger.debug '==== PAPER APPLICATION PROOF UPLOAD FINISHED ===='
         true
       ensure
         # Always clear the thread-local variable
@@ -306,9 +308,7 @@ module Applications
       if @constituent.communication_preference == 'email'
         # Send emails as before
         @application.proof_reviews.reload.each do |review|
-          if review.status_rejected?
-            ApplicationNotificationsMailer.proof_rejected(@application, review).deliver_later
-          end
+          ApplicationNotificationsMailer.proof_rejected(@application, review).deliver_later if review.status_rejected?
         end
 
         # Send account creation email for new constituents
@@ -335,19 +335,19 @@ module Applications
 
         # Proof rejection letters
         @application.proof_reviews.reload.each do |review|
-          if review.status_rejected?
-            Letters::LetterGeneratorService.new(
-              template_type: 'proof_rejected',
-              constituent: @constituent,
-              application: @application,
-              data: { 
-                proof_review: review,
-                proof_type: review.proof_type,
-                rejection_reason: review.rejection_reason,
-                rejection_notes: review.notes
-              }
-            ).queue_for_printing
-          end
+          next unless review.status_rejected?
+
+          Letters::LetterGeneratorService.new(
+            template_type: 'proof_rejected',
+            constituent: @constituent,
+            application: @application,
+            data: {
+              proof_review: review,
+              proof_type: review.proof_type,
+              rejection_reason: review.rejection_reason,
+              rejection_notes: review.notes
+            }
+          ).queue_for_printing
         end
       end
     end

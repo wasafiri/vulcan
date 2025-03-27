@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class UserMailer < ApplicationMailer
   def password_reset
     @user = params[:user]
@@ -6,10 +8,10 @@ class UserMailer < ApplicationMailer
 
     mail(
       to: @user.email,
-      subject: "Reset your password",
-      template_path: "user_mailer",
-      template_name: "password_reset",
-      message_stream: "outbound"
+      subject: 'Reset your password',
+      template_path: 'user_mailer',
+      template_name: 'password_reset',
+      message_stream: 'outbound'
     )
   rescue StandardError => e
     Rails.logger.error("Failed to send password reset email: #{e.message}")
@@ -22,10 +24,10 @@ class UserMailer < ApplicationMailer
 
     mail(
       to: @user.email,
-      subject: "Verify your email",
-      template_path: "user_mailer",
-      template_name: "email_verification",
-      message_stream: "outbound"
+      subject: 'Verify your email',
+      template_path: 'user_mailer',
+      template_name: 'email_verification',
+      message_stream: 'outbound'
     )
   rescue StandardError => e
     Rails.logger.error("Failed to send verification email: #{e.message}")

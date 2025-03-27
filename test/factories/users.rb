@@ -1,28 +1,30 @@
+# frozen_string_literal: true
+
 FactoryBot.define do
   unless FactoryBot.factories.registered?(:user)
     factory :user do
       sequence(:email) { |n| "user#{n}@example.com" }
-      password { "password123" }
-      first_name { "Test" }
-      last_name { "User" }
-      phone { "555-555-5555" }
+      password { 'password123' }
+      first_name { 'Test' }
+      last_name { 'User' }
+      phone { '555-555-5555' }
       date_of_birth { 30.years.ago }
-      timezone { "Eastern Time (US & Canada)" }
-      locale { "en" }
+      timezone { 'Eastern Time (US & Canada)' }
+      locale { 'en' }
       email_verified { true }
       verified { true }
 
-      factory :admin, class: "Admin" do
+      factory :admin, class: 'Admin' do
         sequence(:email) { |n| "admin#{n}@example.com" }
-        type { "Admin" }
-        first_name { "Admin" }
+        type { 'Admin' }
+        first_name { 'Admin' }
       end
 
-      factory :evaluator, class: "Evaluator" do
-        type { "Evaluator" }
-        first_name { "Test" }
-        last_name { "Evaluator" }
-        availability_schedule { { monday: [ "9:00", "17:00" ] } }
+      factory :evaluator, class: 'Evaluator' do
+        type { 'Evaluator' }
+        first_name { 'Test' }
+        last_name { 'Evaluator' }
+        availability_schedule { { monday: ['9:00', '17:00'] } }
         status { :evaluator_active }
 
         trait :inactive do
@@ -34,12 +36,12 @@ FactoryBot.define do
         end
       end
 
-      factory :constituent, class: "Constituent" do
-        type { "Constituent" }
-        physical_address_1 { "123 Main St" }
-        city { "Baltimore" }
-        state { "MD" }
-        zip_code { "21201" }
+      factory :constituent, class: 'Constituent' do
+        type { 'Constituent' }
+        physical_address_1 { '123 Main St' }
+        city { 'Baltimore' }
+        state { 'MD' }
+        zip_code { '21201' }
 
         # Set default disability to pass validation
         after(:build) do |constituent|
@@ -62,12 +64,12 @@ FactoryBot.define do
 
         trait :as_guardian do
           is_guardian { true }
-          guardian_relationship { "Parent" }
+          guardian_relationship { 'Parent' }
         end
 
         trait :as_legal_guardian do
           is_guardian { true }
-          guardian_relationship { "Legal Guardian" }
+          guardian_relationship { 'Legal Guardian' }
         end
 
         trait :with_internet do

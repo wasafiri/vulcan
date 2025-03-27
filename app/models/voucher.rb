@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Represents a voucher that can be redeemed by constituents for assistive technology products
 class Voucher < ApplicationRecord
   belongs_to :application
@@ -88,7 +90,7 @@ class Voucher < ApplicationRecord
     transaction do
       # Create the transaction record
       txn = create_redemption_transaction(amount, vendor, generate_reference_number)
-      
+
       # Process any products that were purchased
       process_product_data(product_data, txn) if product_data.present?
 
@@ -158,7 +160,7 @@ class Voucher < ApplicationRecord
   def process_product_data(product_data, transaction)
     product_data.each do |product_id, quantity|
       product = Product.find(product_id)
-      
+
       # Create transaction product record
       transaction.voucher_transaction_products.create!(
         product: product,
@@ -180,10 +182,10 @@ class Voucher < ApplicationRecord
     self.remaining_value -= amount
     self.last_used_at = Time.current
     self.vendor = vendor
-    
+
     # Update status if fully redeemed
     self.status = :redeemed if remaining_value.zero?
-    
+
     save!
   end
 
@@ -195,33 +197,31 @@ class Voucher < ApplicationRecord
   # Create an event record for voucher redemption
   # This method is fault-tolerant - if it fails, it logs the error but doesn't raise an exception
   def log_redemption_event(vendor, amount, transaction, product_data)
-    begin
-      events.create!(
-        user: vendor,
-        action: "voucher_redeemed",
-        metadata: {
-          application_id: application.id,
-          voucher_code: code,
-          amount: amount,
-          vendor_name: vendor.business_name || "Unknown vendor",
-          transaction_id: transaction.id,
-          remaining_value: remaining_value,
-          products: format_product_data_for_event(product_data)
-        }
-      )
-    rescue StandardError => e
-      # Log the error but don't raise - this ensures the transaction still completes
-      Rails.logger.error("Failed to log voucher redemption event: #{e.message}")
-      Rails.logger.error(e.backtrace.join("\n")) if e.backtrace
-      # Return nil but don't raise exception
-      nil
-    end
+    events.create!(
+      user: vendor,
+      action: 'voucher_redeemed',
+      metadata: {
+        application_id: application.id,
+        voucher_code: code,
+        amount: amount,
+        vendor_name: vendor.business_name || 'Unknown vendor',
+        transaction_id: transaction.id,
+        remaining_value: remaining_value,
+        products: format_product_data_for_event(product_data)
+      }
+    )
+  rescue StandardError => e
+    # Log the error but don't raise - this ensures the transaction still completes
+    Rails.logger.error("Failed to log voucher redemption event: #{e.message}")
+    Rails.logger.error(e.backtrace.join("\n")) if e.backtrace
+    # Return nil but don't raise exception
+    nil
   end
 
   # Format product data for event metadata
   def format_product_data_for_event(product_data)
     return nil unless product_data.present?
-    
+
     product_data.map do |id, qty|
       { id: id, quantity: qty }
     end
@@ -253,13 +253,14 @@ class Voucher < ApplicationRecord
   end
 
   def remaining_value_cannot_exceed_initial_value
-    if remaining_value && initial_value && remaining_value > initial_value
-      errors.add(:remaining_value, 'cannot exceed initial value')
-    end
+    return unless remaining_value && initial_value && remaining_value > initial_value
+
+    errors.add(:remaining_value, 'cannot exceed initial value')
   end
 
   def generate_code
     return if code.present?
+
     loop do
       self.code = SecureRandom.alphanumeric(12).upcase
       break unless Voucher.exists?(code: code)
@@ -277,11 +278,10 @@ class Voucher < ApplicationRecord
       total_value = self.class.calculate_value_for_constituent(application.user)
       self.initial_value = total_value
       self.remaining_value = total_value
-      self.issued_at = Time.current
     else
       self.initial_value = 0
       self.remaining_value = 0
-      self.issued_at = Time.current
     end
+    self.issued_at = Time.current
   end
 end

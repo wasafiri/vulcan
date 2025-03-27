@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 FactoryBot.define do
   factory :invoice do
     association :vendor
@@ -5,7 +7,7 @@ FactoryBot.define do
     end_date { Time.current.end_of_day }
     status { :invoice_pending }
     total_amount { 0 }
-    invoice_number { "INV-#{Time.current.strftime("%Y%m")}-#{SecureRandom.hex(4).upcase}" }
+    invoice_number { "INV-#{Time.current.strftime('%Y%m')}-#{SecureRandom.hex(4).upcase}" }
 
     trait :pending do
       status { :invoice_pending }
@@ -36,10 +38,10 @@ FactoryBot.define do
 
       after(:create) do |invoice, evaluator|
         transactions = create_list(:voucher_transaction, evaluator.transaction_count,
-          vendor: invoice.vendor,
-          amount: evaluator.amount_per_transaction,
-          invoice: invoice,
-          status: :transaction_completed)
+                                   vendor: invoice.vendor,
+                                   amount: evaluator.amount_per_transaction,
+                                   invoice: invoice,
+                                   status: :transaction_completed)
 
         # Update total amount
         invoice.update!(
@@ -59,7 +61,7 @@ FactoryBot.define do
     end
 
     trait :with_notes do
-      notes { "Payment processed via direct deposit" }
+      notes { 'Payment processed via direct deposit' }
     end
 
     # Ensure total amount matches transactions

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 FactoryBot.define do
   unless FactoryBot.factories.registered?(:policy)
     factory :policy do
@@ -5,32 +7,32 @@ FactoryBot.define do
       value { 3 }
 
       trait :max_training_sessions do
-        key { "max_training_sessions" }
+        key { 'max_training_sessions' }
         value { 3 }
       end
 
       trait :waiting_period_years do
-        key { "waiting_period_years" }
+        key { 'waiting_period_years' }
         value { 3 }
       end
 
       trait :proof_submission_rate_limit_web do
-        key { "proof_submission_rate_limit_web" }
+        key { 'proof_submission_rate_limit_web' }
         value { 5 }
       end
 
       trait :proof_submission_rate_limit_email do
-        key { "proof_submission_rate_limit_email" }
+        key { 'proof_submission_rate_limit_email' }
         value { 5 }
       end
 
       trait :proof_submission_rate_period do
-        key { "proof_submission_rate_period" }
+        key { 'proof_submission_rate_period' }
         value { 24 }
       end
 
       trait :max_proof_rejections do
-        key { "max_proof_rejections" }
+        key { 'max_proof_rejections' }
         value { 3 }
       end
     end

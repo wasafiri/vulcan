@@ -1,8 +1,10 @@
+# frozen_string_literal: true
+
 class Product < ApplicationRecord
   has_and_belongs_to_many :evaluations
   has_and_belongs_to_many :vendors,
-    class_name: "User",
-    join_table: "products_users"
+                          class_name: 'User',
+                          join_table: 'products_users'
   has_and_belongs_to_many :applications
 
   has_many :voucher_transaction_products, dependent: :destroy
@@ -32,10 +34,10 @@ class Product < ApplicationRecord
   scope :active, -> { where(archived_at: nil) }
   scope :archived, -> { where.not(archived_at: nil) }
   scope :ordered_by_name, -> { order(:manufacturer, :name) }
-  scope :with_selected_types, ->(types) {
-    where("device_types::text[] && ?::text[]", "{#{Array(types).join(',')}}")
+  scope :with_selected_types, lambda { |types|
+    where('device_types::text[] && ?::text[]', "{#{Array(types).join(',')}}")
   }
-  scope :by_device_types, ->(types) { where("device_types && ARRAY[?]::text[]", Array(types)) }
+  scope :by_device_types, ->(types) { where('device_types && ARRAY[?]::text[]', Array(types)) }
   scope :by_manufacturer, ->(manufacturer) { where(manufacturer: manufacturer) }
 
   def archive!

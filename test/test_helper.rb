@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 ENV['RAILS_ENV'] ||= 'test'
 require_relative '../config/environment'
 require 'rails/test_help'
@@ -104,12 +106,14 @@ module ActiveSupport
 
       # Create a fresh session for this user to ensure consistent state
       test_session = user.sessions.create!(
-        user_agent: 'Rails Testing', 
+        user_agent: 'Rails Testing',
         ip_address: '127.0.0.1',
         created_at: Time.current
       )
 
-      puts "TEST AUTH: Created test session: #{test_session.id}, token: #{test_session.session_token}" if ENV['DEBUG_AUTH'] == 'true'
+      if ENV['DEBUG_AUTH'] == 'true'
+        puts "TEST AUTH: Created test session: #{test_session.id}, token: #{test_session.session_token}"
+      end
 
       # Set both signed and unsigned cookies for maximum compatibility
       if respond_to?(:cookies)
@@ -119,12 +123,12 @@ module ActiveSupport
         # Set signed cookie if possible
         if cookies.respond_to?(:signed) && cookies.signed.respond_to?(:[]=)
           cookies.signed[:session_token] = { value: test_session.session_token, httponly: true }
-          puts "TEST AUTH: Set signed cookie" if ENV['DEBUG_AUTH'] == 'true'
+          puts 'TEST AUTH: Set signed cookie' if ENV['DEBUG_AUTH'] == 'true'
         end
 
         puts "TEST AUTH: Set cookies for user #{user.email}" if ENV['DEBUG_AUTH'] == 'true'
-      else
-        puts 'TEST AUTH: No cookies method available, relying on TEST_USER_ID' if ENV['DEBUG_AUTH'] == 'true'
+      elsif ENV['DEBUG_AUTH'] == 'true'
+        puts 'TEST AUTH: No cookies method available, relying on TEST_USER_ID'
       end
 
       # For integration tests, authenticate via the sign-in flow as well
@@ -139,8 +143,8 @@ module ActiveSupport
         current_user = @controller.send(:current_user)
         if current_user
           puts "TEST AUTH: current_user is set to #{current_user.email}" if ENV['DEBUG_AUTH'] == 'true'
-        else
-          puts 'TEST AUTH: WARNING - current_user is nil after sign_in!' if ENV['DEBUG_AUTH'] == 'true'
+        elsif ENV['DEBUG_AUTH'] == 'true'
+          puts 'TEST AUTH: WARNING - current_user is nil after sign_in!'
         end
       end
 
@@ -163,7 +167,9 @@ module ActiveSupport
         return sign_out_with_headers if respond_to?(:sign_out_with_headers)
 
         # Direct fallback if helper not available
-        return cookies.signed.delete(:session_token) if cookies.respond_to?(:signed) && cookies.signed.respond_to?(:delete)
+        if cookies.respond_to?(:signed) && cookies.signed.respond_to?(:delete)
+          return cookies.signed.delete(:session_token)
+        end
 
         cookies.delete(:session_token)
       end
@@ -231,7 +237,8 @@ module ActiveSupport
       if defined?(@controller) && @controller.respond_to?(:current_user, true)
         current_user = @controller.send(:current_user)
         if current_user
-          assert_equal expected_user.id, current_user.id, "Expected to be authenticated as #{expected_user.email}, but was authenticated as #{current_user.email}"
+          assert_equal expected_user.id, current_user.id,
+                       "Expected to be authenticated as #{expected_user.email}, but was authenticated as #{current_user.email}"
         else
           flunk "Expected to be authenticated as #{expected_user.email}, but was not authenticated"
         end

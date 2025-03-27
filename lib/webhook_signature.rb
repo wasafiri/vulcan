@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Shared module for computing webhook signatures
 # This ensures consistent signature computation between production and tests
 module WebhookSignature
@@ -10,6 +12,6 @@ module WebhookSignature
     secret ||= Rails.application.credentials.webhook_secret
 
     # Compute the HMAC signature using SHA-256
-    OpenSSL::HMAC.hexdigest("sha256", secret, payload)
+    OpenSSL::HMAC.hexdigest('sha256', secret, payload)
   end
 end

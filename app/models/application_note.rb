@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class ApplicationNote < ApplicationRecord
   belongs_to :application
   belongs_to :admin, class_name: 'User'

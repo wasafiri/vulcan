@@ -1,9 +1,11 @@
+# frozen_string_literal: true
+
+# Handles password reset and forced password change functionality
 class PasswordsController < ApplicationController
   skip_before_action :authenticate_user!
   before_action :set_user, only: %i[edit update]
 
-  def new
-  end
+  def new; end
 
   def create
     @user = User.find_by(email: params[:email])

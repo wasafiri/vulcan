@@ -15,23 +15,24 @@
 # This is the single source of truth for attachment operations to avoid inconsistencies
 # between different submission paths.
 class ProofAttachmentService
-    # Attaches a proof document to an application
-    #
-    # This is the central method used by both constituent portal and paper application
-    # workflows to attach proof documents. It handles different input types, manages
-    # transactions, and provides consistent logging and metrics.
-    #
-    # @param application [Application] The application to attach the proof to
-    # @param proof_type [Symbol] The type of proof (:income or :residency)
-    # @param blob_or_file [ActiveStorage::Blob, String, ActionDispatch::Http::UploadedFile] 
-    #        The file to attach - can be a direct blob, a signed_id string, or an uploaded file
-    # @param status [Symbol] The status to set for the proof (:not_reviewed, :approved, :rejected)
-    # @param admin [User] The admin user if this is an admin action (nil for constituent actions)
-    # @param submission_method [Symbol] The method of submission (:paper, :web, :email, etc.)
-    # @param metadata [Hash] Additional metadata to store with the attachment audit
-    #
-    # @return [Hash] Result hash with :success, :error, and :duration_ms keys
-  def self.attach_proof(application:, proof_type:, blob_or_file:, status: :not_reviewed, admin: nil, submission_method:, metadata: {})
+  # Attaches a proof document to an application
+  #
+  # This is the central method used by both constituent portal and paper application
+  # workflows to attach proof documents. It handles different input types, manages
+  # transactions, and provides consistent logging and metrics.
+  #
+  # @param application [Application] The application to attach the proof to
+  # @param proof_type [Symbol] The type of proof (:income or :residency)
+  # @param blob_or_file [ActiveStorage::Blob, String, ActionDispatch::Http::UploadedFile]
+  #        The file to attach - can be a direct blob, a signed_id string, or an uploaded file
+  # @param status [Symbol] The status to set for the proof (:not_reviewed, :approved, :rejected)
+  # @param admin [User] The admin user if this is an admin action (nil for constituent actions)
+  # @param submission_method [Symbol] The method of submission (:paper, :web, :email, etc.)
+  # @param metadata [Hash] Additional metadata to store with the attachment audit
+  #
+  # @return [Hash] Result hash with :success, :error, and :duration_ms keys
+  def self.attach_proof(application:, proof_type:, blob_or_file:, submission_method:, status: :not_reviewed,
+                        admin: nil, metadata: {})
     start_time = Time.current
     result = { success: false, error: nil, duration_ms: 0 }
 
@@ -84,7 +85,11 @@ class ProofAttachmentService
       else
         # Other types (IO, Hash, etc) - use as is
         Rails.logger.info "ATTACHMENT PARAM TYPE: #{blob_or_file.class.name}"
-        Rails.logger.info "ATTACHMENT PARAM DETAILS: #{blob_or_file.inspect[0..100]}" rescue 'Could not inspect blob_or_file'
+        begin
+          Rails.logger.info "ATTACHMENT PARAM DETAILS: #{blob_or_file.inspect[0..100]}"
+        rescue StandardError
+          'Could not inspect blob_or_file'
+        end
         attachment_param = blob_or_file
       end
 
@@ -130,7 +135,7 @@ class ProofAttachmentService
       # Step 3: Update status and create audit record in a single transaction
       ActiveRecord::Base.transaction do
         # Update status
-        status_attrs = {"#{proof_type}_proof_status" => status}
+        status_attrs = { "#{proof_type}_proof_status" => status }
         status_attrs[:needs_review_since] = Time.current if status == :not_reviewed
         application.update!(status_attrs)
 
@@ -189,7 +194,8 @@ class ProofAttachmentService
   # @param metadata [Hash] Additional metadata to store with the rejection audit
   #
   # @return [Hash] Result hash with :success, :error, and :duration_ms keys
-  def self.reject_proof_without_attachment(application:, proof_type:, admin:, reason: 'other', notes: nil, submission_method:, metadata: {})
+  def self.reject_proof_without_attachment(application:, proof_type:, admin:, submission_method:, reason: 'other',
+                                           notes: nil, metadata: {})
     start_time = Time.current
     result = { success: false, error: nil, duration_ms: 0 }
 
@@ -199,7 +205,7 @@ class ProofAttachmentService
         proof_type,
         admin: admin,
         reason: reason,
-        notes: notes || "Rejected during paper application submission"
+        notes: notes || 'Rejected during paper application submission'
       )
 
       if success
@@ -234,16 +240,16 @@ class ProofAttachmentService
   def self.record_failure(application, proof_type, error, admin, submission_method, metadata)
     Rails.logger.error "Proof attachment error: #{error.message}"
     Rails.logger.error error.backtrace.join("\n")
-    
+
     begin
       # Get the application's submission method if available, otherwise use the parameter
       app_submission_method = application.submission_method.to_sym if application.submission_method.present?
-      
+
       # Use application's submission method first, then fall back to parameter, then to validator
-      safe_submission_method = app_submission_method || 
-                               (submission_method.present? ? submission_method.to_sym : nil) || 
+      safe_submission_method = app_submission_method ||
+                               (submission_method.present? ? submission_method.to_sym : nil) ||
                                SubmissionMethodValidator.validate(submission_method)
-      
+
       # Record the failure for metrics and monitoring
       ProofSubmissionAudit.create!(
         application: application,
@@ -266,13 +272,12 @@ class ProofAttachmentService
     # Report to error tracking service if available
     if defined?(Honeybadger)
       Honeybadger.notify(error,
-        context: {
-          application_id: application.id,
-          proof_type: proof_type,
-          admin_id: admin&.id,
-          metadata: metadata
-        }
-      )
+                         context: {
+                           application_id: application.id,
+                           proof_type: proof_type,
+                           admin_id: admin&.id,
+                           metadata: metadata
+                         })
     end
   rescue StandardError => e
     # Last resort logging if even the failure tracking fails
@@ -298,11 +303,11 @@ class ProofAttachmentService
 
   def self.build_context(result, proof_type, status)
     context = {
-      proof_type:     proof_type,
-      status:         status,
-      success:        result[:success],
-      duration_ms:    result[:duration_ms],
-      environment:    Rails.env,
+      proof_type: proof_type,
+      status: status,
+      success: result[:success],
+      duration_ms: result[:duration_ms],
+      environment: Rails.env,
       transaction_id: SecureRandom.uuid
     }
     context[:blob_size_bytes] = result[:blob_size] if result[:success] && result[:blob_size].present?
@@ -325,6 +330,9 @@ class ProofAttachmentService
     ]
     Datadog.increment('proof_attachments.operations', tags: tags)
     Datadog.timing('proof_attachments.duration', result[:duration_ms], tags: tags)
-    Datadog.histogram('proof_attachments.size', result[:blob_size], tags: tags) if result[:success] && result[:blob_size].present?
+    return unless result[:success] && result[:blob_size].present?
+
+    Datadog.histogram('proof_attachments.size', result[:blob_size],
+                      tags: tags)
   end
 end
