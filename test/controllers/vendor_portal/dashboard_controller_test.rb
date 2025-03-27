@@ -21,9 +21,12 @@ module VendorPortal
       follow_redirect!
     end
 
-    def test_gets_show
-      get vendor_dashboard_path
+    def test_get_show
+      get vendor_portal_dashboard_path
       assert_response :success
+      assert_not_nil assigns(:recent_vouchers)
+      assert_not_nil assigns(:pending_vouchers)
+      assert_not_nil assigns(:vendor_stats)
     end
   end
 end

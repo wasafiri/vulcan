@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 module VendorPortal
-  class ProfilesController < VendorPortal::BaseController
+  # Controller for vendor profile management
+  class ProfilesController < BaseController
     def edit
       @vendor = current_user
     end
@@ -9,32 +10,31 @@ module VendorPortal
     def update
       @vendor = current_user
 
-      # Check if a new W9 form is being uploaded
-      w9_form_changed = params.dig(:vendor, :w9_form).present?
-
       if @vendor.update(vendor_params)
-        # If W9 form was updated, set status to pending_review
-        @vendor.update(w9_status: :pending_review) if w9_form_changed
-
-        redirect_to vendor_dashboard_path,
-                    notice: 'Profile updated successfully.'
+        flash[:notice] = 'Profile updated successfully'
+        redirect_to vendor_dashboard_path
       else
-        render :edit, status: :unprocessable_entity
+        flash.now[:alert] = 'There was an error updating your profile'
+        render :edit
       end
     end
 
     private
 
     def vendor_params
-      params.require(:vendor).permit(
-        :business_name,
-        :business_tax_id,
-        :w9_form,
-        :terms_accepted,
+      params.require(:user).permit(
+        :name,
+        :company_name,
+        :address_line1,
+        :address_line2,
+        :city,
+        :state,
+        :zip_code,
+        :phone,
+        :fax,
+        :email,
         :website_url
-      ).tap do |permitted_params|
-        permitted_params[:terms_accepted_at] = Time.current if permitted_params.delete(:terms_accepted)
-      end
+      )
     end
   end
 end

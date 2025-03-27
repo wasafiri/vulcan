@@ -1,16 +1,19 @@
 # frozen_string_literal: true
 
 module VendorPortal
+  # Base controller for all vendor portal controllers
   class BaseController < ApplicationController
-    before_action :authenticate_user!
-    before_action :require_vendor!
+    before_action :authenticate_vendor!
+    layout 'vendor_portal'
 
     private
 
-    def require_vendor!
+    def authenticate_vendor!
+      authenticate_user!
       return if current_user&.vendor?
 
-      redirect_to root_path, alert: 'Access denied. Vendor-only area.'
+      flash[:alert] = I18n.t('alerts.must_be_vendor', default: 'You must be a vendor to access this section')
+      redirect_to root_path
     end
   end
 end

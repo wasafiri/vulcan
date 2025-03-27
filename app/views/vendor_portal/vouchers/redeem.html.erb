@@ -1,0 +1,149 @@
+<div class="container voucher-redemption mx-auto px-4 py-8">
+  <h1 class="text-3xl font-bold mb-6">Voucher Redemption</h1>
+
+  <!-- Voucher Details -->
+  <div class="bg-white shadow rounded-lg p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">Voucher Details</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <p class="mb-1"><strong>Voucher Code:</strong> <%= @voucher.code %></p>
+        <p class="mb-1"><strong>Constituent:</strong> <%= @voucher.application.constituent_full_name %></p>
+        <p class="mb-1"><strong>Issue Date:</strong> <%= @voucher.issued_at.strftime("%B %d, %Y") %></p>
+      </div>
+      <div>
+        <p class="mb-1"><strong>Original Amount:</strong> <%= number_to_currency(@voucher.initial_value) %></p>
+        <p class="mb-1">
+          <strong>Current Balance:</strong>
+          <span class="text-green-600 font-semibold"><%= number_to_currency(@voucher.remaining_value) %></span>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <%= form_with(url: process_redemption_vendor_voucher_path(@voucher), method: :post, id: "redemption-form", class: "space-y-6") do |f| %>
+    <!-- Redemption Amount -->
+    <div class="bg-white shadow rounded-lg p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-4">Redemption Details</h2>
+      <div class="mb-4">
+        <%= f.label :amount, "Redemption Amount", class: "block text-sm font-medium text-gray-700" %>
+        <div class="mt-1 flex rounded-md shadow-sm">
+          <span class="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+            $
+          </span>
+          <%= f.number_field :amount, class: "flex-1 block w-full rounded-none rounded-r-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm", min: 0.01, max: @voucher.remaining_value, step: 0.01, required: true, id: "redemption-amount" %>
+        </div>
+        <p class="mt-1 text-sm text-gray-500">Enter the amount to be redeemed (cannot exceed current balance).</p>
+      </div>
+    </div>
+
+    <!-- Product Selection -->
+    <div class="bg-white shadow rounded-lg p-6 mb-6">
+      <div class="mb-4">
+        <h2 class="text-xl font-semibold">Select Products</h2>
+        <p class="text-sm text-gray-500">Choose which products the constituent is purchasing with this voucher. (This is for documentation only.)</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <% @products.each do |product| %>
+          <div class="border rounded-lg p-4">
+            <div class="flex items-center">
+              <%= f.check_box "product_ids[]", { class: "form-checkbox product-checkbox h-4 w-4 text-indigo-600", id: "product_#{product.id}" }, product.id, nil %>
+              <label for="product_<%= product.id %>" class="ml-3 block text-sm font-medium text-gray-700 flex-1">
+                <div class="flex justify-between items-center">
+                  <span class="font-semibold"><%= product.name %></span>
+                  <span class="inline-block bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded">
+                    <%= number_to_currency(product.price) %>
+                  </span>
+                </div>
+                <p class="mt-1 text-sm text-gray-500"><%= product.description %></p>
+              </label>
+            </div>
+            <div class="mt-2 ml-7 product-quantity-field hidden">
+              <label for="quantity_<%= product.id %>" class="block text-sm font-medium text-gray-700">Quantity</label>
+              <input type="number" id="quantity_<%= product.id %>" name="product_quantities[<%= product.id %>]" value="1" min="1" class="mt-1 block w-24 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+            </div>
+          </div>
+        <% end %>
+      </div>
+      <div id="no-products-warning" class="mt-4 text-sm text-red-600 hidden">
+        Please select at least one product for this voucher redemption.
+      </div>
+
+      <!-- Voucher Redemption Summary -->
+      <div class="mt-6 p-4 border rounded-lg bg-gray-50">
+        <h4 class="text-lg font-semibold">Voucher Redemption Summary</h4>
+        <div class="flex justify-between mt-2">
+          <span>Number of products selected:</span>
+          <span id="selected-products-count" class="font-medium">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex justify-end space-x-4">
+      <%= f.submit "Process Redemption", class: "inline-flex items-center px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500", id: "submit-redemption", data: { disable_with: "Processing..." } %>
+      <%= link_to "Cancel", vendor_vouchers_path, class: "inline-flex items-center px-6 py-3 border border-gray-300 rounded-md text-base font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+    </div>
+  <% end %>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const productCheckboxes = document.querySelectorAll('.product-checkbox');
+    const redemptionAmount = document.getElementById('redemption-amount');
+    const selectedCount = document.getElementById('selected-products-count');
+    const submitButton = document.getElementById('submit-redemption');
+    const noProductsWarning = document.getElementById('no-products-warning');
+
+    // Toggle quantity fields when product checkboxes change
+    productCheckboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', function() {
+        const quantityField = this.closest('.border').querySelector('.product-quantity-field');
+        if (quantityField) {
+          quantityField.classList.toggle('hidden', !this.checked);
+        }
+        updateSelectedCount();
+      });
+    });
+
+    // Update the count when quantity inputs change (if needed)
+    const quantityInputs = document.querySelectorAll('[id^="quantity_"]');
+    quantityInputs.forEach(input => {
+      input.addEventListener('change', updateSelectedCount);
+    });
+
+    function updateSelectedCount() {
+      let count = 0;
+      productCheckboxes.forEach(checkbox => {
+        if (checkbox.checked) {
+          count++;
+        }
+      });
+      selectedCount.textContent = count;
+      if (count === 0) {
+        noProductsWarning.classList.remove('hidden');
+        submitButton.disabled = true;
+      } else {
+        noProductsWarning.classList.add('hidden');
+        submitButton.disabled = false;
+      }
+    }
+
+    // Prevent form submission if no products are selected
+    document.getElementById('redemption-form').addEventListener('submit', function(e) {
+      let hasSelected = false;
+      productCheckboxes.forEach(checkbox => {
+        if (checkbox.checked) {
+          hasSelected = true;
+        }
+      });
+      if (!hasSelected) {
+        e.preventDefault();
+        noProductsWarning.classList.remove('hidden');
+        window.scrollTo(0, noProductsWarning.offsetTop - 100);
+      }
+    });
+
+    // Run initial update on page load
+    updateSelectedCount();
+  });
+</script>

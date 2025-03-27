@@ -29,3 +29,7 @@
 
 en:
   hello: "Hello world"
+
+en:
+  alerts:
+    must_be_vendor: "You must be a vendor to access this section"
