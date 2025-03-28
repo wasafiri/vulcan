@@ -16,7 +16,6 @@ import DateRangeController from "./date_range_controller"
 import W9ReviewController from "./w9_review_controller"
 import PdfLoaderController from "./pdf_loader_controller"
 import EvaluationManagementController from "./evaluation_management_controller"
-import CommunicationPreferenceController from "./communication_preference_controller"
 import CheckboxSelectAllController from "./checkbox_select_all_controller"
 
 application.register("role-select", RoleSelectController)
@@ -36,5 +35,4 @@ application.register("date-range", DateRangeController)
 application.register("w9-review", W9ReviewController)
 application.register("pdf-loader", PdfLoaderController)
 application.register("evaluation-management", EvaluationManagementController)
-application.register("communication-preference", CommunicationPreferenceController)
 application.register("checkbox-select-all", CheckboxSelectAllController)

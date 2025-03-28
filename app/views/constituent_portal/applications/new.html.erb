@@ -112,7 +112,7 @@
               <%= form.label :physical_address_1, "Street Address", class: "block text-sm font-medium text-gray-700" %>
               <%= form.text_field :physical_address_1, 
                   value: @address[:physical_address_1],
-                  class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md",
+                  class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
                   required: true %>
             </div>
             
@@ -120,7 +120,7 @@
               <%= form.label :physical_address_2, "Apartment/Suite", class: "block text-sm font-medium text-gray-700" %>
               <%= form.text_field :physical_address_2, 
                   value: @address[:physical_address_2],
-                  class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+                  class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" %>
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -128,7 +128,7 @@
                 <%= form.label :city, "City", class: "block text-sm font-medium text-gray-700" %>
                 <%= form.text_field :city, 
                     value: @address[:city],
-                    class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md",
+                    class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
                     required: true %>
               </div>
               
@@ -159,7 +159,7 @@
                 <%= form.label :zip_code, "Zip Code", class: "block text-sm font-medium text-gray-700" %>
                 <%= form.text_field :zip_code, 
                     value: @address[:zip_code],
-                    class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md",
+                    class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
                     required: true,
                     pattern: "\\d{5}(-\\d{4})?",
                     title: "5-digit zip code (12345) or 9-digit zip code (12345-6789)" %>

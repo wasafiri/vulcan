@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require 'rubygems'
+require 'zip'
+
 module Admin
   class PrintQueueController < Admin::BaseController
     before_action :require_admin
@@ -36,6 +39,7 @@ module Admin
 
     def mark_batch_as_printed
       @letters = PrintQueueItem.where(id: params[:letter_ids])
+                              .includes(:constituent)
 
       if @letters.empty?
         redirect_to admin_print_queue_index_path, alert: 'No letters selected'
@@ -55,6 +59,7 @@ module Admin
 
     def download_batch
       @letters = PrintQueueItem.where(id: params[:letter_ids])
+                              .includes(:constituent, :pdf_letter_attachment)
 
       return redirect_empty_letters if @letters.empty?
       return send_single_letter(@letters.first) if @letters.one?
@@ -80,51 +85,42 @@ module Admin
                 filename: filename,
                 type: 'application/pdf',
                 disposition: 'attachment',
-                stream: false
+                stream: true
     end
 
     def send_multiple_letters(letters)
-      zipfile_name = build_zipfile_name
-      temp_file = create_temp_file(zipfile_name)
-
-      begin
-        Zip::File.open(temp_file.path, Zip::File::CREATE) do |zipfile|
-          populate_zip_file(zipfile, letters)
-        end
-
-        send_zip_file(temp_file, zipfile_name)
-      rescue StandardError => e
-        handle_zip_error(e)
-      ensure
-        temp_file.close
-        temp_file.unlink
-      end
-    end
-
-    def build_zipfile_name
-      "letters_batch_#{Date.today.strftime('%Y%m%d')}.zip"
-    end
-
-    def create_temp_file(name)
-      Tempfile.new(name)
-    end
-
-    def populate_zip_file(zipfile, letters)
-      letters.each do |letter_item|
-        next unless letter_item.pdf_letter.attached?
-
-        zipfile.get_output_stream(letter_filename(letter_item)) do |file_stream|
-          file_stream.write letter_item.pdf_letter.download
-        end
-      end
-    end
-
-    def send_zip_file(temp_file, zipfile_name)
-      send_file temp_file.path,
+      zipfile_name = "letters_batch_#{Date.today.strftime('%Y%m%d')}.zip"
+      
+      # Create a zip file in memory
+      zip_data = create_zip_data(letters)
+      
+      # Send the data directly, avoiding file system operations
+      send_data zip_data,
                 filename: zipfile_name,
                 type: 'application/zip',
-                disposition: 'attachment',
-                stream: false
+                disposition: 'attachment'
+    rescue StandardError => e
+      handle_zip_error(e)
+    end
+
+    # Create zip file directly in memory
+    def create_zip_data(letters)
+      # Create a StringIO to hold the zip data
+      buffer = StringIO.new
+      
+      Zip::OutputStream.write_buffer(buffer) do |zos|
+        letters.each do |letter_item|
+          next unless letter_item.pdf_letter.attached?
+          
+          # Add each PDF to the zip file
+          filename = letter_filename(letter_item)
+          zos.put_next_entry(filename)
+          zos.write letter_item.pdf_letter.download
+        end
+      end
+      
+      # Return the binary data
+      buffer.string
     end
 
     def handle_zip_error(exception)
