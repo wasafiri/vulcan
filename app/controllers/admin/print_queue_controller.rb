@@ -5,7 +5,7 @@ module Admin
     before_action :require_admin
 
     def index
-      @pending_letters = PrintQueueItem.pending.includes(:constituent, :application, :admin).order(created_at: :desc)
+      @pending_letters = PrintQueueItem.pending.includes(:constituent, :application).order(created_at: :desc)
       @printed_letters = PrintQueueItem.printed.includes(:constituent, :application,
                                                          :admin).order(printed_at: :desc).limit(50)
     end
