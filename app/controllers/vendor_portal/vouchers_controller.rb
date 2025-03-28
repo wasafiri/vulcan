@@ -3,27 +3,64 @@
 module VendorPortal
   # Controller for managing vouchers
   class VouchersController < BaseController
-    before_action :set_voucher, only: [:redeem, :process_redemption]
+    before_action :set_voucher, only: %i[verify verify_dob redeem process_redemption]
+    before_action :check_voucher_active, only: %i[verify redeem]
+    before_action :check_identity_verified, only: %i[redeem]
 
     def index
       @vouchers = current_user.processed_vouchers.order(updated_at: :desc)
-
-      # Handle voucher code lookups from URL params
-      if params[:code].present?
-        voucher = Voucher.active.find_by(code: params[:code])
-        if voucher
-          redirect_to redeem_vendor_voucher_path(voucher.code)
+      
+      if params[:code].blank?
+        return
+      end
+      
+      voucher = Voucher.active.find_by(code: params[:code])
+      if voucher
+        redirect_to verify_vendor_voucher_path(voucher.code)
+      else
+        flash.now[:alert] = t('alerts.invalid_voucher_code', default: 'Invalid voucher code')
+      end
+    end
+    
+    def verify
+      # Initialize the verification attempts
+      reset_verification_attempts
+    end
+    
+    def verify_dob
+      # Use the verification service to check the DOB
+      verification_service = VoucherVerificationService.new(
+        @voucher, 
+        params[:date_of_birth], 
+        session
+      )
+      
+      result = verification_service.verify
+      
+      # Record verification attempt in events
+      record_verification_event(result.success?)
+      
+      if result.success?
+        flash[:notice] = t(result.message_key)
+        redirect_to redeem_vendor_voucher_path(@voucher.code)
+      else
+        flash[:alert] = if result.attempts_left&.positive?
+                          t(result.message_key, attempts_left: result.attempts_left)
+                        else
+                          t(result.message_key)
+                        end
+        
+        if result.attempts_left&.zero?
+          redirect_to vendor_vouchers_path
         else
-          flash.now[:alert] = 'Invalid voucher code'
+          redirect_to verify_vendor_voucher_path(@voucher.code)
         end
       end
     end
 
     def redeem
-      unless @voucher.active?
-        flash[:alert] = 'This voucher is not active or has already been processed'
-        redirect_to vendor_vouchers_path
-      end
+      # check_voucher_active and check_identity_verified before actions
+      # will redirect if necessary
     end
 
     def process_redemption
@@ -38,6 +75,13 @@ module VendorPortal
       unless @voucher.active?
         flash[:alert] = 'This voucher is not active or has already been processed'
         redirect_to vendor_vouchers_path
+        return
+      end
+
+      # Validate identity has been verified
+      unless identity_verified?(@voucher)
+        flash[:alert] = 'Identity verification is required before redemption'
+        redirect_to verify_vendor_voucher_path(@voucher.code)
         return
       end
 
@@ -91,6 +135,44 @@ module VendorPortal
 
     def set_voucher
       @voucher = Voucher.find_by!(code: params[:id])
+    end
+    
+    def check_voucher_active
+      unless @voucher.active?
+        flash[:alert] = 'This voucher is not active or has already been processed'
+        redirect_to vendor_vouchers_path
+      end
+    end
+    
+    def check_identity_verified
+      unless identity_verified?(@voucher)
+        flash[:alert] = 'Identity verification is required before redemption'
+        redirect_to verify_vendor_voucher_path(@voucher.code)
+      end
+    end
+    
+    def identity_verified?(voucher)
+      session[:verified_vouchers].present? && 
+      session[:verified_vouchers].include?(voucher.id)
+    end
+    
+    def reset_verification_attempts
+      session[:voucher_verification_attempts] ||= {}
+      session[:voucher_verification_attempts][@voucher.id.to_s] = 0
+    end
+    
+    def record_verification_event(successful)
+      Event.create!(
+        user: current_user,
+        action: 'voucher_verification_attempt',
+        metadata: {
+          voucher_id: @voucher.id,
+          voucher_code: @voucher.code,
+          constituent_id: @voucher.application.user_id,
+          successful: successful,
+          attempt_number: session[:voucher_verification_attempts][@voucher.id.to_s] || 0
+        }
+      )
     end
   end
 end

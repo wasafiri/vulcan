@@ -241,6 +241,8 @@ Rails.application.routes.draw do
     end
     resources :vouchers, only: [:index], param: :code do
       member do
+        get :verify
+        post :verify_dob
         get :redeem
         post :process_redemption
       end

@@ -1,0 +1,40 @@
+<div class="container voucher-verification mx-auto px-4 py-8">
+  <h1 class="text-3xl font-bold mb-6">Verify Voucher Identity</h1>
+
+  <!-- Voucher Basic Details -->
+  <div class="bg-white shadow rounded-lg p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">Voucher Details</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <p class="mb-1"><strong>Voucher Code:</strong> <%= @voucher.code %></p>
+        <p class="mb-1"><strong>Constituent:</strong> <%= @voucher.application.constituent_full_name %></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Identity Verification Form -->
+  <div class="bg-white shadow rounded-lg p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">Identity Verification</h2>
+    <p class="mb-4 text-gray-700">Please ask the constituent to provide their date of birth to verify their identity.</p>
+    
+    <%= form_with(url: verify_dob_vendor_voucher_path(@voucher), method: :post, id: "verification-form", class: "space-y-6") do |f| %>
+      <div class="mb-4">
+        <%= f.label :date_of_birth, "Date of Birth", class: "block text-sm font-medium text-gray-700" %>
+        <div class="mt-1">
+          <%= f.date_field :date_of_birth, 
+                          class: "block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500", 
+                          required: true %>
+        </div>
+        <p class="mt-1 text-sm text-gray-500">Format: MM/DD/YYYY</p>
+      </div>
+
+      <div class="flex justify-end space-x-4">
+        <%= f.submit "Verify Identity", 
+                    class: "inline-flex items-center px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500", 
+                    data: { disable_with: "Verifying..." } %>
+        <%= link_to "Cancel", vendor_vouchers_path, 
+                  class: "inline-flex items-center px-6 py-3 border border-gray-300 rounded-md text-base font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+      </div>
+    <% end %>
+  </div>
+</div>

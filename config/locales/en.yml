@@ -29,7 +29,8 @@
 
 en:
   hello: "Hello world"
-
-en:
   alerts:
     must_be_vendor: "You must be a vendor to access this section"
+    dob_verification_failed: "Date of birth verification failed. You have %{attempts_left} attempts remaining."
+    dob_verification_too_many_attempts: "Too many failed verification attempts. Please contact support."
+    dob_verification_success: "Identity verification successful."
