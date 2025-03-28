@@ -115,6 +115,10 @@
           <dd class="mt-1 text-sm text-gray-900"><%= @application.user&.full_name || "Unknown User" %></dd>
         </div>
         <div>
+          <dt class="text-sm font-medium text-gray-500">Date of Birth</dt>
+          <dd class="mt-1 text-sm text-gray-900"><%= @application.user&.date_of_birth&.strftime("%B %d, %Y") || "Not provided" %></dd>
+        </div>
+        <div>
           <dt class="text-sm font-medium text-gray-500">Email</dt>
           <dd class="mt-1 text-sm text-gray-900">
             <% if @application.user&.email.present? %>

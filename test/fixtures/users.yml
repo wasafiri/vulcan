@@ -8,6 +8,8 @@ admin:
   last_name: User
   password_digest: <%= User.digest('password123') %>
   email_verified: true
+  date_of_birth: <%= 45.years.ago.to_date %>
+  status: active
 
 confirmed_user:
   type: Constituent
@@ -17,6 +19,8 @@ confirmed_user:
   password_digest: <%= User.digest('password123') %>
   email_verified: true
   hearing_disability: true
+  date_of_birth: <%= 32.years.ago.to_date %>
+  status: active
 
 confirmed_user2:
   type: Constituent
@@ -26,6 +30,8 @@ confirmed_user2:
   password_digest: <%= User.digest('password123') %>
   email_verified: true
   hearing_disability: true
+  date_of_birth: <%= 29.years.ago.to_date %>
+  status: active
 
 unconfirmed_user:
   type: Constituent
@@ -35,6 +41,8 @@ unconfirmed_user:
   password_digest: <%= User.digest('password123') %>
   email_verified: false
   hearing_disability: true
+  date_of_birth: <%= 27.years.ago.to_date %>
+  status: active
 
 trainer:
   type: Trainer
@@ -43,6 +51,8 @@ trainer:
   last_name: Person
   password_digest: <%= User.digest('password123') %>
   email_verified: true
+  date_of_birth: <%= 39.years.ago.to_date %>
+  status: active
 
 evaluator:
   type: Evaluator
@@ -51,6 +61,8 @@ evaluator:
   last_name: Person
   password_digest: <%= User.digest('password123') %>
   email_verified: true
+  date_of_birth: <%= 42.years.ago.to_date %>
+  status: active
 
 medical_provider:
   type: MedicalProvider
@@ -59,6 +71,8 @@ medical_provider:
   last_name: Smith
   password_digest: <%= User.digest('password123') %>
   email_verified: true
+  date_of_birth: <%= 48.years.ago.to_date %>
+  status: active
 
 # Custom users needed for seeding
 
@@ -75,6 +89,7 @@ admin_david:
   locale: en
   hearing_disability: true
   email_verified: true
+  status: active
 
 admin_kevin:
   type: Admin
@@ -88,6 +103,7 @@ admin_kevin:
   locale: en
   hearing_disability: true
   email_verified: true
+  status: active
 
 admin_jane:
   type: Admin
@@ -101,6 +117,7 @@ admin_jane:
   locale: en
   hearing_disability: true
   email_verified: true
+  status: active
 
 admin_brandie:
   type: Admin
@@ -114,6 +131,7 @@ admin_brandie:
   locale: en
   hearing_disability: true
   email_verified: true
+  status: active
 
 # Constituents
 constituent_alex:
@@ -133,6 +151,7 @@ constituent_alex:
   locale: en
   email_verified: true
   guardian_relationship: parent
+  status: active
 
 constituent_john:
   type: Constituent
@@ -151,6 +170,7 @@ constituent_john:
   locale: en
   email_verified: true
   guardian_relationship: parent
+  status: active
 
 constituent_jane:
   type: Constituent
@@ -169,6 +189,7 @@ constituent_jane:
   locale: en
   email_verified: true
   guardian_relationship: parent
+  status: active
 
 constituent_kenneth:
   type: Constituent
@@ -187,6 +208,7 @@ constituent_kenneth:
   locale: en
   email_verified: true
   guardian_relationship: parent
+  status: active
 
 constituent_wilbur:
   type: Constituent
@@ -204,6 +226,7 @@ constituent_wilbur:
   timezone: "Eastern Time (US & Canada)"
   locale: en
   email_verified: true
+  status: active
 
 constituent_steven:
   type: Constituent
@@ -222,6 +245,7 @@ constituent_steven:
   locale: en
   email_verified: true
   guardian_relationship: parent
+  status: active
 
 constituent_mark:
   type: Constituent
@@ -240,6 +264,7 @@ constituent_mark:
   locale: en
   email_verified: true
   guardian_relationship: parent
+  status: active
 
 constituent_rex:
   type: Constituent
@@ -258,6 +283,7 @@ constituent_rex:
   locale: en
   email_verified: true
   guardian_relationship: parent
+  status: active
 
 # Evaluator
 evaluator_betsy:
