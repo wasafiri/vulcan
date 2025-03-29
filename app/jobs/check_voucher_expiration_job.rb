@@ -84,7 +84,7 @@ class CheckVoucherExpirationJob < ApplicationJob
 
     return unless expired_with_value.any?
 
-    Admin.find_each do |admin|
+    User.where(type: 'Users::Administrator').find_each do |admin|
       AdminNotificationsMailer.expired_vouchers_report(
         admin,
         expired_with_value

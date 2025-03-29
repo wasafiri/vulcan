@@ -1,47 +1,44 @@
 # frozen_string_literal: true
 
 # This initializer sets up Single Table Inheritance (STI) type mapping
-# to allow the Admin module to coexist with the Users::Admin class
-# for STI purposes
+# using Rails conventions for namespaced STI classes.
+# This handles both reading types from the database and writing types to the database.
 
 ActiveSupport.on_load(:active_record) do
+  # Step 1: Override how Rails resolves the class from a database type string
   ActiveRecord::Base.singleton_class.class_eval do
-    alias_method :original_find_sti_class, :find_sti_class
-
-    def find_sti_class(type_name)
-      if type_name == "Admin" && self <= User
-        Users::Admin
+    alias_method :original_sti_name_to_class, :sti_name_to_class if method_defined?(:sti_name_to_class)
+      
+    private
+      # Override the Rails STI class resolver to handle our namespaced classes
+      def sti_name_to_class(type_name)
+        if self <= User && !type_name.include?('::')
+          # For User STI types, try looking in the Users namespace first
+          begin
+            "Users::#{type_name}".constantize
+          rescue NameError
+            # Fall back to original behavior if class doesn't exist in Users namespace
+            original_sti_name_to_class(type_name)
+          end
+        else
+          original_sti_name_to_class(type_name)
+        end
+      end
+  end
+  
+  # Step 2: Override how Rails computes the type string to store in the database
+  # This fixes the other direction of the mapping
+  module NamespacedStiTypeName
+    def computed_type(value = self.class.name)
+      if value.start_with?('Users::')
+        # Strip the namespace when storing in the database
+        value.demodulize
       else
-        original_find_sti_class(type_name)
+        super
       end
     end
   end
   
-  # Also patch ActiveRecord::FixtureSet::TableRow to resolve Admin => Users::Admin
-  # This is needed specifically for fixture loading when resolving enums
-  ActiveRecord::FixtureSet::TableRow.class_eval do
-    alias_method :original_resolve_enums, :resolve_enums
-    
-    def resolve_enums
-      # Handle the Admin => Users::Admin case specifically for fixtures
-      if @fixture && @fixture['type'] == 'Admin' && @model_class && @model_class <= User
-        admin_class = Users::Admin
-        @fixture.each do |key, value|
-          next unless value.is_a?(String) && key.include?('_')
-          
-          enum_type = key.to_s.gsub(/(_)(.+)/, '')
-          name = ::ActiveRecord::Base.pluralize_table_names ? enum_type.pluralize : enum_type
-          
-          # Add nil checks to avoid "undefined method '[]' for nil" errors
-          if admin_class.defined_enums && 
-             admin_class.defined_enums[name] && 
-             admin_class.defined_enums[name][value]
-            @fixture[key] = admin_class.defined_enums[name][value]
-          end
-        end
-      else
-        original_resolve_enums
-      end
-    end
-  end
+  # Apply this to all User STI types
+  User.prepend(NamespacedStiTypeName)
 end

@@ -149,7 +149,7 @@
                       ["South Dakota", "SD"], ["Tennessee", "TN"], ["Texas", "TX"], ["Utah", "UT"], 
                       ["Vermont", "VT"], ["Virginia", "VA"], ["Washington", "WA"], ["West Virginia", "WV"], 
                       ["Wisconsin", "WI"], ["Wyoming", "WY"], ["District of Columbia", "DC"]
-                    ], @address[:state]),
+                    ], (@address.respond_to?(:[]) ? @address[:state] : nil) || params.dig(:application, :state)),
                     { include_blank: "Select State" },
                     { class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
                       required: true } %>

@@ -59,7 +59,7 @@ class GenerateVendorInvoicesJob < ApplicationJob
         VendorNotificationsMailer.invoice_generated(invoice).deliver_later
 
         # Notify admins
-        Admin.find_each do |admin|
+        User.where(type: 'Users::Administrator').find_each do |admin|
           AdminNotificationsMailer.invoice_ready_for_review(
             admin,
             invoice

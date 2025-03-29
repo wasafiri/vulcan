@@ -62,7 +62,7 @@ class RegistrationsController < ApplicationController
 
   def build_user
     @user = User.new(registration_params)
-    @user.type = 'Constituent'
+    @user.type = 'Users::Constituent' # Ensure we use fully qualified class name with namespace
     @user.force_password_change = false
     set_communication_preference
   end

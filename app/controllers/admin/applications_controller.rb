@@ -169,7 +169,7 @@ module Admin
 
     def assign_evaluator
       @application = Application.find(params[:id])
-      evaluator = Evaluator.find(params[:evaluator_id])
+      evaluator = Users::Evaluator.find(params[:evaluator_id])
 
       if @application.assign_evaluator!(evaluator)
         redirect_to admin_application_path(@application),
@@ -182,7 +182,7 @@ module Admin
 
     def assign_trainer
       @application = Application.find(params[:id])
-      trainer = Trainer.find(params[:trainer_id])
+      trainer = Users::Trainer.find(params[:trainer_id])
 
       if @application.assign_trainer!(trainer)
         redirect_to admin_application_path(@application),
@@ -194,7 +194,7 @@ module Admin
     end
 
     def schedule_training
-      trainer = Trainer.active.find_by(id: params[:trainer_id])
+      trainer = Users::Trainer.active.find_by(id: params[:trainer_id])
       unless trainer
         redirect_to admin_application_path(@application), alert: 'Invalid trainer selected.'
         return

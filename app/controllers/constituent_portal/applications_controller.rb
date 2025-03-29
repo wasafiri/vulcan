@@ -77,15 +77,37 @@ module ConstituentPortal
 
         # Force reload the user after successfully saving attributes
         current_user.reload
+        
+        # Step 2: Verify that the user has the required disability attributes
+        # This is to make sure validation will pass when creating the application
+        unless current_user.has_disability_selected?
+          Rails.logger.error "User does not have any disability selected after update: #{current_user.attributes.inspect}"
+          @application = current_user.applications.new(filtered_application_params)
+          @application.errors.add(:base, 'At least one disability must be selected before submitting an application.')
+          
+          # We need to prepare the view for rendering outside the transaction
+          @prepare_view_for_disability_error = true
+          
+          return false
+        end
 
-        # Step 2: Now create the application with the updated user
+        # Step 3: Now create the application with the updated user
         @application = current_user.applications.new(filtered_application_params)
         set_initial_application_attributes(@application)
+
+        # Set medical provider fields from params
+        if params.dig(:application, :medical_provider_attributes).present?
+          mp_attrs = params[:application][:medical_provider_attributes]
+          @application.medical_provider_name = mp_attrs[:name] if mp_attrs[:name].present?
+          @application.medical_provider_phone = mp_attrs[:phone] if mp_attrs[:phone].present?
+          @application.medical_provider_fax = mp_attrs[:fax] if mp_attrs[:fax].present?
+          @application.medical_provider_email = mp_attrs[:email] if mp_attrs[:email].present?
+        end
 
         # Log for debugging
         debug_application_info(@application, params)
 
-        # Step 3: Validate and save the application
+        # Step 4: Validate and save the application
         if @application.valid?
           @application.save!
 
@@ -116,7 +138,18 @@ module ConstituentPortal
         log_guardian_event if current_user.is_guardian? && @application.persisted?
         redirect_to_app(@application)
       else
+        # Ensure we have the medical provider data available for re-rendering the form
         build_medical_provider_for_form
+        
+        # Setup address data from form params or current user so we don't lose it
+        @address = {
+          physical_address_1: params.dig(:application, :physical_address_1) || current_user.physical_address_1,
+          physical_address_2: params.dig(:application, :physical_address_2) || current_user.physical_address_2,
+          city: params.dig(:application, :city) || current_user.city,
+          state: params.dig(:application, :state) || current_user.state,
+          zip_code: params.dig(:application, :zip_code) || current_user.zip_code
+        }
+        
         render :new, status: :unprocessable_entity
       end
     end
@@ -130,9 +163,10 @@ module ConstituentPortal
       Rails.logger.debug "Submit application param: #{params[:submit_application].inspect}"
 
       # Prepare application attributes using filtered_application_params.
+      # Ensure we're not passing user address fields to the application
       application_attrs = filtered_application_params.merge(
         annual_income: params[:application][:annual_income]&.gsub(/[^\d.]/, '')
-      )
+      ).except(:physical_address_1, :physical_address_2, :city, :state, :zip_code)
 
       # (No separate handling for medical provider keys is needed anymore.)
 
@@ -434,10 +468,22 @@ module ConstituentPortal
 
     def build_medical_provider_for_form
       @medical_provider = OpenStruct.new(
-        name: params.dig(:medical_provider, :name) || params.dig(:application, :medical_provider, :name),
-        phone: params.dig(:medical_provider, :phone) || params.dig(:application, :medical_provider, :phone),
-        fax: params.dig(:medical_provider, :fax) || params.dig(:application, :medical_provider, :fax),
-        email: params.dig(:medical_provider, :email) || params.dig(:application, :medical_provider, :email)
+        name: params.dig(:medical_provider, :name) || 
+              params.dig(:application, :medical_provider, :name) || 
+              params.dig(:application, :medical_provider_name) ||
+              @application&.medical_provider_name,
+        phone: params.dig(:medical_provider, :phone) || 
+               params.dig(:application, :medical_provider, :phone) || 
+               params.dig(:application, :medical_provider_phone) ||
+               @application&.medical_provider_phone,
+        fax: params.dig(:medical_provider, :fax) || 
+             params.dig(:application, :medical_provider, :fax) || 
+             params.dig(:application, :medical_provider_fax) ||
+             @application&.medical_provider_fax,
+        email: params.dig(:medical_provider, :email) || 
+               params.dig(:application, :medical_provider, :email) || 
+               params.dig(:application, :medical_provider_email) ||
+               @application&.medical_provider_email
       )
     end
 
@@ -496,12 +542,8 @@ module ConstituentPortal
         :speech_disability,
         :mobility_disability,
         :cognition_disability,
-        # Address fields for updating user profile
-        :physical_address_1,
-        :physical_address_2,
-        :city,
-        :state,
-        :zip_code,
+        # Note: Address fields are handled separately in user_attrs
+        # and should not be passed to the application model
         medical_provider_attributes: %i[name phone fax email]
       )
       if base_params[:medical_provider_attributes].present?
@@ -570,15 +612,18 @@ module ConstituentPortal
       log_debug("Processed attributes: #{processed_attrs.inspect}")
 
       begin
-        # IMPORTANT: Always ensure type is "Constituent" for the constituent? method to work
-        # This follows Rails STI conventions for role checks (see User#constituent? method)
-        if current_user.type != 'Constituent' && (current_user.is_a?(Constituent) || current_user.is_a?(Users::Constituent))
-          processed_attrs[:type] = 'Constituent'
-          log_debug("Ensuring user type is set to 'Constituent' (was: #{current_user.type})")
-        end
+        # IMPORTANT: Set type to "Users::Constituent" to match Application model's association
+        # This fixes the STI type mismatch between Constituent and Users::Constituent
+        processed_attrs[:type] = 'Users::Constituent'
+        log_debug("Setting user type to 'Users::Constituent' to match association (was: #{current_user.type})")
 
         # Use update! for reliability and consistent validation
         current_user.update!(processed_attrs)
+        
+        # Ensure the user is fully saved before proceeding
+        current_user.save!
+        
+        # Reload to ensure we have the latest state of the user
         current_user.reload
 
         log_debug("User type after update: #{current_user.type}")

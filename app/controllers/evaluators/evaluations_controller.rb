@@ -13,10 +13,10 @@ module Evaluators
       if params[:status].present? || params[:scope].present? || params[:filter].present?
         @evaluations = if current_user.evaluator?
                          # For evaluators, show only their evaluations
-                         current_user.evaluations.includes(:constituent, :application).order(created_at: :desc)
+                         current_user.evaluations.includes(:constituent).order(created_at: :desc)
                        else
                          # For admins, show all evaluations
-                         Evaluation.includes(:constituent, :application, :evaluator).order(created_at: :desc)
+                         Evaluation.includes(:constituent).order(created_at: :desc)
                        end
       else
         redirect_to evaluators_dashboard_path
@@ -41,11 +41,11 @@ module Evaluators
     def requested
       @evaluations = if current_user.admin?
                        Evaluation.where(status: :requested)
-                                 .includes(:constituent, :application)
+                                 .includes(:constituent)
                                  .order(created_at: :desc)
                      else
                        current_user.evaluations.requested_evaluations
-                                   .includes(:constituent, :application)
+                                   .includes(:constituent)
                                    .order(created_at: :desc)
                      end
       render :index
@@ -54,11 +54,11 @@ module Evaluators
     def scheduled
       @evaluations = if current_user.admin?
                        Evaluation.where(status: %i[scheduled confirmed])
-                                 .includes(:constituent, :application)
+                                 .includes(:constituent)
                                  .order(evaluation_datetime: :asc)
                      else
                        current_user.evaluations.active
-                                   .includes(:constituent, :application)
+                                   .includes(:constituent)
                                    .order(evaluation_datetime: :asc)
                      end
       render :index
@@ -66,14 +66,14 @@ module Evaluators
 
     def pending
       @evaluations = current_user.evaluations.pending
-                                 .includes(:constituent, :application)
+                                 .includes(:constituent)
                                  .order(created_at: :desc)
       render :index
     end
 
     def completed
       @evaluations = current_user.evaluations.completed_evaluations
-                                 .includes(:constituent, :application)
+                                 .includes(:constituent)
                                  .order(evaluation_date: :desc)
       render :index
     end
@@ -81,11 +81,11 @@ module Evaluators
     def needs_followup
       @evaluations = if current_user.admin?
                        Evaluation.where(status: %i[no_show cancelled])
-                                 .includes(:constituent, :application)
+                                 .includes(:constituent)
                                  .order(updated_at: :desc)
                      else
                        current_user.evaluations.needing_followup
-                                   .includes(:constituent, :application)
+                                   .includes(:constituent)
                                    .order(updated_at: :desc)
                      end
       render :index
@@ -226,9 +226,12 @@ module Evaluators
 
     def filter_evaluations(scope, status)
       # Base query - either all sessions or just mine
-      base_query = if scope == 'all' && current_user.admin?
+      base_query = if current_user.admin?
+                     # For administrators, they don't have an 'evaluations' association
+                     # So regardless of scope, we start with all evaluations
                      Evaluation.all
                    else
+                     # For regular evaluators, use their association
                      current_user.evaluations
                    end
 
@@ -254,8 +257,8 @@ module Evaluators
                         filtered_query.order(updated_at: :desc)
                       end
 
-      # Include associated models for performance
-      ordered_query.includes(:constituent, :application)
+      # Include only constituent since that's all we use in the view
+      ordered_query.includes(:constituent)
     end
   end
 end

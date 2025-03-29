@@ -49,14 +49,14 @@
             scheduled_time: false,
             view_path: latest_evaluation.present? ? evaluators_evaluation_path(latest_evaluation) : nil,
             assign_path: ->(evaluator) { assign_evaluator_admin_application_path(@application, evaluator_id: evaluator.id) },
-            available_assignees: Evaluator.available
+            available_assignees: Users::Evaluator.available
           %>
           
           <!-- Trainer Section -->
           <% latest_training = @application.training_sessions.where(status: [:requested, :scheduled, :confirmed]).order(created_at: :desc).first %>
           <% 
             # Get trainers by type and by capability
-            trainers_by_type = User.where(type: "Trainer", status: :active)
+            trainers_by_type = User.where(type: "Users::Trainer", status: :active)
             trainers_by_capability = User.joins(:role_capabilities).where(role_capabilities: { capability: "can_train" }, status: :active)
             
             # Combine the two sets of trainers

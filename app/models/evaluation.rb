@@ -4,8 +4,8 @@ class Evaluation < ApplicationRecord
   include EvaluationStatusManagement
   include NotificationDelivery
 
-  belongs_to :evaluator, class_name: 'Evaluator'
-  belongs_to :constituent, class_name: 'Constituent'
+  belongs_to :evaluator, class_name: 'Users::Evaluator'
+  belongs_to :constituent, class_name: 'Users::Constituent'
   belongs_to :application
   has_many :notifications, as: :notifiable, dependent: :destroy
   has_and_belongs_to_many :recommended_products, class_name: 'Product', join_table: 'evaluations_products'
@@ -84,7 +84,7 @@ class Evaluation < ApplicationRecord
   end
 
   def evaluator_must_be_evaluator_type
-    return if evaluator.nil? || evaluator.type == 'Evaluator'
+    return if evaluator.nil? || evaluator.type == 'Users::Evaluator'
 
     errors.add(:evaluator, 'must be an Evaluator')
   end

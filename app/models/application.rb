@@ -5,7 +5,7 @@
 # medical certification, training sessions, evaluations, and voucher issuance
 class Application < ApplicationRecord
   delegate :guardian_relationship, :guardian_relationship=, to: :user, allow_nil: true
-  
+
   # Concerns
   include ApplicationStatusManagement
   include NotificationDelivery
@@ -16,8 +16,11 @@ class Application < ApplicationRecord
   include TrainingManagement
   include EvaluationManagement
 
-  # Associations
-  belongs_to :user, class_name: 'Constituent', foreign_key: :user_id, inverse_of: :applications
+  # Associations - made more flexible to work with both Constituent and Users::Constituent
+  belongs_to :user, -> { where("type = 'Users::Constituent' OR type = 'Constituent'") }, 
+             class_name: 'User', 
+             foreign_key: :user_id, 
+             inverse_of: :applications
   belongs_to :income_verified_by,
              class_name: 'User',
              foreign_key: :income_verified_by_id,
@@ -84,15 +87,15 @@ class Application < ApplicationRecord
       .where('users.last_name ILIKE ?', "%#{query}%")
       .references(:users)
   }
-  
+
   # Base scope for approved applications
   scope :approved, -> { where(status: :approved) }
-  
+
   # Alias scopes for approved applications
   scope :complete, -> { approved }
   scope :needs_evaluation, -> { approved }
   scope :needs_training, -> { approved }
-  
+
   scope :needs_income_review, -> { where(income_proof_status: :not_reviewed) }
   scope :needs_residency_review, -> { where(residency_proof_status: :not_reviewed) }
   scope :rejected_income_proofs, -> { where(income_proof_status: :rejected) }
@@ -282,7 +285,7 @@ class Application < ApplicationRecord
   def notify_admins_of_new_proofs
     return unless user
 
-    admin_ids = User.where(type: Admin.name).pluck(:id)
+    admin_ids = User.where(type: 'Users::Administrator').pluck(:id)
     return if admin_ids.empty?
 
     notifications = admin_ids.map do |admin_id|

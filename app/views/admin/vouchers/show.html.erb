@@ -197,7 +197,7 @@
                         <div class="text-sm text-gray-500">
                           <%= event.action.titleize %>
                           by
-                          <% if event.user.is_a?(Admin) %>
+                          <% if event.user.is_a?(Users::Administrator) %>
                             <span class="font-medium text-gray-900"><%= event.user.full_name %></span>
                           <% else %>
                             <%= link_to event.user.full_name,

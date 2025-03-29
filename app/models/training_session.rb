@@ -37,7 +37,7 @@ class TrainingSession < ApplicationRecord
   private
 
   def trainer_must_be_trainer_type
-    return if trainer&.type == 'Trainer'
+    return if trainer&.type == 'Users::Trainer'
 
     errors.add(:trainer, 'must be a trainer')
   end

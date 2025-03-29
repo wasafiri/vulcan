@@ -11,13 +11,17 @@
   
   # Determine dashboard path once if user is logged in
   if user
-    dashboard_path = case user
-      when Admin then admin_applications_path
-      when Constituent then constituent_dashboard_path
-      when Evaluator then evaluators_dashboard_path
-      when Vendor then vendor_dashboard_path
-      else admin_applications_path
-    end
+    dashboard_path = if user.admin?
+                       admin_applications_path
+                     elsif user.constituent?
+                       constituent_dashboard_path
+                     elsif user.evaluator?
+                       evaluators_dashboard_path
+                     elsif user.vendor?
+                       vendor_dashboard_path
+                     else
+                       admin_applications_path
+                     end
   end
 %>
 

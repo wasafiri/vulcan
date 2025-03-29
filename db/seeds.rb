@@ -104,7 +104,7 @@ else
       puts 'Creating admin users...'
       admin_users = [
         {
-          type: 'Admin',
+          type: 'Users::Administrator',
           email: 'david.bahar@maryland.gov',
           first_name: 'David',
           last_name: 'Bahar',
