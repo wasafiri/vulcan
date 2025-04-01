@@ -40,13 +40,13 @@ class SessionsController < ApplicationController
 
   def after_sign_in_path
     case current_user
-    when Admin
+    when Users::Administrator
       admin_applications_path
-    when Constituent
+    when Users::Constituent
       constituent_dashboard_path
-    when Evaluator
+    when Users::Evaluator
       evaluators_dashboard_path
-    when Vendor
+    when Users::Vendor
       vendor_dashboard_path
     else
       root_path
@@ -77,10 +77,10 @@ class SessionsController < ApplicationController
 
   def dashboard_for(user)
     case user
-    when Admin then admin_applications_path
-    when Constituent then constituent_dashboard_path
-    when Evaluator then evaluators_dashboard_path
-    when Vendor then vendor_dashboard_path
+    when Users::Administrator then admin_applications_path
+    when Users::Constituent then constituent_dashboard_path
+    when Users::Evaluator then evaluators_dashboard_path
+    when Users::Vendor then vendor_dashboard_path
     else root_path
     end
   end
