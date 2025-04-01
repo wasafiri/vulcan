@@ -43,7 +43,7 @@ class MedicalCertificationMailbox < ApplicationMailbox
   end
 
   # Creates an ApplicationStatusChange record for better audit trail consistency
-  def create_status_change_record(audit)
+  def create_status_change_record(_audit)
     ApplicationStatusChange.create!(
       application: application,
       user: nil, # No admin user for auto-processing
