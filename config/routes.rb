@@ -94,6 +94,7 @@ Rails.application.routes.draw do
         patch :update_proof_status
         patch :update_certification_status
         post :resend_medical_certification
+        patch :upload_medical_certification
       end
 
       resources :notes, only: [:create], controller: 'application_notes'
@@ -296,5 +297,6 @@ Rails.application.routes.draw do
   namespace :webhooks do
     resources :email_events, only: [:create]
     resources :medical_certifications, only: [:create]
+    post 'twilio/fax_status', to: 'twilio#fax_status', as: :twilio_fax_status
   end
 end

@@ -1,39 +1,50 @@
-<% 
-  # Fetch both certification requests and rejections
-  certification_events = Notification.where(
-    notifiable: @application,
-    action: ["medical_certification_requested", "medical_certification_rejected"]
-  ).order(created_at: :desc)
+<%
+  # Use application instance variable to avoid repeating queries
+  request_count = @application.medical_certification_request_count || 0
   
-  # Count only requests for numbering purposes
-  certification_requests = certification_events.select { |e| e.action == "medical_certification_requested" }
-  request_count = certification_requests.size
+  # Only load events if we haven't already done so in the controller
+  # This ensures we don't duplicate expensive queries
+  if !defined?(@certification_events) || @certification_events.nil?
+    @certification_events = Notification.includes(:actor)
+                              .where(notifiable: @application)
+                              .where(action: ["medical_certification_requested", "medical_certification_rejected"])
+                              .order(created_at: :desc)
+                              .limit(10) # Limit to most recent events for performance
+  end
+  
+  # Pre-calculate the request numbers to avoid expensive array operations in the loop
+  request_indexes = {}
+  current_index = 0
+  
+  @certification_events.each do |event|
+    if event.action == "medical_certification_requested"
+      request_indexes[event.id] = request_count - current_index
+      current_index += 1
+    end
+  end
 %>
 
 <div class="certification-history mt-2 pl-4 border-l-2 border-gray-200">
-  <% if certification_events.any? %>
-    <% certification_events.each_with_index do |event, index| %>
+  <% if @certification_events.any? %>
+    <% @certification_events.each_with_index do |event, index| %>
       <% 
         # Get timestamp from metadata if available, otherwise use notification created_at
-        timestamp = nil
-        if event.metadata.present? && event.metadata.is_a?(Hash) && event.metadata['timestamp'].present?
-          begin
-            timestamp = Time.parse(event.metadata['timestamp'])
-          rescue
-            timestamp = event.created_at
+        timestamp = 
+          if event.metadata.is_a?(Hash) && event.metadata['timestamp'].present?
+            begin
+              Time.parse(event.metadata['timestamp'])
+            rescue
+              event.created_at
+            end
+          else
+            event.created_at
           end
-        else
-          timestamp = event.created_at
-        end
         
         # Determine if this is a request or rejection
         is_request = event.action == "medical_certification_requested"
         
-        # For requests, get the appropriate request number (count down from total)
-        request_number = nil
-        if is_request
-          request_number = request_count - certification_requests.index { |r| r.id == event.id }
-        end
+        # Use pre-calculated request number
+        request_number = request_indexes[event.id] if is_request
       %>
       <div class="request-item mb-2">
         <p class="text-sm <%= is_request ? 'text-gray-600' : 'text-red-600' %> mb-1">

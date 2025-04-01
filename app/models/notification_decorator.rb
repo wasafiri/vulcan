@@ -63,7 +63,9 @@ class NotificationDecorator
     when 'review_requested'
       "Review requested for application ##{notification.notifiable_id}"
     when 'trainer_assigned'
-      "Trainer assigned for Application ##{notification.notifiable_id}"
+      "Trainer assigned for application ##{notification.notifiable_id}"
+    when 'voucher_assigned'
+      "Voucher assigned for application ##{notification.notifiable_id}"
     else
       # Default fallback using humanized action
       "#{notification.action.humanize} notification"
@@ -81,5 +83,11 @@ class NotificationDecorator
 
   def respond_to_missing?(method_name, include_private = false)
     notification.respond_to?(method_name, include_private) || super
+  end
+  
+  # Implementation of to_ary that avoids infinite recursion issues
+  # when the decorator is used in array operations
+  def to_ary
+    nil # Return nil to avoid being treated as an array
   end
 end

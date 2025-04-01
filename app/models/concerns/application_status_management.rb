@@ -148,9 +148,9 @@ module ApplicationStatusManagement
     # Log the auto-approval if possible
     begin
       if defined?(Event) && Event.respond_to?(:create)
-        # Try to find system user or admin
-        system_user = User.find_by(email: 'system@example.com') ||
-                      User.where(type: 'Admin').first
+      # Try to find system user or admin
+      system_user = User.find_by(email: 'system@example.com') ||
+                    User.where(type: 'Administrator').first
 
         # Only create event if we have a valid user
         if system_user

@@ -8,6 +8,8 @@ ruby '3.4.2'
 gem 'authentication-zero'
 # gem for hosting images & getting ocr functionality
 gem 'aws-sdk-s3'
+# for fax capabilities
+gem 'twilio-ruby', '~> 7.5.1'
 # use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 gem 'bcrypt', '~> 3.1.20'
 # reduces boot times through caching; required in config/boot.rb

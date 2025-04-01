@@ -41,19 +41,20 @@ module Applications
     # Load status changes with minimal eager loading
     def load_status_changes
       ApplicationStatusChange
-        .select('id, application_id, user_id, from_status, to_status, created_at, metadata')
+        .select('id, application_id, user_id, from_status, to_status, created_at, metadata, notes')
         .includes(user: []) # Include the user but not role_capabilities
         .where(application_id: application.id)
         .order(created_at: :desc)
         .to_a
     end
 
-    # Load notifications with no eager loading
+    # Load notifications with eager loading for actor association
     def load_notifications
       # For notifications, use a more optimized query and apply the decorator pattern
       # to prevent ActiveStorage eager loading on blob associations
       notifications = Notification
                       .select('id, recipient_id, actor_id, notifiable_id, notifiable_type, action, read_at, created_at, message_id, delivery_status, metadata')
+                      .includes(:actor)
                       .where(notifiable_type: 'Application', notifiable_id: application.id)
                       .where(action: %w[
                                medical_certification_requested

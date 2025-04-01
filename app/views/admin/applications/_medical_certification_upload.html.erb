@@ -1,0 +1,212 @@
+<%
+  # Only show the form when:
+  # 1. The certification has been requested but not yet received, OR
+  # 2. The status is "requested" and there's no attachment
+  show_upload_form = @application.medical_certification_status == "requested" && !@application.medical_certification.attached?
+%>
+
+<% if show_upload_form %>
+  <div class="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-md" 
+       data-testid="medical-certification-upload-form">
+    <h3 class="text-sm font-medium text-blue-700 mb-2">Upload Medical Certification</h3>
+    <p class="text-sm text-blue-600 mb-2">
+      Use this form to attach a medical certification received for this application.
+    </p>
+    
+    <%= form_with url: upload_medical_certification_admin_application_path(@application), 
+                  method: :patch, 
+                  local: true, 
+                  class: "mt-3",
+                  multipart: true do |f| %>
+    
+      <!-- Status Selection -->
+      <div class="flex items-center space-x-4 mb-4">
+        <div>
+          <%= f.radio_button "medical_certification_status", "accepted",
+              checked: true,
+              class: "focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300",
+              "aria-describedby": "certification_status_help",
+              id: "accept_medical_certification" %>
+          <%= f.label "medical_certification_status_accepted", "Accept Certification and Upload",
+              class: "ml-2 text-sm text-gray-700" %>
+        </div>
+        <div>
+          <%= f.radio_button "medical_certification_status", "rejected",
+              class: "focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300",
+              "aria-describedby": "certification_status_help",
+              id: "reject_medical_certification" %>
+          <%= f.label "medical_certification_status_rejected", "Reject Certification",
+              class: "ml-2 text-sm text-gray-700" %>
+        </div>
+      </div>
+      <p id="certification_status_help" class="sr-only">
+        Choose whether to accept this medical certification and upload a document, or reject it and provide a reason
+      </p>
+      
+      <!-- File Upload Section -->
+      <div id="medical_certification_upload" class="mt-4">
+        <!-- Submission Method Dropdown -->
+        <div class="mb-4">
+          <%= f.label "submission_method", "Submission Method",
+              class: "block text-sm font-medium text-gray-700" %>
+          <p id="submission_method_hint" class="text-xs text-gray-700 mb-2">
+            Select how this certification was received
+          </p>
+          <%= f.select "submission_method",
+              options_for_select([
+                ["Fax", "fax"],
+                ["Email", "email"],
+                ["Portal", "portal"],
+                ["Mail", "mail"],
+                ["Other", "other"]
+              ], "fax"),
+              {},
+              { class: "mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md",
+                "aria-describedby": "submission_method_hint" } %>
+        </div>
+        
+        
+        <div>
+          <%= f.label "medical_certification", "Certification Document",
+              class: "block text-sm font-medium text-gray-700" %>
+          <p id="certification_hint" class="text-xs text-gray-700 mb-2">
+            Upload the medical certification document
+          </p>
+          <%= f.file_field "medical_certification",
+              class: "block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500",
+              "aria-describedby": "certification_hint",
+              direct_upload: true,
+              accept: ".pdf,.jpg,.jpeg,.png" %>
+          <p id="certification_keyboard_hint" class="mt-1 text-xs text-gray-700">
+            <span class="sr-only">Keyboard users:</span> Press Space or Enter to open the file browser
+          </p>
+        </div>
+      </div>
+      
+      <!-- Rejection Section -->
+      <div id="medical_certification_rejection" class="mt-4 hidden">
+        <div class="space-y-4">
+          <div>
+            <%= f.label "medical_certification_rejection_reason", "Rejection Reason",
+                class: "block text-sm font-medium text-gray-700" %>
+            <p id="certification_rejection_hint" class="text-xs text-gray-700 mb-2">
+              Select the reason why this medical certification cannot be accepted
+            </p>
+            <%= f.select "medical_certification_rejection_reason",
+                options_for_select([
+                  ["Missing Signature", "missing_signature"],
+                  ["Missing Information", "missing_information"],
+                  ["Outdated/Expired Document", "expired"],
+                  ["Wrong Form Used", "wrong_form"],
+                  ["Illegible Document", "illegible"],
+                  ["Incomplete Detail", "incomplete_detail"],
+                  ["Missing Provider Credentials", "missing_credentials"],
+                  ["Other", "other"]
+                ]),
+                { include_blank: "Select a reason" },
+                { class: "mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md",
+                  "aria-describedby": "certification_rejection_hint" } %>
+          </div>
+
+          <div>
+            <%= f.label "medical_certification_rejection_notes", "Notes to Provider",
+                class: "block text-sm font-medium text-gray-700" %>
+            <p id="certification_notes_hint" class="text-xs text-gray-700 mb-2">
+              Provide clear instructions to help the provider understand why their certification was rejected and what they need to do next.
+            </p>
+            <%= f.text_area "medical_certification_rejection_notes",
+                rows: 3,
+                class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md",
+                "aria-describedby": "certification_notes_hint" %>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Using the Stimulus controller for toggling sections -->
+      <div data-controller="proof-status">
+        <input type="hidden" data-proof-status-target="radioGroup" name="radioGroup" value="medical_certification_status">
+        <input type="hidden" data-proof-status-target="statusAcceptedValue" value="accepted">
+        <input type="hidden" data-proof-status-target="statusRejectedValue" value="rejected">
+      </div>
+
+      <div class="mt-4">
+        <%= f.submit "Process Certification", 
+                    class: "inline-flex justify-center py-2 px-4 border border-transparent
+                          shadow-sm text-sm font-medium rounded-md text-white
+                          bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2
+                          focus:ring-offset-2 focus:ring-blue-500" %>
+      </div>
+    <% end %>
+  </div>
+<% elsif @application.medical_certification.attached? %>
+  <div class="mb-4">
+    <div class="flex justify-between items-center">
+      <h3 class="text-sm font-medium text-gray-700 mb-2">
+        <%= medical_certification_label(@application) %> History
+      </h3>
+    </div>
+    
+    <% if (@application.medical_certification_status == "accepted" || @application.medical_certification_status == "approved") %>
+      <%= medical_certification_link(@application, :button) %>
+    <% elsif @application.medical_certification_status != "received" %>
+      <%= medical_certification_link(@application, :link) %>
+    <% end %>
+    
+    <!-- Combined Status Changes and Request History -->
+    <div class="mt-4 pl-4 border-l-2 border-gray-200">
+      <% 
+        # First try to get status changes
+        status_changes = ApplicationStatusChange.where(application_id: @application.id)
+                         .where("metadata->>'change_type' = ? OR metadata->>'submission_method' IS NOT NULL", 'medical_certification')
+                         .order(created_at: :desc)
+      %>
+      
+      <% if status_changes.any? %>
+        <% status_changes.each do |change| %>
+          <div class="history-item mb-2">
+            <p class="text-sm text-gray-600 mb-1">
+              <% case change.to_status %>
+              <% when 'accepted', 'approved' %>
+                <span class="text-green-600">✓</span> Approved on 
+              <% when 'rejected' %>
+                <span class="text-red-600">×</span> Rejected on 
+              <% when 'received', 'requested' %>
+                <span class="text-blue-600">→</span> <%= change.to_status.titleize %> on
+              <% end %>
+              <%= change.created_at&.strftime("%B %d, %Y at %I:%M %p") %>
+              <% if change.user.present? %>
+                by <%= change.user&.full_name || "Unknown Admin" %>
+              <% end %>
+              
+              <% if change.metadata.present? && change.metadata['submission_method'].present? %>
+                <span class="text-xs text-gray-500">(via <%= change.metadata['submission_method'] %>)</span>
+              <% end %>
+            </p>
+            
+            <% if change.to_status == 'rejected' && change.notes.present? %>
+              <p class="text-sm text-gray-600 ml-4 mb-1">
+                <span class="text-gray-500">Reason:</span> "<%= sanitize change.notes %>"
+              </p>
+            <% elsif change.notes.present? %>
+              <p class="text-sm text-gray-600 ml-4 mb-1">
+                <span class="text-gray-500">Note:</span> "<%= sanitize change.notes %>"
+              </p>
+            <% end %>
+          </div>
+        <% end %>
+      <% elsif @application.medical_certification.attached? %>
+        <!-- Fallback when no status change records exist but certification is attached -->
+        <div class="history-item mb-2">
+          <p class="text-sm text-gray-600 mb-1">
+            <span class="text-blue-600">→</span> Submitted on 
+            <%= @application.medical_certification.created_at.strftime("%B %d, %Y at %I:%M %p") %>
+            <span class="text-xs text-gray-500">(via <%= medical_certification_submission_method(@application) %>)</span>
+          </p>
+        </div>
+      <% end %>
+      
+      <!-- Additional request history -->
+      <%= render "certification_history" %>
+    </div>
+  </div>
+<% end %>

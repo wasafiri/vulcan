@@ -315,7 +315,7 @@ module ConstituentPortal
     def request_review
       @application = current_user.applications.find(params[:id])
       if @application.update(needs_review_since: Time.current)
-        User.where(type: 'Admin').find_each do |admin|
+        User.where(type: 'Administrator').find_each do |admin|
           Notification.create!(
             recipient: admin,
             actor: current_user,
@@ -373,7 +373,7 @@ module ConstituentPortal
         return
       end
 
-      User.where(type: 'Admin').find_each do |admin|
+      User.where(type: 'Administrator').find_each do |admin|
         Notification.create!(
           recipient: admin,
           actor: current_user,

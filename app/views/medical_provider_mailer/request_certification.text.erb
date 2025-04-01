@@ -1,19 +1,31 @@
-<%= render 'shared/mailers/header', title: "Disability Certification Request" %>
+MEDICAL CERTIFICATION FORM REQUEST
 
 Dear Healthcare Provider,
 
-==================================================
-ℹ CERTIFICATION REQUEST
-==================================================
+We are writing to request your completion of a disability certification form for your patient, <%= @constituent.full_name %>, who is applying for the Maryland Assistive Technology Program.
 
-We are requesting disability certification for your patient, <%= @constituent.full_name %>.
-Please complete the certification form for the patient and reply to this email with the attached certification document (PDF or image format). Simply click the reply button on this email and attach your completed certification.
+This <%= @request_count > 1 ? "is a follow-up request (Request ##{@request_count})" : "request" %> was sent on <%= Time.parse(@timestamp).strftime("%B %d, %Y at %I:%M %p") %>.
 
 PATIENT INFORMATION:
 - Name: <%= @constituent.full_name %>
-- Date of Birth: <%= @constituent.date_of_birth.present? ? format_date(@constituent.date_of_birth, :short) : "Not provided" %>
+- Date of Birth: <%= @constituent.date_of_birth.strftime("%B %d, %Y") if @constituent.date_of_birth.present? %>
 - Application ID: <%= @application.id %>
 
-Thank you for your assistance. Your prompt response will help ensure your patient receives the services they need.
+The certification form is essential for your patient to qualify for assistive technology devices they need. To complete this form:
 
-<%= render 'shared/mailers/footer' %>
+1. Download the form at: https://mdmat.org/forms/disability-certification.pdf
+2. Complete all required fields
+3. Sign the form
+4. Return the completed form by email to medical-cert@mdmat.org or by fax to (410) 554-9277
+
+If you have questions or need assistance, please contact our medical certification team at medical-cert@mdmat.org or call (410) 554-9230.
+
+Thank you for your prompt attention to this important matter.
+
+Sincerely,
+Maryland Assistive Technology Program
+
+---
+
+This email was sent regarding Application #<%= @application.id %> on behalf of <%= @constituent.full_name %>.
+CONFIDENTIALITY NOTICE: This email may contain confidential health information protected by state and federal privacy laws.

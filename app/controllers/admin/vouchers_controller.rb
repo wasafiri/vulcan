@@ -26,6 +26,7 @@ module Admin
 
       @audit_logs = Event.where('metadata @> ?', { voucher_id: @voucher.id }.to_json)
                          .or(Event.where('metadata @> ?', { voucher_code: @voucher.code }.to_json))
+                         .includes(:user)
                          .order(created_at: :desc)
     end
 

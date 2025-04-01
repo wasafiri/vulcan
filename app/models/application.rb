@@ -169,6 +169,20 @@ class Application < ApplicationRecord
     end
   end
 
+  # Determines if the proof needs review based on submission history
+  # @param proof_type [String] The type of proof ("income" or "residency")
+  # @return [Boolean] True if there's a new submission requiring review
+  def needs_proof_type_review?(proof_type)
+    latest_review = proof_reviews.where(proof_type: proof_type).order(created_at: :desc).first
+    latest_audit = proof_submission_audits.where(proof_type: proof_type).order(created_at: :desc).first
+    
+    # Case 1: No reviews yet, but has submission
+    return true if latest_review.nil? && latest_audit.present?
+    
+    # Case 2: Has a new submission after the last review
+    return latest_audit.present? && latest_review.present? && latest_audit.created_at > latest_review.created_at
+  end
+
   # Determines the appropriate proof review button text based on proof status
   # @param proof_type [String] The type of proof ("income" or "residency")
   # @return [String] The appropriate button text

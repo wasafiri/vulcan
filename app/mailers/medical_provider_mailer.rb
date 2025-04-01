@@ -1,46 +1,59 @@
 # frozen_string_literal: true
 
 class MedicalProviderMailer < ApplicationMailer
-  def request_certification(application, notification = nil)
-    # Ensure we have the full application with user data properly loaded
-    @application = Application.includes(:user).find(application.id)
-    @constituent = @application.user
+  include Rails.application.routes.url_helpers
 
-    # Add logging to help diagnose any issues
-    Rails.logger.info "Medical certification request - Constituent: #{@constituent.id}, DOB: #{@constituent.date_of_birth.inspect}"
+  def self.default_url_options
+    Rails.application.config.action_mailer.default_url_options
+  end
 
-    @notification = notification
+  # Notify a medical provider that a certification has been rejected
+  # @param application [Application] The application with the rejected certification
+  # @param rejection_reason [String] The reason for rejection
+  # @param admin [User] The admin who rejected the certification
+  def certification_rejected(application, rejection_reason, admin)
+    @application = application
+    @rejection_reason = rejection_reason
+    @admin = admin
+    @constituent = application.user
+    @remaining_attempts = 8 - application.total_rejections
 
     mail_options = {
-      to: @application.medical_provider_email,
+      to: application.medical_provider_email,
       from: 'info@mdmat.org',
       reply_to: 'medical-cert@mdmat.org',
-      subject: "Disability Certification Request for #{@constituent.full_name}",
+      subject: "Disability Certification Form for Patient needs Updates",
       message_stream: 'outbound'
     }
 
-    # Send the mail through ActionMailer
-    message = mail(mail_options)
-
-    # Record the message ID if we have a notification to track
-    if @notification.present? &&
-       message.respond_to?(:delivery_method) &&
-       message.delivery_method.is_a?(Mail::Postmark) &&
-       message.respond_to?(:delivery_handler) &&
-       message.delivery_handler.present? &&
-       message.delivery_handler.respond_to?(:response) &&
-       message.delivery_handler.response.present?
-      begin
-        message_id = message.delivery_handler.response['MessageID']
-        if message_id.present?
-          @notification.update(message_id: message_id)
-          UpdateEmailStatusJob.set(wait: 1.minute).perform_later(@notification.id)
-        end
-      rescue StandardError => e
-        Rails.logger.error("Failed to record message ID: #{e.message}")
-      end
+    mail(mail_options)
+  end
+  
+  # Request certification from a medical provider
+  # @param application [Application] The application requiring certification
+  # @param timestamp [String] ISO8601 timestamp of when the request was made
+  # @param notification_id [Integer] ID of the notification record for tracking
+  def request_certification(application, timestamp = nil, notification_id = nil)
+    @application = application
+    @constituent = application.user
+    @timestamp = timestamp || Time.current.iso8601
+    @notification_id = notification_id
+    @request_count = application.medical_certification_request_count || 1
+    
+    mail_options = {
+      to: application.medical_provider_email,
+      from: 'info@mdmat.org',
+      reply_to: 'medical-cert@mdmat.org',
+      subject: "Disability Certification Form Request for #{application.constituent_full_name}",
+      message_stream: 'outbound'
+    }
+    
+    # Add notification message ID for tracking if available
+    if notification_id.present?
+      notification = Notification.find_by(id: notification_id)
+      mail_options[:message_id] = notification.message_id if notification&.message_id.present?
     end
-
-    # Do not return the response object, ActionMailer expects mail() to be the last line
+    
+    mail(mail_options)
   end
 end

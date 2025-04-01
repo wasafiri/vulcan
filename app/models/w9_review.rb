@@ -38,7 +38,7 @@ class W9Review < ApplicationRecord
   end
 
   def admin_must_be_admin_type
-    errors.add(:admin, 'must be an administrator') unless admin&.type == 'Admin'
+    errors.add(:admin, 'must be an administrator') unless admin&.type == 'Administrator'
   end
 
   def vendor_must_be_vendor_type

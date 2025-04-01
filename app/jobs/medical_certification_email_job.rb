@@ -24,8 +24,8 @@ class MedicalCertificationEmailJob < ApplicationJob
                      existing || create_notification(application, timestamp)
                    end
 
-    # Send email with notification for tracking
-    MedicalProviderMailer.request_certification(application, notification).deliver_now
+    # Send email with notification for tracking - updated to match new method signature
+    MedicalProviderMailer.request_certification(application, timestamp, notification&.id).deliver_now
 
     Rails.logger.info "Successfully sent medical certification email for application #{application_id}"
   rescue StandardError => e

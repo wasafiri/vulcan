@@ -19,7 +19,7 @@ class ProofAttachmentMetricsJob < ApplicationJob
 
       # Alert if success rate drops below threshold
       if success_rate < 95 && failed > 5
-        admins = User.where(type: 'Admin')
+        admins = User.where(type: 'Administrator')
         admins.each do |admin|
           Notification.create!(
             recipient: admin,

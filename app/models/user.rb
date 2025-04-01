@@ -9,10 +9,10 @@ class User < ApplicationRecord
         u.first_name = 'System'
         u.last_name = 'User'
         u.password = SecureRandom.hex(32)
-        u.type = 'Administrator'
+        u.type = 'Users::Administrator'
         u.verified = true
       end
-      user.admin? ? user : user.tap { |u| u.update!(type: 'Administrator') }
+      user.admin? ? user : user.tap { |u| u.update!(type: 'Users::Administrator') }
     end
   end
 
@@ -60,9 +60,9 @@ class User < ApplicationRecord
   def self.capable_types_for(capability)
     case capability
     when 'can_train'
-      %w[Administrator Trainer]
+      %w[Users::Administrator Users::Trainer]
     when 'can_evaluate'
-      %w[Administrator Evaluator]
+      %w[Users::Administrator Users::Evaluator]
     else
       []
     end
@@ -74,7 +74,7 @@ class User < ApplicationRecord
       .where(role_capabilities: { capability: capability })
       .or(where(type: capable_types_for(capability)))
   }
-  scope :admins, -> { where(type: 'Administrator') }
+  scope :admins, -> { where(type: 'Users::Administrator') }
   scope :vendors, -> { where(type: 'Vendor') }
   scope :ordered_by_name, -> { order(:first_name) }
   scope :locked, -> { where.not(locked_at: nil) }

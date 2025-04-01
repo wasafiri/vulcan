@@ -4,7 +4,7 @@ class NotifyAdminsJob < ApplicationJob
   queue_as :default
 
   def perform(application)
-    User.where(type: 'Admin').find_each do |admin|
+    User.where(type: 'Administrator').find_each do |admin|
       Notification.create!(
         recipient: admin,
         actor: application.user,

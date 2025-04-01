@@ -12,6 +12,7 @@ module Admin
       verify_income request_documents review_proof update_proof_status
       approve reject assign_evaluator assign_trainer schedule_training complete_training
       update_certification_status resend_medical_certification assign_voucher
+      upload_medical_certification
     ]
     before_action :load_audit_logs_with_service, only: %i[show approve reject]
 
@@ -55,12 +56,12 @@ module Admin
     def load_application_associations_for_show
       # Load status changes directly – they're always needed
       ApplicationStatusChange.where(application_id: @application.id)
-                             .includes(user: :role_capabilities)
+                             .includes(:user)
                              .load
 
       # Load proof reviews that are needed
       ProofReview.where(application_id: @application.id)
-                 .includes(admin: :role_capabilities)
+                 .includes(:admin)
                  .order(created_at: :desc)
                  .load
 
@@ -119,7 +120,28 @@ module Admin
     end
 
     def update_proof_status
-      reviewer = Applications::ProofReviewer.new(@application, current_user)
+      Rails.logger.info "Update proof status - Current user: #{current_user.inspect}"
+      Rails.logger.info "Current user type: #{current_user.type}, admin? method result: #{current_user.admin?}"
+      Rails.logger.info "Current user class: #{current_user.class}, class name: #{current_user.class.name}"
+
+      # Ensure we're using a properly loaded administrator user
+      admin_user = if current_user.admin?
+                     current_user
+                  else
+                    # Fallback to reload the user if admin? check fails but type is correct
+                    if current_user.type == 'Administrator' || current_user.type == 'Users::Administrator'
+                      Rails.logger.info "User type indicates admin but admin? method returned false, reloading user"
+                      User.find(current_user.id)
+                    else
+                      Rails.logger.error "Non-admin user attempting to perform admin action"
+                      current_user
+                    end
+                   end
+
+      Rails.logger.info "Admin user prepared for proof review: #{admin_user.inspect}"
+      Rails.logger.info "Prepared admin - Type: #{admin_user.type}, admin? result: #{admin_user.admin?}"
+
+      reviewer = Applications::ProofReviewer.new(@application, admin_user)
       Thread.current[:reviewing_single_proof] = true
 
       log_proof_review_start
@@ -222,10 +244,29 @@ module Admin
                   notice: 'Training session marked as completed'
     end
 
-    def update_certification_status
+  def update_certification_status
+    status = params[:status]&.to_sym
+    
+    # Use the new reviewer service for rejections
+    if status == :rejected && params[:rejection_reason].present?
+      reviewer = Applications::MedicalCertificationReviewer.new(@application, current_user)
+      result = reviewer.reject(
+        rejection_reason: params[:rejection_reason],
+        notes: params[:notes]
+      )
+      
+      if result[:success]
+        redirect_to admin_application_path(@application),
+                    notice: 'Medical certification rejected and provider notified.'
+      else
+        redirect_to admin_application_path(@application),
+                    alert: "Failed to reject certification: #{result[:error]}"
+      end
+    else
+      # Use the existing method for other statuses
       if @application.update_certification!(
         certification: params[:medical_certification],
-        status: params[:status],
+        status: status,
         verified_by: current_user,
         rejection_reason: params[:rejection_reason]
       )
@@ -236,6 +277,7 @@ module Admin
                     alert: 'Failed to update certification status.'
       end
     end
+  end
 
     def resend_medical_certification
       service = Applications::MedicalCertificationService.new(
@@ -261,6 +303,89 @@ module Admin
                     alert: 'Failed to assign voucher. Please ensure all requirements are met.'
       end
     end
+
+  # Handles uploading and processing medical certification documents
+  # This action can either accept and attach a certification document
+  # or reject it with a reason, notifying the medical provider
+  def upload_medical_certification
+    status = params[:medical_certification_status]
+
+    # Handle based on selected action
+    if status == "accepted"
+      process_accepted_certification
+    elsif status == "rejected"
+      process_rejected_certification
+    else
+      redirect_to admin_application_path(@application),
+                  alert: 'Please select whether to accept or reject the certification.'
+    end
+  end
+
+  # Process an accepted medical certification
+  def process_accepted_certification
+    if params[:medical_certification].blank?
+      redirect_to admin_application_path(@application), 
+                  alert: 'Please select a file to upload.'
+      return
+    end
+
+    # Attach document and update status to accepted
+    @application.medical_certification.attach(params[:medical_certification])
+    @application.update(medical_certification_status: :accepted)
+    
+    result = { success: @application.medical_certification.attached? }
+
+    if result[:success]
+      # Create an application status change for audit trail
+      current_time = Time.current
+      submission_method = params[:submission_method].presence || 'fax'
+      
+      ApplicationStatusChange.create!(
+        application: @application,
+        user: current_user,
+        from_status: @application.medical_certification_status_before_last_save || 'requested',
+        to_status: 'accepted',
+        metadata: {
+          change_type: 'medical_certification',
+          submission_method: submission_method,
+          received_at: current_time.iso8601,
+          processed_at: current_time.iso8601,
+          admin_id: current_user.id
+        }
+      )
+
+      redirect_to admin_application_path(@application),
+                  notice: 'Medical certification successfully uploaded and accepted.'
+    else
+      redirect_to admin_application_path(@application),
+                  alert: "Failed to upload certification: #{result[:error]&.message}"
+    end
+  end
+
+  # Process a rejected medical certification
+  def process_rejected_certification
+    # Validate required rejection reason
+    if params[:medical_certification_rejection_reason].blank?
+      redirect_to admin_application_path(@application),
+                  alert: 'Please select a rejection reason.'
+      return
+    end
+
+    # Use the medical certification reviewer service
+    reviewer = Applications::MedicalCertificationReviewer.new(@application, current_user)
+    result = reviewer.reject(
+      rejection_reason: params[:medical_certification_rejection_reason],
+      notes: params[:medical_certification_rejection_notes]
+    )
+
+    if result[:success]
+      redirect_to admin_application_path(@application),
+                  notice: 'Medical certification rejected and provider notified.'
+    else
+      redirect_to admin_application_path(@application),
+                  alert: "Failed to reject certification: #{result[:error]}"
+    end
+  end
 
     private
 

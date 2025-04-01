@@ -15,6 +15,9 @@ class MedicalCertificationMailbox < ApplicationMailbox
       attach_certification(attachment, audit)
     end
 
+    # Create an application status change for consistent tracking across submission methods
+    create_status_change_record(audit)
+
     # Notify admin of new certification submission
     notify_admin
 
@@ -33,7 +36,25 @@ class MedicalCertificationMailbox < ApplicationMailbox
         medical_provider_id: medical_provider.id,
         inbound_email_id: inbound_email.id,
         email_subject: mail.subject,
-        email_from: mail.from.first
+        email_from: mail.from.first,
+        submission_method: 'email'
+      }
+    )
+  end
+
+  # Creates an ApplicationStatusChange record for better audit trail consistency
+  def create_status_change_record(audit)
+    ApplicationStatusChange.create!(
+      application: application,
+      user: nil, # No admin user for auto-processing
+      from_status: 'requested',
+      to_status: 'received',
+      metadata: {
+        change_type: 'medical_certification',
+        submission_method: 'email',
+        received_at: Time.current.iso8601,
+        medical_provider_id: medical_provider.id,
+        inbound_email_id: inbound_email.id
       }
     )
   end

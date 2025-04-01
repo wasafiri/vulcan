@@ -93,39 +93,60 @@ export default class extends Controller {
 
   // Handle predefined reason selection
   selectPredefinedReason(event) {
-    if (!this.hasReasonFieldTarget || !this.hasProofTypeTarget) {
-      console.warn('Missing required targets for predefined reason selection')
+    if (!this.hasReasonFieldTarget) {
+      console.warn('Missing reason field target for predefined reason selection')
       return
     }
 
     const reasonType = event.currentTarget.dataset.reasonType
-    const proofType = this.proofTypeTarget.value
-    
-    if (!reasonType || !proofType) {
-      console.warn('Missing reason type or proof type')
+    if (!reasonType) {
+      console.warn('Missing reason type in button data attribute')
       return
     }
 
-    // For medical certification, we use the direct reason values
-    if (proofType === 'medical') {
-      const reasonText = this[`${reasonType}Value`]
-      if (reasonText) {
-        this.reasonFieldTarget.value = reasonText
-        this.reasonFieldTarget.classList.remove('border-red-500')
-      } else {
-        console.warn(`No predefined reason found for ${reasonType}`)
+    // Get the proof type from the hidden field, defaulting to a sensible value if missing
+    let proofType = 'general'
+    if (this.hasProofTypeTarget && this.proofTypeTarget.value) {
+      proofType = this.proofTypeTarget.value
+      console.log(`Using proof type from field: ${proofType}`)
+    } else {
+      // Try to infer from context - check if this is inside the medical certification modal
+      const isMedicalModal = event.currentTarget.closest('#medicalCertificationRejectionModal')
+      if (isMedicalModal) {
+        proofType = 'medical'
+        console.log('Inferred medical proof type from modal context')
       }
+    }
+
+    let reasonText = null
+
+    // For medical certification reasons
+    if (proofType === 'medical') {
+      reasonText = this[`${reasonType}Value`]
+      console.log(`Looking for medical reason: ${reasonType}Value = ${reasonText ? 'Found' : 'Not found'}`)
     } else {
       // For income/residency, use the composite key approach
       const key = `${reasonType}${proofType.charAt(0).toUpperCase() + proofType.slice(1)}`
-      const reasonText = this[`${key}Value`]
-      
-      if (reasonText) {
-        this.reasonFieldTarget.value = reasonText
-        this.reasonFieldTarget.classList.remove('border-red-500')
-      } else {
-        console.warn(`No predefined reason found for ${key}`)
+      reasonText = this[`${key}Value`]
+      console.log(`Looking for ${proofType} reason: ${key}Value = ${reasonText ? 'Found' : 'Not found'}`)
+    }
+    
+    // Directly search for the value as a fallback
+    if (!reasonText) {
+      // Try direct access to the attribute
+      const dataAttributeName = `data-rejection-form-${reasonType}-value`
+      const directValue = this.element.getAttribute(dataAttributeName)
+      if (directValue) {
+        reasonText = directValue
+        console.log(`Found reason text via direct attribute: ${dataAttributeName}`)
       }
+    }
+    
+    if (reasonText) {
+      this.reasonFieldTarget.value = reasonText
+      this.reasonFieldTarget.classList.remove('border-red-500')
+    } else {
+      console.warn(`No predefined reason found for type: ${reasonType}, proof type: ${proofType}`)
     }
   }
 

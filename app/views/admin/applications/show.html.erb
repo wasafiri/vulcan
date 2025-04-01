@@ -209,6 +209,9 @@
       </div>
 
       <div class="mt-6 space-y-4">
+        <!-- Fax Upload Form and History -->
+        <%= render "medical_certification_upload" %>
+      
         <!-- Provider Information -->
         <% if @application.medical_provider_name.present? %>
           <div class="mb-4" data-testid="provider-information">
@@ -230,63 +233,35 @@
             </div>
           </div>
         <% end %>
-
-        <!-- Certification Status -->
-        <div class="mb-4" data-testid="certification-status">
-          <h3 class="text-sm font-medium text-gray-700 mb-2">Certification Status</h3>
-          <div class="pl-4 border-l-2 border-gray-200">
-            <p class="text-sm text-gray-700">
-              Disability Certification Form <%= @application.medical_certification_status&.titleize %>
-              <% if @application.medical_certification_request_count && @application.medical_certification_request_count > 0 %>
-                (<%= pluralize(@application.medical_certification_request_count, "request") %> sent)
-              <% end %>
-            </p>
-            
-            <% if @application.medical_certification_status == "rejected" %>
-              <% if @application.respond_to?(:medical_certification_rejection_reason) && @application.medical_certification_rejection_reason.present? %>
-                <p class="text-sm text-red-600 mt-1">
-                  <strong>Reason:</strong> <%= sanitize @application.medical_certification_rejection_reason %>
-                </p>
-              <% elsif @application.respond_to?(:rejection_reason) && @application.rejection_reason.present? %>
-                <p class="text-sm text-red-600 mt-1">
-                  <strong>Reason:</strong> <%= sanitize @application.rejection_reason %>
-                </p>
-              <% end %>
-            <% end %>
-            
-            <% if @application.medical_certification_verified_at.present? && 
-                  (@application.medical_certification_status == "accepted" || 
-                   @application.medical_certification_status == "approved") %>
-              <p class="text-sm text-gray-600 mt-1">
-                Certified on <%= @application.medical_certification_verified_at.strftime("%B %d, %Y at %I:%M %p") %>
-                <% if @application.medical_certification_verified_by.present? %>
-                  by <%= @application.medical_certification_verified_by.full_name %>
-                <% end %>
-              </p>
-            <% end %>
-          </div>
-        </div>
-        
-        <!-- Request History -->
-        <div class="mb-4" data-testid="request-history">
-          <h3 class="text-sm font-medium text-gray-700 mb-2">Request History</h3>
-          <%= render "certification_history" %>
-        </div>
         
         <!-- Action Buttons -->
         <div class="mt-6">
-          <% request_count = @application.medical_certification_request_count || 0 %>
-          <% latest_request = Notification.where(
-               notifiable: @application, 
-               action: "medical_certification_requested"
-             ).order(created_at: :desc).first %>
-          <% latest_reject = Notification.where(
-               notifiable: @application, 
-               action: "medical_certification_rejected"
-             ).order(created_at: :desc).first %>
-         
-          <% # Check if we have both a request and a rejection, and if the request is more recent than the rejection %>
-          <% requested_after_rejection = latest_request.present? && latest_reject.present? && latest_request.created_at > latest_reject.created_at %>
+          <% 
+            # Use instance variables that might be preloaded in the controller
+            # or load them once if not already available
+            request_count = @application.medical_certification_request_count || 0
+            
+            if !defined?(@latest_certification_request) || @latest_certification_request.nil?
+              @latest_certification_request = Notification
+                .where(notifiable: @application, action: "medical_certification_requested")
+                .order(created_at: :desc)
+                .limit(1)
+                .first
+            end
+            
+            if !defined?(@latest_certification_reject) || @latest_certification_reject.nil?
+              @latest_certification_reject = Notification
+                .where(notifiable: @application, action: "medical_certification_rejected")
+                .order(created_at: :desc)
+                .limit(1)
+                .first
+            end
+            
+            # Check if we have both a request and a rejection, and if the request is more recent than the rejection
+            requested_after_rejection = @latest_certification_request.present? && 
+                                       @latest_certification_reject.present? && 
+                                       @latest_certification_request.created_at > @latest_certification_reject.created_at
+          %>
           
           <% if @application.medical_certification_status == "not_requested" || 
                 @application.medical_certification_status == "rejected" ||
@@ -311,22 +286,7 @@
                   class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">
               Review Certification
             </button>
-          <% elsif @application.medical_certification.attached? && 
-                  (@application.medical_certification_status == "accepted" || 
-                   @application.medical_certification_status == "approved") &&
-                  !requested_after_rejection %>
-            <!-- View button - Only show this for accepted certificates without a subsequent request -->
-            <%= link_to rails_blob_path(@application.medical_certification, disposition: :inline),
-                target: "_blank",
-                rel: "noopener noreferrer",
-                class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none",
-                data: { turbo: false } do %>
-              <svg class="h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-              View Certification
-            <% end %>
+          <!-- View Certification Button Moved to Medical Certification Upload Partial -->
           <% end %>
           
           <%# View History button removed - history already shown in the certification section %>

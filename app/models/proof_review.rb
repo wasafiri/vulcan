@@ -36,7 +36,12 @@ class ProofReview < ApplicationRecord
   end
 
   def admin_must_be_admin_type
-    errors.add(:admin, 'must be an administrator') unless admin&.type == 'Admin'
+    Rails.logger.info "ProofReview validation - Admin: #{admin.inspect}, Admin type: #{admin&.type}, Admin#admin? result: #{admin&.admin?}"
+    
+    unless admin&.admin?
+      Rails.logger.error "Admin validation failed: #{admin&.inspect} (type: #{admin&.type}) - admin? method returned false"
+      errors.add(:admin, 'must be an administrator')
+    end
   end
 
   def application_must_be_active

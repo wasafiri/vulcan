@@ -40,11 +40,42 @@ module Applications
     private
 
     def update_certification_status(timestamp)
-      # Use update_columns to bypass validations while maintaining audit trail
+      previous_status = application.medical_certification_status
+      
+      # Update the application columns directly to bypass callbacks
       application.update_columns(
         medical_certification_requested_at: timestamp,
         medical_certification_status: Application.medical_certification_statuses[:requested],
         updated_at: timestamp # Ensure timestamp is updated for audit purposes
+      )
+      
+      # Create ApplicationStatusChange record for activity history
+      ApplicationStatusChange.create!(
+        application: application,
+        user: actor,
+        from_status: previous_status || 'not_requested',
+        to_status: 'requested',
+        metadata: {
+          change_type: 'medical_certification',
+          requested_at: timestamp.iso8601,
+          requested_by_id: actor&.id,
+          provider_name: application.medical_provider_name,
+          provider_email: application.medical_provider_email
+        }
+      )
+      
+      # Create event for audit trail with clear context
+      Event.create!(
+        user: actor,
+        action: 'medical_certification_requested',
+        metadata: {
+          application_id: application.id,
+          old_status: previous_status || 'not_requested',
+          new_status: 'requested',
+          timestamp: timestamp.iso8601,
+          change_type: 'medical_certification',
+          provider_name: application.medical_provider_name
+        }
       )
     end
 

@@ -65,19 +65,19 @@
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <div class="text-sm font-medium text-gray-900">
-                <%= case log
-                    when ProofReview
+                <%= case 
+                    when log.is_a?(ProofReview)
                       "Admin Review"
-                    when ApplicationStatusChange
+                    when log.is_a?(ApplicationStatusChange)
                       "Status Change"
-                    when Notification
+                    when log.is_a?(Notification) || log.class.name == "NotificationDecorator"
                       case log.action
                       when "proof_approved", "proof_rejected"
                         "Notification Sent"
                       else
                         log.action.titleize.gsub('_', ' ')
                       end
-                    when Event
+                    when log.is_a?(Event)
                       case log.action
                       when "application_created"
                         submission_method = log.metadata['submission_method']&.titleize || "Unknown"
@@ -98,39 +98,74 @@
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <div class="text-sm text-gray-900">
-                <%= case log
-                    when ProofReview
+                <%= case 
+                    when log.is_a?(ProofReview)
                       log.admin.full_name
-                    when ApplicationStatusChange
+                    when log.is_a?(ApplicationStatusChange)
                       log.user&.full_name || "System"
-                    when Notification
+                    when log.is_a?(Notification) || log.class.name == "NotificationDecorator"
                       log.actor&.full_name || "System"
-                    when Event
+                    when log.is_a?(Event)
                       log.user&.full_name || "System"
                     end %>
               </div>
             </td>
             <td class="px-6 py-4 text-sm text-gray-500">
-              <%= case log
-                  when ProofReview
+              <%= case
+                  when log.is_a?(ProofReview)
                     status_text = log.status_rejected? ? "rejected" : "approved"
                     rejection_text = log.rejection_reason.present? ? " - #{log.rejection_reason}" : ""
                     "Admin #{status_text} #{log.proof_type.titleize} proof#{rejection_text}"
-                  when ApplicationStatusChange
-                    status_text = case [log.from_status, log.to_status]
-                    when [nil, "draft"]
-                      "Application created as draft"
-                    when ["draft", "in_progress"]
-                      "Application submitted for review"
-                    when [_, "approved"]
-                      "Application approved"
-                    when [_, "rejected"]
-                      "Application rejected"
+                  when log.is_a?(ApplicationStatusChange)
+                    if log.metadata.try(:[], 'change_type') == 'medical_certification'
+                      # Special handling for medical certification status changes
+                      method = log.metadata.try(:[], 'submission_method')&.titleize || "Unknown"
+                      provider = log.metadata.try(:[], 'provider_name')
+                      
+                      status_text = case [log.from_status, log.to_status]
+                      when [nil, "requested"], ["not_requested", "requested"]
+                        provider_text = provider.present? ? " from #{provider}" : ""
+                        "Medical certification requested#{provider_text}"
+                      when [_, "received"]
+                        received_at = log.metadata['received_at'].present? ? Time.parse(log.metadata['received_at']).strftime("%m/%d/%Y at %I:%M %p") : nil
+                        timestamp_text = received_at.present? ? " on #{received_at}" : ""
+                        "Medical certification received (via #{method})#{timestamp_text}"
+                      when [_, "accepted"]
+                        received_at = log.metadata['received_at'].present? ? Time.parse(log.metadata['received_at']).strftime("%m/%d/%Y at %I:%M %p") : nil
+                        processed_at = log.metadata['processed_at'].present? ? Time.parse(log.metadata['processed_at']).strftime("%m/%d/%Y at %I:%M %p") : nil
+                        
+                        # If both timestamps exist and are different, show both
+                        if received_at.present? && processed_at.present? && received_at != processed_at
+                          "Medical certification received on #{received_at} and approved on #{processed_at} (via #{method})"
+                        # If only processed_at exists or they're the same, just show one timestamp
+                        elsif processed_at.present?
+                          "Medical certification approved on #{processed_at} (via #{method})"
+                        else
+                          "Medical certification approved (via #{method})"
+                        end
+                      when [_, "rejected"]
+                        "Medical certification rejected (via #{method})#{log.metadata.try(:[], 'rejection_reason').present? ? " - #{log.metadata['rejection_reason']}" : ""}"
+                      else
+                        "Medical certification status changed from #{log.from_status&.titleize || 'Not Requested'} to #{log.to_status&.titleize}"
+                      end
+                      "#{status_text}#{log.notes.present? ? " - #{log.notes}" : ""}"
                     else
-                      "Status changed from #{log.from_status&.titleize} to #{log.to_status&.titleize}"
+                      # Regular application status changes
+                      status_text = case [log.from_status, log.to_status]
+                      when [nil, "draft"]
+                        "Application created as draft"
+                      when ["draft", "in_progress"]
+                        "Application submitted for review"
+                      when [_, "approved"]
+                        "Application approved" 
+                      when [_, "rejected"]
+                        "Application rejected"
+                      else
+                        "Status changed from #{log.from_status&.titleize || 'Not Set'} to #{log.to_status&.titleize}"
+                      end
+                      "#{status_text}#{log.notes.present? ? " - #{log.notes}" : ""}"
                     end
-                    "#{status_text}#{log.notes.present? ? " - #{log.notes}" : ""}"
-                  when Notification
+                  when log.is_a?(Notification) || log.class.name == "NotificationDecorator"
                     case log.action
                     when "medical_certification_requested"
                       "Medical certification requested from #{@application.medical_provider_name}"
@@ -154,7 +189,7 @@
                     else
                       log.action.titleize.gsub('_', ' ')
                     end
-                  when Event
+                  when log.is_a?(Event)
                     case log.action
                     when "application_created"
                       method = log.metadata['submission_method']&.titleize || "Unknown"

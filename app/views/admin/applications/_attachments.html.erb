@@ -114,19 +114,19 @@
       <!-- Action Buttons -->
       <div class="mt-4 flex space-x-2">
         <% if @application.income_proof.attached? %>
-          <% if @application.income_proof_status == "approved" %>
-            <button type="button"
-                    data-action="click->modal#open"
-                    data-modal-id="incomeProofReviewModal"
-                    data-proof-type="income"
-                    class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none">
+          <% if @application.income_proof_status == "approved" && !@application.needs_proof_type_review?("income") %>
+            <!-- If proof is approved and there's no newer submission, open in new tab -->
+            <%= link_to rails_blob_path(@application.income_proof, disposition: :inline),
+                    target: "_blank",
+                    class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none" do %>
               <svg class="h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
               View Approved Proof
-            </button>
+            <% end %>
           <% else %>
+            <!-- Show review button for pending submissions or non-approved proofs -->
             <button type="button"
                     data-action="click->modal#open"
                     data-modal-id="incomeProofReviewModal"
@@ -138,7 +138,6 @@
         <% else %>
           <span class="text-sm text-gray-500">Not Attached</span>
         <% end %>
-
       </div>
     </div>
   </div>
@@ -258,19 +257,19 @@
       <!-- Action Buttons -->
       <div class="mt-4 flex space-x-2">
         <% if @application.residency_proof.attached? %>
-          <% if @application.residency_proof_status == "approved" %>
-            <button type="button"
-                    data-action="click->modal#open"
-                    data-modal-id="residencyProofReviewModal"
-                    data-proof-type="residency"
-                    class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none">
+          <% if @application.residency_proof_status == "approved" && !@application.needs_proof_type_review?("residency") %>
+            <!-- If proof is approved and there's no newer submission, open in new tab -->
+            <%= link_to rails_blob_path(@application.residency_proof, disposition: :inline),
+                    target: "_blank",
+                    class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none" do %>
               <svg class="h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
               View Approved Proof
-            </button>
+            <% end %>
           <% else %>
+            <!-- Show review button for pending submissions or non-approved proofs -->
             <button type="button"
                     data-action="click->modal#open"
                     data-modal-id="residencyProofReviewModal"
