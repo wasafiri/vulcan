@@ -27,7 +27,7 @@ ActiveSupport.on_load(:active_record) do
 
     # Override the Rails STI class resolver to handle our namespaced classes
     def sti_name_to_class(type_name)
-      if self <= User && type_name.exclude?('::')
+      if self.name == 'User' || (self.ancestors.map(&:name).include?('User') && type_name.exclude?('::'))
         # For User STI types, try looking in the Users namespace first
         begin
           "Users::#{type_name}".constantize
@@ -40,9 +40,12 @@ ActiveSupport.on_load(:active_record) do
       end
     end
   end
+end
 
-  # Step 2: Override how Rails computes the type string to store in the database
-  # This fixes the other direction of the mapping.
-  # Apply this to all User STI types.
+# Step 2: We'll add this in a separate hook to ensure User is loaded
+ActiveSupport.on_load(:user) do
   User.prepend(NamespacedStiTypeName)
 end
+
+# Make sure we define the hook for the User model
+ActiveSupport.run_load_hooks(:user, User) rescue nil
