@@ -31,7 +31,7 @@ class Application < ApplicationRecord
   has_many :evaluations, dependent: :destroy
   has_many :notifications, as: :notifiable, dependent: :destroy
   has_many :proof_reviews, dependent: :destroy
-  has_many :status_changes, class_name: 'ApplicationStatusChange', dependent: destroy
+  has_many :status_changes, class_name: 'ApplicationStatusChange', dependent: :destroy
   has_many :proof_submission_audits, dependent: :destroy
   has_many :vouchers, dependent: :restrict_with_error
   has_many :application_notes, dependent: :destroy
