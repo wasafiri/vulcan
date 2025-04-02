@@ -17,9 +17,9 @@ class Application < ApplicationRecord
   include EvaluationManagement
 
   # Associations - made more flexible to work with both Constituent and Users::Constituent
-  belongs_to :user, -> { where("type = 'Users::Constituent' OR type = 'Constituent'") }, 
-             class_name: 'User', 
-             foreign_key: :user_id, 
+  belongs_to :user, -> { where("type = 'Users::Constituent' OR type = 'Constituent'") },
+             class_name: 'User',
+             foreign_key: :user_id,
              inverse_of: :applications
   belongs_to :income_verified_by,
              class_name: 'User',
@@ -31,7 +31,7 @@ class Application < ApplicationRecord
   has_many :evaluations, dependent: :destroy
   has_many :notifications, as: :notifiable, dependent: :destroy
   has_many :proof_reviews, dependent: :destroy
-  has_many :status_changes, class_name: 'ApplicationStatusChange'
+  has_many :status_changes, class_name: 'ApplicationStatusChange', dependent: destroy
   has_many :proof_submission_audits, dependent: :destroy
   has_many :vouchers, dependent: :restrict_with_error
   has_many :application_notes, dependent: :destroy
@@ -175,10 +175,10 @@ class Application < ApplicationRecord
   def needs_proof_type_review?(proof_type)
     latest_review = proof_reviews.where(proof_type: proof_type).order(created_at: :desc).first
     latest_audit = proof_submission_audits.where(proof_type: proof_type).order(created_at: :desc).first
-    
+
     # Case 1: No reviews yet, but has submission
     return true if latest_review.nil? && latest_audit.present?
-    
+
     # Case 2: Has a new submission after the last review
     return latest_audit.present? && latest_review.present? && latest_audit.created_at > latest_review.created_at
   end
