@@ -32,10 +32,71 @@ module CertificationManagement
   private
 
   def attach_certification_if_needed(certification)
-    # Only try to attach if we have a valid file object (not a symbol or nil)
-    if certification.present? && !certification.is_a?(Symbol)
-      medical_certification.attach(certification)
+    return unless certification.present? && !certification.is_a?(Symbol)
+    
+    Rails.logger.info "MEDICAL CERTIFICATION ATTACHMENT: Input type is #{certification.class.name}"
+    
+    # Process the attachment parameter based on its type - similar to ProofAttachmentService
+    attachment_param = certification
+    
+    if certification.is_a?(ActiveStorage::Blob)
+      # Direct blob object - convert to signed_id
+      Rails.logger.info "Converting blob to signed_id for medical certification"
+      attachment_param = certification.signed_id
+    elsif certification.is_a?(String) && certification.start_with?('eyJf')
+      # Already a signed_id string - use as is
+      Rails.logger.info "Input is already a signed_id, using directly"
+      attachment_param = certification
+    elsif certification.respond_to?(:tempfile) || certification.is_a?(ActionDispatch::Http::UploadedFile)
+      # ActionDispatch::Http::UploadedFile or similar
+      if certification.respond_to?(:original_filename)
+        Rails.logger.info "UPLOAD INFO: Filename=#{certification.original_filename}, Content-Type=#{certification.content_type}"
+      end
+      
+      # Create ActiveStorage blob directly for more reliable attachment
+      begin
+        blob = ActiveStorage::Blob.create_and_upload!(
+          io: certification.tempfile,
+          filename: certification.original_filename,
+          content_type: certification.content_type
+        )
+        Rails.logger.info "Successfully created blob for medical_certification: #{blob.id}"
+        attachment_param = blob.signed_id
+      rescue StandardError => e
+        Rails.logger.error "Failed to create blob from uploaded file: #{e.message}"
+        # Continue with original param as fallback
+      end
     end
+    
+    # Log pre-attachment info
+    Rails.logger.info "PRE-ATTACHMENT CHECK: Application #{id}, medical_certification attached? #{medical_certification.attached?}"
+    
+    # Get a fresh copy of the application to avoid stale records
+    fresh_application = Application.unscoped.find(id)
+    fresh_application.medical_certification.attach(attachment_param)
+    
+    # Verify attachment succeeded
+    reload  # Ensure we have the latest data
+    
+    unless medical_certification.attached?
+      # Try one last manual DB query to check if attachment exists
+      attachment_exists = ActiveStorage::Attachment.where(
+        record_type: 'Application',
+        record_id: id,
+        name: "medical_certification"
+      ).exists?
+      
+      unless attachment_exists
+        Rails.logger.error "Failed to verify medical certification attachment"
+        return false
+      end
+      
+      Rails.logger.warn 'Attachment exists in DB but not detected in model - forcing reload'
+      medical_certification.reset
+    end
+    
+    Rails.logger.info "Successfully verified medical certification attachment for application #{id}"
+    true
   end
 
 def update_certification_attributes(status, verified_by, rejection_reason)
