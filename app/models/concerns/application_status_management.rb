@@ -138,32 +138,39 @@ module ApplicationStatusManagement
   def all_requirements_met?
     income_proof_status_approved? &&
       residency_proof_status_approved? &&
-      medical_certification_status_accepted?
+      medical_certification_status_approved?
   end
 
+  # Auto-approves the application when all requirements are met
+  # Uses proper Rails update mechanisms to ensure audit trails are created
   def auto_approve_if_eligible
-    # Use update_column to avoid callbacks loop
-    update_column(:status, self.class.statuses[:approved])
+    previous_status = status
+    update_application_status_to_approved
+    create_auto_approval_audit_event(previous_status)
+  end
 
-    # Log the auto-approval if possible
+  # Updates the application status using the model's status update method
+  # This ensures proper status change records are created
+  def update_application_status_to_approved
+    update_status('approved', user: nil, notes: 'Auto-approved based on all requirements being met')
+  end
+
+  # Creates an audit event for the auto-approval
+  def create_auto_approval_audit_event(previous_status)
+    return unless defined?(Event) && Event.respond_to?(:create)
+    
     begin
-      if defined?(Event) && Event.respond_to?(:create)
-      # Try to find system user or admin
-      system_user = User.find_by(email: 'system@example.com') ||
-                    User.where(type: 'Administrator').first
-
-        # Only create event if we have a valid user
-        if system_user
-          Event.create(
-            user: system_user,
-            action: 'application_auto_approved',
-            metadata: {
-              application_id: id,
-              timestamp: Time.current.iso8601
-            }
-          )
-        end
-      end
+      Event.create!(
+        user: nil,  # nil user indicates system action
+        action: 'application_auto_approved',
+        metadata: {
+          application_id: id,
+          old_status: previous_status,
+          new_status: status,
+          timestamp: Time.current.iso8601,
+          auto_approval: true
+        }
+      )
     rescue StandardError => e
       # Log error but don't prevent the auto-approval
       Rails.logger.error("Failed to create event for auto-approval: #{e.message}")

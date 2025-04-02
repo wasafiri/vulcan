@@ -276,10 +276,11 @@
                 } do %>
               <%= button_text %>
             <% end %>
-          <% elsif @application.medical_certification_status == "received" || 
+          <% elsif (@application.medical_certification_status == "received" || 
                  (@application.medical_certification_status == "requested" && @application.medical_certification.attached?) ||
-                 requested_after_rejection %>
-            <!-- Review button - Show this when we have a certification to review OR when a new request was sent after rejection -->
+                 requested_after_rejection) && 
+                 !["approved"].include?(@application.medical_certification_status) %>
+            <!-- Review button - Show this only when we have a certification to review AND it's not already accepted/approved -->
             <button type="button"
                   data-action="click->modal#open"
                   data-modal-id="medicalCertificationReviewModal"
@@ -304,7 +305,7 @@
     <%= render "modals" %>
 
     <!-- Voucher Details Section -->
-    <% if @application.status_approved? && @application.medical_certification_status_accepted? %>
+    <% if @application.status_approved? && @application.medical_certification_status_approved? %>
       <%= render "voucher_details" %>
     <% end %>
 

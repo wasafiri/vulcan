@@ -1,8 +1,10 @@
 <%
   # Only show the form when:
-  # 1. The certification has been requested but not yet received, OR
-  # 2. The status is "requested" and there's no attachment
-  show_upload_form = @application.medical_certification_status == "requested" && !@application.medical_certification.attached?
+  # 1. The certification has been requested but not yet received, AND
+  # 2. There's no attachment OR the status is not "approved"
+  show_upload_form = @application.medical_certification_status == "requested" && 
+                    (!@application.medical_certification.attached? ||
+                     @application.medical_certification_status != "approved")
 %>
 
 <% if show_upload_form %>
@@ -16,18 +18,18 @@
     <%= form_with url: upload_medical_certification_admin_application_path(@application), 
                   method: :patch, 
                   local: true, 
-                  class: "mt-3",
+                   class: "mt-3",
                   multipart: true do |f| %>
     
       <!-- Status Selection -->
       <div class="flex items-center space-x-4 mb-4">
         <div>
-          <%= f.radio_button "medical_certification_status", "accepted",
+          <%= f.radio_button "medical_certification_status", "approved",
               checked: true,
               class: "focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300",
               "aria-describedby": "certification_status_help",
               id: "accept_medical_certification" %>
-          <%= f.label "medical_certification_status_accepted", "Approve Certification and Upload",
+          <%= f.label "medical_certification_status_approved", "Approve Certification and Upload",
               class: "ml-2 text-sm text-gray-700" %>
         </div>
         <div>
@@ -128,7 +130,7 @@
       <!-- Using the Stimulus controller for toggling sections -->
       <div data-controller="proof-status">
         <input type="hidden" data-proof-status-target="radioGroup" name="radioGroup" value="medical_certification_status">
-        <input type="hidden" data-proof-status-target="statusAcceptedValue" value="accepted">
+        <input type="hidden" data-proof-status-target="statusAcceptedValue" value="approved">
         <input type="hidden" data-proof-status-target="statusRejectedValue" value="rejected">
       </div>
 
@@ -149,7 +151,7 @@
       </h3>
     </div>
     
-    <% if (@application.medical_certification_status == "accepted" || @application.medical_certification_status == "approved") %>
+    <% if @application.medical_certification_status == "approved" %>
       <%= medical_certification_link(@application, :button) %>
     <% elsif @application.medical_certification_status != "received" %>
       <%= medical_certification_link(@application, :link) %>
@@ -169,7 +171,7 @@
           <div class="history-item mb-2">
             <p class="text-sm text-gray-600 mb-1">
               <% case change.to_status %>
-              <% when 'accepted', 'approved' %>
+              <% when 'approved' %>
                 <span class="text-green-600">✓</span> Approved on 
               <% when 'rejected' %>
                 <span class="text-red-600">×</span> Rejected on 

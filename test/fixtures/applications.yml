@@ -29,7 +29,7 @@ approved:
   medical_provider_name: "Dr. Bob Jones"
   medical_provider_phone: "555-555-6666"
   medical_provider_email: "bob.jones@example.com"
-  medical_certification_status: accepted
+  medical_certification_status: approved
 
 draft:
   user: unconfirmed_user
@@ -74,7 +74,7 @@ complete:
   medical_provider_name: "Dr. Eve Green"
   medical_provider_phone: "555-555-9999"
   medical_provider_email: "eve.green@example.com"
-  medical_certification_status: accepted
+  medical_certification_status: approved
 
 # Applications for proof testing
 one:
@@ -158,7 +158,7 @@ approved_application:
   medical_provider_email: "appointments@cityhealth.com"
   income_proof_status: approved
   residency_proof_status: approved
-  medical_certification_status: accepted
+  medical_certification_status: approved
   submission_method: web
 
 submitted_proofs_pending_application:

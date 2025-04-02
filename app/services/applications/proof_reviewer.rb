@@ -75,7 +75,7 @@ module Applications
       # Check if all requirements are met
       if @application.income_proof_status_approved? &&
          @application.residency_proof_status_approved? &&
-         @application.medical_certification_status_accepted?
+         @application.medical_certification_status_approved?
 
         # Auto-approve using update_column to avoid triggering other validations
         @application.update_column(:status, Application.statuses[:approved])

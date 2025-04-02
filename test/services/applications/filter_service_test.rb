@@ -50,15 +50,22 @@ module Applications
     end
 
     test 'filters by medical certifications to review' do
-      # Set up an application with medical certification status "received"
-      @active_app.update!(medical_certification_status: :received)
-      @approved_app.update!(medical_certification_status: :accepted)
+      # Set up applications with different statuses
+      @active_app.update!(medical_certification_status: :received, status: :in_progress)
+      @approved_app.update!(medical_certification_status: :accepted, status: :approved)
+      
+      # Create a rejected application with received medical certification
+      # This should NOT appear in the results
+      @rejected_app = applications(:rejected)
+      prepare_application_for_test(@rejected_app, status: :rejected)
+      @rejected_app.update!(medical_certification_status: :received)
 
       service = FilterService.new(@scope, { filter: 'medical_certs_to_review' })
       result = service.apply_filters
 
       assert_includes result, @active_app
       assert_not_includes result, @approved_app
+      assert_not_includes result, @rejected_app, "Rejected applications should be excluded even with received medical certification"
     end
 
     test 'filters by explicit status parameter' do

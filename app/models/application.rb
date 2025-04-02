@@ -59,7 +59,7 @@ class Application < ApplicationRecord
     not_requested: 0,
     requested: 1,
     received: 2,
-    accepted: 3,
+    approved: 3,
     rejected: 4
   }, prefix: :medical_certification_status
 

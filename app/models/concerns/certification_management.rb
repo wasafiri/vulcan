@@ -8,12 +8,17 @@ module CertificationManagement
   # Determines if medical certification has been requested
   def medical_certification_requested?
     medical_certification_requested_at.present? ||
-      medical_certification_status.in?(%w[requested received accepted rejected])
+      medical_certification_status.in?(%w[requested received approved rejected])
+  end
+
+  # Determines if medical certification has been approved
+  def medical_certification_status_approved?
+    medical_certification_status == "approved"
   end
 
   # Updates the certification with the given status and reviewer
   # @param certification [ActionDispatch::Http::UploadedFile] The uploaded certification file
-  # @param status [String] The new status ('accepted', 'rejected', 'received')
+  # @param status [String] The new status ('approved', 'rejected', 'received')
   # @param verified_by [User] The admin who verified the certification
   # @param rejection_reason [String, nil] Reason for rejection if status is 'rejected'
   # @return [Boolean] True if the certification was updated successfully
@@ -31,8 +36,20 @@ module CertificationManagement
           api_call: true
         }
       )
+    elsif medical_certification.attached? && certification.blank?
+      # Status-only update for existing certification (no new file)
+      result = MedicalCertificationAttachmentService.update_certification_status(
+        application: self,
+        status: status.to_sym,
+        admin: verified_by,
+        submission_method: 'api',
+        metadata: {
+          api_call: true,
+          rejection_reason: rejection_reason
+        }
+      )
     else
-      # Use the attach_certification method for uploads or status changes
+      # Use the attach_certification method for uploads
       result = MedicalCertificationAttachmentService.attach_certification(
         application: self,
         blob_or_file: certification,

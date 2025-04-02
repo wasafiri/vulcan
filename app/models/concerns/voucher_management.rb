@@ -43,7 +43,7 @@ module VoucherManagement
   # @return [Boolean] True if the application can receive a voucher
   def can_create_voucher?
     status_approved? &&
-      medical_certification_status_accepted? &&
+      medical_certification_status_approved? &&
       !vouchers.exists?
   end
 

@@ -247,6 +247,12 @@ module Admin
   def update_certification_status
     status = params[:status]&.to_sym
     
+    # Convert any 'accepted' to 'approved' for consistency with the Application model enum
+    status = :approved if status == :accepted
+    
+    # Log status for debugging
+    Rails.logger.info "Processing medical certification status update: #{status.inspect}"
+    
     # Use the new reviewer service for rejections
     if status == :rejected && params[:rejection_reason].present?
       reviewer = Applications::MedicalCertificationReviewer.new(@application, current_user)
@@ -262,16 +268,68 @@ module Admin
         redirect_to admin_application_path(@application),
                     alert: "Failed to reject certification: #{result[:error]}"
       end
+    # Check if this is a status change only (no new file) for an existing certification
+    elsif @application.medical_certification.attached? && params[:medical_certification].blank?
+      # Use the status-only update method to avoid deleting the attachment
+      result = MedicalCertificationAttachmentService.update_certification_status(
+        application: @application,
+        status: status,
+        admin: current_user,
+        submission_method: 'admin_review',
+        metadata: { via_ui: true }
+      )
+      
+      if result[:success]
+    # Check if auto-approval should have happened but didn't
+    if (status == :approved || status == :accepted) && 
+       @application.income_proof_status_approved? && 
+       @application.residency_proof_status_approved? &&
+       !@application.status_approved?
+          
+          Rails.logger.info "Auto-approval conditions met but application was not auto-approved."
+          Rails.logger.info "Manually triggering approval for application #{@application.id}"
+          
+          # Manually trigger the application approval
+          @application.reload
+          @application.approve!
+          
+          redirect_to admin_application_path(@application),
+                      notice: 'Medical certification approved and application approved.'
+        else
+          redirect_to admin_application_path(@application),
+                      notice: 'Medical certification status updated.'
+        end
+      else
+        redirect_to admin_application_path(@application),
+                    alert: "Failed to update certification status: #{result[:error]&.message}"
+      end
     else
-      # Use the existing method for other statuses
+      # Use the existing method when there's a new file to upload
       if @application.update_certification!(
         certification: params[:medical_certification],
         status: status,
         verified_by: current_user,
         rejection_reason: params[:rejection_reason]
       )
-        redirect_to admin_application_path(@application),
-                    notice: 'Medical certification status updated.'
+    # Check if auto-approval should have happened but didn't
+    if (status == :approved || status == :accepted) && 
+       @application.income_proof_status_approved? && 
+       @application.residency_proof_status_approved? &&
+       !@application.status_approved?
+          
+          Rails.logger.info "Auto-approval conditions met but application was not auto-approved."
+          Rails.logger.info "Manually triggering approval for application #{@application.id}"
+          
+          # Manually trigger the application approval
+          @application.reload
+          @application.approve!
+          
+          redirect_to admin_application_path(@application),
+                      notice: 'Medical certification approved and application approved.'
+        else
+          redirect_to admin_application_path(@application),
+                      notice: 'Medical certification status updated.'
+        end
       else
         redirect_to admin_application_path(@application),
                     alert: 'Failed to update certification status.'
@@ -310,8 +368,8 @@ module Admin
   def upload_medical_certification
     status = params[:medical_certification_status]
 
-    # Handle based on selected action
-    if status == "accepted"
+  # Handle based on selected action
+  if status == "approved"
       process_accepted_certification
     elsif status == "rejected"
       process_rejected_certification
@@ -321,7 +379,7 @@ module Admin
     end
   end
 
-  # Process an accepted medical certification
+  # Process an approved medical certification
   # This method handles the upload and approval of medical certifications in a single step
   def process_accepted_certification
     # Log debug information only in development or test environments
@@ -335,6 +393,7 @@ module Admin
     end
 
     # Process the certification with approved status
+    # We use "approved" consistently in the backend
     result = attach_certification_with_status(:approved)
     
     handle_certification_result(result)
@@ -347,6 +406,7 @@ module Admin
   
   # Attaches a certification with the specified status
   def attach_certification_with_status(status)
+    # Use "approved" consistently in the UI and controller
     MedicalCertificationAttachmentService.attach_certification(
       application: @application,
       blob_or_file: params[:medical_certification],

@@ -12,6 +12,55 @@
 # 3. Maintain audit records for all attachment operations
 # 4. Provide consistent error handling and logging
 class MedicalCertificationAttachmentService
+  # Updates only the status of a medical certification without touching the attachment
+  #
+  # @param application [Application] The application whose certification status to update
+  # @param status [Symbol] The status to set (:accepted, :rejected, :received)
+  # Using 'approved' consistently throughout the codebase to match the Application model enum
+  # @param admin [User] The admin user performing this action
+  # @param submission_method [Symbol] The method of submission (:fax, :email, :portal, etc.)
+  # @param metadata [Hash] Additional metadata to store with the operation
+  #
+  # @return [Hash] Result hash with :success, :error, and :duration_ms keys
+  # Updates only the status of a medical certification without touching the attachment
+  #
+  # @param application [Application] The application whose certification status to update
+  # @param status [Symbol] The status to set (:accepted, :rejected, :received)
+  # @param admin [User] The admin user performing this action
+  # @param submission_method [Symbol] The method of submission (:fax, :email, :portal, etc.)
+  # @param metadata [Hash] Additional metadata to store with the operation
+  #
+  # @return [Hash] Result hash with :success, :error, and :duration_ms keys
+  def self.update_certification_status(application:, status:, admin:, submission_method: :admin_review, metadata: {})
+    start_time = Time.current
+    result = { success: false, error: nil, duration_ms: 0 }
+
+    begin
+      # Verify the existing certification is attached before proceeding
+      unless application.medical_certification.attached?
+        raise "Cannot update certification status: No certification is attached"
+      end
+
+      Rails.logger.info "Updating medical certification status to #{status} for application #{application.id}"
+      
+      # Update status and create audit records in a single transaction
+      update_certification_status_only(application, status, admin, submission_method, metadata)
+
+      # Set success outcome
+      result[:success] = true
+      result[:status] = status.to_s
+    rescue StandardError => e
+      # Track failure with detailed information
+      record_failure(application, e, admin, submission_method, metadata)
+      result[:error] = e
+    ensure
+      result[:duration_ms] = ((Time.current - start_time) * 1000).round
+      record_metrics(result, status)
+    end
+
+    result
+  end
+
   # Attaches a medical certification document to an application
   #
   # @param application [Application] The application to attach the certification to
@@ -23,7 +72,7 @@ class MedicalCertificationAttachmentService
   # @param metadata [Hash] Additional metadata to store with the operation
   #
   # @return [Hash] Result hash with :success, :error, and :duration_ms keys
-  def self.attach_certification(application:, blob_or_file:, status: :accepted, 
+  def self.attach_certification(application:, blob_or_file:, status: :approved, 
                                 admin: nil, submission_method: :admin_upload, metadata: {})
     start_time = Time.current
     result = { success: false, error: nil, duration_ms: 0 }
@@ -57,7 +106,7 @@ class MedicalCertificationAttachmentService
       Rails.logger.info "Successfully verified medical certification attachment for application #{application.id}"
 
       # Step 3: Update status and create audit record in a single transaction
-      update_certification_status(application, status, admin, submission_method, metadata)
+      update_certification_status_only(application, status, admin, submission_method, metadata)
 
       # Final verification after status update
       application.reload
@@ -297,7 +346,8 @@ class MedicalCertificationAttachmentService
     true
   end
 
-  def self.update_certification_status(application, status, admin, submission_method, metadata)
+  # Updates only the status fields and creates audit records without touching the attachment
+  def self.update_certification_status_only(application, status, admin, submission_method, metadata)
     ActiveRecord::Base.transaction do
       # Update certification status
       application.update!(
@@ -337,7 +387,7 @@ class MedicalCertificationAttachmentService
 
       # Create notification if needed
       action_mapping = {
-        accepted: 'medical_certification_approved',
+        approved: 'medical_certification_approved',
         rejected: 'medical_certification_rejected',
         received: 'medical_certification_received'
       }
@@ -357,6 +407,8 @@ class MedicalCertificationAttachmentService
       end
     end
   end
+
+  # Method removed since it was duplicated with update_certification_status_only
 
   def self.record_failure(application, error, admin, submission_method, metadata)
     Rails.logger.error "Medical certification attachment error: #{error.message}"

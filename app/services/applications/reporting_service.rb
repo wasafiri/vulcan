@@ -137,7 +137,9 @@ module Applications
       data[:proofs_needing_review_count] =
         (income_proofs_pending.pluck(:id) + residency_proofs_pending.pluck(:id)).uniq.count
 
-      data[:medical_certs_to_review_count] = Application.where(medical_certification_status: 'received').count
+      data[:medical_certs_to_review_count] = Application.where.not(status: %i[rejected archived])
+                                            .where(medical_certification_status: 'received')
+                                            .count
 
       # Count applications with pending training sessions
       data[:training_requests_count] = Application.joins(:training_sessions)
