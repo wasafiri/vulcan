@@ -329,36 +329,41 @@ module Admin
       return
     end
 
-    # Attach document and update status to accepted
-    @application.medical_certification.attach(params[:medical_certification])
-    @application.update(medical_certification_status: :accepted)
+    # Use the specialized update_certification! method from CertificationManagement concern
+    # This method is designed specifically for medical certification attachments
+    submission_method = params[:submission_method].presence || 'admin_upload'
     
-    result = { success: @application.medical_certification.attached? }
-
-    if result[:success]
-      # Create an application status change for audit trail
-      current_time = Time.current
-      submission_method = params[:submission_method].presence || 'fax'
+    if @application.update_certification!(
+      certification: params[:medical_certification],
+      status: 'accepted',
+      verified_by: current_user
+    )
+      # Create application status change with additional metadata for better tracking
+      metadata = {
+        change_type: 'medical_certification',
+        received_at: Time.current.iso8601,
+        processed_at: Time.current.iso8601,
+        admin_id: current_user.id,
+        submission_method: submission_method,
+        ip_address: request.remote_ip
+      }
       
+      # ApplicationStatusChange is created inside update_certification! but we add one with our extra metadata
       ApplicationStatusChange.create!(
         application: @application,
         user: current_user,
-        from_status: @application.medical_certification_status_before_last_save || 'requested',
+        from_status: 'requested',
         to_status: 'accepted',
-        metadata: {
-          change_type: 'medical_certification',
-          submission_method: submission_method,
-          received_at: current_time.iso8601,
-          processed_at: current_time.iso8601,
-          admin_id: current_user.id
-        }
+        metadata: metadata
       )
 
       redirect_to admin_application_path(@application),
                   notice: 'Medical certification successfully uploaded and accepted.'
     else
+      Rails.logger.error "Medical certification upload failed using update_certification!"
+      
       redirect_to admin_application_path(@application),
-                  alert: "Failed to upload certification: #{result[:error]&.message}"
+                  alert: "Failed to upload medical certification."
     end
   end
 
