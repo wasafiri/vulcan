@@ -323,6 +323,10 @@ module Admin
 
   # Process an accepted medical certification
   def process_accepted_certification
+    Rails.logger.info "MEDICAL CERTIFICATION PARAMS: #{params.to_unsafe_h.inspect}"
+    Rails.logger.info "MEDICAL CERTIFICATION FILE PARAM: #{params[:medical_certification].inspect}"
+    Rails.logger.info "MEDICAL CERTIFICATION FILE PARAM CLASS: #{params[:medical_certification].class.name}" if params[:medical_certification].present?
+    
     if params[:medical_certification].blank?
       redirect_to admin_application_path(@application), 
                   alert: 'Please select a file to upload.'
@@ -333,11 +337,16 @@ module Admin
     # This method is designed specifically for medical certification attachments
     submission_method = params[:submission_method].presence || 'admin_upload'
     
+    # Add better logging before the update call
+    Rails.logger.info "Calling update_certification! with certification param: #{params[:medical_certification].inspect}"
+    
     if @application.update_certification!(
       certification: params[:medical_certification],
       status: 'accepted',
       verified_by: current_user
     )
+      Rails.logger.info "Medical certification update_certification! SUCCEEDED"
+      
       # Create application status change with additional metadata for better tracking
       metadata = {
         change_type: 'medical_certification',

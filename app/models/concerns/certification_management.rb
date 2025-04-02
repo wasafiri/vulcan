@@ -66,6 +66,21 @@ module CertificationManagement
         Rails.logger.error "Failed to create blob from uploaded file: #{e.message}"
         # Continue with original param as fallback
       end
+    elsif certification.is_a?(String) && certification.present?
+      # It could be a direct upload signed ID that doesn't match the standard format
+      Rails.logger.info "Processing string param for medical certification: #{certification[0..20]}..."
+      
+      # Check if it might be a signed ID by trying to locate the blob
+      begin
+        blob = ActiveStorage::Blob.find_signed(certification)
+        if blob.present?
+          Rails.logger.info "Found blob using signed ID for medical certification: #{blob.id}"
+          attachment_param = certification
+        end
+      rescue ActiveSupport::MessageVerifier::InvalidSignature
+        Rails.logger.warn "String is not a valid signed ID: #{certification[0..20]}..."
+        attachment_param = certification
+      end
     end
     
     # Log pre-attachment info
