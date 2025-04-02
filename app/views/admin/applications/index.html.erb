@@ -85,7 +85,7 @@
                 <span class="inline-block pr-2">Print Queue</span>
                 <% pending_count = PrintQueueItem.pending.count rescue 0 %>
                 <% if pending_count > 0 %>
-                  <span class="absolute -top-1 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white">
+                  <span class="absolute top-0 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white">
                     <%= pending_count %>
                   </span>
                 <% end %>
