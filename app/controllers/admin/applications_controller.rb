@@ -328,7 +328,7 @@ module Admin
     Rails.logger.info "MEDICAL CERTIFICATION FILE PARAM CLASS: #{params[:medical_certification].class.name}" if params[:medical_certification].present?
     
     # Extra debugging for direct uploads in production environment
-    Rails.logger.info "ACTION CONTROLLER PARAMETERS TO_H: #{params.to_h.inspect}"
+    Rails.logger.info "ACTION CONTROLLER PARAMETERS TO_H: #{params.permit!.to_h.inspect}"
     
     # Log raw request parameters to help diagnose direct upload structure
     raw_post = request.raw_post rescue "Could not access raw post"
@@ -368,7 +368,8 @@ module Admin
     end
 
     # Use the enhanced MedicalCertificationAttachmentService for reliable uploads
-    submission_method = params[:submission_method].presence || 'admin_upload'
+    # Make sure to explicitly permit and access the parameters we need
+    submission_method = params.permit(:submission_method)[:submission_method].presence || 'admin_upload'
     
     result = MedicalCertificationAttachmentService.attach_certification(
       application: @application,
