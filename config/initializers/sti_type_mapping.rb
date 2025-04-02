@@ -4,8 +4,6 @@
 # using Rails conventions for namespaced STI classes.
 # This handles both reading types from the database and writing types to the database.
 
-require_relative '../../app/models/application_record'
-
 # Define the module outside the block to avoid constant definition in a block
 module NamespacedStiTypeName
   def computed_type(value = self.class.name)
@@ -27,13 +25,22 @@ ActiveSupport.on_load(:active_record) do
 
     # Override the Rails STI class resolver to handle our namespaced classes
     def sti_name_to_class(type_name)
-      if self.name == 'User' || (self.ancestors.map(&:name).include?('User') && type_name.exclude?('::'))
+      return original_sti_name_to_class(type_name) unless type_name.is_a?(String)
+      
+      # Special handling for User STI types 
+      if type_name.exclude?('::') && 
+         (self.name == 'User' || self.ancestors.map(&:name).include?('User'))
         # For User STI types, try looking in the Users namespace first
         begin
           "Users::#{type_name}".constantize
         rescue NameError
-          # Fall back to original behavior if class doesn't exist in Users namespace
-          original_sti_name_to_class(type_name)
+          # If that fails, try looking for a top-level constant with the same name
+          begin
+            type_name.constantize
+          rescue NameError
+            # Fall back to original behavior if neither exists
+            original_sti_name_to_class(type_name)
+          end
         end
       else
         original_sti_name_to_class(type_name)
@@ -42,10 +49,15 @@ ActiveSupport.on_load(:active_record) do
   end
 end
 
-# Step 2: We'll add this in a separate hook to ensure User is loaded
-ActiveSupport.on_load(:user) do
-  User.prepend(NamespacedStiTypeName)
+# Step 2: Apply the module to User when it's available
+# Note: We're no longer trying to define constants here, since that's now
+# handled by the individual bridge files in app/models/
+ActiveSupport.on_load(:active_record) do
+  # Try to apply the module early if User is already loaded
+  User.prepend(NamespacedStiTypeName) if defined?(User) && !User.included_modules.include?(NamespacedStiTypeName)
+  
+  # But also hook into after_initialize in case User wasn't loaded yet
+  ActiveSupport.on_load(:after_initialize) do
+    User.prepend(NamespacedStiTypeName) if defined?(User) && !User.included_modules.include?(NamespacedStiTypeName)
+  end
 end
-
-# Make sure we define the hook for the User model
-ActiveSupport.run_load_hooks(:user, User) rescue nil

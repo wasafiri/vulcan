@@ -1,12 +1,11 @@
 # frozen_string_literal: true
 
-class Trainer < User
-  has_many :training_sessions, foreign_key: :trainer_id
-  has_many :applications, through: :training_sessions
+# This file acts as a bridge between the Trainer constant needed for backward compatibility
+# and the Users::Trainer class needed for Single Table Inheritance
 
-  enum :status, { inactive: 0, active: 1, suspended: 2 }, default: :inactive, prefix: true
-  scope :available, -> { where(status: :active) }
-  scope :active, -> { where(status: :active) }
+# Include the actual implementation
+require_dependency 'users/trainer'
 
-  validates :availability_schedule, presence: true
-end
+# Define Trainer class for STI backward compatibility
+# This helps Rails find the class when loading from the database
+Trainer = Users::Trainer unless defined?(Trainer)

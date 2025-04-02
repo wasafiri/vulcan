@@ -15,3 +15,7 @@
 
 # Include the actual implementation
 require_dependency 'users/administrator'
+
+# Define Administrator class for STI backward compatibility
+# This helps Rails find the class when loading from the database
+Administrator = Users::Administrator unless defined?(Administrator)

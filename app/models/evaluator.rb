@@ -1,12 +1,11 @@
 # frozen_string_literal: true
 
-class Evaluator < User
-  has_many :evaluations, foreign_key: :evaluator_id, dependent: :restrict_with_error
-  has_many :assigned_constituents,
-           through: :evaluations,
-           source: :constituent
+# This file acts as a bridge between the Evaluator constant needed for backward compatibility
+# and the Users::Evaluator class needed for Single Table Inheritance
 
-  enum :status, { inactive: 0, active: 1, suspended: 2 }, default: :inactive, prefix: true
+# Include the actual implementation
+require_dependency 'users/evaluator'
 
-  scope :available, -> { where(status: :active) }
-end
+# Define Evaluator class for STI backward compatibility
+# This helps Rails find the class when loading from the database
+Evaluator = Users::Evaluator unless defined?(Evaluator)

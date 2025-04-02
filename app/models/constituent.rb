@@ -1,84 +1,11 @@
 # frozen_string_literal: true
 
-# Model for application constituents (recipients) inheriting from User
-# This class provides a flattened namespace alternative to Users::Constituent
-# for Rails STI role checking (user.constituent?)
-class Constituent < User
-  # Include methods and associations from the nested class
-  include Users::ConstituentBehavior if defined?(Users::ConstituentBehavior)
+# This file acts as a bridge between the Constituent constant needed for backward compatibility
+# and the Users::Constituent class needed for Single Table Inheritance
 
-  # Associations
-  has_many :applications, foreign_key: :user_id, dependent: :destroy
-  has_many :evaluations, foreign_key: :constituent_id
-  has_many :assigned_evaluators, through: :evaluations, source: :evaluator
+# Include the actual implementation
+require_dependency 'users/constituent'
 
-  # Scopes
-  scope :needs_evaluation, -> { joins(:applications).where(applications: { status: :approved }) }
-  scope :active, -> { where.not(status: %i[withdrawn rejected expired]) }
-  scope :ytd, lambda {
-    where('created_at >= ?', Date.new(Date.current.year >= 7 ? Date.current.year : Date.current.year - 1, 7, 1))
-  }
-
-  DISABILITY_TYPES = %w[hearing vision speech mobility cognition].freeze
-
-  # Define enum for notification method
-  enum :communication_preference, { email: 0, letter: 1 }, default: :email
-
-  # Define boolean attributes with defaults
-  attribute :is_guardian, :boolean, default: false
-  attribute :guardian_relationship, :string
-
-  # Define disability attributes with defaults
-  DISABILITY_TYPES.each do |type|
-    attribute :"#{type}_disability", :boolean, default: false
-  end
-
-  validates :guardian_relationship, presence: true, if: :is_guardian
-  validates :email, presence: true, if: :requires_email?
-
-  def requires_email?
-    communication_preference == 'email'
-  end
-
-  # Cast boolean values properly
-  def is_guardian=(value)
-    super(ActiveModel::Type::Boolean.new.cast(value))
-  end
-
-  # Make guardian_relationship= public
-  def guardian_relationship=(value)
-    write_attribute(:guardian_relationship, value)
-  end
-
-  DISABILITY_TYPES.each do |type|
-    define_method("#{type}_disability=") do |value|
-      super(ActiveModel::Type::Boolean.new.cast(value))
-    end
-  end
-
-  # Optional: Method to check inherited columns
-  def self.inherited_columns
-    column_names
-  end
-
-  def active_application?
-    active_application.present?
-  end
-
-  def active_application
-    applications.active.order(application_date: :desc).first
-  end
-
-  # Public method to check if any disability is selected
-  def has_disability_selected?
-    hearing_disability || vision_disability || speech_disability || mobility_disability || cognition_disability
-  end
-
-  private
-
-  def must_have_at_least_one_disability
-    unless hearing_disability || vision_disability || speech_disability || mobility_disability || cognition_disability
-      errors.add(:base, 'At least one disability must be selected.')
-    end
-  end
-end
+# Define Constituent class for STI backward compatibility
+# This helps Rails find the class when loading from the database
+Constituent = Users::Constituent unless defined?(Constituent)
