@@ -333,46 +333,28 @@ module Admin
       return
     end
 
-    # Use the specialized update_certification! method from CertificationManagement concern
-    # This method is designed specifically for medical certification attachments
+    # Use the new MedicalCertificationAttachmentService for reliable uploads
     submission_method = params[:submission_method].presence || 'admin_upload'
     
-    # Add better logging before the update call
-    Rails.logger.info "Calling update_certification! with certification param: #{params[:medical_certification].inspect}"
-    
-    if @application.update_certification!(
-      certification: params[:medical_certification],
-      status: 'accepted',
-      verified_by: current_user
-    )
-      Rails.logger.info "Medical certification update_certification! SUCCEEDED"
-      
-      # Create application status change with additional metadata for better tracking
-      metadata = {
-        change_type: 'medical_certification',
-        received_at: Time.current.iso8601,
-        processed_at: Time.current.iso8601,
-        admin_id: current_user.id,
-        submission_method: submission_method,
-        ip_address: request.remote_ip
+    result = MedicalCertificationAttachmentService.attach_certification(
+      application: @application,
+      blob_or_file: params[:medical_certification],
+      status: :accepted,
+      admin: current_user,
+      submission_method: submission_method,
+      metadata: {
+        ip_address: request.remote_ip,
+        user_agent: request.user_agent
       }
-      
-      # ApplicationStatusChange is created inside update_certification! but we add one with our extra metadata
-      ApplicationStatusChange.create!(
-        application: @application,
-        user: current_user,
-        from_status: 'requested',
-        to_status: 'accepted',
-        metadata: metadata
-      )
-
+    )
+    
+    if result[:success]
       redirect_to admin_application_path(@application),
                   notice: 'Medical certification successfully uploaded and accepted.'
     else
-      Rails.logger.error "Medical certification upload failed using update_certification!"
-      
+      Rails.logger.error "Medical certification upload failed: #{result[:error]&.message}"
       redirect_to admin_application_path(@application),
-                  alert: "Failed to upload medical certification."
+                  alert: "Failed to upload medical certification: #{result[:error]&.message}"
     end
   end
 
@@ -385,11 +367,17 @@ module Admin
       return
     end
 
-    # Use the medical certification reviewer service
-    reviewer = Applications::MedicalCertificationReviewer.new(@application, current_user)
-    result = reviewer.reject(
-      rejection_reason: params[:medical_certification_rejection_reason],
-      notes: params[:medical_certification_rejection_notes]
+    # Use our new service for rejection
+    result = MedicalCertificationAttachmentService.reject_certification(
+      application: @application,
+      admin: current_user,
+      reason: params[:medical_certification_rejection_reason],
+      notes: params[:medical_certification_rejection_notes],
+      submission_method: params[:submission_method].presence || 'admin_review',
+      metadata: {
+        ip_address: request.remote_ip,
+        user_agent: request.user_agent
+      }
     )
 
     if result[:success]
@@ -397,7 +385,7 @@ module Admin
                   notice: 'Medical certification rejected and provider notified.'
     else
       redirect_to admin_application_path(@application),
-                  alert: "Failed to reject certification: #{result[:error]}"
+                  alert: "Failed to reject certification: #{result[:error]&.message}"
     end
   end
 
