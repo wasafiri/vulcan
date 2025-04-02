@@ -322,75 +322,83 @@ module Admin
   end
 
   # Process an accepted medical certification
+  # This method handles the upload and approval of medical certifications in a single step
   def process_accepted_certification
-    Rails.logger.info "MEDICAL CERTIFICATION PARAMS: #{params.to_unsafe_h.inspect}"
-    Rails.logger.info "MEDICAL CERTIFICATION FILE PARAM: #{params[:medical_certification].inspect}"
-    Rails.logger.info "MEDICAL CERTIFICATION FILE PARAM CLASS: #{params[:medical_certification].class.name}" if params[:medical_certification].present?
+    # Log debug information only in development or test environments
+    log_certification_params if !Rails.env.production?
     
-    # Extra debugging for direct uploads in production environment
-    Rails.logger.info "ACTION CONTROLLER PARAMETERS TO_H: #{params.permit!.to_h.inspect}"
-    
-    # Log raw request parameters to help diagnose direct upload structure
-    raw_post = request.raw_post rescue "Could not access raw post"
-    Rails.logger.info "RAW REQUEST BODY (first 500 chars): #{raw_post[0..500]}" if raw_post
-    
-    # Inspect content-type and other headers that might help diagnose the issue
-    Rails.logger.info "REQUEST CONTENT TYPE: #{request.content_type}"
-    Rails.logger.info "DIRECT UPLOAD HEADER PRESENT: #{request.headers['X-Requested-With']}"
-    
-    # Enhanced debugging for direct uploads
-    if params[:medical_certification].respond_to?(:content_type)
-      Rails.logger.info "Upload type: Regular file upload with content_type: #{params[:medical_certification].content_type}"
-    elsif params[:medical_certification].respond_to?(:[]) && params[:medical_certification][:signed_id].present?
-      Rails.logger.info "Upload type: Direct upload with signed_id: #{params[:medical_certification][:signed_id][0..20]}..."
-    elsif params[:medical_certification].is_a?(String)
-      Rails.logger.info "Upload type: String input (potential direct upload signed ID): #{params[:medical_certification][0..50]}"
-    else
-      Rails.logger.info "Upload type: Unknown structure: #{params[:medical_certification].class.name}"
-      
-      # Try to log relevant attributes that might help in debugging
-      if params[:medical_certification].respond_to?(:each_pair)
-        Rails.logger.info "Keys in params: #{params[:medical_certification].keys.join(', ')}"
-        
-        # Look for possible signed ID fields
-        params[:medical_certification].each_pair do |k, v|
-          if v.is_a?(String) && v.present?
-            Rails.logger.info "Potential value found in key '#{k}': #{v[0..50]}..."
-          end
-        end
-      end
-    end
-    
+    # Validate file presence
     if params[:medical_certification].blank?
       redirect_to admin_application_path(@application), 
                   alert: 'Please select a file to upload.'
       return
     end
 
-    # Use the enhanced MedicalCertificationAttachmentService for reliable uploads
-    # Make sure to explicitly permit and access the parameters we need
-    submission_method = params.permit(:submission_method)[:submission_method].presence || 'admin_upload'
+    # Process the certification with approved status
+    result = attach_certification_with_status(:approved)
     
-    result = MedicalCertificationAttachmentService.attach_certification(
+    handle_certification_result(result)
+  end
+  
+  # Extracts submission method from params with a fallback to admin_upload
+  def extract_submission_method
+    params.permit(:submission_method)[:submission_method].presence || 'admin_upload'
+  end
+  
+  # Attaches a certification with the specified status
+  def attach_certification_with_status(status)
+    MedicalCertificationAttachmentService.attach_certification(
       application: @application,
       blob_or_file: params[:medical_certification],
-      status: :accepted,
+      status: status,
       admin: current_user,
-      submission_method: submission_method,
-      metadata: {
-        ip_address: request.remote_ip,
-        user_agent: request.user_agent
-      }
+      submission_method: extract_submission_method,
+      metadata: request_metadata
     )
-    
+  end
+  
+  # Builds standard request metadata
+  def request_metadata
+    {
+      ip_address: request.remote_ip,
+      user_agent: request.user_agent
+    }
+  end
+  
+  # Handles the result of certification operations
+  def handle_certification_result(result)
     if result[:success]
+      status_text = result[:status] || 'processed'
       redirect_to admin_application_path(@application),
-                  notice: 'Medical certification successfully uploaded and accepted.'
+                  notice: "Medical certification successfully uploaded and #{status_text}."
     else
-      Rails.logger.error "Medical certification upload failed: #{result[:error]&.message}"
+      Rails.logger.error "Medical certification operation failed: #{result[:error]&.message}"
       redirect_to admin_application_path(@application),
-                  alert: "Failed to upload medical certification: #{result[:error]&.message}"
+                  alert: "Failed to process medical certification: #{result[:error]&.message}"
     end
+  end
+  
+  # Logs detailed information about certification parameters
+  def log_certification_params
+    Rails.logger.info "MEDICAL CERTIFICATION PARAMS: #{params.to_unsafe_h.inspect}"
+    Rails.logger.info "MEDICAL CERTIFICATION FILE PARAM: #{params[:medical_certification].inspect}"
+    
+    if params[:medical_certification].present?
+      Rails.logger.info "PARAM CLASS: #{params[:medical_certification].class.name}"
+      
+      # Log upload type based on parameter structure
+      if params[:medical_certification].respond_to?(:content_type)
+        Rails.logger.info "Upload type: Regular file upload with content_type: #{params[:medical_certification].content_type}"
+      elsif params[:medical_certification].respond_to?(:[]) && params[:medical_certification][:signed_id].present?
+        Rails.logger.info "Upload type: Direct upload with signed_id"
+      elsif params[:medical_certification].is_a?(String)
+        Rails.logger.info "Upload type: String input (potential direct upload signed ID)"
+      else
+        Rails.logger.info "Upload type: Unknown structure: #{params[:medical_certification].class.name}"
+      end
+    end
+    
+    Rails.logger.info "REQUEST CONTENT TYPE: #{request.content_type}"
   end
 
   # Process a rejected medical certification
@@ -402,26 +410,20 @@ module Admin
       return
     end
 
-    # Use our new service for rejection
+    # Use our service for rejection
     result = MedicalCertificationAttachmentService.reject_certification(
       application: @application,
       admin: current_user,
       reason: params[:medical_certification_rejection_reason],
       notes: params[:medical_certification_rejection_notes],
-      submission_method: params[:submission_method].presence || 'admin_review',
-      metadata: {
-        ip_address: request.remote_ip,
-        user_agent: request.user_agent
-      }
+      submission_method: extract_submission_method || 'admin_review',
+      metadata: request_metadata
     )
 
-    if result[:success]
-      redirect_to admin_application_path(@application),
-                  notice: 'Medical certification rejected and provider notified.'
-    else
-      redirect_to admin_application_path(@application),
-                  alert: "Failed to reject certification: #{result[:error]&.message}"
-    end
+    # Add status information for consistent messaging
+    result[:status] = 'rejected'
+    
+    handle_certification_result(result)
   end
 
     private
