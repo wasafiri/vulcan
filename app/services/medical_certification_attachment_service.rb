@@ -166,6 +166,27 @@ class MedicalCertificationAttachmentService
       Rails.logger.info "Could not inspect input: #{e.message}"
     end
     
+    # First check for direct string SignedID from form submission
+    if blob_or_file.is_a?(String) && blob_or_file.present?
+      Rails.logger.info "Processing potential SignedID string from direct upload: #{blob_or_file[0..20]}..."
+      
+      # Try to use it as a SignedID directly
+      begin
+        blob = ActiveStorage::Blob.find_signed(blob_or_file)
+        if blob.present?
+          Rails.logger.info "Successfully located blob via SignedID: #{blob.id}, filename: #{blob.filename}"
+          attachment_param = blob_or_file  # Use the original string as it's a valid signed ID
+          return attachment_param  # Early return with valid signed ID
+        end
+      rescue ActiveSupport::MessageVerifier::InvalidSignature
+        Rails.logger.info "String is not a valid SignedID, will try other parsing methods"
+        # Continue with other approaches
+      rescue StandardError => e
+        Rails.logger.info "Error checking SignedID: #{e.message}, will try other parsing methods"
+        # Continue with other approaches
+      end
+    end
+    
     # Handle ActionController::Parameters (direct upload case)
     if defined?(ActionController::Parameters) && blob_or_file.is_a?(ActionController::Parameters)
       Rails.logger.info "Processing ActionController::Parameters from direct upload"
@@ -207,8 +228,8 @@ class MedicalCertificationAttachmentService
       attachment_param = blob_or_file.signed_id
       Rails.logger.info "Using signed_id: #{attachment_param || '[nil]'}"
     elsif blob_or_file.is_a?(String) && blob_or_file.start_with?('eyJf')
-      # Already a signed_id string - use as is
-      Rails.logger.info "Input is already a signed_id, using directly: #{blob_or_file[0..20]}..."
+      # Already a signed_id string with known prefix - use as is
+      Rails.logger.info "Input matches known signed_id format, using directly: #{blob_or_file[0..20]}..."
       attachment_param = blob_or_file
     elsif blob_or_file.respond_to?(:tempfile) || blob_or_file.is_a?(ActionDispatch::Http::UploadedFile)
       # ActionDispatch::Http::UploadedFile or similar - use as is
@@ -234,21 +255,7 @@ class MedicalCertificationAttachmentService
         Rails.logger.info "Falling back to direct file parameter"
         # Continue with original param explicitly set above
       end
-    elsif blob_or_file.is_a?(String) && blob_or_file.present?
-      # It could be a direct upload signed ID that doesn't match the standard format
-      Rails.logger.info "Processing string param for medical certification: #{blob_or_file[0..20]}..."
-
-      # Check if it might be a signed ID by trying to locate the blob
-      begin
-        blob = ActiveStorage::Blob.find_signed(blob_or_file)
-        if blob.present?
-          Rails.logger.info "Found blob using signed ID for medical certification: #{blob.id}"
-          attachment_param = blob_or_file
-        end
-      rescue ActiveSupport::MessageVerifier::InvalidSignature
-        Rails.logger.warn "String is not a valid signed ID: #{blob_or_file[0..20]}..."
-        attachment_param = blob_or_file
-      end
+    # The generic String case is now handled at the top of the method
     else
       # Other types (IO, Hash, etc) - use as is with logging
       Rails.logger.info "ATTACHMENT PARAM TYPE: #{blob_or_file.class.name}"
