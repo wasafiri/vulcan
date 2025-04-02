@@ -327,13 +327,34 @@ module Admin
     Rails.logger.info "MEDICAL CERTIFICATION FILE PARAM: #{params[:medical_certification].inspect}"
     Rails.logger.info "MEDICAL CERTIFICATION FILE PARAM CLASS: #{params[:medical_certification].class.name}" if params[:medical_certification].present?
     
+    # Enhanced debugging for direct uploads
+    if params[:medical_certification].respond_to?(:content_type)
+      Rails.logger.info "Upload type: Regular file upload with content_type: #{params[:medical_certification].content_type}"
+    elsif params[:medical_certification].respond_to?(:[]) && params[:medical_certification][:signed_id].present?
+      Rails.logger.info "Upload type: Direct upload with signed_id: #{params[:medical_certification][:signed_id][0..20]}..."
+    else
+      Rails.logger.info "Upload type: Unknown structure: #{params[:medical_certification].class.name}"
+      
+      # Try to log relevant attributes that might help in debugging
+      if params[:medical_certification].respond_to?(:each_pair)
+        Rails.logger.info "Keys in params: #{params[:medical_certification].keys.join(', ')}"
+        
+        # Look for possible signed ID fields
+        params[:medical_certification].each_pair do |k, v|
+          if v.is_a?(String) && v.start_with?('eyJf')
+            Rails.logger.info "Potential signed ID found in key '#{k}': #{v[0..20]}..."
+          end
+        end
+      end
+    end
+    
     if params[:medical_certification].blank?
       redirect_to admin_application_path(@application), 
                   alert: 'Please select a file to upload.'
       return
     end
 
-    # Use the new MedicalCertificationAttachmentService for reliable uploads
+    # Use the enhanced MedicalCertificationAttachmentService for reliable uploads
     submission_method = params[:submission_method].presence || 'admin_upload'
     
     result = MedicalCertificationAttachmentService.attach_certification(

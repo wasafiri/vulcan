@@ -154,8 +154,53 @@ class MedicalCertificationAttachmentService
 
   def self.process_attachment_param(blob_or_file)
     attachment_param = blob_or_file
-
-    if blob_or_file.is_a?(ActiveStorage::Blob)
+    
+    # Enhanced logging to diagnose the input type
+    Rails.logger.info "MEDICAL CERTIFICATION ATTACHMENT INPUT: Type=#{blob_or_file.class.name}"
+    begin
+      if blob_or_file.respond_to?(:inspect)
+        inspection = blob_or_file.inspect[0..200]
+        Rails.logger.info "MEDICAL CERTIFICATION ATTACHMENT INSPECTION: #{inspection}"
+      end
+    rescue => e
+      Rails.logger.info "Could not inspect input: #{e.message}"
+    end
+    
+    # Handle ActionController::Parameters (direct upload case)
+    if defined?(ActionController::Parameters) && blob_or_file.is_a?(ActionController::Parameters)
+      Rails.logger.info "Processing ActionController::Parameters from direct upload"
+      
+      # Try different strategies to extract the signed blob ID
+      if blob_or_file.respond_to?(:[]) && blob_or_file[:signed_id].present?
+        Rails.logger.info "Found signed_id in parameters: #{blob_or_file[:signed_id]}"
+        attachment_param = blob_or_file[:signed_id]
+      elsif blob_or_file.respond_to?(:[]) && blob_or_file["signed_id"].present?
+        Rails.logger.info "Found string-keyed signed_id in parameters: #{blob_or_file["signed_id"]}"
+        attachment_param = blob_or_file["signed_id"]
+      elsif blob_or_file.respond_to?(:key?) && blob_or_file.key?(:blob_signed_id)
+        Rails.logger.info "Found blob_signed_id: #{blob_or_file[:blob_signed_id]}"
+        attachment_param = blob_or_file[:blob_signed_id]
+      else
+        # Try to find any signed ID-like field in the parameters
+        Rails.logger.info "Searching for signed ID in parameters"
+        found_signed_id = false
+        
+        if blob_or_file.respond_to?(:each)
+          blob_or_file.each do |key, value|
+            if value.is_a?(String) && value.start_with?('eyJf')
+              Rails.logger.info "Found potential signed_id in field '#{key}': #{value[0..20]}..."
+              attachment_param = value
+              found_signed_id = true
+              break
+            end
+          end
+        end
+        
+        unless found_signed_id
+          Rails.logger.info "Could not find signed_id in parameters, using as-is"
+        end
+      end
+    elsif blob_or_file.is_a?(ActiveStorage::Blob)
       # Direct blob object - convert to signed_id
       Rails.logger.info "Converting blob to signed_id for medical certification attachment"
       Rails.logger.info "BLOB INFO: ID=#{blob_or_file.id}, Key=#{blob_or_file.key}, Content-Type=#{blob_or_file.content_type}, Size=#{blob_or_file.byte_size}"
