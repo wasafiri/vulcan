@@ -16,9 +16,15 @@ After our initial form fix, a second error appeared:
 ActionController::UnfilteredParameters (unable to convert unpermitted parameters to hash)
 ```
 
+After fixing that, we encountered a third error:
+
+```
+Failed to upload medical certification: undefined local variable or method 'action' for class MedicalCertificationAttachmentService
+```
+
 ## Root Cause
 
-There were two separate issues at play:
+There were three separate issues at play:
 
 1. **Form Implementation**: The form was using the Rails form helper with `direct_upload: true`:
    ```erb
@@ -29,9 +35,11 @@ There were two separate issues at play:
 
 2. **Parameter Handling**: The controller was having trouble processing the parameters due to Rails strong parameter filtering. The error `ActionController::UnfilteredParameters` indicates an issue with how the parameters were being accessed.
 
+3. **Undefined Variable**: In the `MedicalCertificationAttachmentService`, there was a reference to an undefined variable `action` in the `update_certification_status` method. The code was trying to use this variable to determine if a notification should be created.
+
 ## Solution
 
-The fix required two changes:
+The fix required three changes:
 
 ### 1. Form Update
 
@@ -61,6 +69,46 @@ submission_method = params.permit(:submission_method)[:submission_method].presen
 ```
 
 The key change was using `params.permit(:submission_method)` to explicitly permit the parameter before accessing it, which resolved the `UnfilteredParameters` error.
+
+### 3. Fixed Undefined Variable
+
+We fixed the undefined variable issue in the `update_certification_status` method:
+
+```ruby
+# Before
+action_mapping = {
+  accepted: 'medical_certification_approved',
+  rejected: 'medical_certification_rejected',
+  received: 'medical_certification_received'
+}
+
+if action == action_mapping[status.to_sym]
+  Notification.create!(...)
+end
+
+# After
+action_mapping = {
+  accepted: 'medical_certification_approved',
+  rejected: 'medical_certification_rejected',
+  received: 'medical_certification_received'
+}
+
+# Get the notification action name based on the status
+notification_action = action_mapping[status.to_sym]
+
+# Create notification if we have a valid action for this status
+if notification_action.present?
+  Notification.create!(
+    recipient: application.user,
+    actor: admin,
+    action: notification_action,
+    notifiable: application,
+    metadata: metadata
+  )
+end
+```
+
+This fix properly defines and uses the notification action variable, preventing the "undefined variable" error.
 
 ## Testing
 

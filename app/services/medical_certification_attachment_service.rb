@@ -342,11 +342,15 @@ class MedicalCertificationAttachmentService
         received: 'medical_certification_received'
       }
 
-      if action == action_mapping[status.to_sym]
+      # Get the notification action name based on the status
+      notification_action = action_mapping[status.to_sym]
+      
+      # Create notification if we have a valid action for this status
+      if notification_action.present?
         Notification.create!(
           recipient: application.user,
           actor: admin,
-          action: action,
+          action: notification_action,
           notifiable: application,
           metadata: metadata
         )
