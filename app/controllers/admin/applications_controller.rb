@@ -327,11 +327,24 @@ module Admin
     Rails.logger.info "MEDICAL CERTIFICATION FILE PARAM: #{params[:medical_certification].inspect}"
     Rails.logger.info "MEDICAL CERTIFICATION FILE PARAM CLASS: #{params[:medical_certification].class.name}" if params[:medical_certification].present?
     
+    # Extra debugging for direct uploads in production environment
+    Rails.logger.info "ACTION CONTROLLER PARAMETERS TO_H: #{params.to_h.inspect}"
+    
+    # Log raw request parameters to help diagnose direct upload structure
+    raw_post = request.raw_post rescue "Could not access raw post"
+    Rails.logger.info "RAW REQUEST BODY (first 500 chars): #{raw_post[0..500]}" if raw_post
+    
+    # Inspect content-type and other headers that might help diagnose the issue
+    Rails.logger.info "REQUEST CONTENT TYPE: #{request.content_type}"
+    Rails.logger.info "DIRECT UPLOAD HEADER PRESENT: #{request.headers['X-Requested-With']}"
+    
     # Enhanced debugging for direct uploads
     if params[:medical_certification].respond_to?(:content_type)
       Rails.logger.info "Upload type: Regular file upload with content_type: #{params[:medical_certification].content_type}"
     elsif params[:medical_certification].respond_to?(:[]) && params[:medical_certification][:signed_id].present?
       Rails.logger.info "Upload type: Direct upload with signed_id: #{params[:medical_certification][:signed_id][0..20]}..."
+    elsif params[:medical_certification].is_a?(String)
+      Rails.logger.info "Upload type: String input (potential direct upload signed ID): #{params[:medical_certification][0..50]}"
     else
       Rails.logger.info "Upload type: Unknown structure: #{params[:medical_certification].class.name}"
       
@@ -341,8 +354,8 @@ module Admin
         
         # Look for possible signed ID fields
         params[:medical_certification].each_pair do |k, v|
-          if v.is_a?(String) && v.start_with?('eyJf')
-            Rails.logger.info "Potential signed ID found in key '#{k}': #{v[0..20]}..."
+          if v.is_a?(String) && v.present?
+            Rails.logger.info "Potential value found in key '#{k}': #{v[0..50]}..."
           end
         end
       end

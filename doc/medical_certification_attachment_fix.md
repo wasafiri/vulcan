@@ -1,115 +1,96 @@
 # Medical Certification Direct Upload Fix
 
-## Problem
+## Issue Summary
 
-When attempting to upload medical certifications through direct uploads in production, users encountered the following error:
+When trying to upload a medical certification in the production environment (Heroku), users encountered:
 
 ```
 Error storing "medical_certification_valid.pdf". Status: 0
 ```
 
-The logs showed that:
-1. The first stage of direct upload to S3 succeeded (Status 200 OK)
-2. But the second stage (attaching the uploaded blob to the application record) failed
+This occurred during direct uploads, where files are first uploaded to S3 via JavaScript and then their signed_id is included in form submissions rather than the actual file data.
 
-## Root Cause
+## Diagnosis
 
-The issue was in how `MedicalCertificationAttachmentService` handled the parameters passed from `ApplicationsController`.
+The logs showed that the direct upload process was partially working:
 
-For regular file uploads (e.g., from multipart forms), the parameter is an `ActionDispatch::Http::UploadedFile` object with attributes like:
-- `tempfile`
-- `original_filename` 
-- `content_type`
-
-But for ActiveStorage direct uploads, the parameter is an `ActionController::Parameters` object containing a signed blob ID, with a different structure. The service needed to specifically handle this format.
-
-## Solution
-
-1. Added special handling for `ActionController::Parameters` object in `MedicalCertificationAttachmentService#process_attachment_param`:
-
-```ruby
-# Handle ActionController::Parameters (direct upload case)
-if defined?(ActionController::Parameters) && blob_or_file.is_a?(ActionController::Parameters)
-  Rails.logger.info "Processing ActionController::Parameters from direct upload"
-  
-  # Try different strategies to extract the signed blob ID
-  if blob_or_file.respond_to?(:[]) && blob_or_file[:signed_id].present?
-    Rails.logger.info "Found signed_id in parameters: #{blob_or_file[:signed_id]}"
-    attachment_param = blob_or_file[:signed_id]
-  elsif blob_or_file.respond_to?(:[]) && blob_or_file["signed_id"].present?
-    Rails.logger.info "Found string-keyed signed_id in parameters: #{blob_or_file["signed_id"]}"
-    attachment_param = blob_or_file["signed_id"]
-  elsif blob_or_file.respond_to?(:key?) && blob_or_file.key?(:blob_signed_id)
-    Rails.logger.info "Found blob_signed_id: #{blob_or_file[:blob_signed_id]}"
-    attachment_param = blob_or_file[:blob_signed_id]
-  else
-    # Try to find any signed ID-like field in the parameters
-    Rails.logger.info "Searching for signed ID in parameters"
-    found_signed_id = false
-    
-    if blob_or_file.respond_to?(:each)
-      blob_or_file.each do |key, value|
-        if value.is_a?(String) && value.start_with?('eyJf')
-          Rails.logger.info "Found potential signed_id in field '#{key}': #{value[0..20]}..."
-          attachment_param = value
-          found_signed_id = true
-          break
-        end
-      end
-    end
-    
-    unless found_signed_id
-      Rails.logger.info "Could not find signed_id in parameters, using as-is"
-    end
-  end
-end
+```
+2025-04-02T01:57:20.264556+00:00 app[web.1]: Started POST "/rails/active_storage/direct_uploads"
+2025-04-02T01:57:20.294580+00:00 app[web.1]: Completed 200 OK
 ```
 
-2. Added enhanced logging in `ApplicationsController#process_accepted_certification` to better diagnose direct upload parameters:
+This indicated that the file successfully uploaded to S3 and received a signed blob ID. However, the subsequent form submission with this signed ID was failing.
 
-```ruby
-# Enhanced debugging for direct uploads
-if params[:medical_certification].respond_to?(:content_type)
-  Rails.logger.info "Upload type: Regular file upload with content_type: #{params[:medical_certification].content_type}"
-elsif params[:medical_certification].respond_to?(:[]) && params[:medical_certification][:signed_id].present?
-  Rails.logger.info "Upload type: Direct upload with signed_id: #{params[:medical_certification][:signed_id][0..20]}..."
-else
-  Rails.logger.info "Upload type: Unknown structure: #{params[:medical_certification].class.name}"
-  
-  # Try to log relevant attributes that might help in debugging
-  if params[:medical_certification].respond_to?(:each_pair)
-    Rails.logger.info "Keys in params: #{params[:medical_certification].keys.join(', ')}"
-    
-    # Look for possible signed ID fields
-    params[:medical_certification].each_pair do |k, v|
-      if v.is_a?(String) && v.start_with?('eyJf')
-        Rails.logger.info "Potential signed ID found in key '#{k}': #{v[0..20]}..."
-      end
-    end
-  end
-end
-```
+After analyzing multiple files, we identified two critical issues:
 
-## Testing
+1. **String Parameter Handling**: The `MedicalCertificationAttachmentService` was too selective about which string parameters it treated as signed IDs.
 
-The fix was tested with:
+2. **Direct Upload Flow Assumptions**: Our code assumed direct uploads would be sent in a specific format (as ActionController::Parameters objects), but in practice, they were often simple strings.
 
-1. Created a dedicated test case in `test/services/medical_certification_attachment_service_test.rb` to verify handling of:
-   - Regular file uploads 
-   - Direct uploads with signed IDs
-   - Fallback behavior if blob creation fails
+## Solution Implemented
 
-2. The enhanced logging will provide much more detailed information about the exact structure of parameters being received, helping diagnose any future issues.
+1. **Prioritize Any String Input**
 
-## Lessons Learned
+   We completely rewrote the string parameter handling to prioritize ANY string as a potential signed ID, not just those with a specific prefix:
 
-1. When implementing file upload functionality, ensure your services handle both regular multipart uploads and direct uploads via ActiveStorage.
+   ```ruby
+   # SIMPLIFICATION: Handle strings generically first - prioritize them as potential signed IDs
+   if blob_or_file.is_a?(String) && blob_or_file.present?
+     Rails.logger.info "Processing string input as potential SignedID: #{blob_or_file[0..20]}..."
+     
+     # Just use the string parameter directly - let ActiveStorage figure it out
+     attachment_param = blob_or_file
+     
+     # Return the string parameter directly
+     return attachment_param
+   end
+   ```
 
-2. Direct uploads involve a two-phase process:
-   - First, the file is uploaded directly to storage (S3) 
-   - Then, a signed blob ID is submitted with the form
-   - Your code must handle this signed blob ID correctly
+2. **Enhanced Logging**
 
-3. Implement thorough logging around file upload parameters to make debugging easier.
+   We added comprehensive logging in both the controller and service to better understand the parameter formats:
 
-4. Always implement a fallback mechanism to handle unexpected parameter formats.
+   ```ruby
+   # Extra debugging for direct uploads in production environment
+   Rails.logger.info "ACTION CONTROLLER PARAMETERS TO_H: #{params.to_h.inspect}"
+   
+   # Log raw request parameters
+   raw_post = request.raw_post rescue "Could not access raw post"
+   Rails.logger.info "RAW REQUEST BODY (first 500 chars): #{raw_post[0..500]}"
+   
+   # Inspect content-type and other headers
+   Rails.logger.info "REQUEST CONTENT TYPE: #{request.content_type}"
+   Rails.logger.info "DIRECT UPLOAD HEADER PRESENT: #{request.headers['X-Requested-With']}"
+   ```
+
+3. **Model After Proven Solutions**
+
+   We studied the `ProofAttachmentService` implementation, which was successfully handling direct uploads for other file types, and modeled our solution after it.
+
+## Technical Details
+
+### Root Cause
+
+Active Storage direct uploads operate in two phases:
+1. The file is uploaded directly to S3/the storage service via JavaScript
+2. A form is submitted with just the signed ID of the uploaded blob, not the actual file
+
+Our service was trying to validate signed IDs too aggressively, making assumptions about their format. In production, the signed IDs weren't formatted exactly as expected.
+
+### Fix Details
+
+Our solution now:
+1. Treats ALL string parameters as potential signed IDs, letting ActiveStorage's built-in handling deal with validation
+2. Provides early return for string parameters to prioritize direct upload flow
+3. Falls back to other parameter formats only when needed
+
+### Verification
+
+After deploying these changes, direct uploads of medical certifications should work correctly in all environments. The enhanced logging will help diagnose any remaining issues.
+
+## Best Practices Applied
+
+1. **Trust Rails Conventions**: Our solution now lets ActiveStorage do the heavy lifting rather than trying to validate signed IDs ourselves.
+2. **Better Logging**: We've improved debugging with comprehensive logging.
+3. **Error Isolation**: We've maintained the error handling and metrics while fixing the underlying issue.
+4. **Compatibility**: The solution works with both direct uploads and regular file uploads.

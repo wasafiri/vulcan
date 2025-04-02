@@ -157,6 +157,7 @@ class MedicalCertificationAttachmentService
     
     # Enhanced logging to diagnose the input type
     Rails.logger.info "MEDICAL CERTIFICATION ATTACHMENT INPUT: Type=#{blob_or_file.class.name}"
+    Rails.logger.info "MEDICAL CERTIFICATION BLOB OR FILE VALUE: #{blob_or_file.to_s[0..100]}" if blob_or_file.respond_to?(:to_s)
     begin
       if blob_or_file.respond_to?(:inspect)
         inspection = blob_or_file.inspect[0..200]
@@ -166,28 +167,32 @@ class MedicalCertificationAttachmentService
       Rails.logger.info "Could not inspect input: #{e.message}"
     end
     
-    # First check for direct string SignedID from form submission
+    # SIMPLIFICATION: Handle strings generically first - prioritize them as potential signed IDs
+    # This is a much more aggressive approach than before - ANY string could be a signed ID
     if blob_or_file.is_a?(String) && blob_or_file.present?
-      Rails.logger.info "Processing potential SignedID string from direct upload: #{blob_or_file[0..20]}..."
+      Rails.logger.info "Processing string input as potential SignedID: #{blob_or_file[0..20]}..."
       
-      # Try to use it as a SignedID directly
+      # Just use the string parameter directly - let ActiveStorage figure it out
+      # This matches the approach in PaperApplicationService which works reliably
+      attachment_param = blob_or_file
+      
+      # Try to validate it's actually a blob ID, just for logging purposes
       begin
         blob = ActiveStorage::Blob.find_signed(blob_or_file)
         if blob.present?
-          Rails.logger.info "Successfully located blob via SignedID: #{blob.id}, filename: #{blob.filename}"
-          attachment_param = blob_or_file  # Use the original string as it's a valid signed ID
-          return attachment_param  # Early return with valid signed ID
+          Rails.logger.info "Confirmed string is a valid signed ID: blob_id=#{blob.id}, filename=#{blob.filename}"
         end
-      rescue ActiveSupport::MessageVerifier::InvalidSignature
-        Rails.logger.info "String is not a valid SignedID, will try other parsing methods"
-        # Continue with other approaches
       rescue StandardError => e
-        Rails.logger.info "Error checking SignedID: #{e.message}, will try other parsing methods"
-        # Continue with other approaches
+        # Just log this, but KEEP using the string parameter anyway - ActiveStorage will handle it
+        Rails.logger.info "Note: String parameter validation error: #{e.message}"
       end
+      
+      # Return the string parameter directly - this is consistent with PaperApplicationService
+      return attachment_param
     end
     
-    # Handle ActionController::Parameters (direct upload case)
+    # Handle ActionController::Parameters case - but this is now a fallback
+    # Direct string inputs are prioritized above
     if defined?(ActionController::Parameters) && blob_or_file.is_a?(ActionController::Parameters)
       Rails.logger.info "Processing ActionController::Parameters from direct upload"
       
@@ -227,10 +232,7 @@ class MedicalCertificationAttachmentService
       Rails.logger.info "BLOB INFO: ID=#{blob_or_file.id}, Key=#{blob_or_file.key}, Content-Type=#{blob_or_file.content_type}, Size=#{blob_or_file.byte_size}"
       attachment_param = blob_or_file.signed_id
       Rails.logger.info "Using signed_id: #{attachment_param || '[nil]'}"
-    elsif blob_or_file.is_a?(String) && blob_or_file.start_with?('eyJf')
-      # Already a signed_id string with known prefix - use as is
-      Rails.logger.info "Input matches known signed_id format, using directly: #{blob_or_file[0..20]}..."
-      attachment_param = blob_or_file
+    # String case is already handled at the top with highest priority
     elsif blob_or_file.respond_to?(:tempfile) || blob_or_file.is_a?(ActionDispatch::Http::UploadedFile)
       # ActionDispatch::Http::UploadedFile or similar - use as is
       if blob_or_file.respond_to?(:original_filename)
@@ -255,7 +257,7 @@ class MedicalCertificationAttachmentService
         Rails.logger.info "Falling back to direct file parameter"
         # Continue with original param explicitly set above
       end
-    # The generic String case is now handled at the top of the method
+    # No more handling needed for the string case - it's covered at the top
     else
       # Other types (IO, Hash, etc) - use as is with logging
       Rails.logger.info "ATTACHMENT PARAM TYPE: #{blob_or_file.class.name}"
