@@ -95,7 +95,8 @@ class ApplicationNotificationsMailer < ApplicationMailer
       ).queue_for_printing
     end
 
-    prepare_email(
+    # Create email with appropriate reply-to for Postmark inbound email routing
+    mail_obj = prepare_email(
       application,
       proof_review,
       subject_template: 'Document Review Update: Your %<formatted_type>s documentation needs revision',
@@ -105,6 +106,12 @@ class ApplicationNotificationsMailer < ApplicationMailer
         @reapply_date = reapply_date
       }
     )
+    
+    # Set appropriate reply-to header - this is the address that the email will show as "reply to"
+    # Using "proof@" domain to ensure Postmark routes these correctly when users reply
+    mail_obj.reply_to = ["proof@#{Rails.application.config.action_mailer.default_url_options[:host]}"]
+    
+    mail_obj
   rescue StandardError => e
     Rails.logger.error("Failed to send proof rejection email: #{e.message}")
     Rails.logger.error(e.backtrace.join("\n"))

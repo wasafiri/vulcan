@@ -42,19 +42,43 @@
 <% if @remaining_attempts && @remaining_attempts > 0 %>
   <p>You have <strong><%= @remaining_attempts %> <%= 'attempt'.pluralize(@remaining_attempts) %></strong> remaining to submit your revised document.</p>
   
-  <p>Please ensure all required documentation has been submitted for review. You can:</p>
-  <ul>
-    <li>Visit <%= link_to "your application page", constituent_portal_application_url(@application, host: Rails.application.config.action_mailer.default_url_options[:host]) %> to upload new documentation</li>
-    <li>Reply to this email with your documentation attached</li>
-  </ul>
+  <p>Please ensure all required documentation has been submitted for review. You have two ways to provide your updated documentation:</p>
+  
+  <div style="margin: 15px 0; padding: 10px; background-color: #f8f9fa; border-left: 4px solid #6c757d;">
+    <h3 style="margin-top: 0; color: #495057;">OPTION 1: EMAIL REPLY</h3>
+    <ul style="color: #495057;">
+      <li>Simply reply to this email with your updated/corrected documentation attached</li>
+      <li>Make sure files are clearly visible and complete</li>
+    </ul>
+  </div>
+  
+  <div style="margin: 15px 0; padding: 10px; background-color: #f8f9fa; border-left: 4px solid #6c757d;">
+    <h3 style="margin-top: 0; color: #495057;">OPTION 2: ONLINE UPLOAD</h3>
+    <ul style="color: #495057;">
+      <li>Sign in to your account at <%= link_to "login page", login_url(host: Rails.application.config.action_mailer.default_url_options[:host]) %></li>
+      <li>Once signed in, visit your application page to upload new documentation</li>
+    </ul>
+  </div>
 <% elsif @reapply_date %>
   <p>Please note that this was your final attempt to submit this document. Your application (ID: <%= @application.id %>) has been archived. You are welcome to start a new application after <strong><%= format_date(@reapply_date) %></strong>.</p>
 <% else %>
-  <p>Please ensure all required documentation has been submitted for review. You can:</p>
-  <ul>
-    <li>Visit <%= link_to "your application page", constituent_portal_application_url(@application, host: Rails.application.config.action_mailer.default_url_options[:host]) %> to upload new documentation</li>
-    <li>Reply to this email with your documentation attached</li>
-  </ul>
+  <p>Please ensure all required documentation has been submitted for review. You have two ways to provide your updated documentation:</p>
+  
+  <div style="margin: 15px 0; padding: 10px; background-color: #f8f9fa; border-left: 4px solid #6c757d;">
+    <h3 style="margin-top: 0; color: #495057;">OPTION 1: EMAIL REPLY</h3>
+    <ul style="color: #495057;">
+      <li>Simply reply to this email with your updated/corrected documentation attached</li>
+      <li>Make sure files are clearly visible and complete</li>
+    </ul>
+  </div>
+  
+  <div style="margin: 15px 0; padding: 10px; background-color: #f8f9fa; border-left: 4px solid #6c757d;">
+    <h3 style="margin-top: 0; color: #495057;">OPTION 2: ONLINE UPLOAD</h3>
+    <ul style="color: #495057;">
+      <li>Sign in to your account at <%= link_to "login page", login_url(host: Rails.application.config.action_mailer.default_url_options[:host]) %></li>
+      <li>Once signed in, visit your application page to upload new documentation</li>
+    </ul>
+  </div>
 <% end %>
 
 <%= render 'shared/mailers/footer', show_automated_message: true %>

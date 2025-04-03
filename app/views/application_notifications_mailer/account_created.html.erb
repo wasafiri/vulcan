@@ -2,9 +2,16 @@
 
 <p>Dear <%= @constituent.first_name %>,</p>
 
-<p>An administrator has created an account for you in our system based on your paper application submission.</p>
+<p>Thank you for applying with Maryland Accessible Telecommunications. We are dedicated to providing accessible telecommunications solutions that help ensure every Maryland resident stays connected. We have received your application, and an administrator has created an account for you in our system.</p>
 
-<p>You can now access your application online using the following credentials:</p>
+<p>Your new account lets you easily:</p>
+<ul>
+  <li>Check the status of your application</li>
+  <li>Upload any additional proofs if needed</li>
+  <li>View your voucher code and other important updates</li>
+</ul>
+
+<p>You can access your application online using the credentials below:</p>
 
 <div style="background-color: #f3f4f6; padding: 16px; margin: 16px 0; border-radius: 4px;">
   <p><strong>Email:</strong> <%= @constituent.email %></p>
@@ -18,6 +25,8 @@
     Sign in here
   </a>
 </p>
+
+<p>If you prefer not to access your account online or encounter any issues, do not worry — we will continue to send you important updates and documents by mail.</p>
 
 <p>If you have any questions or need assistance, please contact our support team.</p>
 

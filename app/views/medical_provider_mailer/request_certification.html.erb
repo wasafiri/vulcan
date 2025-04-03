@@ -31,6 +31,7 @@
       <ul>
         <li>Name: <%= @constituent.full_name %></li>
         <li>Date of Birth: <%= @constituent.date_of_birth.strftime("%B %d, %Y") if @constituent.date_of_birth.present? %></li>
+        <li>Address: <%= @constituent.address %>, <%= @constituent.city %>, <%= @constituent.state %> <%= @constituent.zip %></li>
         <li>Application ID: <%= @application.id %></li>
       </ul>
     </div>
@@ -41,14 +42,14 @@
       <li>Click the link below to download the form</li>
       <li>Complete all required fields</li>
       <li>Sign the form</li>
-      <li>Return the completed form by email to <a href="mailto:medical-cert@mdmat.org">medical-cert@mdmat.org</a> or by fax to (410) 554-9277</li>
+      <li>Return the completed form by email to <a href="mailto:medical-certification@maryland.gov">medical-certification@maryland.gov</a> or by fax to (410) 554-9277</li>
     </ol>
     
     <p style="text-align: center; margin: 25px 0;">
       <a href="https://mdmat.org/forms/disability-certification.pdf" class="button">Download Certification Form</a>
     </p>
     
-    <p>If you have questions or need assistance, please contact our medical certification team at <a href="mailto:medical-cert@mdmat.org">medical-cert@mdmat.org</a> or call (410) 554-9230.</p>
+    <p>If you have questions or need assistance, please contact our medical certification team at <a href="mailto:more.info@maryland.gov">more.info@maryland.gov</a> or call (410) 554-9230.</p>
     
     <p>Thank you for your prompt attention to this important matter.</p>
     

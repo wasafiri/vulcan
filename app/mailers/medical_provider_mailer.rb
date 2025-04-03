@@ -21,14 +21,14 @@ class MedicalProviderMailer < ApplicationMailer
     mail_options = {
       to: application.medical_provider_email,
       from: 'info@mdmat.org',
-      reply_to: 'medical-cert@mdmat.org',
+      reply_to: 'medical-certification@maryland.gov',
       subject: "Disability Certification Form for Patient needs Updates",
       message_stream: 'outbound'
     }
 
     mail(mail_options)
   end
-  
+
   # Request certification from a medical provider
   # @param application [Application] The application requiring certification
   # @param timestamp [String] ISO8601 timestamp of when the request was made
@@ -39,21 +39,21 @@ class MedicalProviderMailer < ApplicationMailer
     @timestamp = timestamp || Time.current.iso8601
     @notification_id = notification_id
     @request_count = application.medical_certification_request_count || 1
-    
+
     mail_options = {
       to: application.medical_provider_email,
       from: 'info@mdmat.org',
-      reply_to: 'medical-cert@mdmat.org',
+      reply_to: 'medical-certification@maryland.gov',
       subject: "Disability Certification Form Request for #{application.constituent_full_name}",
       message_stream: 'outbound'
     }
-    
+
     # Add notification message ID for tracking if available
     if notification_id.present?
       notification = Notification.find_by(id: notification_id)
       mail_options[:message_id] = notification.message_id if notification&.message_id.present?
     end
-    
+
     mail(mail_options)
   end
 end

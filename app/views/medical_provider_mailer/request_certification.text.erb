@@ -9,6 +9,7 @@ This <%= @request_count > 1 ? "is a follow-up request (Request ##{@request_count
 PATIENT INFORMATION:
 - Name: <%= @constituent.full_name %>
 - Date of Birth: <%= @constituent.date_of_birth.strftime("%B %d, %Y") if @constituent.date_of_birth.present? %>
+- Address: <%= @constituent.address %>, <%= @constituent.city %>, <%= @constituent.state %> <%= @constituent.zip %>
 - Application ID: <%= @application.id %>
 
 The certification form is essential for your patient to qualify for assistive technology devices they need. To complete this form:
@@ -16,9 +17,9 @@ The certification form is essential for your patient to qualify for assistive te
 1. Download the form at: https://mdmat.org/forms/disability-certification.pdf
 2. Complete all required fields
 3. Sign the form
-4. Return the completed form by email to medical-cert@mdmat.org or by fax to (410) 554-9277
+4. Return the completed form by email to medical-certification@maryland.gov or by fax to (410) 554-9277
 
-If you have questions or need assistance, please contact our medical certification team at medical-cert@mdmat.org or call (410) 554-9230.
+If you have questions or need assistance, please contact our medical certification team at more.info@maryland.gov or call (410) 554-9230.
 
 Thank you for your prompt attention to this important matter.
 

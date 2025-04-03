@@ -5,7 +5,6 @@ class ApplicationMailer < ActionMailer::Base
 
   default(
     from: 'no_reply@mdmat.org'
-    # Removing reply_to as it might be causing Postmark API issues
   )
 
   layout 'mailer'

@@ -7,6 +7,8 @@ module Admin
   class ApplicationsController < BaseController
     include ActionView::Helpers::TagHelper
     include ActionView::Helpers::JavaScriptHelper
+    include RedirectHelper
+    include AutoApprovalHelper
     before_action :set_application, only: %i[
       show edit update
       verify_income request_documents review_proof update_proof_status
@@ -122,54 +124,78 @@ module Admin
       respond_to(&:js)
     end
 
+    # Updates the proof status of an application 
+    # Handles both income and residency proof reviews
     def update_proof_status
+      admin_user = validate_and_prepare_admin_user
+      
+      log_proof_review_start
+      
+      Thread.current[:reviewing_single_proof] = true
+      
+      begin
+        execute_proof_review(admin_user)
+        handle_successful_review
+      rescue StandardError => e
+        handle_review_error(e)
+      ensure
+        Thread.current[:reviewing_single_proof] = nil
+      end
+    end
+    
+    # Validates the admin user and reloads if necessary
+    # @return [User] The validated admin user
+    def validate_and_prepare_admin_user
       Rails.logger.info "Update proof status - Current user: #{current_user.inspect}"
       Rails.logger.info "Current user type: #{current_user.type}, admin? method result: #{current_user.admin?}"
-      Rails.logger.info "Current user class: #{current_user.class}, class name: #{current_user.class.name}"
-
-      # Ensure we're using a properly loaded administrator user
-      admin_user = if current_user.admin?
-                     current_user
-                  else
-                    # Fallback to reload the user if admin? check fails but type is correct
-                    if current_user.type == 'Administrator' || current_user.type == 'Users::Administrator'
-                      Rails.logger.info "User type indicates admin but admin? method returned false, reloading user"
-                      User.find(current_user.id)
-                    else
-                      Rails.logger.error "Non-admin user attempting to perform admin action"
-                      current_user
-                    end
-                   end
-
+      
+      if current_user.admin?
+        current_user
+      elsif current_user.type == 'Administrator' || current_user.type == 'Users::Administrator'
+        Rails.logger.info "User type indicates admin but admin? method returned false, reloading user"
+        User.find(current_user.id)
+      else
+        Rails.logger.error "Non-admin user attempting to perform admin action"
+        current_user
+      end
+    end
+    
+    # Executes the proof review using the ProofReviewer service
+    # @param admin_user [User] The admin user performing the review
+    def execute_proof_review(admin_user)
       Rails.logger.info "Admin user prepared for proof review: #{admin_user.inspect}"
       Rails.logger.info "Prepared admin - Type: #{admin_user.type}, admin? result: #{admin_user.admin?}"
-
+      
       reviewer = Applications::ProofReviewer.new(@application, admin_user)
-      Thread.current[:reviewing_single_proof] = true
-
-      log_proof_review_start
-
+      
       reviewer.review(
         proof_type: params[:proof_type],
         status: params[:status],
         rejection_reason: params[:rejection_reason],
         notes: params[:notes]
       )
+      
       Rails.logger.info 'Proof review completed successfully'
-
+    end
+    
+    # Handles a successful proof review
+    def handle_successful_review
       respond_to do |format|
         format.html { handle_html_success }
         format.turbo_stream { handle_turbo_stream_success }
       end
-    rescue StandardError => e
-      Rails.logger.error "Failed to update proof status: #{e.message}"
-      Rails.logger.error e.backtrace.join("\n")
+    end
+    
+    # Handles errors during proof review
+    # @param error [StandardError] The error that occurred
+    def handle_review_error(error)
+      Rails.logger.error "Failed to update proof status: #{error.message}"
+      Rails.logger.error error.backtrace.join("\n")
+      
       respond_to do |format|
-        format.html { handle_html_error(e) }
-        format.turbo_stream { handle_turbo_stream_error(e) }
+        format.html { handle_html_error(error) }
+        format.turbo_stream { handle_turbo_stream_error(error) }
       end
-    ensure
-      Thread.current[:reviewing_single_proof] = nil
     end
 
     def process_application_status(action)
@@ -247,97 +273,139 @@ module Admin
                   notice: 'Training session marked as completed'
     end
 
+  # Updates medical certification status and handles file uploads
+  # Accepts various status changes including approvals and rejections
   def update_certification_status
-    status = params[:status]&.to_sym
-    
-    # Convert any 'accepted' to 'approved' for consistency with the Application model enum
-    status = :approved if status == :accepted
+    status = normalize_certification_status(params[:status])
     
     # Log status for debugging
     Rails.logger.info "Processing medical certification status update: #{status.inspect}"
     
-    # Use the new reviewer service for rejections
-    if status == :rejected && params[:rejection_reason].present?
-      reviewer = Applications::MedicalCertificationReviewer.new(@application, current_user)
-      result = reviewer.reject(
-        rejection_reason: params[:rejection_reason],
-        notes: params[:notes]
-      )
-      
-      if result[:success]
-        redirect_to admin_application_path(@application),
-                    notice: 'Medical certification rejected and provider notified.'
-      else
-        redirect_to admin_application_path(@application),
-                    alert: "Failed to reject certification: #{result[:error]}"
-      end
-    # Check if this is a status change only (no new file) for an existing certification
-    elsif @application.medical_certification.attached? && params[:medical_certification].blank?
-      # Use the status-only update method to avoid deleting the attachment
-      result = MedicalCertificationAttachmentService.update_certification_status(
-        application: @application,
-        status: status,
-        admin: current_user,
-        submission_method: 'admin_review',
-        metadata: { via_ui: true }
-      )
-      
-      if result[:success]
-    # Check if auto-approval should have happened but didn't
-    if (status == :approved || status == :accepted) && 
-       @application.income_proof_status_approved? && 
-       @application.residency_proof_status_approved? &&
-       !@application.status_approved?
-          
-          Rails.logger.info "Auto-approval conditions met but application was not auto-approved."
-          Rails.logger.info "Manually triggering approval for application #{@application.id}"
-          
-          # Manually trigger the application approval
-          @application.reload
-          @application.approve!
-          
-          redirect_to admin_application_path(@application),
-                      notice: 'Medical certification approved and application approved.'
-        else
-          redirect_to admin_application_path(@application),
-                      notice: 'Medical certification status updated.'
-        end
-      else
-        redirect_to admin_application_path(@application),
-                    alert: "Failed to update certification status: #{result[:error]&.message}"
-      end
+    if rejection_requested?(status)
+      process_certification_rejection
+    elsif status_only_update_requested?
+      update_existing_certification_status(status)
     else
-      # Use the existing method when there's a new file to upload
-      if @application.update_certification!(
-        certification: params[:medical_certification],
-        status: status,
-        verified_by: current_user,
-        rejection_reason: params[:rejection_reason]
-      )
-    # Check if auto-approval should have happened but didn't
-    if (status == :approved || status == :accepted) && 
-       @application.income_proof_status_approved? && 
-       @application.residency_proof_status_approved? &&
-       !@application.status_approved?
-          
-          Rails.logger.info "Auto-approval conditions met but application was not auto-approved."
-          Rails.logger.info "Manually triggering approval for application #{@application.id}"
-          
-          # Manually trigger the application approval
-          @application.reload
-          @application.approve!
-          
-          redirect_to admin_application_path(@application),
-                      notice: 'Medical certification approved and application approved.'
-        else
-          redirect_to admin_application_path(@application),
-                      notice: 'Medical certification status updated.'
-        end
-      else
-        redirect_to admin_application_path(@application),
-                    alert: 'Failed to update certification status.'
-      end
+      upload_new_certification(status)
     end
+  end
+  
+  # Normalizes certification status for consistent handling
+  # @param status [String, Symbol] The status from params
+  # @return [Symbol] Normalized status symbol
+  def normalize_certification_status(status)
+    return nil unless status
+    
+    status = status.to_sym if status.respond_to?(:to_sym)
+    # Convert any 'accepted' to 'approved' for consistency with the Application model enum
+    status = :approved if status == :accepted
+    status
+  end
+  
+  # Determines if a certification rejection was requested
+  # @param status [Symbol] The normalized status
+  # @return [Boolean] True if rejection was requested with reason
+  def rejection_requested?(status)
+    status == :rejected && params[:rejection_reason].present?
+  end
+  
+  # Determines if this is a status-only update (no new file)
+  # @return [Boolean] True if updating status on existing certification
+  def status_only_update_requested?
+    @application.medical_certification.attached? && params[:medical_certification].blank?
+  end
+  
+  # Processes a certification rejection using the reviewer service
+  def process_certification_rejection
+    reviewer = Applications::MedicalCertificationReviewer.new(@application, current_user)
+    result = reviewer.reject(
+      rejection_reason: params[:rejection_reason],
+      notes: params[:notes]
+    )
+    
+    if result[:success]
+      redirect_with_notice('Medical certification rejected and provider notified.')
+    else
+      redirect_with_alert("Failed to reject certification: #{result[:error]}")
+    end
+  end
+  
+  # Updates status of an existing certification without replacing the file
+  # @param status [Symbol] The normalized certification status
+  def update_existing_certification_status(status)
+    result = MedicalCertificationAttachmentService.update_certification_status(
+      application: @application,
+      status: status,
+      admin: current_user,
+      submission_method: 'admin_review',
+      metadata: { via_ui: true }
+    )
+    
+    if result[:success]
+      handle_successful_status_update(status)
+    else
+      redirect_with_alert("Failed to update certification status: #{result[:error]&.message}")
+    end
+  end
+  
+  # Uploads and processes a new certification file
+  # @param status [Symbol] The normalized certification status
+  def upload_new_certification(status)
+    success = @application.update_certification!(
+      certification: params[:medical_certification],
+      status: status,
+      verified_by: current_user,
+      rejection_reason: params[:rejection_reason]
+    )
+    
+    if success
+      handle_successful_status_update(status)
+    else
+      redirect_with_alert('Failed to update certification status.')
+    end
+  end
+  
+  # Handles successful status updates, including potential auto-approval
+  # @param status [Symbol] The normalized certification status
+  def handle_successful_status_update(status)
+    if should_auto_approve?(status)
+      perform_auto_approval
+      redirect_with_notice('Medical certification approved and application approved.')
+    else
+      redirect_with_notice('Medical certification status updated.')
+    end
+  end
+  
+  # Determines if auto-approval conditions are met
+  # @param status [Symbol] The normalized certification status
+  # @return [Boolean] True if conditions for auto-approval are met
+  def should_auto_approve?(status)
+    (status == :approved) && 
+      @application.income_proof_status_approved? && 
+      @application.residency_proof_status_approved? &&
+      !@application.status_approved?
+  end
+  
+  # Performs application auto-approval
+  def perform_auto_approval
+    Rails.logger.info "Auto-approval conditions met but application was not auto-approved."
+    Rails.logger.info "Manually triggering approval for application #{@application.id}"
+    
+    # Ensure we have fresh data
+    @application.reload
+    @application.approve!
+  end
+  
+  # Redirects with a notice message
+  # @param message [String] The notice message
+  def redirect_with_notice(message)
+    redirect_to admin_application_path(@application), notice: message
+  end
+  
+  # Redirects with an alert message
+  # @param message [String] The alert message
+  def redirect_with_alert(message)
+    redirect_to admin_application_path(@application), alert: message
   end
 
     def resend_medical_certification
