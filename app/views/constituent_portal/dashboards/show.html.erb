@@ -122,6 +122,104 @@
           </div>
         </div>
 
+        <!-- Proof Status and Upload Section -->
+        <% if @active_application %>
+          <div class="mt-6 bg-white shadow overflow-hidden sm:rounded-lg">
+            <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+              <h3 class="text-lg leading-6 font-medium text-gray-900">Document Status</h3>
+            </div>
+            <div class="px-4 py-5 sm:p-6 space-y-6">
+              <!-- Income Proof Status -->
+              <div class="pb-5">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h4 class="text-md font-medium text-gray-900">Income Proof</h4>
+                    <% if @income_proof_status == "approved" %>
+                      <div class="flex items-center mt-2">
+                        <div class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                          Approved
+                        </div>
+                      </div>
+                    <% elsif @income_proof_status == "rejected" %>
+                      <div class="flex items-center mt-2">
+                        <div class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                          Rejected
+                        </div>
+                        <% if @income_proof_rejection_reason.present? %>
+                          <span class="ml-2 text-sm text-gray-600">
+                            Reason: <%= @income_proof_rejection_reason %>
+                          </span>
+                        <% end %>
+                      </div>
+                      <% if @income_proof_rejection_date.present? %>
+                        <div class="mt-1 text-sm text-gray-600">
+                          Rejected on: <%= @income_proof_rejection_date.strftime("%B %d, %Y") %>
+                        </div>
+                      <% end %>
+                    <% else %>
+                      <div class="flex items-center mt-2">
+                        <div class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                          Pending Review
+                        </div>
+                      </div>
+                    <% end %>
+                  </div>
+                  
+                  <% if @can_resubmit_income_proof %>
+                    <%= link_to "Upload New Income Proof", 
+                        new_proof_constituent_portal_application_path(@active_application, proof_type: "income"), 
+                        class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700" %>
+                  <% end %>
+                </div>
+              </div>
+              
+              <!-- Residency Proof Status -->
+              <div>
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h4 class="text-md font-medium text-gray-900">Residency Proof</h4>
+                    <% if @residency_proof_status == "approved" %>
+                      <div class="flex items-center mt-2">
+                        <div class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                          Approved
+                        </div>
+                      </div>
+                    <% elsif @residency_proof_status == "rejected" %>
+                      <div class="flex items-center mt-2">
+                        <div class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                          Rejected
+                        </div>
+                        <% if @residency_proof_rejection_reason.present? %>
+                          <span class="ml-2 text-sm text-gray-600">
+                            Reason: <%= @residency_proof_rejection_reason %>
+                          </span>
+                        <% end %>
+                      </div>
+                      <% if @residency_proof_rejection_date.present? %>
+                        <div class="mt-1 text-sm text-gray-600">
+                          Rejected on: <%= @residency_proof_rejection_date.strftime("%B %d, %Y") %>
+                        </div>
+                      <% end %>
+                    <% else %>
+                      <div class="flex items-center mt-2">
+                        <div class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                          Pending Review
+                        </div>
+                      </div>
+                    <% end %>
+                  </div>
+                  
+                  <% if @can_resubmit_residency_proof %>
+                    <%= link_to "Upload New Residency Proof", 
+                        new_proof_constituent_portal_application_path(@active_application, proof_type: "residency"), 
+                        class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700" %>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+          </div>
+        <% end %>
+
         <!-- Application Information -->
         <% if @active_application && @active_application.status_approved? %>
           <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -193,15 +291,20 @@
                       <div class="relative pb-8">
                         <div class="relative flex space-x-3">
                           <div>
-                            <span class="h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white" aria-hidden="true">
-                              <!-- Activity icon based on type -->
+                            <span class="<%= activity_icon_class(activity) %>" aria-hidden="true">
+                              <%= activity.icon_symbol %>
                             </span>
                           </div>
                           <div class="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
                             <div>
-                              <p class="text-sm text-gray-500"><%= activity.description %></p>
+                              <p class="text-sm text-gray-700"><%= activity.description %></p>
+                              <% if activity.details.present? %>
+                                <p class="mt-1 text-sm text-gray-600">
+                                  <span class="text-gray-500">Reason:</span> "<%= activity.details %>"
+                                </p>
+                              <% end %>
                             </div>
-                            <div class="text-sm text-gray-500">
+                            <div class="text-sm text-gray-500 whitespace-nowrap">
                               <time datetime="<%= activity.created_at.iso8601 %>">
                                 <%= time_ago_in_words(activity.created_at) %> ago
                               </time>

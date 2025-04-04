@@ -119,9 +119,14 @@
 
 <div class="certification-history mt-2 pl-4 border-l-2 border-gray-200">
   <% if @certification_events.any? %>
-    <% @certification_events.each_with_index do |event, index| %>
-      <% 
-        # Get timestamp and determine event type based on event class
+    <%
+      # Create a hash to collect unique request events by timestamp
+      unique_requests = {}
+      
+      # Group request events by timestamp key first
+      @certification_events.each do |event|
+        next unless is_request_event[event.id]
+        
         timestamp = event.created_at
         if event.respond_to?(:metadata) && event.metadata.is_a?(Hash) && event.metadata['timestamp'].present?
           begin
@@ -131,84 +136,47 @@
           end
         end
         
-        # Determine event type and details based on record type - more inclusive detection
+        timestamp_key = timestamp.strftime("%Y-%m-%d %H:%M")
+        
+        # Determine actor name
         if event.is_a?(Notification)
-          is_request = event.action == "medical_certification_requested" || 
-                      event.action.to_s.include?("certification") && event.action.to_s.include?("request")
-          is_rejection = event.action == "medical_certification_rejected" || 
-                        event.action.to_s.include?("certification") && event.action.to_s.include?("reject")
-          request_number = request_indexes[event.id] if is_request
           actor_name = event.actor&.full_name || "System"
         elsif event.is_a?(ApplicationStatusChange)
-          is_request = event.to_status == "requested" || 
-                      (event.metadata.is_a?(Hash) && event.metadata["change_type"] == "medical_certification" && 
-                       event.to_status.to_s.include?("request"))
-          is_rejection = event.to_status == "rejected" || 
-                        (event.metadata.is_a?(Hash) && event.metadata["change_type"] == "medical_certification" && 
-                         event.to_status.to_s.include?("reject"))
-          request_number = request_indexes[event.id] if is_request
           actor_name = event.user&.full_name || "System"
         elsif event.is_a?(Event)
-          is_request = event.action == "medical_certification_requested" || 
-                      event.action.to_s.include?("certification") && event.action.to_s.include?("request") ||
-                      (event.metadata.is_a?(Hash) && event.metadata["details"].to_s.include?("certification requested"))
-          is_rejection = event.action == "medical_certification_rejected" || 
-                        event.action.to_s.include?("certification") && event.action.to_s.include?("reject") ||
-                        (event.metadata.is_a?(Hash) && event.metadata["details"].to_s.include?("certification rejected"))
-          request_number = request_indexes[event.id] if is_request
           actor_name = event.user&.full_name || "System"
-          
-          # Try to extract provider name from event metadata if available
-          provider_name = event.metadata.is_a?(Hash) ? (event.metadata["provider_name"] || event.metadata["doctor_name"]) : nil
         end
-      %>
+        
+        # Determine submission method if available
+        submission_method = nil
+        if event.respond_to?(:metadata) && event.metadata.is_a?(Hash)
+          submission_method = event.metadata['submission_method'] || 
+                             event.metadata['method'] || 
+                             event.metadata['delivery_method']
+        end
+        
+        # Store only one request per timestamp
+        if !unique_requests.key?(timestamp_key) || 
+           (submission_method.present? && !unique_requests[timestamp_key][:submission_method].present?)
+          unique_requests[timestamp_key] = {
+            timestamp: timestamp,
+            actor_name: actor_name,
+            submission_method: submission_method
+          }
+        end
+      end
+      
+      # Sort the unique requests by timestamp (most recent first)
+      sorted_unique_requests = unique_requests.values.sort_by { |r| r[:timestamp] }.reverse
+    %>
+    
+    <% sorted_unique_requests.each do |request| %>
       <div class="request-item mb-2">
-        <p class="text-sm <%= is_request ? 'text-gray-600' : (is_rejection ? 'text-red-600' : 'text-blue-600') %> mb-1">
-          <% if is_request %>
-            Request <%= request_number %> sent on 
-            <%= timestamp.strftime("%B %d, %Y at %I:%M %p") %>
-            <% if actor_name.present? %>by <%= actor_name %><% end %>
-            <% if defined?(provider_name) && provider_name.present? %>
-              to <%= provider_name %>
-            <% elsif event.respond_to?(:metadata) && event.metadata.is_a?(Hash) && event.metadata['provider_name'].present? %>
-              to <%= event.metadata['provider_name'] %>
-            <% end %>
-          <% elsif is_rejection %>
-            Medical certification rejected on
-            <%= timestamp.strftime("%B %d, %Y at %I:%M %p") %>
-            <% if actor_name.present? %>by <%= actor_name %><% end %>
-          <% elsif event.is_a?(ApplicationStatusChange) && event.to_status == "approved" %>
-            Medical certification approved on
-            <%= timestamp.strftime("%B %d, %Y at %I:%M %p") %>
-            <% if actor_name.present? %>by <%= actor_name %><% end %>
-          <% elsif event.is_a?(ApplicationStatusChange) && event.to_status == "received" %>
-            Medical certification received on
-            <%= timestamp.strftime("%B %d, %Y at %I:%M %p") %>
-            <% submission_method = event.metadata['submission_method'] if event.respond_to?(:metadata) && event.metadata.is_a?(Hash) %>
-            <% if submission_method.present? %>(via <%= submission_method %>)<% end %>
-          <% end %>
-          <% if index == 0 %>
-            <span class="text-xs text-gray-500">(most recent)</span>
-          <% end %>
+        <p class="text-sm text-gray-600 mb-1">
+          → Requested on <%= request[:timestamp].strftime("%B %d, %Y at %I:%M %p") %>
+          <% if request[:actor_name].present? %>by <%= request[:actor_name] %><% end %>
+          <% if request[:submission_method].present? %>(via <%= request[:submission_method] %>)<% end %>
         </p>
-        
-        <% 
-          # Display rejection reason if available
-          rejection_reason = nil
-          if is_rejection
-            if event.is_a?(ApplicationStatusChange) && event.metadata.is_a?(Hash) && event.metadata['rejection_reason'].present?
-              rejection_reason = event.metadata['rejection_reason']
-            elsif event.respond_to?(:metadata) && event.metadata.is_a?(Hash) && event.metadata['reason'].present?
-              rejection_reason = event.metadata['reason']
-            end
-          end
-        %>
-        
-        <% if rejection_reason.present? %>
-          <p class="text-sm text-gray-600 ml-4 mb-1">
-            <span class="text-gray-500">Reason:</span> <%= rejection_reason %>
-          </p>
-        <% end %>
       </div>
     <% end %>
   <% else %>

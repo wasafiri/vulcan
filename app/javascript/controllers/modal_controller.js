@@ -19,11 +19,27 @@ export default class extends Controller {
     this._handleKeydown = this.handleKeydown.bind(this)
     document.addEventListener("keydown", this._handleKeydown)
     
+    // Add Turbo form submission event listeners
+    this._handleTurboSubmitEnd = this.handleTurboSubmitEnd.bind(this)
+    document.addEventListener("turbo:submit-end", this._handleTurboSubmitEnd)
+    
+    // Add listener for our custom form submit event from rejection form controller
+    this._handleTurboFormSubmit = this.handleTurboFormSubmit.bind(this)
+    document.addEventListener("turbo-form-submit", this._handleTurboFormSubmit)
+    
+    // Add a safety timeout to ensure body scroll is restored if other mechanisms fail
+    this._setupScrollSafetyTimeout()
+    
     console.log('Modal controller initialization complete')
   }
 
   disconnect() {
     document.removeEventListener("keydown", this._handleKeydown)
+    document.removeEventListener("turbo:submit-end", this._handleTurboSubmitEnd)
+    document.removeEventListener("turbo-form-submit", this._handleTurboFormSubmit)
+    if (this._scrollSafetyTimeout) {
+      clearTimeout(this._scrollSafetyTimeout)
+    }
     this.cleanup()
   }
 
@@ -228,6 +244,106 @@ export default class extends Controller {
       modal.classList.add('hidden')
       console.log("Hidden modal:", modal.id || 'unnamed modal')
     })
+    
+    // Set up safety timeout again in case we need it
+    this._setupScrollSafetyTimeout()
+  }
+  
+  // Setup a safety timeout to ensure body scroll is restored
+  _setupScrollSafetyTimeout() {
+    // Clear any existing timeout
+    if (this._scrollSafetyTimeout) {
+      clearTimeout(this._scrollSafetyTimeout)
+    }
+    
+    // Set a new timeout that will ensure body scroll is restored
+    // even if other mechanisms fail
+    this._scrollSafetyTimeout = setTimeout(() => {
+      // Only run if overflow-hidden is still present
+      if (document.body.classList.contains("overflow-hidden")) {
+        console.warn("Safety timeout triggered: overflow-hidden still present on body")
+        document.body.classList.remove("overflow-hidden")
+      }
+    }, 2000) // 2 seconds should be plenty of time for normal operations to complete
+  }
+  
+  // Handle custom turbo-form-submit event from rejection form
+  handleTurboFormSubmit(event) {
+    console.log("Custom turbo-form-submit event received from rejection form")
+    
+    // Mark that we need to restore scroll
+    this._formSubmissionInProgress = true;
+    
+    // Immediately ensure all modals are hidden to prevent stacking issues
+    document.querySelectorAll('[data-modal-target="container"]').forEach(modal => {
+      modal.classList.add('hidden');
+    });
+    
+    // First timer that runs quickly to catch immediate responses
+    setTimeout(() => {
+      console.log("First scroll restoration check")
+      // Force cleanup body overflow regardless of submission state
+      document.body.classList.remove("overflow-hidden")
+    }, 300);
+    
+    // Second timer with longer delay as a fallback
+    setTimeout(() => {
+      console.log("Second scroll restoration check")
+      if (this._formSubmissionInProgress) {
+        console.log("Form submission still in progress, force-restoring body scroll")
+        document.body.classList.remove("overflow-hidden")
+        this._formSubmissionInProgress = false;
+      }
+      
+      // Always ensure document body is scrollable
+      if (document.body.classList.contains("overflow-hidden")) {
+        console.log("overflow-hidden still present, removing")
+        document.body.classList.remove("overflow-hidden")
+      }
+    }, 1000); // Increased delay to handle slower responses
+    
+    // Add a visibility change listener as an extra safety measure
+    // This catches cases where the user switches tabs during submission
+    const visibilityListener = () => {
+      console.log("Visibility changed - cleaning up modal state")
+      document.body.classList.remove("overflow-hidden")
+      document.removeEventListener("visibilitychange", visibilityListener)
+    };
+    document.addEventListener("visibilitychange", visibilityListener, { once: true })
+  }
+  
+  // Handle Turbo form submissions
+  handleTurboSubmitEnd(event) {
+    // Check if the form that was submitted belongs to a modal
+    const form = event.detail?.formSubmission?.formElement
+    if (form && form.closest('[data-modal-target="container"]')) {
+      console.log("Turbo form submission complete in modal, ensuring body scroll is restored")
+      
+      // Mark that a form submission has completed
+      this._formSubmissionInProgress = false;
+      
+      // Immediately hide all modals to prevent stacking issues
+      document.querySelectorAll('[data-modal-target="container"]').forEach(modal => {
+        modal.classList.add('hidden');
+      });
+      
+      // Wait a short moment to allow Turbo to process the response
+      setTimeout(() => {
+        // Check if we should restore scroll
+        const shouldRestoreScroll = !this.preserveScrollValue
+        
+        if (shouldRestoreScroll) {
+          console.log("Restoring body scroll after Turbo form submission")
+          document.body.classList.remove("overflow-hidden")
+        }
+        
+        // Always check if overflow-hidden is still present and remove it as a safety measure
+        if (document.body.classList.contains("overflow-hidden")) {
+          console.log("overflow-hidden still present, removing")
+          document.body.classList.remove("overflow-hidden")
+        }
+      }, 250) // Increased from 100ms for more reliable cleanup
+    }
   }
 
   handleKeydown(event) {

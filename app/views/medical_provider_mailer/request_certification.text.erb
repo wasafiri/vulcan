@@ -2,7 +2,7 @@ MEDICAL CERTIFICATION FORM REQUEST
 
 Dear Healthcare Provider,
 
-We are writing to request your completion of a disability certification form for your patient, <%= @constituent.full_name %>, who is applying for the Maryland Assistive Technology Program.
+We are writing to request your completion of a disability certification form for your patient, <%= @constituent.full_name %>, who is applying for the Maryland Accessible Telecommunications Program.
 
 This <%= @request_count > 1 ? "is a follow-up request (Request ##{@request_count})" : "request" %> was sent on <%= Time.parse(@timestamp).strftime("%B %d, %Y at %I:%M %p") %>.
 
@@ -12,8 +12,8 @@ PATIENT INFORMATION:
 - Address: <%= @constituent.address %>, <%= @constituent.city %>, <%= @constituent.state %> <%= @constituent.zip %>
 - Application ID: <%= @application.id %>
 
-The certification form is essential for your patient to qualify for assistive technology devices they need. To complete this form:
-
+ <To qualify for assistance through MAT, your patient requires documentation that they have a disability that makes it difficult for them to use a standard telephone. The certification form is essential for your patient to qualify for accessible telecommunications devices they need. To complete this form:
+    
 1. Download the form at: https://mdmat.org/forms/disability-certification.pdf
 2. Complete all required fields
 3. Sign the form

@@ -2,6 +2,7 @@
 
 # Application helper methods for common view functionality and formatting.
 module ApplicationHelper
+  include ConstituentPortal::ActivityHelper
   include ActiveStorageHelper
   include Pagy::Frontend
   include BadgeHelper

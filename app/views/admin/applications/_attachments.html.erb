@@ -46,49 +46,49 @@
         <div class="mt-4">
           <h3 class="text-sm font-medium text-gray-700 mb-2">Proof History</h3>
           <div class="proof-history pl-4 border-l-2 border-gray-200">
-            <!-- Review History -->
-            <% if @proof_histories[:income][:reviews].any? %>
-              <% @proof_histories[:income][:reviews].each do |review| %>
+            <% chronological_activities = get_chronological_proof_history(@application, "income") %>
+            
+            <% if chronological_activities.any? %>
+              <% chronological_activities.each do |activity| %>
                 <div class="history-item mb-2">
                   <p class="text-sm text-gray-600 mb-1">
-                    <% if review.status_approved? %>
-                      <span class="text-green-600">✓</span> Approved on 
-                    <% else %>
-                      <span class="text-red-600">×</span> Rejected on 
+                    <span class="<%= activity.icon_class %>"><%= activity.icon_symbol %></span>
+                    
+                    <% case activity.activity_type %>
+                    <% when :submission %>
+                      Submitted on
+                    <% when :resubmission %>
+                      Resubmitted on
+                    <% when :approval %>
+                      Approved on
+                    <% when :rejection %>
+                      Rejected on
                     <% end %>
-                    <%= review.reviewed_at&.strftime("%B %d, %Y at %I:%M %p") %>
-                    by <%= review.admin&.full_name || "Unknown Admin" %>
+                    
+                    <%= activity.created_at.strftime("%B %d, %Y at %I:%M %p") %>
+                    
+                    <% if [:submission, :resubmission].include?(activity.activity_type) && activity.source.respond_to?(:submission_method) && activity.source.submission_method.present? %>
+                      <span class="text-xs text-gray-500">(via <%= activity.source.submission_method %>)</span>
+                    <% elsif [:approval, :rejection].include?(activity.activity_type) %>
+                      by <%= activity.source.admin&.full_name || "Unknown Admin" %>
+                    <% end %>
                   </p>
-                  <% if review.status_rejected? && review.rejection_reason.present? %>
+                  
+                  <% if activity.activity_type == :rejection && activity.details.present? %>
                     <p class="text-sm text-gray-600 ml-4 mb-1">
-                      <span class="text-gray-500">Reason:</span> "<%= sanitize review.rejection_reason %>"
+                      <span class="text-gray-500">Reason:</span> "<%= sanitize activity.details %>"
                     </p>
-                  <% elsif review.status_approved? && review.respond_to?(:notes) && review.notes.present? %>
+                  <% elsif activity.activity_type == :approval && activity.details.present? %>
                     <p class="text-sm text-gray-600 ml-4 mb-1">
-                      <span class="text-gray-500">Note:</span> "<%= sanitize review.notes %>"
+                      <span class="text-gray-500">Note:</span> "<%= sanitize activity.details %>"
+                    </p>
+                  <% elsif activity.source.respond_to?(:notes) && activity.source.notes.present? %>
+                    <p class="text-sm text-gray-600 ml-4">
+                      <%= sanitize activity.source.notes %>
                     </p>
                   <% end %>
                 </div>
               <% end %>
-            <% end %>
-
-            <!-- Initial Submission -->
-            <% if @proof_histories[:income][:audits].any? %>
-              <% initial_submission = @proof_histories[:income][:audits].last %>
-              <div class="history-item mb-2">
-                <p class="text-sm text-gray-600 mb-1">
-                  <span class="text-blue-600">→</span> Submitted on 
-                  <%= initial_submission.created_at&.strftime("%B %d, %Y at %I:%M %p") %>
-                  <% if initial_submission.respond_to?(:submission_method) && initial_submission.submission_method.present? %>
-                    <span class="text-xs text-gray-500">(via <%= initial_submission.submission_method %>)</span>
-                  <% end %>
-                </p>
-                <% if initial_submission.respond_to?(:notes) && initial_submission.notes.present? %>
-                  <p class="text-sm text-gray-600 ml-4">
-                    <%= sanitize initial_submission.notes %>
-                  </p>
-                <% end %>
-              </div>
             <% elsif @application.created_at.present? %>
               <!-- Fallback when no audit records exist -->
               <div class="history-item mb-2">
@@ -98,9 +98,7 @@
                   <span class="text-xs text-gray-500">(via application submission)</span>
                 </p>
               </div>
-            <% end %>
-
-            <% if !@proof_histories[:income] || (@proof_histories[:income][:reviews].empty? && @proof_histories[:income][:audits].empty?) %>
+            <% else %>
               <div class="history-item mb-2">
                 <p class="text-sm text-gray-600 mb-1">
                   <span class="text-yellow-500">Note:</span> No detailed history available.
@@ -189,61 +187,59 @@
         <div class="mt-4">
           <h3 class="text-sm font-medium text-gray-700 mb-2">Proof History</h3>
           <div class="proof-history pl-4 border-l-2 border-gray-200">
-            <!-- Review History -->
-            <% if @proof_histories[:residency][:reviews].any? %>
-              <% @proof_histories[:residency][:reviews].each do |review| %>
+            <% chronological_activities = get_chronological_proof_history(@application, "residency") %>
+            
+            <% if chronological_activities.any? %>
+              <% chronological_activities.each do |activity| %>
                 <div class="history-item mb-2">
                   <p class="text-sm text-gray-600 mb-1">
-                    <% if review.status_approved? %>
-                      <span class="text-green-600">✓</span> Approved on
-                    <% else %>
-                      <span class="text-red-600">×</span> Rejected on
+                    <span class="<%= activity.icon_class %>"><%= activity.icon_symbol %></span>
+                    
+                    <% case activity.activity_type %>
+                    <% when :submission %>
+                      Submitted on
+                    <% when :resubmission %>
+                      Resubmitted on
+                    <% when :approval %>
+                      Approved on
+                    <% when :rejection %>
+                      Rejected on
                     <% end %>
-                    <%= review.reviewed_at&.strftime("%B %d, %Y at %I:%M %p") %>
-                    by <%= review.admin&.full_name || "Unknown Admin" %>
+                    
+                    <%= activity.created_at.strftime("%B %d, %Y at %I:%M %p") %>
+                    
+                    <% if [:submission, :resubmission].include?(activity.activity_type) && activity.source.respond_to?(:submission_method) && activity.source.submission_method.present? %>
+                      <span class="text-xs text-gray-500">(via <%= activity.source.submission_method %>)</span>
+                    <% elsif [:approval, :rejection].include?(activity.activity_type) %>
+                      by <%= activity.source.admin&.full_name || "Unknown Admin" %>
+                    <% end %>
                   </p>
-                  <% if review.status_rejected? && review.rejection_reason.present? %>
+                  
+                  <% if activity.activity_type == :rejection && activity.details.present? %>
                     <p class="text-sm text-gray-600 ml-4 mb-1">
-                      <span class="text-gray-500">Reason:</span> "<%= sanitize review.rejection_reason %>"
+                      <span class="text-gray-500">Reason:</span> "<%= sanitize activity.details %>"
                     </p>
-                  <% elsif review.status_approved? && review.respond_to?(:notes) && review.notes.present? %>
+                  <% elsif activity.activity_type == :approval && activity.details.present? %>
                     <p class="text-sm text-gray-600 ml-4 mb-1">
-                      <span class="text-gray-500">Note:</span> "<%= sanitize review.notes %>"
+                      <span class="text-gray-500">Note:</span> "<%= sanitize activity.details %>"
+                    </p>
+                  <% elsif activity.source.respond_to?(:notes) && activity.source.notes.present? %>
+                    <p class="text-sm text-gray-600 ml-4">
+                      <%= sanitize activity.source.notes %>
                     </p>
                   <% end %>
                 </div>
               <% end %>
-            <% end %>
-
-            <!-- Initial Submission -->
-            <% if @proof_histories[:residency][:audits].any? %>
-              <% initial_submission = @proof_histories[:residency][:audits].last %>
-              <div class="history-item mb-2">
-                <p class="text-sm text-gray-600 mb-1">
-                  <span class="text-blue-600">→</span> Submitted on
-                  <%= initial_submission.created_at&.strftime("%B %d, %Y at %I:%M %p") %>
-                  <% if initial_submission.respond_to?(:submission_method) && initial_submission.submission_method.present? %>
-                    <span class="text-xs text-gray-500">(via <%= initial_submission.submission_method %>)</span>
-                  <% end %>
-                </p>
-                <% if initial_submission.respond_to?(:notes) && initial_submission.notes.present? %>
-                  <p class="text-sm text-gray-600 ml-4">
-                    <%= sanitize initial_submission.notes %>
-                  </p>
-                <% end %>
-              </div>
             <% elsif @application.created_at.present? %>
               <!-- Fallback when no audit records exist -->
               <div class="history-item mb-2">
                 <p class="text-sm text-gray-600 mb-1">
-                  <span class="text-blue-600">→</span> Submitted on 
+                  <span class="text-blue-600">→</span> Submitted on
                   <%= @application.created_at.strftime("%B %d, %Y at %I:%M %p") %>
                   <span class="text-xs text-gray-500">(via application submission)</span>
                 </p>
               </div>
-            <% end %>
-
-            <% if !@proof_histories[:residency] || (@proof_histories[:residency][:reviews].empty? && @proof_histories[:residency][:audits].empty?) %>
+            <% else %>
               <div class="history-item mb-2">
                 <p class="text-sm text-gray-600 mb-1">
                   <span class="text-yellow-500">Note:</span> No detailed history available.

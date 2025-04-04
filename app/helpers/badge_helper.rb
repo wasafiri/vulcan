@@ -61,6 +61,82 @@ module BadgeHelper
     end
   end
 
+  def certification_status_class(status)
+    case status.to_s
+    when 'not_requested'
+      'text-gray-600'
+    when 'requested'
+      'text-yellow-600'
+    when 'received'
+      'text-blue-600'
+    when 'approved'
+      'text-green-600'
+    when 'rejected'
+      'text-red-600'
+    else
+      'text-gray-500'
+    end
+  end
+  
+  def medical_certification_label(application)
+    status = application.medical_certification_status.to_s
+    case status
+    when 'not_requested'
+      'Medical Certification'
+    when 'requested'
+      'Medical Certification Request'
+    when 'received'
+      'Medical Certification Received'
+    when 'approved'
+      'Medical Certification Approved'
+    when 'rejected'
+      'Medical Certification Rejected'
+    else
+      'Medical Certification'
+    end
+  end
+  
+  def medical_certification_link(application, style = :link)
+    return nil unless application.medical_certification.attached?
+    
+    url = Rails.application.routes.url_helpers.rails_blob_path(application.medical_certification, disposition: :inline)
+    
+    if style == :button
+      link_to 'View Certification', url, 
+              target: '_blank', 
+              class: 'inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700'
+    else
+      link_to 'View Certification', url, 
+              target: '_blank', 
+              class: 'text-blue-600 hover:text-blue-800 underline'
+    end
+  end
+  
+  def medical_certification_submission_method(application)
+    return 'unknown' unless application.medical_certification.attached?
+    
+    # Try to find submission method from metadata or related records
+    if application.respond_to?(:medical_certification_submission_method) && 
+       application.medical_certification_submission_method.present?
+      return application.medical_certification_submission_method
+    end
+    
+    # Check for status changes that might have the method
+    status_change = ApplicationStatusChange.where(application_id: application.id)
+                      .where("metadata->>'change_type' = ? OR to_status = ?", 
+                             'medical_certification', 'received')
+                      .order(created_at: :desc)
+                      .first
+    
+    if status_change&.metadata.present? && 
+       status_change.metadata['submission_method'].present?
+      return status_change.metadata['submission_method']
+    end
+    
+    # Default fallback
+    'portal'
+  end
+
   def badge_label_for(type, status)
     # Special case for evaluation "pending" status
     return 'Requested' if type.to_sym == :evaluation && status.to_s == 'pending'

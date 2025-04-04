@@ -53,12 +53,12 @@ module ConstituentPortal
         # Set flash and keep it through redirects
         flash[:notice] = 'Proof submitted successfully'
         flash.keep(:notice)
-        redirect_to resubmit_proof_document_constituent_portal_application_path(@application)
+        redirect_to constituent_portal_application_path(@application)
       rescue RateLimit::ExceededError
         # Set flash and keep it through redirects
         flash[:alert] = 'Please wait before submitting another proof'
         flash.keep(:alert)
-        redirect_to resubmit_proof_document_constituent_portal_application_path(@application)
+        redirect_to constituent_portal_application_path(@application)
       rescue StandardError => e
         Rails.logger.error "ERROR IN RESUBMIT: #{e.class.name}: #{e.message}"
         Rails.logger.error e.backtrace.join("\n")
@@ -81,11 +81,43 @@ module ConstituentPortal
         }
       end
 
-      def set_application
-        @application = current_user.applications.find(params[:application_id])
-      rescue ActiveRecord::RecordNotFound
-        redirect_to constituent_portal_dashboard_path, alert: 'Application not found'
-      end
+  def set_application
+    # The application ID could be in different params based on the routing
+    # In routes.rb: get 'proofs/new/:proof_type', to: 'proofs/proofs#new', as: :new_proof
+    # The :id is from the resource-level param, and we need to extract the ID from the URL path
+    application_id = params[:application_id]
+    
+    # Special handling for the route format
+    if application_id.nil? && params[:id].present?
+      # When using routes like /constituent_portal/applications/123/proofs/new/income
+      # the ID comes through as :id
+      application_id = params[:id]
+    end
+    
+    Rails.logger.info "Looking for application with ID: #{application_id.inspect}, params: #{params.inspect}"
+    
+    if application_id.blank?
+      Rails.logger.error "Application ID is nil or empty in params: #{params.inspect}"
+      redirect_to constituent_portal_dashboard_path, alert: 'Application not found'
+      return
+    end
+    
+    # First try the standard approach
+    @application = current_user.applications.find_by(id: application_id)
+    
+    # If that fails, try a more flexible query to handle potential type mismatches
+    if @application.nil?
+      @application = Application.where(id: application_id)
+                              .where(user_id: current_user.id)
+                              .first
+    end
+    
+    # If we still couldn't find it, redirect
+    if @application.nil?
+      Rails.logger.error "Application not found with ID: #{application_id} for user: #{current_user.id}"
+      redirect_to constituent_portal_dashboard_path, alert: 'Application not found'
+    end
+  end
 
       def require_constituent!
         return if current_user&.constituent?
@@ -115,18 +147,35 @@ module ConstituentPortal
       # This ensures a consistent approach to attachment across the application
       # Both constituent portal and paper applications use the same service
       def attach_and_update_proof
-        result = ProofAttachmentService.attach_proof(
-          application: @application,
-          proof_type: params[:proof_type],
-          blob_or_file: params[:"#{params[:proof_type]}_proof"],
-          status: :not_reviewed,
-          admin: nil,
-          submission_method: :web,
-          metadata: {
-            ip_address: request.remote_ip,
-            user_agent: request.user_agent
-          }
-        )
+        # Log that we're resubmitting a previously rejected proof
+        is_resubmitting = (@application.income_proof_status_rejected? && params[:proof_type] == 'income') ||
+                         (@application.residency_proof_status_rejected? && params[:proof_type] == 'residency')
+        
+        if is_resubmitting
+          Rails.logger.info "Resubmitting previously rejected #{params[:proof_type]} proof for application #{@application.id}"
+        end
+
+        # Set thread local variable to communicate resubmission status to validation layer
+        Thread.current[:resubmitting_proof] = is_resubmitting
+        
+        begin
+          result = ProofAttachmentService.attach_proof(
+            application: @application,
+            proof_type: params[:proof_type],
+            blob_or_file: params[:"#{params[:proof_type]}_proof"],
+            status: :not_reviewed,
+            admin: nil,
+            submission_method: :web,
+            metadata: {
+              ip_address: request.remote_ip,
+              user_agent: request.user_agent,
+              resubmitting: is_resubmitting # Pass resubmission flag in metadata
+            }
+          )
+        ensure
+          # Always reset thread local, even if an exception occurs
+          Thread.current[:resubmitting_proof] = nil
+        end
 
         return if result[:success]
 

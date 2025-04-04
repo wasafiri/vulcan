@@ -113,9 +113,12 @@
             <td class="px-6 py-4 text-sm text-gray-500">
               <%= case
                   when log.is_a?(ProofReview)
-                    status_text = log.status_rejected? ? "rejected" : "approved"
-                    rejection_text = log.rejection_reason.present? ? " - #{log.rejection_reason}" : ""
-                    "Admin #{status_text} #{log.proof_type.titleize} proof#{rejection_text}"
+                    if log.status_rejected?
+                      rejection_text = log.rejection_reason.present? ? " - #{log.rejection_reason}" : ""
+                      "Admin rejected #{log.proof_type.titleize} proof#{rejection_text}"
+                    else
+                      "Admin approved #{log.proof_type.titleize} proof"
+                    end
                   when log.is_a?(ApplicationStatusChange)
                     if log.metadata.try(:[], 'change_type') == 'medical_certification'
                       # Special handling for medical certification status changes

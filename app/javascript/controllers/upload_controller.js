@@ -1,137 +1,128 @@
 import { Controller } from "@hotwired/stimulus"
+import { DirectUpload } from "@rails/activestorage"
 
-// This controller provides UI feedback for file uploads
-// It relies on Rails' built-in direct upload functionality
 export default class extends Controller {
-  static targets = ["input", "progress", "percentage", "statusText", "cancel"]
+  static targets = ["input", "progress", "percentage", "cancel", "submit"]
 
   connect() {
-    // Set default status text
-    if (this.hasStatusTextTarget) {
-      this.statusTextTarget.textContent = "No file selected"
-    }
-    
-    // Listen for direct-upload events
-    if (this.hasInputTarget) {
-      this.setupDirectUploadHandlers()
-    }
+    this.cancelToken = null
+    this.uploadInProgress = false
   }
 
   handleFileSelect(event) {
     const file = event.target.files[0]
-    if (!file) {
-      if (this.hasStatusTextTarget) {
-        this.statusTextTarget.textContent = "No file selected"
-      }
-      return
+    if (!file) return
+
+    this.validateFile(file)
+
+    // Show the progress bar and cancel button
+    this.progressTarget.classList.remove("hidden")
+    this.cancelTarget.classList.remove("hidden")
+    
+    // Disable the submit button during upload
+    this.submitTarget.disabled = true
+
+    // Start the direct upload process
+    this.uploadInProgress = true
+    this.uploadFile(file)
+  }
+
+  validateFile(file) {
+    const validFileTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/tiff', 'image/bmp']
+    const maxFileSize = 5 * 1024 * 1024 // 5MB in bytes
+
+    if (!validFileTypes.includes(file.type)) {
+      alert("Invalid file type. Please upload a PDF or an image file (jpg, jpeg, png, tiff, bmp).")
+      this.inputTarget.value = ""
+      return false
     }
 
-    // Update status text with file name and size
-    if (this.hasStatusTextTarget) {
-      this.statusTextTarget.textContent = `Selected: ${file.name} (${this.formatFileSize(file.size)})`
+    if (file.size > maxFileSize) {
+      alert("File is too large. Maximum size allowed is 5MB.")
+      this.inputTarget.value = ""
+      return false
+    }
+
+    return true
+  }
+
+  uploadFile(file) {
+    const url = this.inputTarget.dataset.directUploadUrl
+    const upload = new DirectUpload(file, url, this)
+    
+    upload.create((error, blob) => {
+      if (error) {
+        this.handleUploadError(error)
+      } else {
+        this.handleUploadSuccess(blob)
+      }
+    })
+  }
+
+  // DirectUpload delegate methods
+  directUploadWillStoreFileWithXHR(xhr) {
+    this.cancelToken = xhr
+    xhr.upload.addEventListener("progress", event => this.updateProgress(event))
+  }
+
+  updateProgress(event) {
+    if (event.lengthComputable) {
+      const percent = Math.round((event.loaded / event.total) * 100)
+      this.progressTarget.querySelector("[role=progressbar]").style.width = `${percent}%`
+      this.percentageTarget.textContent = `${percent}%`
     }
   }
-  
-  // Set up event handlers for Rails' direct upload
-  setupDirectUploadHandlers() {
-    this.element.addEventListener("direct-upload:initialize", this.initializeUpload.bind(this))
-    this.element.addEventListener("direct-upload:start", this.startUpload.bind(this))
-    this.element.addEventListener("direct-upload:progress", this.progressUpload.bind(this))
-    this.element.addEventListener("direct-upload:error", this.errorUpload.bind(this))
-    this.element.addEventListener("direct-upload:end", this.endUpload.bind(this))
-  }
-  
-  initializeUpload(event) {
-    if (this.hasStatusTextTarget) {
-      this.statusTextTarget.textContent = "Preparing upload..."
+
+  cancelUpload() {
+    if (this.cancelToken && this.uploadInProgress) {
+      this.cancelToken.abort()
+      this.resetUpload()
+      this.inputTarget.value = ""
     }
   }
-  
-  startUpload(event) {
-    if (this.hasProgressTarget) {
-      this.progressTarget.classList.remove('hidden')
-    }
-    
-    if (this.hasCancelTarget) {
-      this.cancelTarget.classList.remove('hidden')
-    }
+
+  handleUploadError(error) {
+    console.error("Upload error:", error)
+    alert("There was an error uploading your file. Please try again.")
+    this.resetUpload()
   }
-  
-  progressUpload(event) {
-    const { progress } = event.detail
+
+  handleUploadSuccess(blob) {
+    // Create a hidden field with the signed_id
+    const hiddenField = document.createElement('input')
+    hiddenField.setAttribute("type", "hidden")
+    hiddenField.setAttribute("name", this.inputTarget.name)
+    hiddenField.setAttribute("value", blob.signed_id)
     
-    if (this.hasPercentageTarget) {
-      this.percentageTarget.textContent = `${progress}%`
-    }
-    
-    const progressBar = this.progressTarget.querySelector('[role="progressbar"]')
-    if (progressBar) {
-      progressBar.style.width = `${progress}%`
-      progressBar.setAttribute('aria-valuenow', progress)
-    }
-  }
-  
-  errorUpload(event) {
-    const { error } = event.detail
-    
-    if (this.hasStatusTextTarget) {
-      this.statusTextTarget.textContent = `Error: ${error}`
-      this.statusTextTarget.classList.add('text-red-500')
-    }
-    
-    if (this.hasProgressTarget) {
-      this.progressTarget.classList.add('hidden')
-    }
-    
-    if (this.hasCancelTarget) {
-      this.cancelTarget.classList.add('hidden')
-    }
-    
-    console.error('Direct upload error:', error)
-  }
-  
-  endUpload(event) {
-    if (this.hasStatusTextTarget) {
-      this.statusTextTarget.textContent = "Upload complete"
-    }
-    
-    if (this.hasProgressTarget) {
-      this.progressTarget.classList.add('hidden')
-    }
-    
-    if (this.hasCancelTarget) {
-      this.cancelTarget.classList.add('hidden')
-    }
-  }
-  
-  cancelUpload(event) {
-    // Reset file input
-    if (this.hasInputTarget) {
-      this.inputTarget.value = null
-    }
+    // Add it to the form
+    this.element.appendChild(hiddenField)
     
     // Update UI
-    if (this.hasStatusTextTarget) {
-      this.statusTextTarget.textContent = "Upload canceled"
-    }
+    this.progressTarget.querySelector("[role=progressbar]").style.width = "100%"
+    this.percentageTarget.textContent = "100%"
     
-    if (this.hasProgressTarget) {
-      this.progressTarget.classList.add('hidden')
-    }
+    // Enable submit button
+    this.submitTarget.disabled = false
+    this.uploadInProgress = false
     
-    if (this.hasCancelTarget) {
-      this.cancelTarget.classList.add('hidden')
-    }
+    // Show success message
+    setTimeout(() => {
+      this.progressTarget.classList.add("hidden")
+      this.cancelTarget.classList.add("hidden")
+    }, 1000)
   }
-  
-  // Helper for formatting file sizes
-  formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
+
+  resetUpload() {
+    // Reset progress bar
+    this.progressTarget.querySelector("[role=progressbar]").style.width = "0%"
+    this.percentageTarget.textContent = "0%"
     
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    // Hide progress bar and cancel button
+    this.progressTarget.classList.add("hidden")
+    this.cancelTarget.classList.add("hidden")
     
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    // Enable submit button
+    this.submitTarget.disabled = false
+    this.uploadInProgress = false
   }
 }

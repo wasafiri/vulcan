@@ -174,5 +174,16 @@ export default class extends Controller {
     }
 
     reasonField.classList.remove('border-red-500')
+    
+    // Notify any parent modal controllers that a form is being submitted
+    // This helps ensure proper scroll restoration after the form submission
+    document.dispatchEvent(new CustomEvent('turbo-form-submit', {
+      detail: { 
+        element: event.target,
+        controller: this
+      }
+    }));
+    
+    console.log("Form submission validated, proceeding with submit");
   }
 }

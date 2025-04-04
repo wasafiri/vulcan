@@ -1,0 +1,135 @@
+<%# Proof Upload Form for constituents to re-submit proofs %>
+<div class="py-10">
+  <header>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="md:flex md:items-center md:justify-between">
+        <div class="flex-1 min-w-0">
+          <h1 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+            Upload New <%= @proof_type.titleize %> Proof
+          </h1>
+        </div>
+        <div class="mt-4 flex md:mt-0 md:ml-4">
+          <%= link_to "Back to Dashboard", constituent_portal_dashboard_path, 
+              class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+      <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+          <!-- Informational Alert -->
+          <div class="rounded-md bg-blue-50 p-4 mb-6">
+            <div class="flex">
+              <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="ml-3 flex-1 md:flex md:justify-between">
+                <p class="text-sm text-blue-700">
+                  <% if @proof_type == 'income' %>
+                    Your income proof document should clearly show your name, date, and income details. Examples include tax returns, pay stubs, or benefit award letters.
+                  <% else %>
+                    Your residency proof document should clearly show your name and current address. Examples include utility bills, lease agreements, or government-issued IDs.
+                  <% end %>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <%= form_with url: resubmit_proof_document_constituent_portal_application_path(@application), method: :post, html: { class: "space-y-6", data: { controller: "upload" } } do |form| %>
+            <%= hidden_field_tag :proof_type, @proof_type %>
+            
+            <div>
+              <label for="<%= "#{@proof_type}_proof" %>" class="block text-sm font-medium text-gray-700">
+                Upload your <%= @proof_type.titleize %> document
+              </label>
+              <p class="mt-1 text-sm text-gray-500" id="file-description">
+                Acceptable formats: PDF, JPG, JPEG, PNG. Maximum file size: 5MB.
+              </p>
+              
+              <div class="mt-2">
+                <%= form.file_field "#{@proof_type}_proof", 
+                    class: "block w-full text-sm text-gray-900 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500",
+                    direct_upload: true,
+                    accept: ".pdf,.jpg,.jpeg,.png",
+                    data: { 
+                      upload_target: "input",
+                      action: "change->upload#handleFileSelect",
+                      direct_upload_url: rails_direct_uploads_path
+                    },
+                    "aria-describedby": "file-description" %>
+              </div>
+              
+              <!-- Progress bar (hidden initially) -->
+              <div class="mt-2 hidden" data-upload-target="progress">
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                  <div class="bg-indigo-600 h-2.5 rounded-full w-0" style="transition: width 0.3s" role="progressbar" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <p class="mt-1 text-xs text-gray-500">
+                  Uploading: <span data-upload-target="percentage">0%</span>
+                </p>
+              </div>
+              
+              <!-- Cancel button (hidden initially) -->
+              <button type="button" 
+                class="mt-2 hidden text-sm text-red-600 hover:text-red-800" 
+                data-upload-target="cancel"
+                data-action="click->upload#cancelUpload">
+                Cancel upload
+              </button>
+            </div>
+            
+            <div class="flex justify-end">
+              <button type="button" 
+                class="mr-3 inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                onclick="window.history.back()">
+                Cancel
+              </button>
+              <%= form.submit "Submit Document", 
+                  class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                  data: { upload_target: "submit" } %>
+            </div>
+          <% end %>
+        </div>
+      </div>
+      
+      <!-- Accessibility section -->
+      <div class="mt-6 px-4 sm:px-0">
+        <h2 class="sr-only">Upload Instructions</h2>
+        <div class="border-t border-gray-200 py-5">
+          <details class="group">
+            <summary class="flex items-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700">
+              <span>Need help with your document upload?</span>
+              <span class="ml-2 flex-shrink-0">
+                <svg class="h-5 w-5 text-gray-400 group-open:transform group-open:rotate-180" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+              </span>
+            </summary>
+            <div class="mt-4 text-sm text-gray-500 space-y-3">
+              <p>Follow these steps to upload your document:</p>
+              <ol class="list-decimal pl-5 space-y-2">
+                <li>Click the "Choose File" button above.</li>
+                <li>Select your document from your device.</li>
+                <li>Wait for the upload to complete (you'll see a progress bar).</li>
+                <li>Click "Submit Document" to finish.</li>
+              </ol>
+              <p class="mt-3">If you're having trouble, make sure your document:</p>
+              <ul class="list-disc pl-5 space-y-2">
+                <li>Is in PDF, JPG, JPEG, or PNG format</li>
+                <li>Is smaller than 5MB in size</li>
+                <li>Is clearly legible</li>
+                <li>Shows all required information</li>
+              </ul>
+              <p class="mt-3">For additional assistance, please contact our support team at <a href="mailto:support@example.com" class="text-indigo-600 hover:text-indigo-900">support@example.com</a> or call (555) 123-4567.</p>
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>

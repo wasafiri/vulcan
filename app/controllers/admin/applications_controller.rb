@@ -441,13 +441,13 @@ module Admin
 
   # Handle based on selected action
   if status == "approved"
-      process_accepted_certification
-    elsif status == "rejected"
-      process_rejected_certification
-    else
-      redirect_to admin_application_path(@application),
-                  alert: 'Please select whether to accept or reject the certification.'
-    end
+    process_accepted_certification
+  elsif status == "rejected"
+    process_rejected_certification
+  else
+    redirect_to admin_application_path(@application),
+      alert: 'Please select whether to accept or reject the certification.'
+  end
   end
 
   # Process an approved medical certification
@@ -455,7 +455,7 @@ module Admin
   def process_accepted_certification
     # Log debug information only in development or test environments
     log_certification_params if !Rails.env.production?
-    
+
     # Validate file presence
     if params[:medical_certification].blank?
       redirect_to admin_application_path(@application), 
@@ -607,8 +607,13 @@ module Admin
       @audit_logs = audit_log_builder.build_audit_logs
 
       flash.now[:notice] = "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
-      streams = remove_modals_streams.concat(update_content_streams)
+      
+      # Changed the order: add cleanup JS FIRST, then update content, finally remove modals
+      # This ensures cleanup runs before modal elements are removed from the DOM
+      streams = []
       streams << append_cleanup_js
+      streams.concat(update_content_streams)
+      streams.concat(remove_modals_streams)
 
       render turbo_stream: streams
     end
@@ -694,12 +699,30 @@ module Admin
     def cleanup_js
       <<-JS.html_safe.strip_heredoc
         (function() {
-          console.log('Executing immediate modal cleanup');
+          console.log('Executing immediate modal cleanup - IMPROVED VERSION');
+          
+          // First and most importantly - remove overflow-hidden from body
           document.body.classList.remove('overflow-hidden');
+          
+          // Clear any inline styles that might affect scrolling
+          document.body.style.overflow = '';
+          document.body.style.position = '';
+          document.documentElement.style.overflow = '';
+          document.documentElement.style.position = '';
+          
+          // Force page scrollability via inline style as a failsafe
+          document.body.style.overflow = 'auto';
+          document.body.style.height = 'auto';
+          
+          console.log('Scroll has been immediately restored');
+          
+          // THEN handle the modals, even if they might be removed soon
           document.querySelectorAll('[data-modal-target="container"]').forEach(function(modal) {
             modal.classList.add('hidden');
             console.log('Hidden modal:', modal.id || 'unnamed modal');
           });
+          
+          // Trigger cleanup on any modal controllers
           document.querySelectorAll("[data-controller~='modal']").forEach(function(element) {
             try {
               var controller = window.Stimulus.getControllerForElementAndIdentifier(element, 'modal');
@@ -711,26 +734,26 @@ module Admin
               console.error('Error cleaning up modal:', e);
             }
           });
+          
+          // Set up a double-safety timer that will forcibly restore scroll
+          // regardless of what other JavaScript might do
+          setTimeout(function() {
+            document.body.classList.remove('overflow-hidden');
+            document.body.style.overflow = 'auto';
+            console.log('Extra safety timeout executed for scroll restoration');
+          }, 100);
         })();
+        
+        // Add our visibility change listener as a tertiary fallback
         document.addEventListener('visibilitychange', function() {
           if (!document.hidden) {
             console.log('Page became visible again - cleaning up modals');
             document.querySelectorAll('[data-modal-target="container"]').forEach(function(modal) {
               modal.classList.add('hidden');
-              console.log('Hidden modal on visibility change:', modal.id || 'unnamed modal');
             });
             document.body.classList.remove('overflow-hidden');
-            document.querySelectorAll("[data-controller~='modal']").forEach(function(element) {
-              try {
-                var controller = window.Stimulus.getControllerForElementAndIdentifier(element, 'modal');
-                if (controller && typeof controller.cleanup === 'function') {
-                  controller.cleanup();
-                  console.log('Modal cleanup triggered on visibility change');
-                }
-              } catch(e) {
-                console.error('Error cleaning up modal:', e);
-              }
-            });
+            document.body.style.overflow = 'auto';
+            console.log('Visibility change scroll restoration completed');
           }
         }, { once: true });
       JS

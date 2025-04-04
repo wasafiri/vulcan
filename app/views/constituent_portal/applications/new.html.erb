@@ -149,7 +149,7 @@
                       ["South Dakota", "SD"], ["Tennessee", "TN"], ["Texas", "TX"], ["Utah", "UT"], 
                       ["Vermont", "VT"], ["Virginia", "VA"], ["Washington", "WA"], ["West Virginia", "WV"], 
                       ["Wisconsin", "WI"], ["Wyoming", "WY"], ["District of Columbia", "DC"]
-                    ], (@address.respond_to?(:[]) ? @address[:state] : nil) || params.dig(:application, :state)),
+                    ], (@address && @address.respond_to?(:[]) ? @address[:state] : nil) || params.dig(:application, :state) || current_user&.state),
                     { include_blank: "Select State" },
                     { class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
                       required: true } %>
@@ -253,10 +253,10 @@
           <h2 id="documents-section-title" class="text-lg font-medium text-gray-900">Required Documentation</h2>
           <div class="space-y-4">
             <div>
-              <%= form.label :residency_proof, "Proof of Residency",
+              <%= form.label :residency_proof, "Proof of Residency (Required)",
                   class: "block text-sm font-medium text-gray-700" %>
               <p id="residency-hint" class="text-xs text-gray-700 mb-2">
-                Upload driver's license, state ID, or identification card
+                Upload driver's license, state ID, or identification card. <span class="font-semibold text-red-600">This proof is required to submit your application.</span>
               </p>
               <%= form.file_field :residency_proof,
                   class: "block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500",
@@ -268,10 +268,10 @@
             </div>
 
             <div>
-              <%= form.label :income_proof, "Income Verification",
+              <%= form.label :income_proof, "Income Verification (Required)",
                   class: "block text-sm font-medium text-gray-700" %>
               <p id="income-hint" class="text-xs text-gray-700 mb-2">
-                We need proof of your household income. Please provide your most recent tax return (preferred), current year SSA award letter (less than 2 months old), or a recent bank statement showing your SSA deposit. If providing a utility bill, it must show your current address.
+                We need proof of your household income. Please provide your most recent tax return (preferred), current year SSA award letter (less than 2 months old), or a recent bank statement showing your SSA deposit. <span class="font-semibold text-red-600">This proof is required to submit your application.</span>
               </p>
               <%= form.file_field :income_proof,
                   class: "block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500",

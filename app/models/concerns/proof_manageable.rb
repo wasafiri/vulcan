@@ -12,9 +12,10 @@ module ProofManageable
     has_one_attached :medical_certification
     has_many_attached :documents
 
-    validate :correct_proof_mime_type
-    validate :proof_size_within_limit
-    validate :verify_proof_attachments
+  validate :correct_proof_mime_type
+  validate :proof_size_within_limit
+  validate :verify_proof_attachments, unless: :resubmitting_proof?
+  validate :require_proof_attachments, if: :require_proof_validations?
 
     # Add callbacks for when proofs are attached
     after_save :create_proof_submission_audit, if: :proof_attachments_changed?
@@ -255,8 +256,11 @@ module ProofManageable
   end
 
   def validate_not_reviewed_proofs
-    # Skip this set of validations for paper applications or when reviewing a single proof
-    return if Thread.current[:paper_application_context] || Thread.current[:reviewing_single_proof]
+    # Skip this set of validations for paper applications, when reviewing a single proof,
+    # or when resubmitting any proof
+    return if Thread.current[:paper_application_context] || 
+              Thread.current[:reviewing_single_proof] ||
+              resubmitting_proof?
 
     validate_not_reviewed_proof(
       proof: income_proof,
@@ -264,6 +268,7 @@ module ProofManageable
       error_field: :income_proof_status,
       label: 'Income proof'
     )
+    
     validate_not_reviewed_proof(
       proof: residency_proof,
       status_check_method: :residency_proof_status_not_reviewed?,
@@ -331,5 +336,47 @@ module ProofManageable
         timestamp: Time.current.iso8601
       }
     )
+  end
+  
+  def require_proof_attachments
+    unless income_proof.attached?
+      errors.add(:income_proof, 'must be attached. Please upload your income documentation.')
+    end
+    
+    unless residency_proof.attached?
+      errors.add(:residency_proof, 'must be attached. Please upload your proof of Maryland residency.')
+    end
+  end
+
+  # Determines if we're in the process of resubmitting a previously rejected proof
+  # This is used to conditionally skip validations in the resubmission flow
+  def resubmitting_proof?
+    # First check if the thread local variable is set - this communicates context from controller
+    return true if Thread.current[:resubmitting_proof]
+    
+    # Then fall back to the original logic for backward compatibility
+    # Check if any proof that was previously rejected is now getting a new attachment
+    return true if income_proof_status_rejected? && 
+                  income_proof.attached? && 
+                  (respond_to?(:attachment_changes) && attachment_changes['income_proof'].present?)
+    
+    return true if residency_proof_status_rejected? && 
+                  residency_proof.attached? && 
+                  (respond_to?(:attachment_changes) && attachment_changes['residency_proof'].present?)
+    
+    false
+  end
+
+  def require_proof_validations?
+    # Only validate proofs when submitting (not for drafts)
+    # This checks if the application is being changed from draft to another status
+    return false if status_draft?
+    return true if saved_change_to_status? && status_before_last_save == 'draft'
+    return true if submitted?
+    
+    # Skip for paper applications processed by admins
+    return false if Thread.current[:paper_application_context]
+    
+    false
   end
 end

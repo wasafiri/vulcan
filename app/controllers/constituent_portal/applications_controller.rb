@@ -62,6 +62,7 @@ module ConstituentPortal
 
         # Don't even try the transaction
         build_medical_provider_for_form
+        initialize_address
         render :new, status: :unprocessable_entity
         return
       end
@@ -141,14 +142,8 @@ module ConstituentPortal
         # Ensure we have the medical provider data available for re-rendering the form
         build_medical_provider_for_form
         
-        # Setup address data from form params or current user so we don't lose it
-        @address = {
-          physical_address_1: params.dig(:application, :physical_address_1) || current_user.physical_address_1,
-          physical_address_2: params.dig(:application, :physical_address_2) || current_user.physical_address_2,
-          city: params.dig(:application, :city) || current_user.city,
-          state: params.dig(:application, :state) || current_user.state,
-          zip_code: params.dig(:application, :zip_code) || current_user.zip_code
-        }
+        # Setup address data from form params or current user
+        initialize_address
         
         render :new, status: :unprocessable_entity
       end
@@ -495,7 +490,13 @@ module ConstituentPortal
         :vision_disability,
         :speech_disability,
         :mobility_disability,
-        :cognition_disability
+        :cognition_disability,
+        # Also exclude address fields that should only update the User model
+        :physical_address_1,
+        :physical_address_2,
+        :city,
+        :state,
+        :zip_code
       )
     end
 
@@ -507,11 +508,23 @@ module ConstituentPortal
       )
     end
 
-    def set_application
-      @application = current_user.applications.find(params[:id])
-    rescue ActiveRecord::RecordNotFound
+  def set_application
+    # First try the standard approach
+    @application = current_user.applications.find_by(id: params[:id])
+    
+    # If that fails, try a more flexible query to handle potential type mismatches
+    # between Constituent and Users::Constituent
+    if @application.nil?
+      @application = Application.where(id: params[:id])
+                               .where(user_id: current_user.id)
+                               .first
+    end
+    
+    # If we still couldn't find it, redirect
+    if @application.nil?
       redirect_to constituent_portal_dashboard_path, alert: 'Application not found'
     end
+  end
 
     def ensure_editable
       return if @application.draft?
@@ -542,8 +555,12 @@ module ConstituentPortal
         :speech_disability,
         :mobility_disability,
         :cognition_disability,
-        # Note: Address fields are handled separately in user_attrs
-        # and should not be passed to the application model
+        # Address fields that will be used for the user model
+        :physical_address_1,
+        :physical_address_2,
+        :city,
+        :state,
+        :zip_code,
         medical_provider_attributes: %i[name phone fax email]
       )
       if base_params[:medical_provider_attributes].present?
@@ -663,6 +680,16 @@ module ConstituentPortal
         params[:application][field] = ActiveModel::Type::Boolean.new.cast(value)
         log_debug("#{field} after casting: #{params[:application][field].inspect}")
       end
+    end
+
+    def initialize_address
+      @address = {
+        physical_address_1: params.dig(:application, :physical_address_1) || current_user.physical_address_1,
+        physical_address_2: params.dig(:application, :physical_address_2) || current_user.physical_address_2,
+        city: params.dig(:application, :city) || current_user.city,
+        state: params.dig(:application, :state) || current_user.state,
+        zip_code: params.dig(:application, :zip_code) || current_user.zip_code
+      }
     end
 
     def log_debug(message)

@@ -15,6 +15,11 @@ class ProofSubmissionAudit < ApplicationRecord
   validates :proof_type, presence: true
   validates :ip_address, presence: true
   validates :submission_method, presence: true
+  
+  # Generate a human-readable description of the proof submission event
+  def description
+    "#{proof_type.to_s.humanize} proof submitted via #{submission_method}"
+  end
 
   # Disable suspicious activity notification in test environment
   after_create :notify_admins_if_suspicious, unless: -> { Rails.env.test? }
