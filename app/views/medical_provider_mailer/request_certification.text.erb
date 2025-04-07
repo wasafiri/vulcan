@@ -9,7 +9,7 @@ This <%= @request_count > 1 ? "is a follow-up request (Request ##{@request_count
 PATIENT INFORMATION:
 - Name: <%= @constituent.full_name %>
 - Date of Birth: <%= @constituent.date_of_birth.strftime("%B %d, %Y") if @constituent.date_of_birth.present? %>
-- Address: <%= @constituent.address %>, <%= @constituent.city %>, <%= @constituent.state %> <%= @constituent.zip %>
+- Address: <%= [@constituent.physical_address_1, @constituent.physical_address_2].compact_blank.join(', ') %>, <%= @constituent.city %>, <%= @constituent.state %> <%= @constituent.zip_code %>
 - Application ID: <%= @application.id %>
 
  <To qualify for assistance through MAT, your patient requires documentation that they have a disability that makes it difficult for them to use a standard telephone. The certification form is essential for your patient to qualify for accessible telecommunications devices they need. To complete this form:

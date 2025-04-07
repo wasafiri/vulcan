@@ -20,7 +20,7 @@
     
     <p>Dear Healthcare Provider,</p>
     
-    <p>We are writing to request your completion of a disability certification form for your patient, <strong><%= @constituent.full_name %></strong>, who is applying for the Maryland Assistive Technology Program.</p>
+    <p>We are writing to request your completion of a disability certification form for your patient, <strong><%= @constituent.full_name %></strong>, who is applying for assistance from the Maryland Accessible Telecommunications (MAT) Program.</p>
     
     <div class="highlight">
       <p>This <%= @request_count > 1 ? "is a follow-up request (Request ##{@request_count})" : "request" %> was sent on <%= Time.parse(@timestamp).strftime("%B %d, %Y at %I:%M %p") %>.</p>
@@ -31,12 +31,12 @@
       <ul>
         <li>Name: <%= @constituent.full_name %></li>
         <li>Date of Birth: <%= @constituent.date_of_birth.strftime("%B %d, %Y") if @constituent.date_of_birth.present? %></li>
-        <li>Address: <%= @constituent.address %>, <%= @constituent.city %>, <%= @constituent.state %> <%= @constituent.zip %></li>
+        <li>Address: <%= [@constituent.physical_address_1, @constituent.physical_address_2].compact_blank.join(', ') %>, <%= @constituent.city %>, <%= @constituent.state %> <%= @constituent.zip_code %></li>
         <li>Application ID: <%= @application.id %></li>
       </ul>
     </div>
     
-    <p>The certification form is essential for your patient to qualify for assistive technology devices they need. To complete this form:</p>
+    <p>To qualify for assistance through MAT, your patient requires documentation that they have a disability that makes it difficult for them to use a standard telephone. The certification form is essential for your patient to qualify for accessible telecommunications devices they need. To complete this form:</p>
     
     <ol>
       <li>Click the link below to download the form</li>
