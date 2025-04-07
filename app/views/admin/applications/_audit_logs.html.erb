@@ -36,28 +36,9 @@
       </thead>
       <tbody class="bg-white divide-y divide-gray-200">
         <%
-        # Filter out notification records that directly correspond to a proof review
-        # This prevents showing both the admin action and the notification as separate entries
-        # Make sure @audit_logs is not nil before filtering
-        filtered_logs = if @audit_logs.present?
-          @audit_logs.reject do |log|
-            # Skip notification records if there's a matching proof review
-            log.is_a?(Notification) && 
-            log.action.in?(["proof_approved", "proof_rejected"]) && 
-            @audit_logs.any? do |pr_log|
-              pr_log.is_a?(ProofReview) && 
-              (log.created_at.to_i - pr_log.created_at.to_i).abs < 30 && # Within 30 seconds (either before or after)
-              ((pr_log.status == "approved" && log.action == "proof_approved") ||
-               (pr_log.status == "rejected" && log.action == "proof_rejected")) &&
-              pr_log.proof_type == log.metadata.try(:[], 'proof_type')
-            end
-          end
-        else
-          []
-        end
-        
-        if filtered_logs.present?
-          filtered_logs.each do |log| 
+        # The audit logs are already deduplicated by the service
+        if @audit_logs.present?
+          @audit_logs.each do |log| 
         %>
           <tr class="hover:bg-gray-50">
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -221,7 +202,7 @@
           </tr>
         <% end 
         end %>
-        <% if filtered_logs.blank? %>
+        <% if @audit_logs.blank? %>
           <tr>
             <td colspan="4" class="px-6 py-4 text-center text-gray-500">
               No activity has been recorded yet.

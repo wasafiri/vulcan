@@ -64,6 +64,16 @@ module Admin
         'Unknown Status'
       end
     end
+
+    def toggle_direction(column)
+      # Check if the current sort column matches the link's column
+      # and if the current direction is ascending.
+      if params[:sort] == column.to_s && params[:direction] == 'asc'
+        'desc' # If so, set the link's direction to descending
+      else
+        'asc'  # Otherwise, set the link's direction to ascending (default)
+      end
+    end
     
     # Get proof history in chronological order with deduplication
     def get_chronological_proof_history(application, proof_type)

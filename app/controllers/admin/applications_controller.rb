@@ -53,8 +53,10 @@ module Admin
         residency: load_proof_history(:residency)
       }
       
-      # Preload certification events for comprehensive history display
-      @certification_events = load_certification_events
+    # Use our new service for certification events
+    certification_service = Applications::CertificationEventsService.new(@application)
+    @certification_events = certification_service.certification_events
+    @certification_requests = certification_service.request_events
     end
 
     # Load only the associations that are actually needed for the show view
@@ -787,7 +789,7 @@ module Admin
       return unless @application
 
       audit_log_builder = Applications::AuditLogBuilder.new(@application)
-      @audit_logs = audit_log_builder.build_audit_logs
+      @audit_logs = audit_log_builder.build_deduplicated_audit_logs
     end
 
     def sort_column

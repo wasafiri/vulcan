@@ -25,6 +25,22 @@ module Applications
       add_error("Failed to build audit logs: #{e.message}")
       []
     end
+    
+    # Build deduplicated audit logs using the EventDeduplicationService
+    def build_deduplicated_audit_logs
+      return [] unless application
+      
+      # Collect all events from various sources
+      events = build_audit_logs
+      
+      # Use the deduplication service to remove duplicates
+      EventDeduplicationService.new.deduplicate(events)
+    rescue StandardError => e
+      Rails.logger.error "Failed to build deduplicated audit logs: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      add_error("Failed to build deduplicated audit logs: #{e.message}")
+      []
+    end
 
     private
 

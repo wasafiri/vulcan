@@ -12,6 +12,8 @@ module MatVulcan
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.0
+    config.time_zone = 'Eastern Time (US & Canada)'
+    config.active_record.default_timezone = :utc
 
     config.action_mailer.delivery_method = :postmark
     config.action_mailer.postmark_settings = {
