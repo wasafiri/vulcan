@@ -102,12 +102,13 @@ module BadgeHelper
     url = Rails.application.routes.url_helpers.rails_blob_path(application.medical_certification, disposition: :inline)
     
     if style == :button
-      link_to 'View Certification', url, 
-              target: '_blank', 
-              class: 'inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700'
+      # Use classes similar to other full-height buttons in the form
+      link_to 'View Certification', url,
+              target: '_blank',
+              class: 'inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
     else
-      link_to 'View Certification', url, 
-              target: '_blank', 
+      link_to 'View Certification', url,
+              target: '_blank',
               class: 'text-blue-600 hover:text-blue-800 underline'
     end
   end

@@ -8,6 +8,9 @@ module Users
     has_many :assigned_evaluators, through: :evaluations, source: :evaluator
     # Removed unconditional validation: validate :must_have_at_least_one_disability
 
+    # Enums
+    enum :communication_preference, { email: 0, letter: 1 }
+
     # Scopes
     scope :needs_evaluation, -> { joins(:applications).where(applications: { status: :approved }) }
     scope :active, -> { where.not(status: %i[withdrawn rejected expired]) }

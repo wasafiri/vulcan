@@ -286,11 +286,11 @@
             <% if @recent_activities.present? %>
               <div class="flow-root">
                 <ul role="list" class="-mb-8">
-                  <% @recent_activities.each do |activity| %>
-                    <li>
-                      <div class="relative pb-8">
-                        <div class="relative flex space-x-3">
-                          <div>
+          <% @recent_activities.each do |activity| %>
+            <li>
+              <div class="relative pb-4">
+                <div class="relative flex space-x-3">
+                  <div>
                             <span class="<%= activity_icon_class(activity) %>" aria-hidden="true">
                               <%= activity.icon_symbol %>
                             </span>

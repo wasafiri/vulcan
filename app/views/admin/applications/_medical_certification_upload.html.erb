@@ -155,7 +155,9 @@
   
   <% if @application.medical_certification.attached? %>
     <% if @application.medical_certification_status == "approved" %>
-      <%= medical_certification_link(@application, :button) %>
+      <div class="mt-4"> <%# Add margin-top to position button at the bottom %>
+        <%= medical_certification_link(@application, :button) %>
+      </div>
     <% elsif @application.medical_certification_status != "received" %>
       <%= medical_certification_link(@application, :link) %>
     <% end %>

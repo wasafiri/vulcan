@@ -64,13 +64,7 @@ class RegistrationsController < ApplicationController
     @user = User.new(registration_params)
     @user.type = 'Users::Constituent' # Ensure we use fully qualified class name with namespace
     @user.force_password_change = false
-    set_communication_preference
-  end
-
-  def set_communication_preference
-    return unless params[:user]&.dig(:communication_preference) == 'letter'
-
-    @user.communication_preference = :letter # Use symbol instead of string to properly set the enum
+    # Removed call to set_communication_preference as enum handles this
   end
 
   def create_session_and_cookie

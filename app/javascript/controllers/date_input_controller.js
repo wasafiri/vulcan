@@ -30,10 +30,17 @@ export default class extends Controller {
 
   handleBlur(event) {
     const input = event.target
-    const value = input.value
+    let value = input.value // Changed from const to let
     
     // Only validate if we have a complete date
     if (value.length >= 8) {
+      // Check for MMDDYYYY format (8 digits, no slashes)
+      if (/^\d{8}$/.test(value)) {
+        value = `${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4, 8)}`
+        // Update the input field visually immediately for consistency
+        input.value = value 
+      }
+      
       const parts = value.split('/')
       if (parts.length === 3) {
         let [month, day, year] = parts.map(p => parseInt(p, 10))
@@ -49,9 +56,14 @@ export default class extends Controller {
           if (this.hasHiddenTarget) {
             this.hiddenTarget.value = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
           }
+          // Ensure the visual input is also correctly formatted after validation
           input.value = `${month.toString().padStart(2, '0')}/${day.toString().padStart(2, '0')}/${year}`
         }
       }
     }
+    // Consider clearing hidden field if input is invalid/incomplete?
+    // else if (this.hasHiddenTarget) { 
+    //   this.hiddenTarget.value = "" 
+    // }
   }
 }
