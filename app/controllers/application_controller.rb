@@ -13,7 +13,11 @@ class ApplicationController < ActionController::Base
   before_action :check_password_change_required
 
   def default_url_options
-    Rails.application.config.action_mailer.default_url_options
+    if Rails.env.production?
+      { host: MatVulcan::Application::PRODUCTION_HOST }
+    else
+      {}
+    end
   end
 
   private
