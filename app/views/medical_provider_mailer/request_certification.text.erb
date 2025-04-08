@@ -2,9 +2,9 @@ MEDICAL CERTIFICATION FORM REQUEST
 
 Dear Healthcare Provider,
 
-We are writing to request your completion of a disability certification form for your patient, <%= @constituent.full_name %>, who is applying for the Maryland Accessible Telecommunications Program.
+We are writing to request your completion of a disability certification form for your patient, <%= @constituent.full_name %>, who is applying for the Maryland Accessible Telecommunications Program to receive accessible telecommunications equipment to support independent telephone usage.
 
-This <%= @request_count > 1 ? "is a follow-up request (Request ##{@request_count})" : "request" %> was sent on <%= Time.parse(@timestamp).strftime("%B %d, %Y at %I:%M %p") %>.
+This <%= @request_count > 1 ? "is a follow-up request (Request ##{@request_count})" : "request" %> and was sent on <%= Time.parse(@timestamp).strftime("%B %d, %Y at %I:%M %p") %>.
 
 PATIENT INFORMATION:
 - Name: <%= @constituent.full_name %>
@@ -17,9 +17,9 @@ PATIENT INFORMATION:
 1. Download the form at: https://mdmat.org/forms/disability-certification.pdf
 2. Complete all required fields
 3. Sign the form
-4. Return the completed form by email to medical-certification@maryland.gov or by fax to (410) 554-9277
+4. Return the completed form by email to medical-certification@maryland.gov or by fax to (410) 767-4276
 
-If you have questions or need assistance, please contact our medical certification team at more.info@maryland.gov or call (410) 554-9230.
+If you have questions or need assistance, please contact our medical certification team at more.info@maryland.gov or call (410) 767-6960.
 
 Thank you for your prompt attention to this important matter.
 

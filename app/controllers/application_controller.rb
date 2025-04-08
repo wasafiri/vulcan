@@ -12,6 +12,10 @@ class ApplicationController < ActionController::Base
 
   before_action :check_password_change_required
 
+  def default_url_options
+    Rails.application.config.action_mailer.default_url_options
+  end
+
   private
 
   def check_password_change_required
