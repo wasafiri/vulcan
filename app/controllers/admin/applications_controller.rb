@@ -129,6 +129,8 @@ module Admin
     # Updates the proof status of an application 
     # Handles both income and residency proof reviews
     def update_proof_status
+      validate_proof_review_params
+      
       admin_user = validate_and_prepare_admin_user
       
       log_proof_review_start
@@ -145,6 +147,27 @@ module Admin
       end
     end
     
+    # Validates proof review parameters
+    def validate_proof_review_params
+      proof_type = params[:proof_type]
+      status = params[:status]
+      
+      if proof_type.blank? || status.blank?
+        redirect_with_alert('Proof type and status are required')
+        return
+      end
+      
+      unless %w[income residency].include?(proof_type)
+        redirect_with_alert('Invalid proof type')
+        return
+      end
+      
+      unless %w[approved rejected].include?(status)
+        redirect_with_alert('Invalid status')
+        return
+      end
+    end
+
     # Validates the admin user and reloads if necessary
     # @return [User] The validated admin user
     def validate_and_prepare_admin_user
@@ -183,7 +206,7 @@ module Admin
     # Handles a successful proof review
     def handle_successful_review
       respond_to do |format|
-        format.html { handle_html_success }
+        format.html { redirect_with_notice("#{params[:proof_type].capitalize} proof #{params[:status]} successfully.") }
         format.turbo_stream { handle_turbo_stream_success }
       end
     end
@@ -191,13 +214,42 @@ module Admin
     # Handles errors during proof review
     # @param error [StandardError] The error that occurred
     def handle_review_error(error)
-      Rails.logger.error "Failed to update proof status: #{error.message}"
-      Rails.logger.error error.backtrace.join("\n")
+      log_review_error(error)
       
       respond_to do |format|
-        format.html { handle_html_error(error) }
-        format.turbo_stream { handle_turbo_stream_error(error) }
+        format.html { render :show, status: :unprocessable_entity, alert: error.message }
+        format.turbo_stream do
+          flash.now[:error] = error.message
+          render turbo_stream: turbo_stream.update('flash', partial: 'shared/flash')
+        end
       end
+    end
+
+    # Logs detailed information about review errors
+    # @param error [StandardError] The error that occurred
+    def log_review_error(error)
+      Rails.logger.error "Proof review failed: #{error.message}"
+      Rails.logger.error error.backtrace.join("\n")
+    end
+
+    # Handles turbo_stream success response for proof review
+    def handle_turbo_stream_success
+      reload_application_and_associations
+      load_proof_histories
+
+      # Use our AuditLogBuilder service to load audit logs
+      audit_log_builder = Applications::AuditLogBuilder.new(@application)
+      @audit_logs = audit_log_builder.build_audit_logs
+
+      flash.now[:notice] = "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
+      
+      # Changed the order: add cleanup JS FIRST, then update content, finally remove modals
+      streams = []
+      streams << append_cleanup_js
+      streams.concat(update_content_streams)
+      streams.concat(remove_modals_streams)
+
+      render turbo_stream: streams
     end
 
     def process_application_status(action)
@@ -279,17 +331,27 @@ module Admin
   # Accepts various status changes including approvals and rejections
   def update_certification_status
     status = normalize_certification_status(params[:status])
+    update_type = determine_certification_update_type(status)
     
-    # Log status for debugging
-    Rails.logger.info "Processing medical certification status update: #{status.inspect}"
-    
-    if rejection_requested?(status)
+    case update_type
+    when :rejection
       process_certification_rejection
-    elsif status_only_update_requested?
+    when :status_update
       update_existing_certification_status(status)
-    else
+    when :new_upload
       upload_new_certification(status)
+    else
+      redirect_with_alert('Invalid certification update type')
     end
+  end
+
+  # Determines the type of certification update
+  # @param status [Symbol] The normalized certification status
+  # @return [Symbol] The type of update (:rejection, :status_update, :new_upload)
+  def determine_certification_update_type(status)
+    return :rejection if rejection_requested?(status)
+    return :status_update if status_only_update_requested?
+    :new_upload
   end
   
   # Normalizes certification status for consistent handling
@@ -441,15 +503,19 @@ module Admin
   def upload_medical_certification
     status = params[:medical_certification_status]
 
-  # Handle based on selected action
-  if status == "approved"
-    process_accepted_certification
-  elsif status == "rejected"
-    process_rejected_certification
-  else
-    redirect_to admin_application_path(@application),
-      alert: 'Please select whether to accept or reject the certification.'
-  end
+    # Validate that a status was selected
+    if status.blank?
+      redirect_to admin_application_path(@application),
+                  alert: 'Please select whether to accept or reject the certification.'
+      return
+    end
+
+    # Handle based on selected action
+    if status == "approved"
+      process_accepted_certification
+    elsif status == "rejected"
+      process_rejected_certification
+    end
   end
 
   # Process an approved medical certification
