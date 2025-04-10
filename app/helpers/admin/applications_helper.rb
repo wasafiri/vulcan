@@ -2,6 +2,59 @@
 
 module Admin
   module ApplicationsHelper
+    def medical_certification_link(application, style = :link)
+      return nil unless application.medical_certification.attached?
+
+      if Rails.env.production?
+        host = MatVulcan::Application::PRODUCTION_HOST
+      else
+        # For non-production environments, use request.host if available
+        host = Rails.application.routes.default_url_options[:host] || (defined?(request) && request.host)
+      end
+
+      url = Rails.application.routes.url_helpers.rails_blob_path(
+        application.medical_certification,
+        disposition: :inline,
+        host: host
+      )
+
+      if style == :button
+        # Use classes similar to other full-height buttons in the form
+        link_to 'View Certification', url,
+                target: '_blank',
+                class: 'inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
+      else
+        link_to 'View Certification', url,
+                target: '_blank',
+                class: 'text-blue-600 hover:text-blue-800 underline'
+      end
+    end
+
+    def medical_certification_submission_method(application)
+      return 'unknown' unless application.medical_certification.attached?
+
+      # Try to find submission method from metadata or related records
+      if application.respond_to?(:medical_certification_submission_method) && 
+         application.medical_certification_submission_method.present?
+        return application.medical_certification_submission_method
+      end
+
+      # Check for status changes that might have the method
+      status_change = ApplicationStatusChange.where(application_id: application.id)
+                        .where("metadata->>'change_type' = ? OR to_status = ?",
+                               'medical_certification', 'received')
+                        .order(created_at: :desc)
+                        .first
+
+      if status_change&.metadata.present? && 
+         status_change.metadata['submission_method'].present?
+        return status_change.metadata['submission_method']
+      end
+
+      # Default fallback
+      'portal'
+    end
+    
     def format_rejection_reason(proof_type, application)
       proof_status_method = "#{proof_type}_proof_status"
       return nil unless application.respond_to?(proof_status_method)
