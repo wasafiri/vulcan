@@ -30,16 +30,37 @@ module Admin
 
       # Get base scope – avoid using with_attached_* which triggers eager loading
       scope = Application.includes(:user)
-                         .distinct
-                         .where.not(status: %i[rejected archived])
+                          .distinct
+
+      # Apply base scope exclusion only if no specific status filter is applied
+      scope = scope.where.not(status: %i[rejected archived]) unless params[:status].present?
 
       # Apply filters using the filter service
       filter_service = Applications::FilterService.new(scope, params)
       scope = filter_service.apply_filters
 
-      # Use pagy for pagination but apply our decorator to prevent unnecessary eager loading
-      @pagy, applications = pagy(scope, items: 20)
-      @applications = applications.map { |app| ApplicationStorageDecorator.new(app) }
+      # Use pagy for pagination
+      @pagy, applications_relation = pagy(scope, items: 20)
+      
+      # Fetch applications for the current page
+      applications = applications_relation.to_a
+      application_ids = applications.map(&:id)
+
+      # Preload attachment existence data for the current page's applications
+      attachments_exist_data = {}
+      if application_ids.present?
+        attachments_exist_data = ActiveStorage::Attachment
+                                 .where(record_type: 'Application', record_id: application_ids, name: %w[income_proof residency_proof medical_certification])
+                                 .group(:record_id, :name)
+                                 .pluck(:record_id, :name)
+                                 .group_by(&:first)
+                                 .transform_values { |v| v.map(&:second).to_set }
+      end
+
+      # Apply decorator, passing preloaded attachment existence data
+      @applications = applications.map do |app|
+        ApplicationStorageDecorator.new(app, attachments_exist_data[app.id] || Set.new)
+      end
     end
 
     def show

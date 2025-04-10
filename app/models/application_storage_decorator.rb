@@ -3,10 +3,12 @@
 # Decorator for Application objects to prevent unnecessary ActiveStorage eager loading
 # when displaying attachments in views
 class ApplicationStorageDecorator
-  attr_reader :application
+  attr_reader :application, :preloaded_attachments
 
-  def initialize(application)
+  # Accept preloaded attachment existence data (a Set of attachment names)
+  def initialize(application, preloaded_attachments = Set.new)
     @application = application
+    @preloaded_attachments = preloaded_attachments
     # Cache attachment metadata to avoid repeated DB queries
     @metadata_cache = {}
   end
@@ -146,12 +148,19 @@ class ApplicationStorageDecorator
 
   private
 
+  # Use preloaded data if available, otherwise fallback (though fallback shouldn't be needed with controller change)
   def attachment_exists?(name)
-    @metadata_cache[:"#{name}_exists"] ||= ActiveStorage::Attachment.where(
-      record_type: 'Application',
-      record_id: application.id,
-      name: name
-    ).exists?
+    @metadata_cache[:"#{name}_exists"] ||= if @preloaded_attachments.present?
+                                             @preloaded_attachments.include?(name)
+                                           else
+                                             # Fallback query - should ideally not be hit from index view now
+                                             Rails.logger.warn "PERFORMANCE: Falling back to DB query for attachment existence: #{name} on Application #{application.id}"
+                                             ActiveStorage::Attachment.where(
+                                               record_type: 'Application',
+                                               record_id: application.id,
+                                               name: name
+                                             ).exists?
+                                           end
   end
 
   def safe_attachment_attribute(name, attribute)

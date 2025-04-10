@@ -129,48 +129,64 @@ module Applications
 
       data[:recent_notifications] = notifications.map { |n| NotificationDecorator.new(n) }
 
-      # Proof review statistics
-      income_proofs_pending = Application.with_attached_income_proof
-                                         .where(income_proof_status: 'not_reviewed')
-      residency_proofs_pending = Application.with_attached_residency_proof
-                                            .where(residency_proof_status: 'not_reviewed')
-      data[:proofs_needing_review_count] =
-        (income_proofs_pending.pluck(:id) + residency_proofs_pending.pluck(:id)).uniq.count
+      # Fetch all status counts in one query
+      status_counts = Application.group(:status).count
+      status_counts.default = 0 # Ensure keys exist even if count is 0
 
-      data[:medical_certs_to_review_count] = Application.where.not(status: %i[rejected archived])
-                                            .where(medical_certification_status: 'received')
-                                            .count
+      # Proof review statistics - Optimized query without with_attached_*
+      data[:proofs_needing_review_count] = Application
+                                           .where(income_proof_status: :not_reviewed)
+                                           .or(Application.where(residency_proof_status: :not_reviewed))
+                                           .distinct
+                                           .count
+
+      data[:medical_certs_to_review_count] = Application
+                                             .where.not(status: %i[rejected archived])
+                                             .where(medical_certification_status: :received)
+                                             .count
 
       # Count applications with pending training sessions
-      data[:training_requests_count] = Application.joins(:training_sessions)
-                                                  .where(training_sessions: { status: %i[requested scheduled confirmed] })
-                                                  .distinct.count
+      data[:training_requests_count] = Application
+                                       .joins(:training_sessions)
+                                       .where(training_sessions: { status: %i[requested scheduled confirmed] })
+                                       .distinct
+                                       .count
+
+      # Use grouped status counts for charts
+      draft_count = status_counts['draft']
+      submitted_count = status_counts['submitted']
+      in_review_count = status_counts['in_review']
+      approved_count = status_counts['approved']
+      rejected_count = status_counts['rejected']
 
       # Application Pipeline data for funnel chart
-      data[:draft_count] = Application.where(status: 'draft').count
-      data[:submitted_count] = Application.where.not(status: 'draft').count
-      data[:in_review_count] = Application.where(status: %w[submitted in_review]).count
-      data[:approved_count] = Application.where(status: 'approved').count
+      total_submitted_or_later = submitted_count + in_review_count + approved_count + rejected_count # Approximation
+      total_in_review_or_later = in_review_count + approved_count + rejected_count # Approximation
 
       data[:pipeline_chart_data] = {
-        'Draft' => data[:draft_count],
-        'Submitted' => data[:submitted_count],
-        'In Review' => data[:in_review_count],
-        'Approved' => data[:approved_count]
+        'Draft' => draft_count,
+        'Submitted' => total_submitted_or_later, # Represents apps that passed draft
+        'In Review' => total_in_review_or_later, # Represents apps that passed submission
+        'Approved' => approved_count
       }
 
       # Status Breakdown data for polar area chart
-      data[:draft_count] = Application.where(status: 'draft').count
-      data[:in_progress_count] = Application.where(status: %w[submitted in_review]).count
-      data[:approved_count] = Application.where(status: 'approved').count
-      data[:rejected_count] = Application.where(status: 'rejected').count
+      in_progress_combined_count = submitted_count + in_review_count # Combine for 'In Progress'
 
       data[:status_chart_data] = {
-        'Draft' => data[:draft_count],
-        'In Progress' => data[:in_progress_count],
-        'Approved' => data[:approved_count],
-        'Rejected' => data[:rejected_count]
+        'Draft' => draft_count,
+        'In Progress' => in_progress_combined_count,
+        'Approved' => approved_count,
+        'Rejected' => rejected_count
       }
+
+      # Add individual counts if needed elsewhere (though charts use combined values)
+      data[:draft_count] = draft_count
+      data[:submitted_count] = submitted_count
+      data[:in_review_count] = in_review_count
+      data[:approved_count] = approved_count
+      data[:rejected_count] = rejected_count
+      data[:in_progress_count] = in_progress_combined_count # Keep for consistency if used directly
 
       data
     rescue StandardError => e
