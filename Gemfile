@@ -44,6 +44,8 @@ gem 'pagy'
 gem 'prawn', '~> 2.5'
 # pdf extraction, display, etc capability
 gem 'mupdf', '~> 1.0'
+# CSV processing, representing rows as Ruby hashes for easy integration with ActiveRecord
+gem 'smarter_csv'
 # windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem 'tzinfo-data'
 

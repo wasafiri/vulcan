@@ -110,13 +110,47 @@ module Admin
     end
 
     def generate_csv(vouchers)
-      require 'csv'
-      CSV.generate(headers: true) do |csv|
-        csv << csv_headers
-        vouchers.find_each do |voucher|
-          csv << voucher_csv_row(voucher)
-        end
+      require 'smarter_csv'
+
+      vouchers_data = vouchers.map do |voucher|
+        {
+          'Code' => voucher.code,
+          'Status' => voucher.status,
+          'Initial Value' => voucher.initial_value,
+          'Remaining Value' => voucher.remaining_value,
+          'Vendor' => voucher.vendor&.business_name,
+          'Created At' => voucher.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+          'Expiration Date' => voucher.expiration_date&.strftime('%Y-%m-%d'),
+          'Last Transaction' => voucher.transactions.last&.processed_at&.strftime('%Y-%m-%d %H:%M:%S')
+        }
       end
+
+      # Return empty string if no data to prevent errors
+      return '' if vouchers_data.empty?
+
+      temp_file = nil
+      csv_content = nil
+
+      begin
+        # Create a temporary file
+        temp_file = Tempfile.new(['vouchers', '.csv'])
+
+        # Use SmarterCSV::Writer with the temp file path
+        # Pass the whole data array; smarter_csv handles headers automatically
+        writer = SmarterCSV::Writer.new(temp_file.path)
+        writer << vouchers_data
+        writer.finalize # This saves and closes the file stream managed by smarter_csv
+
+        # Rewind and read the content from the temp file
+        temp_file.rewind
+        csv_content = temp_file.read
+      ensure
+        # Ensure the temp file is closed and deleted
+        temp_file&.close
+        temp_file&.unlink # Deletes the file from the filesystem
+      end
+
+      csv_content
     end
 
     def csv_headers

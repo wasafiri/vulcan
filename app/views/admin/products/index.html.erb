@@ -40,7 +40,11 @@
   <div id="products_list">
     <% Product::DEVICE_TYPES.sort.each do |device_type| %>
       <% if @products_by_type[device_type].present? %>
-        <details class="mb-6 bg-white rounded-lg shadow" <%= 'open' if params[:device_types]&.include?(device_type) %>>
+        <%
+          details_attributes = { class: "mb-6 bg-white rounded-lg shadow" }
+          details_attributes[:open] = true if params[:device_types]&.include?(device_type)
+        %>
+        <%= tag.details **details_attributes do %>
           <summary class="px-6 py-4 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-medium"><%= device_type %></h2>
@@ -86,7 +90,7 @@
               </tbody>
             </table>
           </div>
-        </details>
+        <% end %> <%# End tag.details %>
       <% end %>
     <% end %>
   </div>

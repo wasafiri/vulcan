@@ -120,35 +120,50 @@ module Admin
     end
 
     def generate_csv(invoices)
-      require 'csv'
+      require 'smarter_csv'
+      require 'tempfile'
+      require 'fileutils' # Although Tempfile handles cleanup, good practice if more complex ops needed
 
-      CSV.generate(headers: true) do |csv|
-        csv << [
-          'Invoice Number',
-          'Vendor',
-          'Total Amount',
-          'Status',
-          'Created At',
-          'Check Number',
-          'Check Issued At',
-          'Check Cashed At',
-          'GAD Reference'
-        ]
-
-        invoices.find_each do |invoice|
-          csv << [
-            invoice.invoice_number,
-            invoice.vendor.business_name,
-            invoice.total_amount,
-            invoice.status,
-            invoice.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            invoice.check_number,
-            invoice.check_issued_at&.strftime('%Y-%m-%d'),
-            invoice.check_cashed_at&.strftime('%Y-%m-%d'),
-            invoice.gad_invoice_reference
-          ]
-        end
+      invoices_data = invoices.map do |invoice|
+        {
+          'Invoice Number' => invoice.invoice_number,
+          'Vendor' => invoice.vendor.business_name,
+          'Total Amount' => invoice.total_amount,
+          'Status' => invoice.status,
+          'Created At' => invoice.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+          'Check Number' => invoice.check_number,
+          'Check Issued At' => invoice.check_issued_at&.strftime('%Y-%m-%d'),
+          'Check Cashed At' => invoice.check_cashed_at&.strftime('%Y-%m-%d'),
+          'GAD Reference' => invoice.gad_invoice_reference
+        }
       end
+
+      # Return empty string if no data to prevent errors
+      return '' if invoices_data.empty?
+
+      temp_file = nil
+      csv_content = nil
+
+      begin
+        # Create a temporary file
+        temp_file = Tempfile.new(['invoices', '.csv'])
+
+        # Use SmarterCSV::Writer with the temp file path
+        # Pass the whole data array; smarter_csv handles headers automatically
+        writer = SmarterCSV::Writer.new(temp_file.path)
+        writer << invoices_data
+        writer.finalize # This saves and closes the file stream managed by smarter_csv
+
+        # Rewind and read the content from the temp file
+        temp_file.rewind
+        csv_content = temp_file.read
+      ensure
+        # Ensure the temp file is closed and deleted
+        temp_file&.close
+        temp_file&.unlink # Deletes the file from the filesystem
+      end
+
+      csv_content
     end
 
     def log_event!(action, metadata = {})

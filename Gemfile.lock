@@ -390,6 +390,7 @@ GEM
       rubyzip (>= 1.2.2, < 3.0)
       websocket (~> 1.0)
     smart_properties (1.17.0)
+    smarter_csv (1.14.2)
     solargraph (0.53.4)
       backport (~> 1.2)
       benchmark
@@ -524,6 +525,7 @@ DEPENDENCIES
   rubocop-rails
   rubyzip (= 3.0.0.rc2)
   selenium-webdriver
+  smarter_csv
   solargraph
   solid_cable
   solid_cache
