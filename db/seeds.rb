@@ -135,7 +135,7 @@ else
       # ------------------------------
       puts 'Ensuring storage directory exists...'
       storage_dir = Rails.root.join('storage')
-      FileUtils.mkdir_p(storage_dir) unless Dir.exist?(storage_dir)
+      FileUtils.mkdir_p(storage_dir) unless storage_dir
 
       # ------------------------------
       # Attaching Files to Applications

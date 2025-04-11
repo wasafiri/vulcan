@@ -52,11 +52,13 @@ Vulcan is a Ruby on Rails application that facilitates Maryland Accessible Telec
 - ✅ Print queue system for letter generation and management
 - ✅ Voucher management and redemption system
 - ✅ Vendor W9 review process
-- ✅ VendorPortal namespace implementation (fixed controller namespace conflict)
+- ✅ Vendor Portal implementation
 - ✅ Email/letter correspondence templates with PDF generation
 - ✅ Inbound email processing (via Action Mailbox)
+- ✅ Communication preference system (email/letter)
+- ✅ Enhanced vendor transaction tracking
 - ⏳ Document OCR processing (planned)
-- ⏳ Enhanced reporting system (partial)
+- ⏳ Enhanced reporting system (in progress)
 
 ## Technical Stack
 
@@ -69,14 +71,25 @@ Vulcan is a Ruby on Rails application that facilitates Maryland Accessible Telec
 - **Postmark** (for email delivery)
 - **Action Mailbox** (for inbound email processing)
 - **AWS S3** (for file storage)
+- **Twilio** (for fax services)
 
 ## Documentation
 
+### Core Functionality
 - [Inbound Email Processing Guide](doc/inbound_email_processing_guide.md) - Setup and usage of email-based proof submission
 - [Email/Letter Consistency](doc/email_letter_consistency.md) - Guidelines for maintaining consistent communication
 - [Constituent Type Standardization](doc/constituent_type_standardization.md) - Standards for constituent type handling
-- [Proof Attachment Guide](doc/proof_attachment_comprehensive_guide.md) - Complete guide to the proof attachment system
-- [System Testing Chrome Update](doc/system_testing_chrome_update.md) - Notes on Chrome testing setup
+
+### Proof System
+- [Proof Attachment Guide](doc/proof_attachment_guide.md) - Comprehensive guide to the proof attachment system including submission, resubmission, monitoring, and improvements
+
+### Medical Certification
+- [Medical Certification Guide](doc/medical_certification_guide.md) - Complete guide to the medical certification process including requesting, approving, and rejecting certifications
+
+### System Configuration
+- [System Testing Guide](doc/system_testing_guide.md) - Comprehensive guide to system testing with Chrome and Selenium
+- [Paper Application File Uploads](doc/paper_application_file_uploads.md) - Paper application processing
+- [Email Delivery Tracking](doc/email_delivery_tracking.md) - Email delivery monitoring
 
 ## Prerequisites
 
@@ -150,21 +163,6 @@ After seeding, the following test users are available:
 ## License
 
 This project is licensed under the MIT License - see the LICENSE.md file for details.
-
-## TODO
-
-- [X] Complete API integration for Postmarkapp
-- [X] Add admin page to change user role and assign role capabilities
-- [X] Configure email templates
-- [X] Implement letter generation and print queue system
-- [X] Implement communication preference system (email/letter)
-- [ ] Enhance admin dashboard views
-- [ ] Enhance constituent dashboard view
-- [ ] Add comprehensive application flow for constituents
-- [ ] Implement document OCR processing via AWS
-- [ ] Complete reporting system
-- [ ] Enhance vendor transaction tracking
-- [ ] Improve system tests coverage
 
 ## Acknowledgments
 

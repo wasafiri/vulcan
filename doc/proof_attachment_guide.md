@@ -1,64 +1,103 @@
-# Proof Attachment Comprehensive Guide
-
-This document provides a complete overview of the proof attachment system used in the MAT Vulcan application, including its current implementation, monitoring, and future roadmap.
+# Proof Attachment System
 
 ## Table of Contents
 1. [Introduction](#introduction)
-2. [Standardization Implementation](#standardization-implementation)
-3. [Current Architecture](#current-architecture)
-4. [Monitoring System](#monitoring-system)
-5. [Debugging Guidelines](#debugging-guidelines)
-6. [Future Improvements](#future-improvements)
-7. [Related Historical Documents](#related-historical-documents)
+2. [System Architecture](#system-architecture)
+3. [User Flows](#user-flows)
+   - [Constituent Portal Upload](#constituent-portal-upload)
+   - [Admin Paper Application Upload](#admin-paper-application-upload)
+   - [Proof Resubmission](#proof-resubmission)
+4. [Technical Implementation](#technical-implementation)
+   - [ProofAttachmentService](#proofattachmentservice)
+   - [Controllers](#controllers)
+   - [Model Implementation](#model-implementation)
+5. [Policy Enforcement](#policy-enforcement)
+6. [Monitoring and Metrics](#monitoring-and-metrics)
+7. [Debugging and Troubleshooting](#debugging-and-troubleshooting)
+8. [Future Improvements](#future-improvements)
 
 ## Introduction
 
-The proof attachment system handles document uploads for residency and income verification in the application. Documents can be submitted through two main channels:
+The proof attachment system handles document uploads for residency and income verification in the MAT Vulcan application. Documents can be submitted through multiple channels:
+
 - The constituent portal (self-service)
 - The admin interface (paper applications)
+- Email submissions (via Action Mailbox)
+- Faxed documents
 
-This document describes the current state of the system and future roadmap.
+This guide provides a comprehensive overview of how the proof attachment system works, its architecture, monitoring, troubleshooting, and future roadmap.
 
-## Standardization Implementation
+## System Architecture
 
-To address the inconsistent approaches, we implemented a standardized architecture with the following key changes:
+The proof attachment system is built around a standardized architecture with the following key components:
 
 ### 1. Unified Service Approach
 
-- Both constituent portal and admin paper applications now use the `ProofAttachmentService` for all document attachments
-- This replaces the previous approach where constituent portal used direct ActiveStorage attachments
+- All document attachments use the `ProofAttachmentService` regardless of submission method
 - Provides consistent error handling, audit trails, and metrics for all file operations
+- Centralizes file validation, attachment logic, and status updates
 
 ### 2. Consistent Transaction Safety
 
-- Both flows now use `ActiveRecord::Base.transaction` for data integrity
-- All operations (file attachment, status updates, and audit records) are wrapped in transactions
+- All operations use `ActiveRecord::Base.transaction` for data integrity
+- File attachment, status updates, and audit records are wrapped in transactions
 - Ensures no partial updates occur that could leave the system in an inconsistent state
 
 ### 3. Standardized Metadata
 
-- Both flows now pass similar metadata to the attachment service:
+All attachment operations include metadata:
 ```ruby
 metadata: { 
-  submission_method: :web, # or :paper for admin uploads
-  ip_address: request.remote_ip
+  submission_method: :web, # or :paper, :email, :fax, etc.
+  ip_address: request.remote_ip,
+  # Additional context-specific metadata
 }
 ```
-- This provides consistent context for monitoring, debugging, and metrics
 
-### 4. Robust Error Handling
+### 4. Audit Trail
 
-- The service detects errors in both file processing and database operations
-- All errors are consistently tracked in the `ProofSubmissionAudit` model
-- Added `submission_method` validation in the model to catch issues earlier
+- All attachment operations (successful or failed) are recorded in `ProofSubmissionAudit`
+- Enables monitoring, debugging, and reporting on submission activities
+- Tracks metadata for each operation to provide context
 
-### 5. Improved Submission Method Handling
+### 5. Error Handling
 
-- Fixed issues with `submission_method` not being properly set in error cases
-- Added validation to the `ProofSubmissionAudit` model
-- Implemented fallback logic to determine submission method from context
+- Robust error capture and reporting across all submission paths
+- Graceful handling of common failure scenarios
+- Clear error messaging for both users and administrators
 
-## Current Architecture
+## User Flows
+
+### Constituent Portal Upload
+
+1. Constituent logs into the portal
+2. Navigates to their application
+3. Selects document(s) to upload
+4. The system validates and processes the uploads
+5. Constituent receives confirmation of successful upload
+6. Document statuses are updated to "not_reviewed"
+7. Administrators are notified of pending documents for review
+
+### Admin Paper Application Upload
+
+1. Administrator creates a new paper application
+2. Enters constituent information
+3. Uploads scanned proof documents
+4. The system validates and processes the uploads
+5. Documents can be automatically approved during upload
+6. Audit records are created for all uploads
+
+### Proof Resubmission
+
+1. A constituent submits an application with proof documents
+2. An administrator reviews and may reject one or both proofs
+3. When a proof is rejected, the constituent receives a notification
+4. The constituent logs into the constituent portal and sees their rejected proof(s)
+5. The constituent clicks the "Upload New Proof" button for the rejected proof
+6. The constituent selects a new file and submits it
+7. The new proof is sent to administrators for review
+
+## Technical Implementation
 
 ### ProofAttachmentService
 
@@ -120,9 +159,9 @@ rescue => error
 end
 ```
 
-### Controller Implementation
+### Controllers
 
-The constituent portal's `upload_documents` method was standardized to use the service:
+The constituent portal's `upload_documents` method:
 
 ```ruby
 def upload_documents
@@ -170,9 +209,9 @@ def upload_documents
 end
 ```
 
-### ProofSubmissionAudit Model
+### Model Implementation
 
-A critical part of the system that provides audit trails and enables monitoring:
+The `ProofSubmissionAudit` model provides audit trails:
 
 ```ruby
 class ProofSubmissionAudit < ApplicationRecord
@@ -199,7 +238,94 @@ class ProofSubmissionAudit < ApplicationRecord
 end
 ```
 
-## Monitoring System
+The `ProofManageable` concern provides proof-related functionality to the `Application` model:
+
+```ruby
+module ProofManageable
+  extend ActiveSupport::Concern
+  
+  # Constants for validation
+  MAX_FILE_SIZE = 10.megabytes
+  ALLOWED_TYPES = %w[image/jpeg image/png application/pdf]
+
+  included do
+    # Active Storage attachments
+    has_one_attached :income_proof
+    has_one_attached :residency_proof
+    
+    # Callbacks
+    after_commit :create_proof_submission_audit, on: [:create, :update]
+    before_save :set_proof_status_to_unreviewed, if: :proof_attachments_changed?
+    
+    # Enums for proof statuses
+    enum income_proof_status: { not_reviewed: 0, approved: 1, rejected: 2 }
+    enum residency_proof_status: { not_reviewed: 0, approved: 1, rejected: 2 }
+    
+    # Validations
+    validate :validate_proof_file_types
+    validate :validate_proof_file_sizes
+  end
+  
+  # Methods related to proofs
+  def can_resubmit_proof?(proof_type)
+    return false unless send("#{proof_type}_proof_status") == "rejected"
+    
+    # Get submission count
+    submission_count = proof_submission_audits
+                        .where(proof_type: proof_type)
+                        .count
+    
+    # Check against policy limit
+    max_submissions = Policy.get('max_proof_submissions') || 3
+    submission_count < max_submissions
+  end
+  
+  private
+  
+  def proof_attachments_changed?
+    income_proof.changed? || residency_proof.changed?
+  end
+  
+  def set_proof_status_to_unreviewed
+    if income_proof.changed?
+      self.income_proof_status = :not_reviewed
+    end
+    
+    if residency_proof.changed?
+      self.residency_proof_status = :not_reviewed
+    end
+  end
+  
+  def validate_proof_file_types
+    # Validation implementation
+  end
+  
+  def validate_proof_file_sizes
+    # Validation implementation
+  end
+end
+```
+
+## Policy Enforcement
+
+The system enforces several policies:
+
+### 1. Resubmission Limits
+
+Constituents are limited in how many times they can resubmit a proof. This limit is defined in the `Policy` model with the `max_proof_submissions` setting. When a constituent reaches this limit, they will no longer see the "Upload New Proof" button and must contact support.
+
+### 2. File Validation
+
+- File size limits defined in `ProofManageable::MAX_FILE_SIZE`
+- Allowed file types defined in `ProofManageable::ALLOWED_TYPES`
+- Validation occurs both in the client and server
+
+### 3. Rate Limiting
+
+- Submissions are rate-limited to prevent abuse
+- The `RateLimit` service controls submission frequency
+
+## Monitoring and Metrics
 
 The proof attachment monitoring system tracks all submissions through the `ProofSubmissionAudit` model and analyzes the data to identify potential issues.
 
@@ -234,14 +360,30 @@ proof_attachment_metrics:
   queue: "low"
 ```
 
-### Testing
+## Debugging and Troubleshooting
 
-The monitoring system is tested through:
-1. Unit tests for the ProofAttachmentService
-2. Integration tests for attachment operations
-3. Job tests that verify metrics calculation and notification thresholds
+### Common Issues and Solutions
 
-## Debugging Guidelines
+#### Status Not Updating
+
+If proof status isn't updating correctly:
+1. Check `ProofManageable` concern for the `set_proof_status_to_unreviewed` method
+2. Verify that callbacks are firing on attachment changes
+
+#### Missing Upload Button
+
+If the upload button doesn't appear for rejected proofs:
+1. Confirm proof status is correctly set to `rejected`
+2. Check that `can_resubmit_proof?` logic in the dashboard controller is working
+3. Verify the user hasn't exceeded maximum resubmission attempts
+
+#### Audit Records Missing
+
+If audit records are missing:
+1. Check `create_proof_submission_audit` in the `ProofManageable` concern
+2. Verify the `ProofSubmissionAudit` model is working correctly
+
+### Checking Logs
 
 When investigating attachment failures:
 
@@ -266,7 +408,7 @@ When investigating attachment failures:
    - Verify IAM permissions
    - Check network connectivity
 
-## Common Failure Types
+### Common Failure Types
 
 Some common reasons for attachment failures:
 
@@ -333,9 +475,3 @@ Several opportunities for further enhancement remain:
 - **Multiple File Handling**: Support attaching multiple proofs at once
 - **Document AI**: Implement automated proof validation using machine learning
 - **Batch Processing**: Support for administrators to process multiple proofs efficiently
-
-## Related Historical Documents
-
-For historical context, these documents describe earlier stages of the system:
-- [Paper Application Upload Refactor](paper_application_upload_refactor.md)
-- [Paper Application Attachment Fix](paper_application_attachment_fix.md)
