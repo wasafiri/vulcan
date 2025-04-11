@@ -16,3 +16,37 @@ paid:
   gad_invoice_reference: GAD-2024-12345
   approved_at: <%= 3.months.ago %>
   payment_recorded_at: <%= 2.months.ago %>
+
+teltex_pending:
+  vendor: vendor_teltex
+  start_date: <%= 1.month.ago.beginning_of_month.beginning_of_day %>
+  end_date: <%= 1.month.ago.end_of_month.end_of_day %>
+  total_amount: 1250.75
+  invoice_number: INV-202503-0001 # Assuming current month is April 2025
+  status: invoice_pending
+  created_at: <%= 15.days.ago %>
+  updated_at: <%= 15.days.ago %>
+
+teltex_paid:
+  vendor: vendor_teltex
+  start_date: <%= 3.months.ago.beginning_of_month.beginning_of_day %>
+  end_date: <%= 3.months.ago.end_of_month.end_of_day %>
+  total_amount: 980.00
+  invoice_number: INV-202501-0002 # Needs unique number
+  status: invoice_paid
+  gad_invoice_reference: GAD-2025-54321
+  approved_at: <%= 2.months.ago %>
+  payment_recorded_at: <%= 1.month.ago %>
+  created_at: <%= 3.months.ago %>
+  updated_at: <%= 1.month.ago %>
+
+raz_approved:
+  vendor: vendor_raz
+  start_date: <%= Date.current.beginning_of_month.beginning_of_day %>
+  end_date: <%= Date.current.end_of_month.end_of_day %>
+  total_amount: 550.25
+  invoice_number: INV-202504-0001 # Needs unique number
+  status: invoice_approved
+  approved_at: <%= 2.days.ago %>
+  created_at: <%= 5.days.ago %>
+  updated_at: <%= 2.days.ago %>

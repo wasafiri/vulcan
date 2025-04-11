@@ -98,6 +98,10 @@ else
       puts 'Loading applications fixture...'
       ActiveRecord::FixtureSet.create_fixtures(fixtures_path, 'applications')
 
+      # Then load invoices that depend on users (vendors)
+      puts 'Loading invoices fixture...'
+      ActiveRecord::FixtureSet.create_fixtures(fixtures_path, 'invoices')
+
       # ------------------------------
       # Create Admin Users
       # ------------------------------

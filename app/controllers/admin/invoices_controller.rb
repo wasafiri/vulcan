@@ -4,11 +4,11 @@ module Admin
   class InvoicesController < Admin::BaseController
     include Pagy::Backend
 
-    before_action :set_invoice, only: %i[how update mark_check_issued mark_check_cashed]
+    before_action :set_invoice, only: %i[show update mark_check_issued mark_check_cashed] # Added :show
     before_action :require_admin!
 
     def index
-      scope = Invoice.includes(:vendor, :voucher_transactions)
+      scope = Invoice.includes(:vendor) # Removed :voucher_transactions as it's not used in the index view
                      .order(created_at: :desc)
 
       scope = apply_filters(scope)

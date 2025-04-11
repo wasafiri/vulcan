@@ -158,40 +158,46 @@
                     class: "text-indigo-600 hover:text-indigo-900" %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                <%= link_to invoice.vendor.business_name,
-                    [:admin, invoice.vendor],
+                <%# Use presence to provide fallback text if business_name is blank %>
+                <% vendor_name = invoice.vendor.business_name.presence || "Vendor #{invoice.vendor.id}" %>
+                <%= link_to vendor_name,
+                    admin_vendor_path(invoice.vendor),
                     class: "text-indigo-600 hover:text-indigo-900" %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                 <%= number_to_currency(invoice.total_amount) %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
+                <%# Use prefixed enum keys for comparison %>
                 <% case invoice.status %>
-                <% when "draft" %>
+                <% when "invoice_draft" %>
                   <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                     Draft
                   </span>
-                <% when "pending" %>
+                <% when "invoice_pending" %>
                   <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                     Pending
                   </span>
-                <% when "approved" %>
+                <% when "invoice_approved" %>
                   <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                     Approved
                   </span>
-                <% when "paid" %>
+                <% when "invoice_paid" %>
                   <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                     Paid
                   </span>
-                <% when "cancelled" %>
+                <% when "invoice_cancelled" %>
                   <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                     Cancelled
                   </span>
+                <% else %>
+                  <%# Handle unexpected or nil statuses %>
+                  <span class="text-gray-400">Unknown</span>
                 <% end %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                <%= invoice.period_start.strftime("%b %d") %> -
-                <%= invoice.period_end.strftime("%b %d, %Y") %>
+                <%= invoice.start_date.strftime("%b %d") %> -
+                <%= invoice.end_date.strftime("%b %d, %Y") %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 <% if invoice.check_number %>
@@ -214,7 +220,8 @@
                 <%= link_to "View",
                     [:admin, invoice],
                     class: "text-indigo-600 hover:text-indigo-900" %>
-                <% if invoice.invoice_status_approved? && !invoice.check_number %>
+                <%# Check status directly instead of using potentially problematic enum helper %>
+                <% if invoice.status == 'invoice_approved' && !invoice.check_number %>
                   |
                   <%= link_to "Issue Check",
                       [:admin, invoice],

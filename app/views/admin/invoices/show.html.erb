@@ -21,13 +21,13 @@
       <h1 class="mt-2 text-3xl font-bold text-gray-900">Invoice Details</h1>
     </div>
     <div class="mt-4 flex md:mt-0 md:ml-4 space-x-4">
-      <% if @invoice.invoice_status_pending? %>
+      <% if @invoice.status_invoice_pending? %>
         <%= form_with model: [ :admin, @invoice ], class: "inline" do |f| %>
           <%= f.hidden_field :status, value: "approved" %>
           <%= f.submit "Approve Invoice",
               class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" %>
         <% end %>
-      <% elsif @invoice.invoice_status_approved? %>
+      <% elsif @invoice.status_invoice_approved? %>
         <%= form_with model: [ :admin, @invoice ], class: "bg-white p-4 rounded-lg shadow space-y-4 max-w-2xl" do |f| %>
           <div class="grid grid-cols-2 gap-4">
             <div>
@@ -112,16 +112,16 @@
           <div>
             <dt class="text-sm font-medium text-gray-500">Period</dt>
             <dd class="mt-1 text-sm text-gray-900">
-              <%= @invoice.period_start.strftime("%B %d") %> -
-              <%= @invoice.period_end.strftime("%B %d, %Y") %>
+              <%= @invoice.start_date.strftime("%B %d") %> -
+              <%= @invoice.end_date.strftime("%B %d, %Y") %>
             </dd>
           </div>
 
           <div class="sm:col-span-2">
             <dt class="text-sm font-medium text-gray-500">Vendor</dt>
             <dd class="mt-1 text-sm text-gray-900">
-              <%= link_to @invoice.vendor.business_name,
-                  [:admin, @invoice.vendor],
+              <%= link_to (@invoice.vendor.business_name.presence || @invoice.vendor.email),
+                  admin_vendor_path(@invoice.vendor),
                   class: "text-indigo-600 hover:text-indigo-900" %>
             </dd>
           </div>
