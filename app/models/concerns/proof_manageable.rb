@@ -12,10 +12,10 @@ module ProofManageable
     has_one_attached :medical_certification
     has_many_attached :documents
 
-  validate :correct_proof_mime_type
-  validate :proof_size_within_limit
-  validate :verify_proof_attachments, unless: :resubmitting_proof?
-  validate :require_proof_attachments, if: :require_proof_validations?
+    validate :correct_proof_mime_type
+    validate :proof_size_within_limit
+    validate :verify_proof_attachments, unless: :resubmitting_proof?
+    validate :require_proof_attachments, if: :require_proof_validations?
 
     # Add callbacks for when proofs are attached
     after_save :create_proof_submission_audit, if: :proof_attachments_changed?
@@ -52,44 +52,9 @@ module ProofManageable
     @creating_proof_audit = true
 
     begin
-      # For each changed proof, create an audit record
-      # Use two different checks to handle both production and test environments
-
-      # Income proof audit
-      if income_proof.attached? &&
-         ((respond_to?(:attachment_changes) && attachment_changes['income_proof'].present?) ||
-          (respond_to?(:saved_change_to_attribute?) && saved_change_to_attribute?(:income_proof_attachment_id)))
-        proof_submission_audits.create!(
-          proof_type: 'income',
-          user: Current.user || user,
-          application: self,
-          ip_address: '0.0.0.0', # Required field but not relevant for audit trail
-          metadata: {
-            blob_id: income_proof.blob&.id,
-            content_type: income_proof.blob&.content_type,
-            byte_size: income_proof.blob&.byte_size,
-            filename: income_proof.blob&.filename.to_s
-          }
-        )
-      end
-
-      # Residency proof audit
-      if residency_proof.attached? &&
-         ((respond_to?(:attachment_changes) && attachment_changes['residency_proof'].present?) ||
-          (respond_to?(:saved_change_to_attribute?) && saved_change_to_attribute?(:residency_proof_attachment_id)))
-        proof_submission_audits.create!(
-          proof_type: 'residency',
-          user: Current.user || user,
-          application: self,
-          ip_address: '0.0.0.0', # Required field but not relevant for audit trail
-          metadata: {
-            blob_id: residency_proof.blob&.id,
-            content_type: residency_proof.blob&.content_type,
-            byte_size: residency_proof.blob&.byte_size,
-            filename: residency_proof.blob&.filename.to_s
-          }
-        )
-      end
+      # Audit each proof type if it has changed
+      audit_specific_proof_change('income')
+      audit_specific_proof_change('residency')
     ensure
       # Always reset the flag, even if an exception occurs
       @creating_proof_audit = false
@@ -197,6 +162,51 @@ module ProofManageable
   end
 
   private
+
+  # --- Refactored Audit Logic ---
+
+  def audit_specific_proof_change(proof_type)
+    return unless specific_proof_changed?(proof_type)
+
+    create_audit_record_for_proof(proof_type)
+  end
+
+  def specific_proof_changed?(proof_type)
+    attachment = public_send("#{proof_type}_proof")
+    return false unless attachment.attached?
+
+    # Check using attachment_changes (newer Rails versions)
+    if respond_to?(:attachment_changes) && attachment_changes["#{proof_type}_proof"].present?
+      return true
+    end
+
+    # Check using saved_change_to_attribute? (older Rails versions/association changes)
+    if respond_to?(:saved_change_to_attribute?) && saved_change_to_attribute?("#{proof_type}_proof_attachment_id")
+      return true
+    end
+
+    false
+  end
+
+  def create_audit_record_for_proof(proof_type)
+    attachment = public_send("#{proof_type}_proof")
+    blob = attachment.blob
+
+    proof_submission_audits.create!(
+      proof_type: proof_type,
+      user: Current.user || user,
+      application: self,
+      ip_address: '0.0.0.0', # Required field but not relevant for audit trail
+      metadata: {
+        blob_id: blob&.id,
+        content_type: blob&.content_type,
+        byte_size: blob&.byte_size,
+        filename: blob&.filename.to_s
+      }
+    )
+  end
+
+  # --- Original Private Methods ---
 
   def correct_proof_mime_type
     return unless residency_proof.attached? && !ALLOWED_TYPES.include?(residency_proof.content_type)

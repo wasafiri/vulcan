@@ -41,7 +41,7 @@ module Admin
 
       # Use pagy for pagination
       @pagy, applications_relation = pagy(scope, items: 20)
-      
+
       # Fetch applications for the current page
       applications = applications_relation.to_a
       application_ids = applications.map(&:id)
@@ -73,7 +73,7 @@ module Admin
         income: load_proof_history(:income),
         residency: load_proof_history(:residency)
       }
-      
+
     # Use our new service for certification events
     certification_service = Applications::CertificationEventsService.new(@application)
     @certification_events = certification_service.certification_events
@@ -151,13 +151,13 @@ module Admin
     # Handles both income and residency proof reviews
     def update_proof_status
       validate_proof_review_params
-      
+
       admin_user = validate_and_prepare_admin_user
-      
+
       log_proof_review_start
-      
+
       Thread.current[:reviewing_single_proof] = true
-      
+
       begin
         execute_proof_review(admin_user)
         handle_successful_review
@@ -167,22 +167,22 @@ module Admin
         Thread.current[:reviewing_single_proof] = nil
       end
     end
-    
+
     # Validates proof review parameters
     def validate_proof_review_params
       proof_type = params[:proof_type]
       status = params[:status]
-      
+
       if proof_type.blank? || status.blank?
         redirect_with_alert('Proof type and status are required')
         return
       end
-      
+
       unless %w[income residency].include?(proof_type)
         redirect_with_alert('Invalid proof type')
         return
       end
-      
+
       unless %w[approved rejected].include?(status)
         redirect_with_alert('Invalid status')
         return
@@ -194,7 +194,7 @@ module Admin
     def validate_and_prepare_admin_user
       Rails.logger.info "Update proof status - Current user: #{current_user.inspect}"
       Rails.logger.info "Current user type: #{current_user.type}, admin? method result: #{current_user.admin?}"
-      
+
       if current_user.admin?
         current_user
       elsif current_user.type == 'Administrator' || current_user.type == 'Users::Administrator'
@@ -205,25 +205,25 @@ module Admin
         current_user
       end
     end
-    
+
     # Executes the proof review using the ProofReviewer service
     # @param admin_user [User] The admin user performing the review
     def execute_proof_review(admin_user)
       Rails.logger.info "Admin user prepared for proof review: #{admin_user.inspect}"
       Rails.logger.info "Prepared admin - Type: #{admin_user.type}, admin? result: #{admin_user.admin?}"
-      
+
       reviewer = Applications::ProofReviewer.new(@application, admin_user)
-      
+
       reviewer.review(
         proof_type: params[:proof_type],
         status: params[:status],
         rejection_reason: params[:rejection_reason],
         notes: params[:notes]
       )
-      
+
       Rails.logger.info 'Proof review completed successfully'
     end
-    
+
     # Handles a successful proof review
     def handle_successful_review
       respond_to do |format|
@@ -231,12 +231,12 @@ module Admin
         format.turbo_stream { handle_turbo_stream_success }
       end
     end
-    
+
     # Handles errors during proof review
     # @param error [StandardError] The error that occurred
     def handle_review_error(error)
       log_review_error(error)
-      
+
       respond_to do |format|
         format.html { render :show, status: :unprocessable_entity, alert: error.message }
         format.turbo_stream do
@@ -255,21 +255,9 @@ module Admin
 
     # Handles turbo_stream success response for proof review
     def handle_turbo_stream_success
-      reload_application_and_associations
-      load_proof_histories
-
-      # Use our AuditLogBuilder service to load audit logs
-      audit_log_builder = Applications::AuditLogBuilder.new(@application)
-      @audit_logs = audit_log_builder.build_audit_logs
-
+      prepare_data_for_turbo_stream
       flash.now[:notice] = "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
-      
-      # Changed the order: add cleanup JS FIRST, then update content, finally remove modals
-      streams = []
-      streams << append_cleanup_js
-      streams.concat(update_content_streams)
-      streams.concat(remove_modals_streams)
-
+      streams = build_turbo_streams_for_success
       render turbo_stream: streams
     end
 
@@ -353,7 +341,7 @@ module Admin
   def update_certification_status
     status = normalize_certification_status(params[:status])
     update_type = determine_certification_update_type(status)
-    
+
     case update_type
     when :rejection
       process_certification_rejection
@@ -374,32 +362,32 @@ module Admin
     return :status_update if status_only_update_requested?
     :new_upload
   end
-  
+
   # Normalizes certification status for consistent handling
   # @param status [String, Symbol] The status from params
   # @return [Symbol] Normalized status symbol
   def normalize_certification_status(status)
     return nil unless status
-    
+
     status = status.to_sym if status.respond_to?(:to_sym)
     # Convert any 'accepted' to 'approved' for consistency with the Application model enum
     status = :approved if status == :accepted
     status
   end
-  
+
   # Determines if a certification rejection was requested
   # @param status [Symbol] The normalized status
   # @return [Boolean] True if rejection was requested with reason
   def rejection_requested?(status)
     status == :rejected && params[:rejection_reason].present?
   end
-  
+
   # Determines if this is a status-only update (no new file)
   # @return [Boolean] True if updating status on existing certification
   def status_only_update_requested?
     @application.medical_certification.attached? && params[:medical_certification].blank?
   end
-  
+
   # Processes a certification rejection using the reviewer service
   def process_certification_rejection
     reviewer = Applications::MedicalCertificationReviewer.new(@application, current_user)
@@ -407,14 +395,14 @@ module Admin
       rejection_reason: params[:rejection_reason],
       notes: params[:notes]
     )
-    
+
     if result[:success]
       redirect_with_notice('Medical certification rejected and provider notified.')
     else
       redirect_with_alert("Failed to reject certification: #{result[:error]}")
     end
   end
-  
+
   # Updates status of an existing certification without replacing the file
   # @param status [Symbol] The normalized certification status
   def update_existing_certification_status(status)
@@ -425,14 +413,14 @@ module Admin
       submission_method: 'admin_review',
       metadata: { via_ui: true }
     )
-    
+
     if result[:success]
       handle_successful_status_update(status)
     else
       redirect_with_alert("Failed to update certification status: #{result[:error]&.message}")
     end
   end
-  
+
   # Uploads and processes a new certification file
   # @param status [Symbol] The normalized certification status
   def upload_new_certification(status)
@@ -442,14 +430,14 @@ module Admin
       verified_by: current_user,
       rejection_reason: params[:rejection_reason]
     )
-    
+
     if success
       handle_successful_status_update(status)
     else
       redirect_with_alert('Failed to update certification status.')
     end
   end
-  
+
   # Handles successful status updates, including potential auto-approval
   # @param status [Symbol] The normalized certification status
   def handle_successful_status_update(status)
@@ -460,7 +448,7 @@ module Admin
       redirect_with_notice('Medical certification status updated.')
     end
   end
-  
+
   # Determines if auto-approval conditions are met
   # @param status [Symbol] The normalized certification status
   # @return [Boolean] True if conditions for auto-approval are met
@@ -470,23 +458,23 @@ module Admin
       @application.residency_proof_status_approved? &&
       !@application.status_approved?
   end
-  
+
   # Performs application auto-approval
   def perform_auto_approval
     Rails.logger.info "Auto-approval conditions met but application was not auto-approved."
     Rails.logger.info "Manually triggering approval for application #{@application.id}"
-    
+
     # Ensure we have fresh data
     @application.reload
     @application.approve!
   end
-  
+
   # Redirects with a notice message
   # @param message [String] The notice message
   def redirect_with_notice(message)
     redirect_to admin_application_path(@application), notice: message
   end
-  
+
   # Redirects with an alert message
   # @param message [String] The alert message
   def redirect_with_alert(message)
@@ -555,15 +543,15 @@ module Admin
     # Process the certification with approved status
     # We use "approved" consistently in the backend
     result = attach_certification_with_status(:approved)
-    
+
     handle_certification_result(result)
   end
-  
+
   # Extracts submission method from params with a fallback to admin_upload
   def extract_submission_method
     params.permit(:submission_method)[:submission_method].presence || 'admin_upload'
   end
-  
+
   # Attaches a certification with the specified status
   def attach_certification_with_status(status)
     # Use "approved" consistently in the UI and controller
@@ -576,7 +564,7 @@ module Admin
       metadata: request_metadata
     )
   end
-  
+
   # Builds standard request metadata
   def request_metadata
     {
@@ -584,7 +572,7 @@ module Admin
       user_agent: request.user_agent
     }
   end
-  
+
   # Handles the result of certification operations
   def handle_certification_result(result)
     if result[:success]
@@ -597,15 +585,15 @@ module Admin
                   alert: "Failed to process medical certification: #{result[:error]&.message}"
     end
   end
-  
+
   # Logs detailed information about certification parameters
   def log_certification_params
     Rails.logger.info "MEDICAL CERTIFICATION PARAMS: #{params.to_unsafe_h.inspect}"
     Rails.logger.info "MEDICAL CERTIFICATION FILE PARAM: #{params[:medical_certification].inspect}"
-    
+
     if params[:medical_certification].present?
       Rails.logger.info "PARAM CLASS: #{params[:medical_certification].class.name}"
-      
+
       # Log upload type based on parameter structure
       if params[:medical_certification].respond_to?(:content_type)
         Rails.logger.info "Upload type: Regular file upload with content_type: #{params[:medical_certification].content_type}"
@@ -617,7 +605,7 @@ module Admin
         Rails.logger.info "Upload type: Unknown structure: #{params[:medical_certification].class.name}"
       end
     end
-    
+
     Rails.logger.info "REQUEST CONTENT TYPE: #{request.content_type}"
   end
 
@@ -642,7 +630,7 @@ module Admin
 
     # Add status information for consistent messaging
     result[:status] = 'rejected'
-    
+
     handle_certification_result(result)
   end
 
@@ -654,20 +642,20 @@ module Admin
                       # Include all certification-related actions
                       .where("action LIKE ?", "%certification%")
                       .select(:id, :actor_id, :action, :created_at, :metadata, :notifiable_id)
-      
+
       # Get status changes related to medical certification
       status_changes = ApplicationStatusChange.where(application_id: @application.id)
                       .where("metadata->>'change_type' = ? OR from_status LIKE ? OR to_status LIKE ?", 
                             'medical_certification', '%certification%', '%certification%')
                       .select(:id, :user_id, :from_status, :to_status, :created_at, :metadata)
-      
+
       # Get events related to medical certification - broader match
       events = Event.where("(metadata->>'application_id' = ? AND (action LIKE ? OR metadata::text LIKE ?))", 
                           @application.id.to_s, 
                           "%certification%",
                           "%certification%")
                     .select(:id, :user_id, :action, :created_at, :metadata)
-      
+
       # Combine all events and sort by creation date
       (notifications.to_a + status_changes.to_a + events.to_a)
         .sort_by(&:created_at)
@@ -682,30 +670,31 @@ module Admin
       Rails.logger.info "Parameters: proof_type=#{params[:proof_type]}, status=#{params[:status]}"
     end
 
-    def handle_html_success
-      flash[:notice] = "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
-      redirect_to admin_application_path(@application)
-    end
+    # --- Turbo Stream Success Helpers ---
 
-    def handle_turbo_stream_success
+    # Prepares necessary data before rendering turbo streams
+    def prepare_data_for_turbo_stream
       reload_application_and_associations
       load_proof_histories
-
-      # Use our new AuditLogBuilder service to load audit logs
+      # Use our AuditLogBuilder service to load audit logs
       audit_log_builder = Applications::AuditLogBuilder.new(@application)
       @audit_logs = audit_log_builder.build_audit_logs
+    end
 
-      flash.now[:notice] = "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
-      
+    # Builds the array of turbo stream objects for the success response
+    def build_turbo_streams_for_success
       # Changed the order: add cleanup JS FIRST, then update content, finally remove modals
       # This ensures cleanup runs before modal elements are removed from the DOM
       streams = []
       streams << append_cleanup_js
       streams.concat(update_content_streams)
       streams.concat(remove_modals_streams)
-
-      render turbo_stream: streams
+      streams
     end
+
+    # --- Other Private Helpers ---
+
+    # Removed duplicate handle_html_success and handle_turbo_stream_success methods (defined earlier)
 
     def handle_html_error(error)
       flash[:error] = "Failed to update proof status: #{error.message}"

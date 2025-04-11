@@ -47,13 +47,13 @@ class Application < ApplicationRecord
     not_reviewed: 0,
     approved: 1,
     rejected: 2
-  }, prefix: :income_proof_status
+  }, prefix: true, suffix: true # Use standard boolean prefix AND add suffix
 
   enum :residency_proof_status, {
     not_reviewed: 0,
     approved: 1,
     rejected: 2
-  }, prefix: :residency_proof_status
+  }, prefix: true # Use standard boolean prefix
 
   enum :medical_certification_status, {
     not_requested: 0,
