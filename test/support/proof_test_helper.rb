@@ -3,67 +3,117 @@
 # Helper module for managing proofs in tests
 module ProofTestHelper
   # Setup an application for testing by ensuring it has the correct proof status and attachments
+  #
+  # @param app [Application] The application to prepare for testing
+  # @param options [Hash] Configuration options
+  # @option options [Boolean] :stub_attachments (true) Whether to stub attachment methods
+  # @option options [String] :status ('in_progress') The application status
+  # @option options [String] :income_proof_status ('not_reviewed') The income proof status
+  # @option options [String] :residency_proof_status ('not_reviewed') The residency proof status
+  # @option options [Boolean] :stub_medical_certification (false) Whether to stub medical certification
+  # @return [Application] The prepared application
+  #
+  # @deprecated Consider using factories with traits instead:
+  #   create(:application, :with_mocked_income_proof, :with_mocked_residency_proof, status: 'in_progress')
+  #   For real attachments: create(:application, :with_real_income_proof, :with_real_residency_proof)
   def prepare_application_for_test(app, options = {})
     # Default options
     options = {
       stub_attachments: true,
       status: 'in_progress',
       income_proof_status: 'not_reviewed',
-      residency_proof_status: 'not_reviewed'
+      residency_proof_status: 'not_reviewed',
+      stub_medical_certification: false
     }.merge(options)
 
-    # Enable paper application context to bypass certain validations
-    Thread.current[:paper_application_context] = true
-    Thread.current[:skip_proof_validation] = true
-
-    # Stub attachments if needed - this avoids the need for actual files
-    if options[:stub_attachments]
-      # Create blob mocks that allow any method calls
-      income_blob = mock
-      income_blob.stubs(:content_type).with(any_parameters).returns('application/pdf')
-      income_blob.stubs(:byte_size).with(any_parameters).returns(1024)
-      income_blob.stubs(:created_at).with(any_parameters).returns(1.day.ago)
-      income_blob.stubs(:filename).with(any_parameters).returns('income.pdf')
-
-      residency_blob = mock
-      residency_blob.stubs(:content_type).with(any_parameters).returns('application/pdf')
-      residency_blob.stubs(:byte_size).with(any_parameters).returns(1024)
-      residency_blob.stubs(:created_at).with(any_parameters).returns(1.day.ago)
-      residency_blob.stubs(:filename).with(any_parameters).returns('residency.pdf')
-
-      # Create attachment mocks with flexible method calls
-      income_proof_mock = mock
-      income_proof_mock.stubs(:attached?).with(any_parameters).returns(true)
-      income_proof_mock.stubs(:blob).with(any_parameters).returns(income_blob)
-      income_proof_mock.stubs(:content_type).with(any_parameters).returns('application/pdf')
-      income_proof_mock.stubs(:download).with(any_parameters).returns('fake pdf content')
-      income_proof_mock.stubs(:filename).with(any_parameters).returns('income.pdf')
-
-      residency_proof_mock = mock
-      residency_proof_mock.stubs(:attached?).with(any_parameters).returns(true)
-      residency_proof_mock.stubs(:blob).with(any_parameters).returns(residency_blob)
-      residency_proof_mock.stubs(:content_type).with(any_parameters).returns('application/pdf')
-      residency_proof_mock.stubs(:download).with(any_parameters).returns('fake pdf content')
-      residency_proof_mock.stubs(:filename).with(any_parameters).returns('residency.pdf')
-
-      # Stub methods at the Application level
-      Application.any_instance.stubs(:income_proof_attached?).with(any_parameters).returns(true)
-      Application.any_instance.stubs(:residency_proof_attached?).with(any_parameters).returns(true)
-      Application.any_instance.stubs(:income_proof).with(any_parameters).returns(income_proof_mock)
-      Application.any_instance.stubs(:residency_proof).with(any_parameters).returns(residency_proof_mock)
-    end
-
-    # Update the application with the specified options
+    # Update application status fields
     app.update!(
       status: options[:status],
       income_proof_status: options[:income_proof_status],
       residency_proof_status: options[:residency_proof_status]
     )
 
-    # Clean up the thread locals
-    Thread.current[:paper_application_context] = false
+    # Setup attachment mocks if requested
+    if options[:stub_attachments]
+      # Use AttachmentTestHelper#mock_attached_file to create standardized mocks
+      income_proof_mock = mock_attached_file(filename: 'income_proof.pdf')
+      residency_proof_mock = mock_attached_file(filename: 'residency_proof.pdf')
 
-    # Return the prepared application
+      app.stubs(:income_proof_attached?).returns(true)
+      app.stubs(:income_proof).returns(income_proof_mock)
+
+      app.stubs(:residency_proof_attached?).returns(true)
+      app.stubs(:residency_proof).returns(residency_proof_mock)
+
+      # Setup medical certification mock if requested
+      if options[:stub_medical_certification]
+        med_cert_mock = mock_attached_file(filename: 'medical_certification.pdf')
+        app.stubs(:medical_certification_attached?).returns(true)
+        app.stubs(:medical_certification).returns(med_cert_mock)
+      end
+    end
+
     app
+  end
+
+  # Setup attachment mocks for audit logs
+  # This prevents common errors like "uninitialized method byte_size" during tests
+  #
+  # @deprecated Consider using :with_mocked_income_proof and :with_mocked_residency_proof
+  #   factory traits instead of this helper
+  def setup_attachment_mocks_for_audit_logs
+    # Find all applications in fixtures and mock their attachments
+    # This prevents errors in tests that iterate through applications
+    Application.all.each do |app|
+      # Use AttachmentTestHelper#mock_attached_file to create standardized mocks
+      income_proof_mock = mock_attached_file(filename: 'income_proof.pdf')
+      residency_proof_mock = mock_attached_file(filename: 'residency_proof.pdf')
+
+      app.stubs(:income_proof_attached?).returns(true)
+      app.stubs(:income_proof).returns(income_proof_mock)
+
+      app.stubs(:residency_proof_attached?).returns(true)
+      app.stubs(:residency_proof).returns(residency_proof_mock)
+    end
+  end
+
+  # Create a test application with standardized factory traits for proofs
+  #
+  # @param options [Hash] Configuration options
+  # @option options [Symbol] :attachment_type (:mock) Use :mock or :real attachments
+  # @option options [String] :status ('in_progress') The application status
+  # @option options [String] :income_proof_status ('not_reviewed') The income proof status
+  # @option options [String] :residency_proof_status ('not_reviewed') The residency proof status
+  # @option options [Boolean] :with_medical_certification (false) Whether to include medical certification
+  # @return [Application] The created application
+  def create_application_with_proofs(options = {})
+    # Default options
+    options = {
+      attachment_type: :mock,
+      status: 'in_progress',
+      income_proof_status: 'not_reviewed',
+      residency_proof_status: 'not_reviewed',
+      with_medical_certification: false
+    }.merge(options)
+
+    # Set up traits based on options
+    traits = []
+
+    if options[:attachment_type] == :mock
+      traits << :with_mocked_income_proof
+      traits << :with_mocked_residency_proof
+      traits << :with_mocked_medical_certification if options[:with_medical_certification]
+    else
+      traits << :with_real_income_proof
+      traits << :with_real_residency_proof
+      traits << :with_real_medical_certification if options[:with_medical_certification]
+    end
+
+    # Create application with desired traits and attributes
+    FactoryBot.create(:application, *traits,
+      status: options[:status],
+      income_proof_status: options[:income_proof_status],
+      residency_proof_status: options[:residency_proof_status]
+    )
   end
 end

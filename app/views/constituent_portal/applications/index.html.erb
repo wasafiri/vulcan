@@ -15,11 +15,11 @@
       <% @applications.each do |application| %>
         <tr>
           <td><%= application.application_date.strftime("%B %d, %Y") %></td>
-          <td><%= application.status.capitalize %></td>
-          <td><%= application.submission_method.capitalize %></td>
+          <td><%= application.status&.capitalize || "Unknown" %></td>
+          <td><%= application.submission_method&.capitalize || "Unknown" %></td>
           <td>
             <%= link_to "View", constituent_portal_application_path(application) %> |
-            <% if application.draft? %>
+            <% if application.status_draft? %>
               <%= link_to "Edit", edit_constituent_portal_application_path(application) %>
             <% else %>
               <!-- No edit link for submitted applications -->

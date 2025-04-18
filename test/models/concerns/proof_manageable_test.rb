@@ -10,8 +10,8 @@ class ProofManageableTest < ActiveSupport::TestCase
     # Set paper application context for tests
     Thread.current[:paper_application_context] = true
 
-    @application = applications(:draft_application) # This has not_reviewed proof statuses
-    @user = users(:constituent_john)
+    @application = applications(:submitted_proofs_pending_application) # This has pending proof statuses
+    @user = users(:constituent_alex)
     @valid_pdf = fixture_file_upload('test/fixtures/files/residency_proof.pdf', 'application/pdf')
     @large_pdf = fixture_file_upload('test/fixtures/files/large.pdf', 'application/pdf')
     @invalid_type = fixture_file_upload('test/fixtures/files/invalid.exe', 'application/x-msdownload')
@@ -42,7 +42,7 @@ class ProofManageableTest < ActiveSupport::TestCase
 
   test 'tracks proof status changes' do
     @application.income_proof.attach(@valid_pdf)
-    assert_changes -> { @application.income_proof_status }, from: 'not_reviewed', to: 'approved' do
+    assert_changes -> { @application.income_proof_status }, from: 'pending', to: 'approved' do
       @application.update_proof_status!('income', 'approved')
     end
   end
@@ -70,7 +70,7 @@ class ProofManageableTest < ActiveSupport::TestCase
     end
 
     assert_not @application.income_proof.attached?
-    assert_equal 'not_reviewed', @application.income_proof_status
+    assert_equal 'pending', @application.reload.income_proof_status
   end
 
   test 'validates both income and residency proofs independently' do

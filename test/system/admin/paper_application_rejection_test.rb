@@ -6,7 +6,7 @@ module Admin
   class PaperApplicationRejectionTest < ApplicationSystemTestCase
     setup do
       @admin = users(:admin)
-      sign_in_as @admin
+      sign_in(@admin)
     end
 
     test 'admin can see all rejection reasons for income proof' do

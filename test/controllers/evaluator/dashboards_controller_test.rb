@@ -5,7 +5,7 @@ require 'test_helper'
 module Evaluators
   class DashboardsControllerTest < ActionDispatch::IntegrationTest
     def setup
-      @evaluator = users(:evaluator_betsy) # Using fixture from your users.yml
+      @evaluator = create(:evaluator) # Using factory
 
       # Use the authentication helper from test_helper.rb
       post sign_in_path,

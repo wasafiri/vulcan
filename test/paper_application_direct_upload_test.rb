@@ -7,7 +7,7 @@ class PaperApplicationDirectUploadTest < ActionDispatch::IntegrationTest
 
   setup do
     @admin = users(:admin)
-    sign_in @admin
+    sign_in(@admin)
   end
 
   test 'direct upload for paper applications should work with signed_ids' do

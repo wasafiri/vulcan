@@ -6,6 +6,10 @@
 # Include the actual implementation
 require_dependency 'users/vendor'
 
-# Define Vendor class for STI backward compatibility
-# This helps Rails find the class when loading from the database
-Vendor = Users::Vendor unless defined?(Vendor)
+# Define a proper Vendor class for STI that maintains compatibility with existing tests
+class Vendor < Users::Vendor
+  # Don't override the database type column - keep it as 'Vendor' to maintain compatibility
+  def self.sti_name
+    'Vendor'
+  end
+end

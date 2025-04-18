@@ -16,7 +16,7 @@ module Applications
 
       events.each do |event|
         timestamp = extract_timestamp(event)
-        timestamp_key = timestamp.strftime("%Y-%m-%d %H:%M")
+        timestamp_key = timestamp.strftime('%Y-%m-%d %H:%M:%S') # Include seconds for granularity
         event_type = extract_event_type(event)
         provider_name = extract_provider_name(event)
         uniq_key = "#{timestamp_key}||#{event_type}||#{provider_name}"
@@ -48,8 +48,8 @@ module Applications
       when Notification, Event
         event.action
       when ApplicationStatusChange
-        if event.metadata.try(:[], 'change_type') == 'medical_certification'
-          "medical_certification_#{event.to_status}"
+        if event.metadata&.[](:change_type) == 'medical_certification' # Use safe navigation &.
+          "status_change_medical_certification_#{event.to_status}" # Make type unique
         else
           event.to_status
         end
@@ -59,9 +59,9 @@ module Applications
     end
 
     def extract_provider_name(event)
-      if event.respond_to?(:metadata) && event.metadata.is_a?(Hash)
-        event.metadata['provider_name'] || event.metadata['doctor_name']
-      end
+      return unless event.respond_to?(:metadata) && event.metadata.is_a?(Hash)
+
+      event.metadata['provider_name'] || event.metadata['doctor_name']
     end
 
     def extract_actor_name(event)
@@ -78,8 +78,9 @@ module Applications
       return true unless events_by_key.key?(key)
 
       existing = events_by_key[key]
+
+      # Simplified fallback logic: Prefer event with any metadata, then prefer newer event if > 30s apart
       metadata_priority?(event, existing) ||
-        event_type_priority?(event, existing) ||
         newer_event_priority?(event, existing)
     end
 

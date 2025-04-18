@@ -332,6 +332,21 @@ constituent_rex:
   guardian_relationship: parent
   status: active
 
+one:
+  type: Users::Constituent
+  email: test1@example.com
+  first_name: Test1
+  last_name: User
+  password_digest: <%= User.digest('password123') %>
+  email_verified: true
+  date_of_birth: <%= 32.years.ago.to_date %>
+  status: active
+  phone: 555-123-4567
+  physical_address_1: 401 Washington Ave
+  city: Towson
+  state: MD
+  zip_code: 21204
+
 # Evaluator
 evaluator_betsy:
   type: Users::Evaluator
@@ -433,3 +448,23 @@ trainer_john:
   city: Bethesda
   state: MD
   zip_code: 20814
+
+# User with webauthn credentials for testing
+constituent_with_webauthn:
+  type: Users::Constituent
+  email: webauthn@example.com
+  first_name: Secure
+  last_name: User
+  password_digest: <%= User.digest('password123') %>
+  email_verified: true
+  hearing_disability: true
+  date_of_birth: <%= 28.years.ago.to_date %>
+  status: active
+  phone: 555-123-9876
+  physical_address_1: 505 Security Ave
+  city: Towson
+  state: MD
+  zip_code: 21204
+  webauthn_id: <%= SecureRandom.uuid %>
+  timezone: "Eastern Time (US & Canada)"
+  locale: en

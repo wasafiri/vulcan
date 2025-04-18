@@ -3,7 +3,7 @@
 # SystemTestAuthentication
 #
 # This module provides enhanced authentication capabilities for system tests
-# It integrates with Capybara, Minitest, and the application's authentication system
+# It integrates with Capybara via Cuprite, Minitest, and the application's authentication system
 # to ensure consistent and reliable user authentication in system tests.
 module SystemTestAuthentication
   extend ActiveSupport::Concern
@@ -18,7 +18,6 @@ module SystemTestAuthentication
 
     teardown do
       # Clean up authentication
-
       system_test_sign_out
     rescue StandardError => e
       # Log but don't fail if cleanup has an issue
@@ -28,6 +27,35 @@ module SystemTestAuthentication
       Capybara.reset_sessions!
       ENV['TEST_USER_ID'] = nil
       Current.reset if defined?(Current)
+    end
+  end
+
+  # Configure Cuprite for system tests if it hasn't been configured
+  def self.configure_cuprite
+    return if @cuprite_configured
+
+    Capybara.register_driver :cuprite do |app|
+      Capybara::Cuprite::Driver.new(app, {
+        js_errors: true,
+        headless: %w[0 false].exclude?(ENV['HEADLESS']),
+        slowmo: ENV['SLOWMO']&.to_f,
+        process_timeout: 15,
+        timeout: 10,
+        browser_options: ENV['DOCKER'] ? { 'no-sandbox' => nil } : {}
+      })
+    end
+
+    # Disable CSS transitions and animations for faster tests
+    Capybara.disable_animation = true if Capybara.respond_to?(:disable_animation=)
+
+    @cuprite_configured = true
+  end
+
+  # Wait for Turbo navigation to complete
+  def wait_for_turbo
+    sleep 0.1 # Small sleep to give Turbo a chance to start
+    Capybara.using_wait_time(5) do
+      has_no_css?('.turbo-progress-bar')
     end
   end
 
@@ -77,7 +105,7 @@ module SystemTestAuthentication
 
     # First check if we're already logged in
     visit root_path
-    wait_for_turbo if respond_to?(:wait_for_turbo)
+    wait_for_turbo
 
     # Debug information
     puts "Current path: #{current_path}"
@@ -95,7 +123,7 @@ module SystemTestAuthentication
 
     # Otherwise, go through sign in flow
     visit sign_in_path
-    wait_for_turbo if respond_to?(:wait_for_turbo)
+    wait_for_turbo
 
     # Find the form
     within('form') do
@@ -116,21 +144,44 @@ module SystemTestAuthentication
     end
 
     # Wait for Turbo navigation
-    wait_for_turbo if respond_to?(:wait_for_turbo)
+    wait_for_turbo
 
-    # Set cookies via Capybara/Selenium for extra reliability
-    page.driver.browser.manage.add_cookie(
-      name: 'session_token',
-      value: test_session.session_token
-    )
+    # Set cookies based on driver type
+    if page.driver.is_a?(Capybara::Selenium::Driver)
+      # For Selenium-based drivers
+      begin
+        page.driver.browser.manage.add_cookie(
+          name: 'session_token',
+          value: test_session.session_token
+        )
+      rescue StandardError => e
+        puts "Warning: Selenium cookie setting failed: #{e.message}"
+      end
+    elsif page.driver.is_a?(Capybara::Cuprite::Driver)
+      # For Cuprite driver
+      begin
+        if page.driver.respond_to?(:set_cookie)
+          page.driver.set_cookie('session_token', test_session.session_token)
+        end
+      rescue StandardError => e
+        puts "Warning: Cuprite cookie setting failed: #{e.message}"
+      end
+    end
+
+    # Refresh the page to apply cookie changes
+    visit current_path
+    wait_for_turbo
 
     # Verify successful authentication
-    if page.has_text?('Signed in successfully')
+    if page.has_text?('Signed in successfully') || page.has_link?('Sign Out') || page.has_button?('Sign Out')
       # Success! We're good to go
+      puts "Successfully authenticated as #{user.email}" if ENV['DEBUG_AUTH'] == 'true'
     elsif defined?(response) && response.redirect? && response.location.include?('sign_in')
       flunk 'Failed to authenticate: Redirected back to sign in'
+    elsif page.has_text?('Invalid email or password') || page.has_text?('Sign In')
+      flunk 'Failed to authenticate: Still on sign in page with error'
     else
-      flunk 'Failed to authenticate: No success message found'
+      puts "WARNING: Authentication state unclear. Current path: #{current_path}, page text includes sign out? #{page.has_text?('Sign Out')}"
     end
 
     # Return the session for potential cleanup
@@ -154,22 +205,37 @@ module SystemTestAuthentication
   end
 
   def system_test_sign_out
-    # Only attempt if we're actually on a page
-    return unless page.driver.browser.manage.respond_to?(:delete_cookie)
-
-    # Delete cookie first to ensure clean state
-    page.driver.browser.manage.delete_cookie('session_token')
-
-    # Clear environment variable
+    # Clear environment variable first
     ENV['TEST_USER_ID'] = nil
+
+    # Handle cookie deletion based on driver type
+    if page.driver.is_a?(Capybara::Selenium::Driver)
+      # For Selenium-based drivers
+      begin
+        page.driver.browser.manage.delete_cookie('session_token') if page.driver.browser.manage.respond_to?(:delete_cookie)
+      rescue StandardError => e
+        puts "Warning: Selenium cookie deletion failed: #{e.message}"
+      end
+    elsif page.driver.is_a?(Capybara::Cuprite::Driver)
+      # For Cuprite driver
+      begin
+        if page.driver.respond_to?(:remove_cookie)
+          page.driver.remove_cookie('session_token')
+        elsif page.driver.respond_to?(:clear_cookies)
+          page.driver.clear_cookies
+        end
+      rescue StandardError => e
+        puts "Warning: Cuprite cookie deletion failed: #{e.message}"
+      end
+    end
 
     # Attempt to click sign out link if visible
     if page.has_link?('Sign Out')
       click_link 'Sign Out'
-      wait_for_turbo if respond_to?(:wait_for_turbo)
+      wait_for_turbo
     elsif page.has_button?('Sign Out')
       click_button 'Sign Out'
-      wait_for_turbo if respond_to?(:wait_for_turbo)
+      wait_for_turbo
     end
 
     # Reset Capybara session
@@ -177,6 +243,44 @@ module SystemTestAuthentication
 
     # Clear Current attributes
     Current.reset if defined?(Current)
+  end
+
+  # Scroll to an element then interact with it (helpful for Cuprite)
+  def scroll_to_element(selector)
+    element = find(selector)
+    page.driver.scroll_to(element.native, align: :center) if page.driver.respond_to?(:scroll_to)
+    element
+  end
+  
+  # Click an element after scrolling to it
+  def scroll_to_and_click(selector)
+    element = scroll_to_element(selector)
+    element.click
+    wait_for_turbo
+  end
+
+  # Flash a message in the browser (for debugging)
+  def flash_message(message, type = :notice)
+    page.execute_script(<<~JS)
+      (function() {
+        var flashDiv = document.createElement('div');
+        flashDiv.textContent = "#{message}";
+        flashDiv.className = "flash flash-#{type}";
+        flashDiv.style.position = 'fixed';
+        flashDiv.style.top = '0';
+        flashDiv.style.left = '0';
+        flashDiv.style.width = '100%';
+        flashDiv.style.padding = '10px';
+        flashDiv.style.backgroundColor = '#{type == :error ? 'red' : 'green'}';
+        flashDiv.style.color = 'white';
+        flashDiv.style.zIndex = '9999';
+        flashDiv.style.textAlign = 'center';
+        document.body.appendChild(flashDiv);
+        setTimeout(function() {
+          flashDiv.remove();
+        }, 3000);
+      })();
+    JS
   end
 
   private

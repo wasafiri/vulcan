@@ -9,11 +9,28 @@ class Session < ApplicationRecord
   validates :ip_address, presence: true
   validates :user_agent, presence: true
 
+  # Scopes for active and expired sessions
+  scope :active, -> { where('expires_at IS NULL OR expires_at > ?', Time.current) }
+  scope :expired, -> { where('expires_at IS NOT NULL AND expires_at <= ?', Time.current) }
+
   # generate a session token before validation on create
   before_validation :generate_session_token, on: :create
 
   # sets the user agent and IP address before validation on create
   before_validation :set_user_agent_and_ip, on: :create
+
+  # sets the expiration date on create
+  before_create :set_expiry
+
+  # Check if the session is expired
+  def expired?
+    expires_at.present? && expires_at <= Time.current
+  end
+
+  # Default session expiration period
+  def self.default_expiry_period
+    2.weeks
+  end
 
   private
 
@@ -31,5 +48,9 @@ class Session < ApplicationRecord
 
     self.user_agent = Current.user_agent
     self.ip_address = Current.ip_address
+  end
+
+  def set_expiry
+    self.expires_at ||= Time.current + self.class.default_expiry_period
   end
 end

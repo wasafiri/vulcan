@@ -1,4 +1,4 @@
-<%= form_with url: admin_policies_path, method: :patch do |form| %>
+<%= form_with url: bulk_update_admin_policies_path, method: :patch do |form| %>
   <% if flash[:notice] %>
     <div class="p-4 bg-green-50 border-l-4 border-green-400" role="alert">
       <p class="text-green-700"><%= flash[:notice] %></p>

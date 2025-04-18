@@ -2,11 +2,19 @@
 
 module Admin
   class PoliciesController < Admin::BaseController
-    before_action :set_policy, only: %i[show edit]
+    before_action :set_policy, only: %i[show edit update]
 
     def index
       @policies = Policy.all.order(:key)
       @recent_changes = PolicyChange.includes(:policy, :user)
+                                    .order(created_at: :desc)
+                                    .limit(10)
+    end
+
+    def show
+      # The policy is already set by the before_action
+      @recent_changes = PolicyChange.where(policy: @policy)
+                                    .includes(:user)
                                     .order(created_at: :desc)
                                     .limit(10)
     end
@@ -39,18 +47,32 @@ module Admin
     end
 
     def update
+      # Single policy update
+      @policy.updated_by = current_user
+      if @policy.update(value: params[:policy][:value])
+        redirect_to admin_policies_path, notice: "Policy '#{@policy.key}' updated successfully."
+      else
+        @policies = Policy.all
+        @recent_changes = PolicyChange.includes(:policy, :user)
+                                      .order(created_at: :desc)
+                                      .limit(10)
+        flash.now[:alert] = "Failed to update policy: #{@policy.errors.full_messages.join(', ')}"
+        render :edit, status: :unprocessable_entity
+      end
+    end
+
+    def bulk_update
+      @policies = Policy.all
       Policy.transaction do
         policies_data = policy_params
 
         if policies_data.is_a?(Array)
-          # Array format
           policies_data.each do |policy_attrs|
             policy = Policy.find(policy_attrs[:id])
             policy.updated_by = current_user
             raise ::ActiveRecord::RecordInvalid, policy unless policy.update(value: policy_attrs[:value])
           end
         else
-          # Hash format (legacy)
           policies_data.each_value do |policy_attrs|
             policy = Policy.find(policy_attrs[:id])
             policy.updated_by = current_user

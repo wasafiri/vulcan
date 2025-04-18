@@ -203,9 +203,7 @@
     <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="certification-title" data-testid="medical-certification-section">
       <div class="flex justify-between items-start">
         <h2 id="certification-title" class="text-xl font-semibold text-gray-900">Medical Certification</h2>
-        <span class="px-2 py-1 text-sm font-medium rounded-full <%= certification_status_class(@application.medical_certification_status) %>">
-          <%= @application.medical_certification_status.titleize %>
-        </span>
+        <%= medical_certification_status_badge(@application) %>
       </div>
 
       <div class="mt-6 space-y-4">

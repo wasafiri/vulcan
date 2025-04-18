@@ -1,17 +1,14 @@
 # frozen_string_literal: true
 
 class ApplicationMailbox < ActionMailbox::Base
-  # Route emails to the specific Postmark inbound address
+  # Order matters: More specific routes first.
+
+  # Use lambdas with direct string comparison for robustness
+  routing ->(inbound_email) { (inbound_email.mail.to || []).include?('medical-cert@mdmat.org') } => :medical_certification
+  routing ->(inbound_email) { (inbound_email.mail.to || []).include?('proof@example.com') } => :proof_submission
   routing lambda { |inbound_email|
-    to_addresses = inbound_email.mail.to || []
-    to_addresses.any? { |address| address.include?(MatVulcan::InboundEmailConfig.inbound_email_address) }
+    (inbound_email.mail.to || []).include?(MatVulcan::InboundEmailConfig.inbound_email_address)
   } => :proof_submission
-
-  # Route emails from constituents for proof submissions (backward compatibility)
-  routing(/proof@.*\.com/i => :proof_submission)
-
-  # Route emails from medical professionals for certifications
-  routing(/medical-cert@mdmat\.org/i => :medical_certification)
 
   # Default routing for unmatched emails
   routing(all: :default)

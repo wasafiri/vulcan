@@ -8,14 +8,11 @@ module Admin
       @admin = users(:admin_david)
       @product = products(:ipad_air)
 
-      # Use authenticate_user! to ensure strong authentication verification
-      authenticate_user!(@admin)
+      # Use sign_in_as to authenticate the user for the test
+      sign_in_as(@admin)
 
       # Additional verification that authentication worked
       debug_auth_state('After setup authentication')
-
-      # Let authenticate_user! handle the authentication through cookies
-      # No direct environment variable setting required
     end
 
     def test_should_get_index

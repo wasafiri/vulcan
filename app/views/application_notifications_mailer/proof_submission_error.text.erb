@@ -1,4 +1,4 @@
-<%= render partial: 'shared/mailers/header' %>
+<%= render partial: 'shared/mailers/header', locals: { title: 'Error Processing Your Proof Submission' } %>
 
 ERROR PROCESSING YOUR PROOF SUBMISSION
 
@@ -14,4 +14,4 @@ If you need assistance, please contact our support team.
 
 Thank you for your understanding.
 
-<%= render partial: 'shared/mailers/footer' %>
+<%= render partial: 'shared/mailers/footer', locals: { show_automated_message: true } %>

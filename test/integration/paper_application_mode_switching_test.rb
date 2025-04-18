@@ -5,7 +5,7 @@ require 'test_helper'
 class PaperApplicationModeSwitchingTest < ActionDispatch::IntegrationTest
   setup do
     @admin = users(:admin_david)
-    sign_in @admin
+    sign_in(@admin)
 
     # Create sample proofs for testing
     @income_proof = fixture_file_upload('test/fixtures/files/sample.pdf', 'application/pdf')

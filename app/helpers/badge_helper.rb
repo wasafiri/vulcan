@@ -92,7 +92,8 @@ module BadgeHelper
             else
               'Unknown Certification Status'
             end
-    label += " #{status}" if status != 'not_requested'
+    # Only add the status if it's not already part of the label and not "not_requested"
+    label += " #{status}" if status != 'not_requested' && !label.include?(status.titleize)
     label
   end
 

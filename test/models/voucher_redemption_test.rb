@@ -5,8 +5,8 @@ require 'test_helper'
 class VoucherRedemptionTest < ActiveSupport::TestCase
   setup do
     @application = applications(:complete)
-    @constituent = users(:constituent)
-    @vendor = users(:vendor)
+    @constituent = users(:constituent_alex)
+    @vendor = users(:vendor_raz)
 
     # Create a test voucher
     @voucher = Voucher.create!(
@@ -63,8 +63,8 @@ class VoucherRedemptionTest < ActiveSupport::TestCase
   end
 
   test 'voucher redemption with products associates products' do
-    product1 = products(:one)
-    product2 = products(:two)
+    product1 = products(:ipad_air)
+    product2 = products(:ipad_mini)
     product_data = { product1.id.to_s => 1, product2.id.to_s => 2 }
 
     @voucher.redeem!(100, @vendor, product_data)

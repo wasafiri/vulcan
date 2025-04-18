@@ -9,6 +9,7 @@ FactoryBot.define do
     status { :in_progress }
     income_proof_status { :not_reviewed } # Add default value
     residency_proof_status { :not_reviewed } # Add default value
+    medical_certification_status { :not_requested } # Valid enum value
 
     # Other required fields
     application_date { Time.current }
@@ -23,6 +24,64 @@ FactoryBot.define do
 
     transient do
       skip_proofs { false }
+      use_mock_attachments { false } # Whether to use mock_attached_file instead of real attachments
+    end
+
+    # Attachment traits that use the standardized mock_attached_file approach
+    trait :with_mocked_income_proof do
+      after(:build) do |application|
+        income_proof_mock = mock_attached_file(filename: 'income.pdf')
+        application.stubs(:income_proof_attached?).returns(true)
+        application.stubs(:income_proof).returns(income_proof_mock)
+      end
+    end
+
+    trait :with_mocked_residency_proof do
+      after(:build) do |application|
+        residency_proof_mock = mock_attached_file(filename: 'residency.pdf')
+        application.stubs(:residency_proof_attached?).returns(true)
+        application.stubs(:residency_proof).returns(residency_proof_mock)
+      end
+    end
+
+    trait :with_mocked_medical_certification do
+      after(:build) do |application|
+        medical_certification_mock = mock_attached_file(filename: 'medical_certification.pdf')
+        application.stubs(:medical_certification_attached?).returns(true)
+        application.stubs(:medical_certification).returns(medical_certification_mock)
+      end
+    end
+
+    trait :with_all_mocked_attachments do
+      with_mocked_income_proof
+      with_mocked_residency_proof
+      with_mocked_medical_certification
+    end
+
+    # Real attachment traits that use actual file attachments (not mocks)
+    # These are more suitable for integration/system tests where actual file processing is needed
+    trait :with_real_income_proof do
+      after(:build) do |application|
+        ActiveStorageTestHelper.new.attach_income_proof(application)
+      end
+    end
+
+    trait :with_real_residency_proof do
+      after(:build) do |application|
+        ActiveStorageTestHelper.new.attach_residency_proof(application)
+      end
+    end
+
+    trait :with_real_medical_certification do
+      after(:build) do |application|
+        ActiveStorageTestHelper.new.attach_medical_certification(application)
+      end
+    end
+
+    trait :with_all_real_attachments do
+      with_real_income_proof
+      with_real_residency_proof
+      with_real_medical_certification
     end
 
     after(:build) do |application, evaluator|

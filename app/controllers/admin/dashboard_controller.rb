@@ -17,9 +17,22 @@ module Admin
     def load_dashboard_counts
       @current_fiscal_year       = fiscal_year
       @total_users_count         = User.count
-      @ytd_constituents_count    = Application.where('created_at >= ?', fiscal_year_start).count
+      @ytd_constituents_count    = Application.where(created_at: fiscal_year_start..).count
       @open_applications_count   = Application.active.count
       @pending_services_count    = Application.where(status: :approved).count
+
+      # Calculate training requests count properly, counting distinct applications 
+      # to avoid duplicate counting if there are multiple notifications for the same application
+      @training_requests_count = Notification.where(action: 'training_requested')
+                                 .where(notifiable_type: 'Application')
+                                 .select(:notifiable_id)
+                                 .distinct
+                                 .count
+
+      @proofs_needing_review_count = Application.where(income_proof_status: :not_reviewed)
+                                                .or(Application.where(residency_proof_status: :not_reviewed))
+                                                .count
+      @medical_certs_to_review_count = Application.where(medical_certification_status: 'received').count
     end
 
     def build_application_scope
@@ -39,6 +52,13 @@ module Admin
              .or(scope.where(residency_proof_status: 0))
       when 'awaiting_medical_response'
         scope.where(status: :awaiting_documents)
+      when 'training_requests'
+        # Filter applications with training request notifications
+        application_ids = Notification.where(action: 'training_requested')
+                                      .where(notifiable_type: 'Application')
+                                      .pluck(:notifiable_id)
+        # Ensure we pass all IDs as an array, not as individual arguments
+        scope.where(id: application_ids.presence || [0])
       else
         scope
       end

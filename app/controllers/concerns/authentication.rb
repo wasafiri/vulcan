@@ -37,6 +37,14 @@ module Authentication
                          # Production environment - use signed cookies only
                          find_production_session
                        end
+
+    # Check for expired session
+    if @current_session && @current_session.respond_to?(:expired?) && @current_session.expired?
+      @current_session = nil
+      cookies.delete(:session_token)
+    end
+
+    @current_session
   end
 
   def find_production_session
@@ -99,19 +107,9 @@ module Authentication
 
   # Redirects unauthenticated users to the sign-in page with an alert message
   def authenticate_user!
-    # Special debug for test environment
-    if Rails.env.test? && ENV['DEBUG_AUTH'] == 'true'
-      Rails.logger.debug "AUTHENTICATE_USER! called from #{caller[0]}"
-      Rails.logger.debug "current_user: #{current_user&.email || 'nil'}"
-      Rails.logger.debug "TEST_USER_ID: #{ENV['TEST_USER_ID']}"
-      Rails.logger.debug "cookies: #{cookies.to_h}"
-      if cookies[:session_token]
-        session = Session.find_by(session_token: cookies[:session_token])
-        Rails.logger.debug "Session found by token: #{session&.id || 'nil'}"
-      end
-    end
+    debug_auth_info if debug_auth_enabled?
 
-    return if current_user
+    return if current_user.present?
 
     store_location
     redirect_to sign_in_path, alert: 'Please sign in to continue'
@@ -132,5 +130,25 @@ module Authentication
     return if current_user.evaluator? || current_user.admin?
 
     redirect_to root_path, alert: 'Unauthorized access'
+  end
+
+  def debug_auth_enabled?
+    Rails.env.test? && ENV['DEBUG_AUTH'] == 'true'
+  end
+
+  def debug_auth_info
+    debug_info = {
+      called_from:            caller(1..1).first,
+      current_user:           current_user&.email || 'nil',
+      test_user_id:           ENV.fetch('TEST_USER_ID', 'nil'),
+      cookies:                cookies.to_h
+    }
+
+    if (token = cookies[:session_token])
+      session = Session.find_by(session_token: token)
+      debug_info[:session_found_by_token] = session&.id || 'nil'
+    end
+
+    Rails.logger.debug { "AUTHENTICATE_USER! debug info: #{debug_info.inspect}" }
   end
 end

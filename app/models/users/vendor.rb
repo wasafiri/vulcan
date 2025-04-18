@@ -5,6 +5,7 @@ module Users
     # Products represent equipment
     has_many :products, foreign_key: :user_id
     has_many :vouchers, foreign_key: :vendor_id
+    has_many :processed_vouchers, -> { where.not(status: :pending) }, class_name: 'Voucher', foreign_key: :vendor_id
     has_many :voucher_transactions, foreign_key: :vendor_id
     has_many :invoices, foreign_key: :vendor_id
     has_many :w9_reviews, foreign_key: :vendor_id

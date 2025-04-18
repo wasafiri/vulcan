@@ -8,9 +8,6 @@ echo "=============================================="
 # Make tmp directory if it doesn't exist
 mkdir -p tmp
 
-# Optionally run setup-test-browser to ensure Chrome is properly installed
-bin/setup-test-browser > /dev/null
-
 # Display installed Chrome version (for informational purposes)
 chrome_version=$(chrome --version 2>/dev/null || echo "Unknown Chrome version")
 echo "Chrome version: $chrome_version"

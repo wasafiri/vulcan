@@ -4,20 +4,12 @@ require 'test_helper'
 
 module Admin
   class ApplicationNotesControllerTest < ActionDispatch::IntegrationTest
-    include AuthenticationTestHelper
+    # AuthenticationTestHelper is included globally via test_helper
 
     setup do
-      @admin = create(:user, type: 'Admin')
-      @application = create(:application)
-
-      # Create a session for the admin user
-      @session = @admin.sessions.create!(
-        user_agent: 'Rails Testing',
-        ip_address: '127.0.0.1'
-      )
-
-      # Set the session token in the cookies
-      cookies[:session_token] = @session.session_token
+      @admin = create(:admin) # Use the dedicated :admin factory
+      @application = create(:application, user: create(:constituent, email: "constituent#{@admin.email}"))
+      sign_in_as(@admin) # Use the standard helper for authentication
     end
 
     test 'should create internal note' do

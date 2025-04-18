@@ -15,8 +15,8 @@ class W9Review < ApplicationRecord
 
   # Validations
   validates :status, :reviewed_at, presence: true
-  validates :rejection_reason, presence: true, if: :status_rejected?
-  validates :rejection_reason_code, presence: true, if: :status_rejected?
+  validates :rejection_reason, presence: true, if: -> { status_rejected? }
+  validates :rejection_reason_code, presence: true, if: -> { status_rejected? }
   validate :admin_must_be_admin_type
   validate :vendor_must_be_vendor_type
   validate :validate_rejection_fields
@@ -38,11 +38,12 @@ class W9Review < ApplicationRecord
   end
 
   def admin_must_be_admin_type
-    errors.add(:admin, 'must be an administrator') unless admin&.type == 'Administrator'
+    errors.add(:admin, 'must be an administrator') unless admin&.admin?
   end
 
   def vendor_must_be_vendor_type
-    errors.add(:vendor, 'must be a vendor') unless vendor&.type == 'Vendor'
+    # Just check vendor presence - association will ensure it's the right type
+    errors.add(:vendor, 'must be a vendor') unless vendor
   end
 
   def handle_post_review_actions

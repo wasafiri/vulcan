@@ -3,17 +3,22 @@ import { Controller } from "@hotwired/stimulus"
 export default class extends Controller {
   static targets = ["input", "hidden"]
 
+  // Store bound functions
+  boundHandleInput = this.handleInput.bind(this)
+  boundHandleBlur = this.handleBlur.bind(this)
+
   connect() {
     if (this.hasInputTarget) {
-      this.inputTarget.addEventListener('input', this.handleInput.bind(this))
-      this.inputTarget.addEventListener('blur', this.handleBlur.bind(this))
+      this.inputTarget.addEventListener('input', this.boundHandleInput)
+      this.inputTarget.addEventListener('blur', this.boundHandleBlur)
     }
   }
 
   disconnect() {
     if (this.hasInputTarget) {
-      this.inputTarget.removeEventListener('input', this.handleInput.bind(this))
-      this.inputTarget.removeEventListener('blur', this.handleBlur.bind(this))
+      // Use the stored bound references for removal
+      this.inputTarget.removeEventListener('input', this.boundHandleInput)
+      this.inputTarget.removeEventListener('blur', this.boundHandleBlur)
     }
   }
 
@@ -29,41 +34,52 @@ export default class extends Controller {
   }
 
   handleBlur(event) {
-    const input = event.target
-    let value = input.value // Changed from const to let
-    
-    // Only validate if we have a complete date
-    if (value.length >= 8) {
-      // Check for MMDDYYYY format (8 digits, no slashes)
-      if (/^\d{8}$/.test(value)) {
-        value = `${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4, 8)}`
-        // Update the input field visually immediately for consistency
-        input.value = value 
+    const input = event.target;
+    let raw = input.value.replace(/\D/g, "");       // strip non‑digits
+
+    // must be exactly MMDDYYYY
+    if (!/^(?<m>\d{2})(?<d>\d{2})(?<y>\d{4})$/.test(raw)) {
+      // Clear hidden field if input is invalid/incomplete
+      if (this.hasHiddenTarget) {
+        this.hiddenTarget.value = ""
       }
-      
-      const parts = value.split('/')
-      if (parts.length === 3) {
-        let [month, day, year] = parts.map(p => parseInt(p, 10))
-        
-        // Handle 2-digit years
-        if (year < 100) {
-          year += year >= 50 ? 1900 : 2000
-        }
-        
-        const date = new Date(year, month - 1, day)
-        if (date.getMonth() === month - 1 && date.getDate() === day && year >= 1900 && year <= new Date().getFullYear()) {
-          // Valid date - update hidden field for Rails
-          if (this.hasHiddenTarget) {
-            this.hiddenTarget.value = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
-          }
-          // Ensure the visual input is also correctly formatted after validation
-          input.value = `${month.toString().padStart(2, '0')}/${day.toString().padStart(2, '0')}/${year}`
-        }
-      }
+      return;
     }
-    // Consider clearing hidden field if input is invalid/incomplete?
-    // else if (this.hasHiddenTarget) { 
-    //   this.hiddenTarget.value = "" 
-    // }
+
+    // pull out the pieces using named capture groups
+    const match = raw.match(/^(?<m>\d{2})(?<d>\d{2})(?<y>\d{4})$/);
+    if (!match || !match.groups) {
+      console.error("[DateInput] Regex match failed unexpectedly.");
+       if (this.hasHiddenTarget) {
+        this.hiddenTarget.value = ""
+      }
+      return;
+    }
+    const { m, d, y } = match.groups;
+
+    // sanity‑check date object
+    const date = new Date(+y, +m - 1, +d); // Use unary plus (+) to convert strings to numbers
+    if (
+      date.getFullYear()  != +y ||
+      date.getMonth()      != +m - 1 ||
+      date.getDate()       != +d
+    ) {
+      console.log("[DateInput] invalid calendar date—skipping");
+      // Clear hidden field if date is invalid
+      if (this.hasHiddenTarget) {
+        this.hiddenTarget.value = ""
+      }
+      return;
+    }
+
+    // format back out for the user (MM/DD/YYYY)
+    const pretty = `${m}/${d}/${y}`; // Already have padded strings from regex match
+    input.value = pretty;
+
+    // finally, update your hidden field
+    if (this.hasHiddenTarget) {
+      const iso = `${y}-${m}-${d}`; // Already have padded strings from regex match
+      this.hiddenTarget.value = iso;
+    }
   }
 }

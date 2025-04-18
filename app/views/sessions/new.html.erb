@@ -1,114 +1,117 @@
-<div class="min-h-screen flex items-center justify-center bg-gray-100 px-4 py-12">
-  <div class="bg-white p-6 sm:p-8 rounded-lg shadow-md w-full max-w-md" role="main">
-    <h1 class="text-2xl font-semibold mb-6 text-center text-gray-900" id="signin-heading">Sign In</h1>
+<main class="min-h-screen flex items-center justify-center bg-gray-100 px-4 py-12">
+  <section class="bg-white p-6 sm:p-8 rounded-lg shadow-md w-full max-w-md" aria-labelledby="signin-heading">
+    <h1 id="signin-heading" class="text-2xl font-semibold mb-6 text-center text-gray-900">Sign In</h1>
 
+    <%# Flash Alert - Using paragraph inside for semantics %>
     <% if flash[:alert] %>
-      <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6" 
-           role="alert"
-           aria-atomic="true">
-        <span><%= flash[:alert] %></span>
+      <div role="alert" aria-live="assertive" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+        <p><%= flash[:alert] %></p>
       </div>
     <% end %>
 
-    <%= form_with url: sign_in_path, 
-                  local: true, 
-                  class: "space-y-6",
-                  aria: { labelledby: "signin-heading" },
-                  data: { controller: "visibility" } do |form| %>
-      
-      <div class="space-y-1">
-        <%= form.label :email, "Email Address", 
-            class: "block text-sm font-medium text-gray-700",
-            for: "email-input" %>
+    <%# Error Summary Block %>
+    <% if @errors&.any? %>
+      <div id="signin-error-summary" role="alert" aria-labelledby="signin-error-heading" tabindex="-1" class="bg-red-50 border border-red-400 text-red-700 p-4 rounded mb-6 focus:outline-none focus:ring-2 focus:ring-red-500">
+        <h2 id="signin-error-heading" class="sr-only">Please address the following errors:</h2>
+        <ul class="list-disc list-inside">
+          <% @errors.each do |field, messages| %>
+            <% messages.each do |msg| %>
+              <li><a href="#<%= field %>-input" class="underline"><%= msg %></a></li>
+            <% end %>
+          <% end %>
+        </ul>
+      </div>
+      <script>
+        // Optional: Focus the error summary when it appears
+        document.getElementById('signin-error-summary')?.focus();
+      </script>
+    <% end %>
+
+    <%= form_with :url => sign_in_path,
+                  :local => true,
+                  :html => { :class => "space-y-6", "aria-labelledby" => "signin-heading" } do |form| %>
+      <div class="space-y-1" role="group" aria-labelledby="email-input-label">
+        <%= form.label :email, "Email Address",
+              :for => "email-input",
+              :id => "email-input-label",
+              :class => "block text-sm font-medium text-gray-700" %>
         <%= form.email_field :email,
-            id: "email-input",
-            class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-            value: params[:email_hint] || "",
-            required: true,
-            autocomplete: "email",
-            aria: {
-              required: "true",
-              invalid: @errors&.include?(:email),
-              errormessage: "email-error",
-              describedby: "email-hint email-error"
-            } %>
-        <p class="text-xs text-gray-500" id="email-hint">Enter the email address associated with your account</p>
+              :id => "email-input",
+              :class => "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+              :value => params[:email_hint] || "",
+              :required => true,
+              :autocomplete => "email",
+              :autofocus => true, # Added autofocus
+              "aria-required" => "true",
+              "aria-invalid" => (@errors&.include?(:email) ? "true" : "false"),
+              "aria-describedby" => (["email-hint", (@errors&.include?(:email) ? "email-error" : nil)].compact.join(" ")) %>
+        <p id="email-hint" class="text-xs text-gray-500">Enter the email address associated with your account</p>
         <% if @errors&.include?(:email) %>
-          <p id="email-error" class="mt-1 text-sm text-red-600">
-            <%= @errors[:email].join(", ") %>
-          </p>
+          <p id="email-error" class="mt-1 text-sm text-red-600"><%= @errors[:email].join(", ") %></p>
         <% end %>
       </div>
 
-      <div class="space-y-1">
+      <div class="space-y-1" role="group" aria-labelledby="password-input-label">
         <%= form.label :password, "Password",
-            class: "block text-sm font-medium text-gray-700",
-            for: "password-input" %>
-        <div class="relative">
+              :for => "password-input",
+              :id => "password-input-label",
+              :class => "block text-sm font-medium text-gray-700" %>
+        <div class="relative" data-controller="visibility">
           <%= form.password_field :password,
-              id: "password-input",
-              class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-              required: true,
-              autocomplete: "current-password",
-              data: { visibility_target: "field" },
-              aria: {
-                required: "true",
-                invalid: @errors&.include?(:password),
-                errormessage: "password-error",
-                describedby: "password-hint password-error password-visibility-status"
-              } %>
+                :id => "password-input",
+                :class => "mt-1 block w-full px-4 py-2 pr-10 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm", # Added pr-10
+                :"data-visibility-target" => "field", # Add target for Stimulus
+                :required => true,
+                :autocomplete => "current-password",
+                "aria-required" => "true",
+                "aria-invalid" => (@errors&.include?(:password) ? "true" : "false"),
+                "aria-describedby" => (["password-hint", (@errors&.include?(:password) ? "password-error" : nil), "password-visibility-status"].compact.join(" ")).html_safe %>
           <button type="button"
-                  data-action="visibility#togglePassword" 
+                  data-action="visibility#togglePassword"
                   class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  aria-label="Toggle password visibility"
+                  aria-label="Show password"
                   aria-pressed="false">
-            <svg class="h-5 w-5" 
-                 data-visibility-target="icon" 
-                 fill="none" 
-                 viewBox="0 0 24 24" 
+            <svg class="h-5 w-5"
+                 data-visibility-target="icon"
+                 fill="none"
+                 viewBox="0 0 24 24"
                  stroke="currentColor"
                  aria-hidden="true">
               <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
             </svg>
           </button>
-          <div aria-live="polite" 
-               class="sr-only" 
-               id="password-visibility-status"
-               data-visibility-target="status">
+          <div id="password-visibility-status" aria-live="polite" class="sr-only" data-visibility-target="status">
             Password is hidden
           </div>
         </div>
         <div class="flex items-center justify-between mt-2">
-          <p class="text-xs text-gray-500" id="password-hint">Enter your password</p>
-          <%= link_to "Forgot password?", 
-              edit_password_path, 
-              class: "text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded",
-              aria: { label: "Reset your password" } %>
+          <p id="password-hint" class="text-xs text-gray-500">Enter your password</p>
+          <%= link_to "Forgot password?",
+                edit_password_path,
+                :class => "text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded",
+                "aria-label" => "Reset your password" %>
         </div>
         <% if @errors&.include?(:password) %>
-          <p id="password-error" class="mt-1 text-sm text-red-600">
-            <%= @errors[:password].join(", ") %>
-          </p>
+          <p id="password-error" class="mt-1 text-sm text-red-600"><%= @errors[:password].join(", ") %></p>
         <% end %>
       </div>
 
-      <%= form.submit "Sign In", 
-          class: "w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-          data: { 
-            disable_with: "Signing in...",
-            "aria-busy": "true" 
-          },
-          aria: { label: "Sign in to your account" } %>
+      <%= form.submit "Sign In",
+          :class => "w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+          :"data-disable-with" => "Signing in...",
+          :"aria-busy" => "true",
+          :"aria-label" => "Sign in to your account" %>
 
       <div class="text-center" role="contentinfo">
         <p class="text-sm text-gray-600">
           Don't have an account?
-          <%= link_to "Sign Up", 
-              sign_up_path, 
-              class: "ml-1 font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded" %>
+          <%= link_to "Sign Up",
+                sign_up_path,
+                :class => "ml-1 font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded",
+                :"aria-label" => "Sign up for a new account" %>
         </p>
       </div>
     <% end %>
-  </div>
-</div>
+  </section>
+</main>

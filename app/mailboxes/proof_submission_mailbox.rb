@@ -40,16 +40,11 @@ class ProofSubmissionMailbox < ApplicationMailbox
   end
 
   def determine_proof_type(subject, body)
-    subject = subject.downcase
-    body = body.downcase
+    text = [subject, body].join(' ').to_s.downcase
 
-    if subject.include?('income') || body.include?('income')
-      :income
-    elsif subject.include?('residency') || body.include?('residency') ||
-          subject.include?('address') || body.include?('address')
+    if text.match?(/\b(residency|address)\b/) && !text.match?(/\bincome\b/)
       :residency
     else
-      # Default to income if we can't determine
       :income
     end
   end
@@ -151,8 +146,9 @@ class ProofSubmissionMailbox < ApplicationMailbox
   end
 
   def bounce_with_notification(error_type, message)
+    # record the bounce event
     Event.create!(
-      user: constituent,
+      user: constituent || User.system_user,
       action: "proof_submission_#{error_type}",
       metadata: {
         application_id: application&.id,
@@ -161,12 +157,17 @@ class ProofSubmissionMailbox < ApplicationMailbox
       }
     )
 
-    bounce_with ApplicationNotificationsMailer.proof_submission_error(
+    # send the actual bounce email
+    mail = ApplicationNotificationsMailer.proof_submission_error(
       constituent,
       application,
       error_type,
       message
     )
+    mail.deliver_now
+
+    # halt further inbound_email processing
+    throw :bounce
   end
 
   def constituent
@@ -174,6 +175,8 @@ class ProofSubmissionMailbox < ApplicationMailbox
   end
 
   def application
-    @application ||= constituent&.applications&.last
+    return nil unless constituent
+
+    @application ||= constituent.applications.order(created_at: :desc).first
   end
 end

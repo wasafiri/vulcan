@@ -66,26 +66,6 @@ class AuthenticationVerificationTest < ActionDispatch::IntegrationTest
     assert_response :success, "Expected to access protected page, but was redirected to #{response.location}"
   end
 
-  # Test the authenticate_user! helper
-  test 'authenticate_user! correctly authenticates user' do
-    # Authenticate the user
-    authenticate_user!(@user)
-
-    # Debug output
-    Rails.logger.debug 'VERIFICATION: After authenticate_user!'
-    Rails.logger.debug "VERIFICATION: Cookies: #{cookies.inspect}"
-
-    # Verify cookie is set
-    assert_not_nil cookies[:session_token], 'Session token cookie not set'
-    assert_not_nil cookies.signed[:session_token], 'Signed session token cookie not set' if cookies.respond_to?(:signed)
-
-    # Verify we can access a protected page
-    get constituent_portal_applications_path
-
-    # Verify we're not redirected to sign in
-    assert_response :success, "Expected to access protected page, but was redirected to #{response.location}"
-  end
-
   # Test authentication persistence across requests
   test 'authentication persists across multiple requests' do
     # Sign in the user

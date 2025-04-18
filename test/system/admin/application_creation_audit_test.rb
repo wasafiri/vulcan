@@ -10,7 +10,7 @@ module Admin
       @admin = users(:admin_david)
       @constituent = users(:constituent_alice)
       setup_active_storage_test
-      sign_in @admin
+      sign_in(@admin)
     end
 
     teardown do
@@ -20,7 +20,7 @@ module Admin
     test 'admin can see application creation event for online applications' do
       # First create an application as a constituent
       sign_out
-      sign_in @constituent
+      sign_in(@constituent)
 
       visit new_constituent_portal_application_path
 
@@ -43,7 +43,7 @@ module Admin
 
       # Sign out and sign in as admin
       sign_out
-      sign_in @admin
+      sign_in(@admin)
 
       # Find and view the application
       visit admin_applications_path

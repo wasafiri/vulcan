@@ -46,14 +46,11 @@ class DisabilityValidationTest < ActiveSupport::TestCase
   end
 
   test 'application can be saved as draft without disability' do
-    application = Application.new(
+    application = create(:application,
       user: @constituent,
-      application_date: Date.today,
-      status: 'draft',
+      status: :draft,
       household_size: 1,
-      annual_income: 30_000,
-      maryland_resident: true,
-      self_certify_disability: true
+      annual_income: 30_000
     )
     assert application.save, 'Application should be saved as draft without disability'
   end
@@ -68,7 +65,12 @@ class DisabilityValidationTest < ActiveSupport::TestCase
       cognition_disability: false
     )
 
-    application = Application.create!(@application_params.merge(status: 'draft'))
+    application = create(:application,
+      user: @constituent,
+      status: :draft,
+      household_size: 1,
+      annual_income: 30_000
+    )
     application.status = 'in_progress'
 
     assert_not application.save, 'Application should not be submitted without disability'
@@ -93,7 +95,12 @@ class DisabilityValidationTest < ActiveSupport::TestCase
       # Set just one disability to true
       @constituent.update("#{disability_type}_disability" => true)
 
-      application = Application.create!(@application_params.merge(status: 'draft'))
+      application = create(:application,
+        user: @constituent,
+        status: :draft,
+        household_size: 1,
+        annual_income: 30_000
+      )
       application.status = 'in_progress'
 
       assert application.save,
@@ -111,7 +118,12 @@ class DisabilityValidationTest < ActiveSupport::TestCase
       cognition_disability: false
     )
 
-    application = Application.create!(@application_params.merge(status: 'draft'))
+    application = create(:application,
+      user: @constituent,
+      status: :draft,
+      household_size: 1,
+      annual_income: 30_000
+    )
     application.status = 'in_progress'
 
     assert application.save, 'Application should be submitted with multiple disabilities'
@@ -127,7 +139,12 @@ class DisabilityValidationTest < ActiveSupport::TestCase
       cognition_disability: true
     )
 
-    application = Application.create!(@application_params.merge(status: 'draft'))
+    application = create(:application,
+      user: @constituent,
+      status: :draft,
+      household_size: 1,
+      annual_income: 30_000
+    )
     application.status = 'in_progress'
 
     assert application.save, 'Application should be submitted with all disabilities'

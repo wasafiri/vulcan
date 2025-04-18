@@ -9,7 +9,7 @@
     "test": {
       "buildpacks": [
         { "url": "heroku/ruby" },
-        { "url": "heroku-community/chrome-for-testing" }
+        { "url": "heroku-community/google-chrome" }
       ],
       "scripts": {
         "test-setup": "bin/rails db:prepare",

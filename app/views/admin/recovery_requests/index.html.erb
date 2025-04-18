@@ -1,0 +1,47 @@
+<div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <h1 class="text-2xl font-semibold mb-6">Security Key Recovery Requests</h1>
+  
+  <% if @recovery_requests.any? %>
+    <div class="bg-white shadow overflow-hidden sm:rounded-md">
+      <ul class="divide-y divide-gray-200">
+        <% @recovery_requests.each do |request| %>
+          <li>
+            <div class="px-4 py-4 sm:px-6">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-lg font-medium text-gray-900"><%= request.user.full_name %></h3>
+                  <p class="text-sm text-gray-500"><%= request.user.email %></p>
+                </div>
+                <div class="text-sm text-gray-500">
+                  Requested: <%= request.created_at.strftime("%B %d, %Y at %I:%M %p") %>
+                </div>
+              </div>
+              
+              <div class="mt-2 sm:flex sm:justify-between">
+                <div class="sm:flex">
+                  <p class="flex items-center text-sm text-gray-500">
+                    <span class="truncate"><%= request.details.presence&.truncate(100) || "No additional details provided" %></span>
+                  </p>
+                </div>
+                <div class="mt-2 flex items-center text-sm sm:mt-0">
+                  <%= link_to "View Details", admin_recovery_request_path(request), 
+                             class: "text-indigo-600 hover:text-indigo-900 mr-4" %>
+                             
+                  <%= button_to "Approve Reset", 
+                              approve_admin_recovery_request_path(request), 
+                              method: :post,
+                              class: "bg-green-500 hover:bg-green-600 text-white py-1 px-3 rounded text-xs",
+                              data: { confirm: "This will remove all security keys for this user. They will need to re-register. Continue?" } %>
+                </div>
+              </div>
+            </div>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+  <% else %>
+    <div class="bg-white shadow overflow-hidden sm:rounded-md p-6 text-center">
+      <p class="text-gray-500">No pending recovery requests.</p>
+    </div>
+  <% end %>
+</div>

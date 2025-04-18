@@ -158,7 +158,7 @@ module ApplicationStatusManagement
   # Creates an audit event for the auto-approval
   def create_auto_approval_audit_event(previous_status)
     return unless defined?(Event) && Event.respond_to?(:create)
-    
+
     begin
       Event.create!(
         user: nil,  # nil user indicates system action

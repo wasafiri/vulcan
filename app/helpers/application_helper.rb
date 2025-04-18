@@ -57,4 +57,12 @@ module ApplicationHelper
                   :training_session, session.status
                 )}")
   end
+
+  def medical_certification_status_badge(application)
+    content_tag(:span,
+                application.medical_certification_status.titleize,
+                class: "px-3 py-2 text-sm font-medium rounded-full whitespace-nowrap inline-flex items-center justify-center #{badge_class_for(
+                  :certification, application.medical_certification_status
+                )}")
+  end
 end

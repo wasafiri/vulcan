@@ -14,7 +14,7 @@ module VendorPortal
         return
       end
       
-      voucher = Voucher.active.find_by(code: params[:code])
+      voucher = Voucher.where(status: :active).find_by(code: params[:code])
       if voucher
         redirect_to verify_vendor_voucher_path(voucher.code)
       else

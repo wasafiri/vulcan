@@ -50,7 +50,8 @@ module Applications
       when 'awaiting_medical_response'
         scope.where(status: :awaiting_documents)
       when 'medical_certs_to_review'
-        scope.where(medical_certification_status: :received)
+        # Only include applications that are in progress and have received certs
+        scope.where(status: :in_progress, medical_certification_status: :received)
       when 'training_requests'
         # Use scope to filter applications with pending training
         scope.with_pending_training

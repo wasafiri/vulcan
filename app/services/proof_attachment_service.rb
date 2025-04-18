@@ -107,7 +107,9 @@ class ProofAttachmentService
       application = Application.unscoped.find(application.id)
 
       # Log details to help debug attachments
-      Rails.logger.debug "Attachment check - application_id: #{application.id}, #{proof_type}_proof attached? #{application.send("#{proof_type}_proof").attached?}"
+      Rails.logger.debug do
+        "Attachment check - application_id: #{application.id}, #{proof_type}_proof attached? #{application.send("#{proof_type}_proof").attached?}"
+      end
       if application.send("#{proof_type}_proof").attached?
         attachment = application.send("#{proof_type}_proof").attachment
         Rails.logger.info "Attachment confirmed - ID: #{attachment.id}, Blob ID: #{attachment.blob_id}"
@@ -122,9 +124,7 @@ class ProofAttachmentService
           name: "#{proof_type}_proof"
         ).exists?
 
-        unless attachment_exists
-          raise "Failed to verify attachment: #{proof_type}_proof not attached after direct attachment"
-        end
+        raise "Failed to verify attachment: #{proof_type}_proof not attached after direct attachment" unless attachment_exists
 
         Rails.logger.warn 'Attachment exists in DB but not detected in model - forcing reload'
         application.send("#{proof_type}_proof").reset
@@ -160,14 +160,14 @@ class ProofAttachmentService
 
       # Final verification after status update
       application.reload
-      unless application.send("#{proof_type}_proof").attached?
-        raise 'Critical error: Attachment disappeared after status update'
-      end
+      raise 'Critical error: Attachment disappeared after status update' unless application.send("#{proof_type}_proof").attached?
 
       # Set blob size for metrics
       result[:blob_size] = blob_size
       result[:success] = true
     rescue StandardError => e
+      # Explicitly set success to false on error
+      result[:success] = false
       # Track failure with detailed information
       record_failure(application, proof_type, e, admin, submission_method, metadata)
       result[:error] = e

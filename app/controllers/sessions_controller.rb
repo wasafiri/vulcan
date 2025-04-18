@@ -1,91 +1,60 @@
-# frozen_string_literal: true
-
 class SessionsController < ApplicationController
   skip_before_action :authenticate_user!, only: %i[new create]
-  before_action :set_session, only: [:destroy]
-
-  def index
-    @sessions = current_user.sessions.order(created_at: :desc)
-  end
-
   def new
-    redirect_to after_sign_in_path if current_user
+    respond_to do |format|
+      format.turbo_stream do
+        render turbo_stream: turbo_stream.replace('sign_in_form', partial: 'sessions/form')
+      end
+      format.html { redirect_to(_dashboard_for(current_user)) if current_user }
+    end
   end
 
   def create
     user = User.find_by(email: params[:email])
-    if user&.authenticate(params[:password])
-      create_and_handle_session(user)
+
+    if user && user.authenticate(params[:password])
+      if user.second_factor_enabled?
+        # Store user ID temporarily and redirect to 2FA step
+        cookies.delete(:session_token) # Ensure no old session interferes
+        TwoFactorAuth.clear_challenge(session) # Clear any stale challenge
+        TwoFactorAuth.store_temp_user_id(session, user.id)
+        TwoFactorAuth.store_return_path(session, session[:return_to])
+        redirect_to verify_method_two_factor_authentication_path(type: 'webauthn')
+      else
+        # User doesn't have 2FA, sign them in directly using the ApplicationController helper
+        sign_in(user) # This now calls the refactored method in ApplicationController
+
+        # Return success for standard flow
+        yield if block_given?
+      end
     else
-      handle_invalid_credentials
+      handle_invalid_credentials # Keep existing invalid credential handling
     end
   end
 
   def destroy
-    session = current_user&.sessions&.find_by(session_token: cookies.signed[:session_token])
-    if session
-      session.destroy
-      cookies.delete(:session_token)
-      redirect_to sign_in_path, notice: 'Signed out successfully'
-    else
-      redirect_to sign_in_path, alert: 'No active session'
+    # Clean up any 2FA in progress
+    TwoFactorAuth.complete_authentication(session) if two_factor_authentication_initiated?
+
+    # Find and destroy the current session if it exists
+    current_user&.sessions&.find_by(session_token: cookies.signed[:session_token])&.destroy
+
+    # Always clear the session cookie
+    cookies.delete(:session_token)
+
+    # Handle different response formats appropriately
+    respond_to do |format|
+      format.html { redirect_to sign_in_path, notice: 'Signed out successfully' }
+      format.turbo_stream { redirect_to sign_in_path, notice: 'Signed out successfully' }
     end
   end
 
   private
 
-  def set_session
-    @session = Session.find_by(session_token: cookies.signed[:session_token])
-  end
-
-  def after_sign_in_path
-    case current_user
-    when Users::Administrator
-      admin_applications_path
-    when Users::Constituent
-      constituent_dashboard_path
-    when Users::Evaluator
-      evaluators_dashboard_path
-    when Users::Vendor
-      vendor_dashboard_path
-    else
-      root_path
-    end
-  end
-
-  def create_and_handle_session(user)
-    @session = user.sessions.new(
-      user_agent: request.user_agent,
-      ip_address: request.remote_ip
-    )
-    if @session.save
-      cookies.signed[:session_token] = session_cookie_options(@session.session_token)
-      user.track_sign_in!(request.remote_ip)
-      redirect_to dashboard_for(user), notice: 'Signed in successfully'
-    else
-      redirect_to sign_in_path(email_hint: params[:email]), alert: 'Unable to create session'
-    end
-  end
-
-  def session_cookie_options(token)
-    {
-      value: token,
-      httponly: true,
-      secure: Rails.env.production?
-    }
-  end
-
-  def dashboard_for(user)
-    case user
-    when Users::Administrator then admin_applications_path
-    when Users::Constituent then constituent_dashboard_path
-    when Users::Evaluator then evaluators_dashboard_path
-    when Users::Vendor then vendor_dashboard_path
-    else root_path
-    end
-  end
-
   def handle_invalid_credentials
+    # Add user feedback for failed login attempts if User model supports it
+    # user = User.find_by(email: params[:email])
+    # user&.track_failed_attempt!(request.remote_ip) if user # Assuming track_failed_attempt! exists
     redirect_to sign_in_path(email_hint: params[:email]), alert: 'Invalid email or password'
   end
 end

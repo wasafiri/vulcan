@@ -7,7 +7,7 @@ module Webhooks
   # This allows us to test webhook functionality without requiring authentication
   class TestBaseController < BaseController
     # Skip authentication for tests
-    skip_before_action :authenticate_user!, raise: false
+    skip_before_action :sign_in, raise: false
 
     # Override the verify_webhook_signature method to use our test secret
     def verify_webhook_signature

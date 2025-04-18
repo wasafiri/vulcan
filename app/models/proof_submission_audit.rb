@@ -15,7 +15,7 @@ class ProofSubmissionAudit < ApplicationRecord
   validates :proof_type, presence: true
   validates :ip_address, presence: true
   validates :submission_method, presence: true
-  
+
   # Generate a human-readable description of the proof submission event
   def description
     "#{proof_type.to_s.humanize} proof submitted via #{submission_method}"
@@ -30,7 +30,7 @@ class ProofSubmissionAudit < ApplicationRecord
     return unless suspicious?
 
     # Only run in production to avoid test failures
-    return unless Rails.env.production? || Rails.env.staging?
+    return unless Rails.env.production?
 
     # Use Rails logger if AdminNotifier is not available
     if defined?(AdminNotifier)

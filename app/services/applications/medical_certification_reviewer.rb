@@ -19,74 +19,40 @@ module Applications
     # @return [Hash] Result hash with success status and any error messages
     def reject(rejection_reason:, notes: nil)
       Rails.logger.info "Rejecting medical certification for Application ##{application.id}"
-      
+
       # Validate inputs
       return failure_result('Rejection reason is required') if rejection_reason.blank?
-      return failure_result('Admin user is required') unless admin.present?
-      
+      return failure_result('Admin user is required') if admin.blank?
+
       # Check if application has a medical provider with contact info
-      unless application.medical_provider_name.present?
-        return failure_result('Application does not have medical provider information')
-      end
-      
+      return failure_result('Application does not have medical provider information') if application.medical_provider_name.blank?
+
       # Make sure there's at least one way to contact the provider
       unless application.medical_provider_email.present? || application.medical_provider_fax.present?
         return failure_result('No contact method available for medical provider')
       end
-      
-      # Attempt to update application status to rejected
-      application.transaction do
-        # Update medical certification status
-        begin
-          # Pass nil for certification when rejecting - we don't need to attach anything
-          application.update_certification!(
-            certification: nil,
-            status: :rejected,
-            verified_by: admin,
-            rejection_reason: rejection_reason
-          )
-        rescue StandardError => e
-          return failure_result("Failed to update application: #{e.message}")
-        end
-        
-        # Add notes if provided
-        if notes.present?
-          application.application_notes.create!(
-            author: admin,
-            content: "Medical certification rejected: #{notes}",
-            note_type: 'medical_certification'
-          )
-        end
-        
-        # Record the status change in audit log
-        ApplicationStatusChange.create!(
-          application: application,
-          user: admin,
-          from_status: 'pending',
-          to_status: 'rejected',
-          change_type: 'medical_certification',
-          metadata: {
-            rejection_reason: rejection_reason,
-            provider_name: application.medical_provider_name,
-            timestamp: Time.current.iso8601
-          }
+
+      # Call the dedicated service to handle rejection logic (updates status, creates events/notifications)
+      result = MedicalCertificationAttachmentService.reject_certification(
+        application: application,
+        admin: admin,
+        reason: rejection_reason,
+        notes: notes # Pass notes to the service, it includes them in notification/status change metadata
+      )
+
+      # If the service call succeeded and notes were provided, create the specific ApplicationNote
+      if result[:success] && notes.present?
+        # Removed begin/rescue to let potential errors propagate
+        application.application_notes.create!(
+          admin: admin, # Correct association name
+          content: "Medical certification rejected: #{notes}"
+          # Removed non-existent note_type attribute
         )
-        
-        # Notify the medical provider
-        notifier = MedicalProviderNotifier.new(application)
-        notification_sent = notifier.notify_certification_rejection(
-          rejection_reason: rejection_reason,
-          admin: admin
-        )
-        
-        unless notification_sent
-          Rails.logger.warn "Certification rejected but failed to notify provider for Application ##{application.id}"
-        end
       end
-      
-      success_result
-    rescue StandardError => e
-      failure_result("Unexpected error: #{e.message}")
+
+      # Return the result hash from the service call
+      result
+      # No need for a broad rescue here, the service handles its errors and returns a result hash
     end
 
     private

@@ -15,7 +15,7 @@ module Admin
       @pending_letter2.pdf_letter.attach(io: test_pdf.open, filename: 'test_letter2.pdf')
 
       # Log in as admin
-      sign_in_as(@admin)
+      sign_in(@admin)
     end
 
     test 'viewing print queue' do

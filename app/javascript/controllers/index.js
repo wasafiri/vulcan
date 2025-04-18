@@ -17,11 +17,14 @@ import W9ReviewController from "./w9_review_controller"
 import PdfLoaderController from "./pdf_loader_controller"
 import EvaluationManagementController from "./evaluation_management_controller"
 import CheckboxSelectAllController from "./checkbox_select_all_controller"
+import AddCredentialController from "./add_credential_controller"
+import CredentialAuthenticatorController from "./credential_authenticator_controller"
+import TotpFormController from "./totp_form_controller"
 
 application.register("role-select", RoleSelectController)
 application.register("modal", ModalController)
 application.register("rejection-form", RejectionFormController)
-application.register("dateinput", DateInputController)
+application.register("date-input", DateInputController)
 application.register("upload", UploadController)
 application.register("chart-toggle", ChartToggleController)
 application.register("chart", ChartController)
@@ -36,3 +39,6 @@ application.register("w9-review", W9ReviewController)
 application.register("pdf-loader", PdfLoaderController)
 application.register("evaluation-management", EvaluationManagementController)
 application.register("checkbox-select-all", CheckboxSelectAllController)
+application.register("add-credential", AddCredentialController)
+application.register("credential-authenticator", CredentialAuthenticatorController)
+application.register("totp-form", TotpFormController)

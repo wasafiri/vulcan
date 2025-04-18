@@ -15,6 +15,9 @@ Rails.application.routes.draw do
   get 'apply', to: 'pages#apply', as: :apply
   get 'contact', to: 'pages#contact', as: :contact
 
+  # Welcome/Onboarding
+  get 'welcome', to: 'welcome#index', as: :welcome
+
   # Authentication
   get 'sign_in', to: 'sessions#new'
   post 'sign_in', to: 'sessions#create'
@@ -26,6 +29,38 @@ Rails.application.routes.draw do
   post 'sign_up', to: 'registrations#create'
   resource :password, only: %i[new create edit update]
   resource :profile, only: %i[edit update], controller: 'users'
+
+  # Two-Factor Authentication (consolidated approach)
+  resource :two_factor_authentication, only: [] do
+    get :setup
+    get :verify
+    post :verify_code
+
+    # Primary verification routes
+    get 'verify/:type', to: 'two_factor_authentications#verify_method', as: :verify_method
+    post 'verify/:type', to: 'two_factor_authentications#process_verification', as: :process_verification
+    get 'verification_options/:type', to: 'two_factor_authentications#verification_options', as: :verification_options
+
+    # Credential management routes
+    get 'credentials/:type/new', to: 'two_factor_authentications#new_credential', as: :new_credential
+    post 'credentials/:type', to: 'two_factor_authentications#create_credential', as: :create_credential
+    delete 'credentials/:type/:id', to: 'two_factor_authentications#destroy_credential', as: :destroy_credential
+    get 'credentials/:type/success', to: 'two_factor_authentications#credential_success', as: :credential_success
+
+    # SMS specific routes
+    get 'credentials/sms/:id/verify', to: 'two_factor_authentications#verify_sms_credential', as: :verify_sms_credential
+    post 'credentials/sms/:id/confirm', to: 'two_factor_authentications#confirm_sms_credential', as: :confirm_sms_credential
+    post 'credentials/sms/:id/resend', to: 'two_factor_authentications#resend_sms_code', as: :resend_sms_code
+
+    # WebAuthn specific routes
+    post 'credentials/webauthn/options', to: 'two_factor_authentications#webauthn_creation_options', as: :webauthn_creation_options
+  end
+
+  # Account Recovery
+  get 'lost_security_key', to: 'account_recovery#new', as: :lost_security_key
+  post 'request_security_key_reset', to: 'account_recovery#create', as: :request_security_key_reset
+  get 'account_recovery/confirmation', to: 'account_recovery#confirmation', as: :account_recovery_confirmation
+
   get 'up', to: 'rails/health#show', as: :rails_health_check
 
   # Notifications
@@ -46,7 +81,14 @@ Rails.application.routes.draw do
   end
 
   namespace :admin do
+    get 'dashboard', to: 'dashboard#index', as: :dashboard # Add dashboard route
     root to: 'applications#index'
+
+    resources :recovery_requests, only: %i[index show] do
+      member do
+        post :approve
+      end
+    end
 
     resources :print_queue, only: %i[index show] do
       member do
@@ -98,6 +140,7 @@ Rails.application.routes.draw do
       end
 
       resources :notes, only: [:create], controller: 'application_notes'
+      resources :scanned_proofs, only: %i[new create] # Added missing routes
     end
 
     resources :constituents_dashboard, only: %i[index show]
@@ -110,7 +153,7 @@ Rails.application.routes.draw do
     resources :policies, only: %i[index show edit update create] do
       collection do
         get :changes
-        patch :update
+        patch :bulk_update # Add route for bulk updates
       end
     end
 

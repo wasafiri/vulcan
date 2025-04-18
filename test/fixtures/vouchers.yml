@@ -57,3 +57,13 @@ fully_redeemed:
   status: redeemed
   issued_at: <%= Time.current - 1.month %>
   last_used_at: <%= Time.current - 2.weeks %>
+
+valid_voucher:
+  code: "VALIDVOUCHER1"
+  application: approved
+  vendor_id: <%= ActiveRecord::FixtureSet.identify(:vendor_raz) %>
+  initial_value: 1000.00
+  remaining_value: 500.00
+  status: active
+  issued_at: <%= Time.current - 2.months %>
+  last_used_at: <%= Time.current - 1.month %>

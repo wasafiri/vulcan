@@ -2,11 +2,16 @@
 import "@hotwired/turbo-rails"
 import * as ActiveStorage from "@rails/activestorage"
 import Chart from "chart.js/auto"
+import * as WebAuthnJSON from "@github/webauthn-json"
+import Auth from "./auth"
 import "./controllers"
 import "./controllers/debug_helper"
 
 // Make Chart.js available globally
 window.Chart = Chart
+// Make WebAuthnJSON and Auth available globally if needed for debugging, or remove if not
+window.WebAuthnJSON = WebAuthnJSON
+window.Auth = Auth
 
 // Set a global timeout for password visibility (for testing purposes)
 window.passwordVisibilityTimeout = 5000;

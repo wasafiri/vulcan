@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 FactoryBot.define do
-  factory :vendor do
-    type { 'Vendor' }
+  factory :vendor, class: 'Users::Vendor' do
+    type { 'Users::Vendor' }
     sequence(:email) { |n| "vendor#{n}@example.com" }
     password { 'password123' }
     first_name { 'Test' }

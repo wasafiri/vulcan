@@ -45,14 +45,11 @@ class VoucherRedemptionIntegrationTest < ActionDispatch::IntegrationTest
     )
 
     # Create application
-    @application = Application.create!(
+    @application = create(:application,
       user: @constituent,
-      application_date: Time.current,
-      status: 'draft', # Use draft to avoid medical provider validations
-      maryland_resident: true,
+      status: 'draft',
       household_size: 2,
       annual_income: 35_000,
-      self_certify_disability: true,
       medical_provider_name: 'Dr. Integration Test',
       medical_provider_email: 'doctor.integration@example.com',
       medical_provider_phone: '555-123-4567'

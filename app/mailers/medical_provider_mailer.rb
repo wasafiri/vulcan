@@ -22,7 +22,7 @@ class MedicalProviderMailer < ApplicationMailer
       to: application.medical_provider_email,
       from: 'info@mdmat.org',
       reply_to: 'medical-certification@maryland.gov',
-      subject: "Disability Certification Form for Patient needs Updates",
+      subject: 'Disability Certification Form for Patient needs Updates',
       message_stream: 'outbound'
     }
 
@@ -55,5 +55,24 @@ class MedicalProviderMailer < ApplicationMailer
     end
 
     mail(mail_options)
+  end
+
+  # Notify a medical provider about an error during certification submission
+  # @param medical_provider [User] The medical provider who sent the email
+  # @param application [Application, nil] The associated application, if found
+  # @param error_type [Symbol] The type of error (:provider_not_found, :invalid_certification_request, etc.)
+  # @param message [String] The error message
+  def certification_submission_error(medical_provider, application, error_type, message)
+    @medical_provider = medical_provider
+    @application = application
+    @constituent = application&.user
+    @error_type = error_type
+    @message = message
+
+    mail(
+      to: @medical_provider.email,
+      subject: 'Error Processing Your Certification Submission',
+      message_stream: 'outbound' # Use appropriate stream
+    )
   end
 end

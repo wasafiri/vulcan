@@ -25,14 +25,14 @@ module Applications
       add_error("Failed to build audit logs: #{e.message}")
       []
     end
-    
+
     # Build deduplicated audit logs using the EventDeduplicationService
     def build_deduplicated_audit_logs
       return [] unless application
-      
+
       # Collect all events from various sources
       events = build_audit_logs
-      
+
       # Use the deduplication service to remove duplicates
       EventDeduplicationService.new.deduplicate(events)
     rescue StandardError => e
@@ -68,25 +68,24 @@ module Applications
     def load_notifications
       # For notifications, use a more optimized query and apply the decorator pattern
       # to prevent ActiveStorage eager loading on blob associations
-      notifications = Notification
-                      .select('id, recipient_id, actor_id, notifiable_id, notifiable_type, action, read_at, created_at, message_id, delivery_status, metadata')
-                      .includes(:actor)
-                      .where(notifiable_type: 'Application', notifiable_id: application.id)
-                      .where(action: %w[
-                               medical_certification_requested
-                               medical_certification_received
-                               medical_certification_approved
-                               medical_certification_rejected
-                               review_requested
-                               documents_requested
-                               proof_approved
-                               proof_rejected
-                             ])
-                      .order(created_at: :desc)
-                      .to_a
+      Notification
+        .select('id, recipient_id, actor_id, notifiable_id, notifiable_type, action, read_at, created_at, message_id, delivery_status, metadata')
+        .includes(:actor)
+        .where(notifiable_type: 'Application', notifiable_id: application.id)
+        .where(action: %w[
+                 medical_certification_requested
+                 medical_certification_received
+                 medical_certification_approved
+                 medical_certification_rejected
+                 review_requested
+                 documents_requested
+                 proof_approved
+                 proof_rejected
+               ])
+        .order(created_at: :desc)
+        .to_a
 
-      # Use decorator pattern to avoid ActiveStorage eager loading
-      notifications.map { |n| NotificationDecorator.new(n) }
+      # Return raw notifications; decorator interferes with deduplication service type checking
     end
 
     # Load application events with minimal eager loading
@@ -100,6 +99,7 @@ module Applications
           %w[
             voucher_assigned voucher_redeemed voucher_expired voucher_cancelled
             application_created evaluator_assigned trainer_assigned application_auto_approved
+            medical_certification_requested medical_certification_status_changed # Added certification events
           ],
           application.id.to_s,
           { application_id: application.id }.to_json

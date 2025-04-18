@@ -6,7 +6,7 @@ class ApplicationTest < ActiveSupport::TestCase
   include ActiveJob::TestHelper
 
   def setup
-    @admin = users(:admin_david)
+    @admin = create(:admin)
 
     # Set paper application context for tests
     Thread.current[:paper_application_context] = true

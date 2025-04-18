@@ -25,7 +25,7 @@ class ConstituentProofsSubmissionTest < ActionDispatch::IntegrationTest
 
     assert_changes '@application.reload.income_proof_status',
                    from: 'rejected',
-                   to: 'not_reviewed' do
+                   to: 'pending' do
       assert_changes '@application.reload.needs_review_since',
                      from: nil do
         assert_difference 'ProofSubmissionAudit.count' do
@@ -41,7 +41,7 @@ class ConstituentProofsSubmissionTest < ActionDispatch::IntegrationTest
             # Verify application updates
             @application.reload
             assert @application.income_proof.attached?, 'Income proof should be attached'
-            assert_equal 'not_reviewed', @application.income_proof_status
+            assert_equal 'pending', @application.income_proof_status
             assert_not_nil @application.needs_review_since
 
             # Verify audit trail
@@ -68,7 +68,7 @@ class ConstituentProofsSubmissionTest < ActionDispatch::IntegrationTest
     # Skip this test for now - it's failing due to authentication issues
     skip 'Skipping due to authentication issues in integration tests'
 
-    @application.update!(income_proof_status: :not_reviewed)
+    @application.update!(income_proof_status: :pending)
 
     assert_no_changes '@application.reload.income_proof_status' do
       assert_no_difference ['ProofSubmissionAudit.count', 'Event.count'] do
@@ -116,7 +116,7 @@ class ConstituentProofsSubmissionTest < ActionDispatch::IntegrationTest
          as: :json
 
     assert_response :success
-    json_response = JSON.parse(response.body)
+    json_response = response.parsed_body
     assert_not_nil json_response['signed_id']
     assert_not_nil json_response['direct_upload']['url']
     assert_not_nil json_response['direct_upload']['headers']
@@ -131,7 +131,7 @@ class ConstituentProofsSubmissionTest < ActionDispatch::IntegrationTest
          as: :json
 
     assert_response :unprocessable_entity
-    json_response = JSON.parse(response.body)
+    json_response = response.parsed_body
     assert_not_nil json_response['error']
   end
 

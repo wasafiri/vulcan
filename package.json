@@ -8,20 +8,21 @@
   "devDependencies": {
     "@babel/core": "^7.24.0",
     "@babel/preset-env": "^7.24.0",
-    "babel-jest": "^29.7.0",
-    "esbuild": "^0.24.2",
-    "jest": "^29.7.0",
-    "jest-environment-jsdom": "^29.7.0",
     "@testing-library/dom": "^9.3.4",
-    "@testing-library/jest-dom": "^6.4.2"
+    "@testing-library/jest-dom": "^6.4.2",
+    "babel-jest": "^29.7.0",
+    "esbuild": "^0.25.2",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
   },
   "scripts": {
     "build": "esbuild app/javascript/application.js --bundle --sourcemap --outdir=app/assets/builds --public-path=/assets",
-    "build:css": "tailwindcss -i ./app/assets/stylesheets/application.tailwind.css -o ./app/assets/builds/application.css --minify",
+    "build:css": "tailwindcss -i ./app/assets/stylesheets/application.tailwind.css -o ./app/assets/builds/application.css --minify --watch",
     "test": "jest",
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@github/webauthn-json": "^2.1.1",
     "@hotwired/stimulus": "^3.2.2",
     "@hotwired/turbo-rails": "^8.0.12",
     "@rails/activestorage": "^7.1.3",

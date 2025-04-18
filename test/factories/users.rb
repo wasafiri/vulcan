@@ -14,9 +14,9 @@ FactoryBot.define do
       email_verified { true }
       verified { true }
 
-      factory :admin, class: 'Admin' do
+      factory :admin, class: 'Users::Administrator' do
         sequence(:email) { |n| "admin#{n}@example.com" }
-        type { 'Admin' }
+        type { 'Administrator' }
         first_name { 'Admin' }
       end
 
@@ -36,8 +36,8 @@ FactoryBot.define do
         end
       end
 
-      factory :constituent, class: 'Constituent' do
-        type { 'Constituent' }
+      factory :constituent, class: 'Users::Constituent' do # Match class name used in controller/associations
+        type { 'Users::Constituent' } # Set type explicitly to match controller expectation
         physical_address_1 { '123 Main St' }
         city { 'Baltimore' }
         state { 'MD' }

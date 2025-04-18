@@ -1,3 +1,12 @@
+# Evaluation Fixtures
+#
+# Dependencies:
+# - Evaluator, Constituent, and Application fixtures are referenced through
+#   'evaluator', 'constituent', and 'application' attributes respectively
+#
+# Naming conventions:
+# - Simple names like 'one' and 'pending' are used to represent different evaluation scenarios
+
 one:
   evaluator: evaluator_betsy
   constituent: constituent_john

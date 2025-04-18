@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_03_28_161800) do
+ActiveRecord::Schema[8.0].define(version: 2025_04_16_200553) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -346,6 +346,19 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_28_161800) do
     t.index ["user_id"], name: "index_proof_submission_audits_on_user_id"
   end
 
+  create_table "recovery_requests", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "status"
+    t.text "details"
+    t.string "ip_address"
+    t.text "user_agent"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "resolved_at"
+    t.integer "resolved_by_id"
+    t.index ["user_id"], name: "index_recovery_requests_on_user_id"
+  end
+
   create_table "role_capabilities", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.string "capability", null: false
@@ -363,8 +376,21 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_28_161800) do
     t.datetime "updated_at", null: false
     t.string "session_token"
     t.integer "failed_attempts", default: 0
+    t.datetime "expires_at"
+    t.index ["expires_at"], name: "index_sessions_on_expires_at"
     t.index ["session_token"], name: "index_sessions_on_session_token", unique: true
     t.index ["user_id"], name: "index_sessions_on_user_id"
+  end
+
+  create_table "sms_credentials", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "phone_number", null: false
+    t.datetime "last_sent_at", null: false
+    t.string "code_digest"
+    t.datetime "code_expires_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_sms_credentials_on_user_id"
   end
 
   create_table "solid_queue_blocked_executions", force: :cascade do |t|
@@ -499,6 +525,16 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_28_161800) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "totp_credentials", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "secret", null: false
+    t.string "nickname", null: false
+    t.datetime "last_used_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_totp_credentials_on_user_id"
+  end
+
   create_table "training_sessions", force: :cascade do |t|
     t.bigint "application_id", null: false
     t.bigint "trainer_id", null: false
@@ -570,6 +606,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_28_161800) do
     t.datetime "last_w9_reminder_sent_at"
     t.boolean "force_password_change", default: false, null: false
     t.string "website_url"
+    t.string "webauthn_id"
     t.index ["business_name"], name: "index_users_on_business_name"
     t.index ["business_tax_id"], name: "index_users_on_business_tax_id"
     t.index ["email"], name: "index_users_on_email", unique: true
@@ -582,6 +619,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_28_161800) do
     t.index ["type"], name: "index_users_on_type"
     t.index ["w9_rejections_count"], name: "index_users_on_w9_rejections_count", where: "((type)::text = 'Vendor'::text)"
     t.index ["w9_status"], name: "index_users_on_w9_status", where: "((type)::text = 'Vendor'::text)"
+    t.index ["webauthn_id"], name: "index_users_on_webauthn_id", unique: true
   end
 
   create_table "voucher_transaction_products", force: :cascade do |t|
@@ -654,6 +692,19 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_28_161800) do
     t.index ["vendor_id"], name: "index_w9_reviews_on_vendor_id"
   end
 
+  create_table "webauthn_credentials", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "external_id", null: false
+    t.string "public_key", null: false
+    t.string "nickname", null: false
+    t.bigint "sign_count", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "authenticator_type"
+    t.index ["external_id"], name: "index_webauthn_credentials_on_external_id", unique: true
+    t.index ["user_id"], name: "index_webauthn_credentials_on_user_id"
+  end
+
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "application_notes", "applications"
@@ -680,8 +731,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_28_161800) do
   add_foreign_key "proof_reviews", "users", column: "admin_id"
   add_foreign_key "proof_submission_audits", "applications"
   add_foreign_key "proof_submission_audits", "users"
+  add_foreign_key "recovery_requests", "users"
   add_foreign_key "role_capabilities", "users"
   add_foreign_key "sessions", "users"
+  add_foreign_key "sms_credentials", "users"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
@@ -689,6 +742,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_28_161800) do
   add_foreign_key "solid_queue_ready_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_recurring_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_scheduled_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "totp_credentials", "users"
   add_foreign_key "training_sessions", "applications"
   add_foreign_key "training_sessions", "users", column: "trainer_id"
   add_foreign_key "users", "users", column: "evaluator_id"
@@ -706,4 +760,5 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_28_161800) do
   add_foreign_key "vouchers", "users", column: "vendor_id"
   add_foreign_key "w9_reviews", "users", column: "admin_id"
   add_foreign_key "w9_reviews", "users", column: "vendor_id"
+  add_foreign_key "webauthn_credentials", "users"
 end

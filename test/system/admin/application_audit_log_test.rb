@@ -14,7 +14,7 @@ module Admin
       @application = applications(:draft_application)
 
       setup_active_storage_test
-      sign_in @admin
+      sign_in(@admin)
     end
 
     teardown do

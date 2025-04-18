@@ -61,22 +61,22 @@ class ApplicationProofValidationTest < ActiveSupport::TestCase
     # Then simulate the controller action
     @application.income_proof.attach(@valid_pdf)
     @application.update!(
-      income_proof_status: :not_reviewed,
+      income_proof_status: :pending,
       needs_review_since: Time.current
     )
 
     # Status should be reset to not_reviewed
-    assert_equal 'not_reviewed', @application.reload.income_proof_status
+    assert_equal 'pending', @application.reload.income_proof_status
   end
 
-  test 'sets needs_review_since when proof status changes to not_reviewed via controller' do
+  test 'sets needs_review_since when proof status changes to pending via controller' do
     # First set the status to rejected
     @application.update!(income_proof_status: :rejected, needs_review_since: nil)
 
     # Then simulate the controller action
     @application.income_proof.attach(@valid_pdf)
     @application.update!(
-      income_proof_status: :not_reviewed,
+      income_proof_status: :pending,
       needs_review_since: Time.current
     )
 
@@ -87,7 +87,7 @@ class ApplicationProofValidationTest < ActiveSupport::TestCase
   test 'notifies admins when proof needs review' do
     assert_enqueued_with(job: NotifyAdminsJob) do
       @application.update!(
-        income_proof_status: :not_reviewed,
+        income_proof_status: :pending,
         needs_review_since: Time.current
       )
     end

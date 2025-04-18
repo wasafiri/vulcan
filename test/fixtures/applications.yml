@@ -222,3 +222,18 @@ wilbur_application:
   residency_proof_status: approved
   medical_certification_status: received
   submission_method: paper
+
+pending_application:
+  user: constituent_mark
+  status: in_progress
+  application_date: <%= Time.current - 2.weeks %>
+  household_size: 3
+  annual_income: 40000
+  income_proof_status: not_reviewed
+  residency_proof_status: not_reviewed
+  maryland_resident: true
+  self_certify_disability: true
+  medical_provider_name: "Pending Provider"
+  medical_provider_phone: "555-666-7777"
+  medical_provider_email: "pending.provider@example.com"
+  medical_certification_status: not_requested

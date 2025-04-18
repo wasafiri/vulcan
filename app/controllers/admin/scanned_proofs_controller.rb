@@ -1,9 +1,7 @@
 # frozen_string_literal: true
 
 module Admin
-  class ScannedProofsController < ApplicationController
-    before_action :authenticate_user!
-    before_action :require_admin!
+  class ScannedProofsController < Admin::BaseController
     before_action :set_application
     before_action :validate_proof_type, only: %i[new create]
     before_action :validate_file, only: [:create]
@@ -22,23 +20,42 @@ module Admin
     end
 
     def create
-      ActiveRecord::Base.transaction do
-        attach_proof
-        create_audit_trail
+      begin
+        # Use ApplicationRecord.transaction for consistency with Rails 7+ and to keep
+        # domain logic near your ApplicationRecord base class if needed.
+        ApplicationRecord.transaction do
+          attach_proof
+          create_audit_trail
+        end
+
+        success = true
+      rescue ActiveRecord::RecordInvalid, ActiveStorage::IntegrityError => e
+        # For record or integrity errors, let the user retry on the form page.
+        redirect_to new_admin_application_scanned_proof_path(@application),
+                    alert: e.message
+        return
+      rescue StandardError => e
+        # Log any unexpected error and let the user know to try again.
+        Rails.logger.error("Proof upload failed: #{e.message}")
+        redirect_to admin_application_path(@application),
+                    alert: 'Error uploading proof. Please try again.'
+        return
       end
 
-      # Keep notifications outside transaction
-      notify_constituent
+      # Only proceed with notification if the upload was successful
+      if success
+        begin
+          # Best practice: run notifications outside the transaction so a rollback
+          # doesn't prevent them. Consider using a background job if it's a heavier process.
+          notify_constituent
+        rescue StandardError => e
+          Rails.logger.error("Failed to send notification: #{e.message}")
+          # Don't fail the upload if just the notification fails
+        end
 
-      redirect_to admin_application_path(@application),
-                  notice: 'Proof successfully uploaded and attached'
-    rescue ActiveRecord::RecordInvalid, ActiveStorage::IntegrityError => e
-      redirect_to new_admin_application_scanned_proof_path(@application),
-                  alert: e.message
-    rescue StandardError => e
-      Rails.logger.error("Proof upload failed: #{e.message}")
-      redirect_to new_admin_application_scanned_proof_path(@application),
-                  alert: 'Error uploading proof. Please try again.'
+        redirect_to admin_application_path(@application),
+                    notice: 'Proof successfully uploaded and attached'
+      end
     end
 
     private
@@ -57,15 +74,11 @@ module Admin
     end
 
     def validate_file
-      unless params[:file].present?
-        redirect_to(new_admin_application_scanned_proof_path(@application),
-                    alert: 'Please select a file to upload')
-      end
+      return redirect_to(new_admin_application_scanned_proof_path(@application),
+                         alert: 'Please select a file to upload') if params[:file].blank?
 
-      unless valid_file_type?
-        redirect_to(new_admin_application_scanned_proof_path(@application),
-                    alert: 'File type not allowed')
-      end
+      return redirect_to(new_admin_application_scanned_proof_path(@application),
+                         alert: 'File type not allowed') unless valid_file_type?
 
       return if valid_file_size?
 
@@ -101,16 +114,21 @@ module Admin
     end
 
     def create_audit_trail
-      ProofSubmissionAudit.create!(
-        application: @application,
-        user: current_user,
-        proof_type: params[:proof_type],
-        submission_method: 'scanned',
-        ip_address: request.remote_ip,
+      # Store additional file info in the metadata column
+      metadata = {
         user_agent: request.user_agent,
         filename: params[:file].original_filename,
         file_size: params[:file].size,
         content_type: params[:file].content_type
+      }
+      
+      ProofSubmissionAudit.create!(
+        application: @application,
+        user: current_user,
+        proof_type: params[:proof_type],
+        submission_method: :paper, # Use the correct enum value from ProofSubmissionAudit model
+        ip_address: request.remote_ip,
+        metadata: metadata
       )
     end
 

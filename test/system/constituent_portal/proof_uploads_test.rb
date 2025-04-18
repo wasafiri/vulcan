@@ -202,8 +202,8 @@ class ProofUploadsTest < ApplicationSystemTestCase
     assert_text 'Proof submitted successfully'
     @application.reload
     assert @application.income_proof.attached?, 'Proof file should be attached'
-    assert_equal 'not_reviewed', @application.income_proof_status,
-                 'Proof status should be reset to not_reviewed'
+    assert_equal 'pending', @application.reload.income_proof_status,
+                 'Proof status should be reset to pending'
   end
 
   test 'system rejects invalid file types' do

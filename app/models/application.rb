@@ -47,7 +47,7 @@ class Application < ApplicationRecord
     not_reviewed: 0,
     approved: 1,
     rejected: 2
-  }, prefix: true, suffix: true # Use standard boolean prefix AND add suffix
+  }, prefix: true # Use standard boolean prefix
 
   enum :residency_proof_status, {
     not_reviewed: 0,
@@ -239,6 +239,70 @@ class Application < ApplicationRecord
     self[:medical_provider_name]
   end
 
+  # === Struct definitions ===
+  # Definition for Medical Provider Info struct
+  MedicalProviderInfo = Struct.new(:name, :phone, :fax, :email, keyword_init: true) do
+    def present?
+      name.present? || phone.present? || fax.present? || email.present?
+    end
+
+    def valid_phone?
+      phone.present? && phone.match?(/\A[\d\-\(\)\s\.]+\z/)
+    end
+
+    def valid_email?
+      email.present? && email.match?(/\A[^@\s]+@[^@\s]+\.[^@\s]+\z/)
+    end
+  end
+
+  # Definition for ProofResult struct
+  ProofResult = Struct.new(:success, :type, :message, :error, keyword_init: true) do
+    def success?
+      success == true
+    end
+
+    def error_message
+      error&.message || message
+    end
+  end
+
+  # Definition for ProofMetadata struct
+  ProofMetadata = Struct.new(:blob_id, :content_type, :byte_size, :filename, keyword_init: true) do
+    def to_h
+      { blob_id: blob_id, content_type: content_type, byte_size: byte_size, filename: filename }
+    end
+  end
+
+  # === Compatibility Methods ===
+  # These methods ensure backward compatibility with code that expects 
+  # the previous enum method naming pattern with suffix
+
+  # Income proof status compatibility methods
+  def income_proof_status_approved_status?
+    income_proof_status_approved?
+  end
+
+  def income_proof_status_rejected_status?
+    income_proof_status_rejected?
+  end
+
+  def income_proof_status_not_reviewed_status?
+    income_proof_status_not_reviewed?
+  end
+
+  # Residency proof status compatibility methods
+  def residency_proof_status_approved_status?
+    residency_proof_status_approved?
+  end
+
+  def residency_proof_status_rejected_status?
+    residency_proof_status_rejected?
+  end
+
+  def residency_proof_status_not_reviewed_status?
+    residency_proof_status_not_reviewed?
+  end
+
   private
 
   def log_status_change
@@ -324,7 +388,17 @@ class Application < ApplicationRecord
   end
 
   def is_guardian?
-    user&.is_guardian == true
+    # Get the value from the form submission if it's being processed
+    if @attributes && @attributes["is_guardian"].present?
+      # Use the form-submitted value
+      ActiveModel::Type::Boolean.new.cast(@attributes["is_guardian"].value)
+    elsif user&.changed? && user.changes.include?("is_guardian")
+      # User has pending changes that aren't saved yet
+      user.is_guardian_will_change
+    else
+      # Fall back to the current database value
+      user&.is_guardian == true
+    end
   end
 
   def constituent_must_have_disability

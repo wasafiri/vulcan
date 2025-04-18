@@ -87,7 +87,7 @@ module VoucherTestHelper
   end
 
   def assert_invoice_paid(invoice)
-    assert invoice.reload.invoice_paid?
+    assert invoice.reload.status_invoice_paid?
     assert invoice.payment_recorded_at.present?
     assert invoice.gad_invoice_reference.present?
     assert(invoice.voucher_transactions.all?(&:transaction_completed?))

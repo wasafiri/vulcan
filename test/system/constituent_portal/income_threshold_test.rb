@@ -6,7 +6,7 @@ module ConstituentPortal
   class IncomeThresholdTest < ApplicationSystemTestCase
     setup do
       @constituent = users(:constituent_john)
-      sign_in @constituent
+      sign_in(@constituent)
 
       # Set up FPL policies for testing
       Policy.find_or_create_by(key: 'fpl_1_person').update(value: 15_000)

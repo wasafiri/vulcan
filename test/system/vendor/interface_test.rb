@@ -2,12 +2,12 @@
 
 require 'application_system_test_case'
 
-module Vendor
+module VendorPortal
   class InterfaceTest < ApplicationSystemTestCase
     setup do
       @vendor = create(:vendor, :approved)
       @voucher = create(:voucher, :active)
-      sign_in @vendor
+      sign_in(@vendor)
     end
 
     test 'viewing dashboard' do

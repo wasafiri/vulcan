@@ -8,9 +8,10 @@ require 'test_helper'
 # It tests both the helper methods and the actual form submission behavior.
 class FormInputsTest < ActionDispatch::IntegrationTest
   setup do
-    # Set up test data
-    @user = users(:constituent_john)
-    @application = applications(:one)
+    # Use factories instead of fixtures
+    @user = create(:constituent)
+    # Create an application associated with this user
+    @application = create(:application, user: @user)
 
     # Sign in the user for all tests
     sign_in(@user)
@@ -71,12 +72,13 @@ class FormInputsTest < ActionDispatch::IntegrationTest
     # Get the newly created application
     application = Application.last
 
-    # Verify the checkbox values were correctly processed
+    # Verify the checkbox values were correctly processed on the application and user
     assert_equal true, application.maryland_resident
     assert_equal true, application.self_certify_disability
-    assert_equal true, application.hearing_disability
-    assert_equal false, application.vision_disability
-    assert_equal true, application.speech_disability
+    # Access disability attributes via the associated user
+    assert_equal true, application.user.hearing_disability
+    assert_equal false, application.user.vision_disability
+    assert_equal true, application.user.speech_disability
   end
 
   # Test form submission with array values for checkboxes
@@ -106,12 +108,13 @@ class FormInputsTest < ActionDispatch::IntegrationTest
     # Get the newly created application
     application = Application.last
 
-    # Verify the checkbox values were correctly processed
+    # Verify the checkbox values were correctly processed on the application and user
     assert_equal true, application.maryland_resident
     assert_equal true, application.self_certify_disability
-    assert_equal true, application.hearing_disability
-    assert_equal false, application.vision_disability
-    assert_equal true, application.speech_disability
+    # Access disability attributes via the associated user
+    assert_equal true, application.user.hearing_disability
+    assert_equal false, application.user.vision_disability
+    assert_equal true, application.user.speech_disability
   end
 
   # Test form submission with direct boolean values
@@ -141,12 +144,13 @@ class FormInputsTest < ActionDispatch::IntegrationTest
     # Get the newly created application
     application = Application.last
 
-    # Verify the checkbox values were correctly processed
+    # Verify the checkbox values were correctly processed on the application and user
     assert_equal true, application.maryland_resident
     assert_equal true, application.self_certify_disability
-    assert_equal true, application.hearing_disability
-    assert_equal false, application.vision_disability
-    assert_equal true, application.speech_disability
+    # Access disability attributes via the associated user
+    assert_equal true, application.user.hearing_disability
+    assert_equal false, application.user.vision_disability
+    assert_equal true, application.user.speech_disability
   end
 
   # Test form submission with string values for checkboxes
@@ -176,12 +180,13 @@ class FormInputsTest < ActionDispatch::IntegrationTest
     # Get the newly created application
     application = Application.last
 
-    # Verify the checkbox values were correctly processed
+    # Verify the checkbox values were correctly processed on the application and user
     assert_equal true, application.maryland_resident
     assert_equal true, application.self_certify_disability
-    assert_equal true, application.hearing_disability
-    assert_equal false, application.vision_disability
-    assert_equal true, application.speech_disability
+    # Access disability attributes via the associated user
+    assert_equal true, application.user.hearing_disability
+    assert_equal false, application.user.vision_disability
+    assert_equal true, application.user.speech_disability
   end
 
   # Test the assert_checkbox_checked helper
@@ -197,10 +202,13 @@ class FormInputsTest < ActionDispatch::IntegrationTest
     assert_select "input[type='checkbox'][name*='self_certify_disability']:not([checked])"
 
     # Now let's check a form with pre-checked checkboxes
+    # Update the user directly for disability attributes
+    @user.update!(hearing_disability: true)
+    # Update the application for its own attributes and set status to draft
     @application.update!(
       maryland_resident: true,
       self_certify_disability: true,
-      hearing_disability: true
+      status: :draft # Ensure application is editable
     )
 
     # Edit the application (which should have pre-checked checkboxes)
@@ -224,11 +232,10 @@ class FormInputsTest < ActionDispatch::IntegrationTest
         household_size: '3',
         annual_income: '50000',
         self_certify_disability: checkbox_params(true),
-        disabilities: {
-          hearing: checkbox_params(true),
-          vision: checkbox_params(false),
-          speech: checkbox_params(true)
-        }
+        # Send disability params in the expected format
+        hearing_disability: checkbox_params(true),
+        vision_disability: checkbox_params(false),
+        speech_disability: checkbox_params(true)
       },
       medical_provider: {
         name: 'Dr. Smith',
@@ -248,12 +255,11 @@ class FormInputsTest < ActionDispatch::IntegrationTest
     assert_equal true, application.maryland_resident
     assert_equal true, application.self_certify_disability
 
-    # Verify nested parameters if the application supports them
-    if application.respond_to?(:disabilities)
-      assert_equal true, application.disabilities[:hearing]
-      assert_equal false, application.disabilities[:vision]
-      assert_equal true, application.disabilities[:speech]
-    end
+    # Verify user attributes were updated
+    assert_equal true, application.user.hearing_disability
+    assert_equal false, application.user.vision_disability
+    assert_equal true, application.user.speech_disability
+    # Removed checks for non-existent application.disabilities attribute
   end
 
   # Test handling of checkbox arrays
@@ -265,7 +271,10 @@ class FormInputsTest < ActionDispatch::IntegrationTest
         household_size: '3',
         annual_income: '50000',
         self_certify_disability: checkbox_params(true),
-        disability_types: %w[hearing speech] # Multiple checkboxes with the same name
+        # Send disability params individually as controller expects
+        hearing_disability: checkbox_params(true),
+        speech_disability: checkbox_params(true),
+        vision_disability: checkbox_params(false) # Assuming vision is off if not in array
       },
       medical_provider: {
         name: 'Dr. Smith',
@@ -285,11 +294,10 @@ class FormInputsTest < ActionDispatch::IntegrationTest
     assert_equal true, application.maryland_resident
     assert_equal true, application.self_certify_disability
 
-    # Verify checkbox arrays if the application supports them
-    if application.respond_to?(:disability_types)
-      assert_includes application.disability_types, 'hearing'
-      assert_includes application.disability_types, 'speech'
-      assert_not_includes application.disability_types, 'vision'
-    end
+    # Verify user attributes were updated
+    assert_equal true, application.user.hearing_disability
+    assert_equal true, application.user.speech_disability
+    assert_equal false, application.user.vision_disability
+    # Removed checks for non-existent application.disability_types attribute
   end
 end

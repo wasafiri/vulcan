@@ -12,6 +12,12 @@ class RegistrationsController < ApplicationController
     @user = User.new
   end
 
+  # GET /edit_registration
+  def edit
+    @user = current_user
+    redirect_to sign_in_path, alert: 'You need to sign in to access this page.' unless @user
+  end
+
   def create
     build_user
 
@@ -20,16 +26,10 @@ class RegistrationsController < ApplicationController
       track_sign_in
       send_registration_confirmation
 
-      redirect_to root_path, notice: 'Account created successfully. Welcome!'
+      redirect_to welcome_path, notice: 'Account created successfully. Welcome!'
     else
       render :new, status: :unprocessable_entity
     end
-  end
-
-  # GET /edit_registration
-  def edit
-    @user = current_user
-    redirect_to sign_in_path, alert: 'You need to sign in to access this page.' unless @user
   end
 
   # PATCH/PUT /update_registration
@@ -85,6 +85,7 @@ class RegistrationsController < ApplicationController
 
   def send_registration_confirmation
     if @user.communication_preference.to_s == 'email'
+      # Use deliver_later for background sending
       ApplicationNotificationsMailer.registration_confirmation(@user).deliver_later
     else
       Letters::LetterGeneratorService.new(

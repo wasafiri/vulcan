@@ -36,12 +36,22 @@ class User < ApplicationRecord
            class_name: 'Notification',
            foreign_key: :recipient_id,
            dependent: :destroy
-  has_many :applications, foreign_key: :user_id
+  has_many :applications, inverse_of: :user # Add inverse_of here too for consistency
+  has_many :income_verified_applications, # Add the missing inverse association
+           class_name: 'Application',
+           foreign_key: :income_verified_by_id,
+           inverse_of: :income_verified_by,
+           dependent: :nullify
   has_many :role_capabilities, dependent: :destroy
   # removed: has_many :activities, dependent: :destroy
 
   has_and_belongs_to_many :products,
                           join_table: 'products_users'
+
+  # Two-Factor Authentication Associations
+  has_many :webauthn_credentials, dependent: :destroy
+  has_many :totp_credentials, dependent: :destroy
+  has_many :sms_credentials, dependent: :destroy
 
   # Validations
   validates :password, length: { minimum: 8 }, if: -> { password.present? }
@@ -52,9 +62,13 @@ class User < ApplicationRecord
   validates :reset_password_token, uniqueness: true, allow_nil: true
   validate :phone_number_must_be_valid
   validate :validate_address_for_letter_preference
+  validate :constituent_must_have_disability # Added validation
 
   # Status enum
   enum :status, { inactive: 0, active: 1, suspended: 2 }, default: :active
+
+  # Communication preference enum
+  enum :communication_preference, { email: 0, letter: 1 }, default: :email
 
   # Class methods for capabilities
   def self.capable_types_for(capability)
@@ -89,14 +103,14 @@ class User < ApplicationRecord
     define_method "#{role}?" do
       if role == 'admin'
         # Special case for admin since we use Administrator as the class name
-        self.class == Users::Administrator || 
-        type == 'Administrator' || 
-        type == 'Users::Administrator'
+        self.class == Users::Administrator ||
+          type == 'Administrator' ||
+          type == 'Users::Administrator'
       else
         # Check for both namespaced and non-namespaced type values
-        self.class.name == "Users::#{role.classify}" || 
-        type == "Users::#{role.classify}" || 
-        type == role.classify
+        self.class.name == "Users::#{role.classify}" ||
+          type == "Users::#{role.classify}" ||
+          type == role.classify
       end
     end
   end
@@ -204,6 +218,13 @@ class User < ApplicationRecord
     role_capabilities.find_by(capability: capability)&.destroy
   end
 
+  # Check if any second factor is enabled
+  def second_factor_enabled?
+    webauthn_credentials.exists? ||
+      totp_credentials.exists? ||
+      sms_credentials.exists?
+  end
+
   private
 
   def reset_all_caches
@@ -268,16 +289,30 @@ class User < ApplicationRecord
     return unless communication_preference.to_s == 'letter' || communication_preference == :letter
 
     # Validate that address fields are present when letter preference is selected
-    if physical_address_1.blank?
-      errors.add(:physical_address_1, 'is required when notification method is set to letter')
-    end
+    errors.add(:physical_address1, 'is required when notification method is set to letter') if physical_address_1.blank?
 
     errors.add(:city, 'is required when notification method is set to letter') if city.blank?
 
     errors.add(:state, 'is required when notification method is set to letter') if state.blank?
 
-    return unless zip_code.blank?
+    return if zip_code.present?
 
     errors.add(:zip_code, 'is required when notification method is set to letter')
+  end
+
+  # Custom validation for constituent disability
+  def constituent_must_have_disability
+    # Only apply to existing Users::Constituent type (skip during initial registration)
+    # because we want them to select a disability on constituent_portal/applications#new instead
+    return unless type == 'Users::Constituent' && !new_record?
+
+    # Check if at least one disability is selected using a more explicit check
+    disability_flags = [
+      hearing_disability, vision_disability, speech_disability,
+      mobility_disability, cognition_disability
+    ]
+    has_disability = disability_flags.any? { |flag| flag == true }
+
+    errors.add(:base, 'At least one disability must be selected.') unless has_disability
   end
 end

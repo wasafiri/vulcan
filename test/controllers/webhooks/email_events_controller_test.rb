@@ -27,7 +27,7 @@ module Webhooks
       # Patch the ApplicationController to skip authentication for webhook tests
       # This is necessary because webhooks use signature verification, not session auth
       ApplicationController.class_eval do
-        skip_before_action :authenticate_user!, raise: false
+        skip_before_action :sign_in, raise: false
       end
 
       # Track initial event count for side effect testing

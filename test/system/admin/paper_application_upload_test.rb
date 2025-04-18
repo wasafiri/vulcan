@@ -6,7 +6,7 @@ module Admin
   class PaperApplicationUploadTest < ApplicationSystemTestCase
     setup do
       @admin = users(:admin_david)
-      sign_in @admin
+      sign_in(@admin)
 
       # Ensure we have the FPL policies set up
       Policy.find_or_create_by(key: 'fpl_2_person').update(value: 20_000)
@@ -64,7 +64,7 @@ module Admin
 
       # Test file input enabling when accept is selected
       find("input[id='accept_income_proof']").click
-      assert_not find("input[name='income_proof']", visible: false).disabled?,
+      assert_not find_by_id("input[name='income_proof']", visible: false).disabled?,
                  'Income proof file input should be enabled when accept is selected'
 
       # Test file clearing when switching to reject after uploading

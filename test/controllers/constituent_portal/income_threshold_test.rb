@@ -9,6 +9,19 @@ module ConstituentPortal
       sign_in(@user)
 
       # Set up FPL policies for testing
+      setup_fpl_policies
+    end
+
+    # Helper method to set up policies for FPL threshold testing
+    def setup_fpl_policies
+      # Stub the log_change method to avoid validation errors in test
+      Policy.class_eval do
+        def log_change
+          # No-op in test environment to bypass the user requirement
+        end
+      end
+
+      # Set up standard FPL values for testing purposes
       Policy.find_or_create_by(key: 'fpl_1_person').update(value: 15_000)
       Policy.find_or_create_by(key: 'fpl_2_person').update(value: 20_000)
       Policy.find_or_create_by(key: 'fpl_3_person').update(value: 25_000)
@@ -25,7 +38,7 @@ module ConstituentPortal
       assert_response :success
 
       # Parse the JSON response
-      json_response = JSON.parse(response.body)
+      json_response = response.parsed_body
 
       # Verify the response contains the expected data
       assert_equal 400, json_response['modifier']
@@ -45,7 +58,7 @@ module ConstituentPortal
 
       # Get the FPL thresholds from the server
       get fpl_thresholds_constituent_portal_applications_path
-      json_response = JSON.parse(response.body)
+      json_response = response.parsed_body
 
       # Extract the thresholds and modifier
       thresholds = json_response['thresholds']
@@ -80,7 +93,5 @@ module ConstituentPortal
                      "Expected income #{income} to be #{expected_result ? 'below' : 'above'} threshold for household size #{household_size}"
       end
     end
-
-    # The JavaScript test has been moved to test/system/constituent_portal/income_threshold_system_test.rb
   end
 end

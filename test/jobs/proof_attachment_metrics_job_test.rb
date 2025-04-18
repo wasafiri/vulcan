@@ -8,7 +8,7 @@ class ProofAttachmentMetricsJobTest < ActiveJob::TestCase
     Notification.delete_all
 
     # Create test audits
-    @application = applications(:john_application)
+    @application = applications(:one) # Reference an existing application fixture
     @admin = users(:admin_david)
 
     # Create some successful audits

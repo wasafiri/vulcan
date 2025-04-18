@@ -7,7 +7,7 @@ module Admin
     setup do
       @admin = users(:admin)
       @application = applications(:pending_with_proofs)
-      sign_in_as @admin
+      sign_in_as(@admin)
     end
 
     test 'admin can see all rejection reasons when rejecting income proof' do

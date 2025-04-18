@@ -77,7 +77,7 @@ class Invoice < ApplicationRecord
     end
   end
 
-  validates :gad_invoice_reference, presence: true, if: :invoice_paid?
+  validates :gad_invoice_reference, presence: true, if: :status_invoice_paid?
 
   before_save :set_timestamps
   after_save :send_payment_notification, if: :payment_details_added?
@@ -85,15 +85,15 @@ class Invoice < ApplicationRecord
   private
 
   def set_timestamps
-    self.approved_at = Time.current if status_changed? && invoice_approved?
+    self.approved_at = Time.current if status_changed? && status_invoice_approved?
 
-    return unless status_changed? && invoice_paid? && gad_invoice_reference.present?
+    return unless status_changed? && status_invoice_paid? && gad_invoice_reference.present?
 
     self.payment_recorded_at = Time.current
   end
 
   def payment_details_added?
-    saved_change_to_status? && invoice_paid? && gad_invoice_reference.present?
+    saved_change_to_status? && status_invoice_paid? && gad_invoice_reference.present?
   end
 
   def send_payment_notification

@@ -4,7 +4,17 @@ module ProofConsistencyValidation
   extend ActiveSupport::Concern
 
   included do
-    validate :proofs_consistent_with_status
+    validate :validate_proof_status_consistent_with_application_status, unless: :skip_proof_validation?
+  end
+
+  # Validation method for proof status consistency with application status
+  def validate_proof_status_consistent_with_application_status
+    proofs_consistent_with_status
+  end
+
+  # Helper method to check if proof validation should be skipped
+  def skip_proof_validation?
+    Thread.current[:paper_application_context].present?
   end
 
   private

@@ -106,11 +106,11 @@ class ApplicationNotificationsMailer < ApplicationMailer
         @reapply_date = reapply_date
       }
     )
-    
+
     # Set appropriate reply-to header - this is the address that the email will show as "reply to"
     # Using "proof@" domain to ensure Postmark routes these correctly when users reply
     mail_obj.reply_to = ["proof@#{Rails.application.config.action_mailer.default_url_options[:host]}"]
-    
+
     mail_obj
   rescue StandardError => e
     Rails.logger.error("Failed to send proof rejection email: #{e.message}")
@@ -240,18 +240,30 @@ class ApplicationNotificationsMailer < ApplicationMailer
     @error_type = error_type
     @message = message
 
-    # Create a letter if the user prefers print communications
-    if @constituent.communication_preference == 'letter'
-      Letters::LetterGeneratorService.new(
-        template_type: 'proof_submission_error',
-        data: { message: message },
-        constituent: @constituent,
-        application: @application
-      ).queue_for_printing
+    # Handle case when constituent is nil (unknown sender)
+    if @constituent
+      recipient_email = @constituent.email
+
+      # Create a letter if the user prefers print communications
+      if @constituent.respond_to?(:communication_preference) && @constituent.communication_preference == 'letter'
+        Letters::LetterGeneratorService.new(
+          template_type: 'proof_submission_error',
+          data: { message: message },
+          constituent: @constituent,
+          application: @application
+        ).queue_for_printing
+      end
+    else
+      # For unknown senders, use the from address from the original email
+      recipient_email = message.match(/from: ([^\s]+@[^\s]+)/)&.captures&.first || 'unknown@example.com'
+
+      # Set default constituent for template to avoid nil errors
+      # Using Struct instead of OpenStruct for better performance
+      @constituent = Struct.new(:full_name, :email).new('Email Sender', recipient_email)
     end
 
     mail(
-      to: @constituent.email,
+      to: recipient_email,
       subject: 'Error Processing Your Proof Submission',
       message_stream: 'notifications'
     )

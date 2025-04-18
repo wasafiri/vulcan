@@ -1,426 +1,329 @@
 <!-- Skip Link (visually hidden until focused) -->
 <a href="#signup-form"
-   class="absolute top-2 left-2 p-2 bg-white border border-gray-300 text-gray-700 rounded
-          sr-only focus:not-sr-only focus:z-50">
+   class="sr-only focus:not-sr-only absolute top-2 left-2 p-2 bg-white border border-gray-300 text-gray-700 rounded focus:z-50"
+   role="link"
+   aria-label="Skip to sign up form">
   Skip to main content
 </a>
 
 <div class="flex items-center justify-center bg-gray-100 px-4 py-12">
-  <!-- If you want vertical centering, keep 'min-h-screen', but not mandatory -->
   <div class="bg-white p-6 sm:p-8 rounded-lg shadow-md w-full max-w-md">
-    <h1 class="text-2xl font-semibold mb-6 text-center text-gray-900" id="signup-heading">
-      Create Account
-    </h1>
+    <!-- Page Heading -->
+    <header>
+      <h1 id="signup-heading" class="text-2xl font-semibold mb-6 text-center text-gray-900">
+        Create Account
+      </h1>
+    </header>
 
     <!-- Flash/Alert Messages -->
     <% if flash[:alert] %>
-      <!-- Using aria-live="polite" to announce updates -->
-      <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6"
-           role="alert"
-           aria-live="polite"
-           aria-atomic="true">
-        <span><%= flash[:alert] %></span>
+      <div role="alert" aria-live="polite" aria-atomic="true"
+           class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+        <p><%= flash[:alert] %></p>
       </div>
     <% end %>
 
     <!-- Main Form -->
-    <%= form_with model: @user, 
-                  url: sign_up_path, 
-                  local: true, 
-                  class: "",
-                  aria: { labelledby: "signup-heading" },
-                  id: "signup-form" do |form| %>
+    <main role="main" aria-labelledby="signup-heading">
+      <%= form_with model: @user,
+                    url: sign_up_path,
+                    local: true,
+                    id: "signup-form",
+                    aria: { labelledby: "signup-heading" } do |form| %>
 
-      <!-- First Name -->
-      <div class="mb-4">
-        <%= form.label :first_name, "First Name", 
-                       class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.text_field :first_name, 
-            class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none
-                    focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-            required: true,
-            autofocus: true,
-            aria: {
-              required: "true",
-              invalid: @user.errors[:first_name].any?,
-              errormessage: "first-name-error"
-            } %>
-        <% if @user.errors[:first_name].any? %>
-          <p id="first-name-error" class="mt-1 text-sm text-red-600">
-            <%= @user.errors[:first_name].join(", ") %>
-          </p>
+        <%# Display base errors (not tied to a specific field) %>
+        <% if @user.errors[:base].any? %>
+          <div role="alert" aria-live="assertive" aria-atomic="true"
+               class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+            <ul>
+              <% @user.errors[:base].each do |message| %>
+                <li><%= message %></li>
+              <% end %>
+            </ul>
+          </div>
         <% end %>
-      </div>
 
-      <!-- Middle Initial -->
-      <div class="mb-4">
-        <%= form.label :middle_initial, "Middle Initial (Optional)",
-                       class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.text_field :middle_initial, 
-            class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none
-                    focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-            maxlength: 1 %>
-      </div>
+        <!-- Name Fields -->
+        <fieldset class="mb-4">
+          <legend class="sr-only">Name</legend>
+          <div class="mb-4">
+            <%= form.label :first_name, "First Name", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= form.text_field :first_name, required: true, autofocus: true,
+                class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm",
+                aria: { required: "true", invalid: @user.errors[:first_name].any?, errormessage: "first-name-error" } %>
+            <% if @user.errors[:first_name].any? %>
+              <p id="first-name-error" role="alert" class="mt-1 text-sm text-red-600"><%= @user.errors[:first_name].join(", ") %></p>
+            <% end %>
+          </div>
+          <div class="mb-4">
+            <%= form.label :middle_initial, "Middle Initial (Optional)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= form.text_field :middle_initial, maxlength: 1,
+                class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm" %>
+          </div>
+          <div class="mb-4">
+            <%= form.label :last_name, "Last Name", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= form.text_field :last_name, required: true,
+                class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm",
+                aria: { required: "true", invalid: @user.errors[:last_name].any?, errormessage: "last-name-error" } %>
+            <% if @user.errors[:last_name].any? %>
+              <p id="last-name-error" role="alert" class="mt-1 text-sm text-red-600"><%= @user.errors[:last_name].join(", ") %></p>
+            <% end %>
+          </div>
+        </fieldset>
 
-      <!-- Last Name -->
-      <div class="mb-4">
-        <%= form.label :last_name, "Last Name", 
-                       class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.text_field :last_name,
-            class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none
-                    focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-            required: true,
-            aria: {
-              required: "true",
-              invalid: @user.errors[:last_name].any?,
-              errormessage: "last-name-error"
-            } %>
-        <% if @user.errors[:last_name].any? %>
-          <p id="last-name-error" class="mt-1 text-sm text-red-600">
-            <%= @user.errors[:last_name].join(", ") %>
-          </p>
-        <% end %>
-      </div>
+        <!-- Contact Fields -->
+        <fieldset class="mb-4">
+          <legend class="sr-only">Contact Information</legend>
+          <div class="mb-4">
+            <%= form.label :email, "Email Address", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= form.email_field :email, id: "user_email", required: true, autocomplete: "email",
+                class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm",
+                aria: { required: "true", invalid: @user.errors[:email].any?, errormessage: "email-error" } %>
+            <% if @user.errors[:email].any? %>
+              <p id="email-error" role="alert" class="mt-1 text-sm text-red-600"><%= @user.errors[:email].join(", ") %></p>
+            <% end %>
+          </div>
+          <div class="mb-4">
+            <%= form.label :phone, "Phone Number", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= form.telephone_field :phone, required: true, pattern: "[0-9]{3}-?[0-9]{3}-?[0-9]{4}", placeholder: "202-555-5555",
+                class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm",
+                aria: { required: "true", invalid: @user.errors[:phone].any?, errormessage: "phone-error" } %>
+            <p id="phone-hint" class="text-xs text-gray-700">10-digit number</p>
+            <% if @user.errors[:phone].any? %>
+              <p id="phone-error" role="alert" class="mt-1 text-sm text-red-600"><%= @user.errors[:phone].join(", ") %></p>
+            <% end %>
+          </div>
+        </fieldset>
 
-      <!-- Email Address -->
-      <div class="mb-4">
-        <%= form.label :email, "Email Address", 
-                       class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.email_field :email, 
-            class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none
-                    focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-            required: true,
-            autocomplete: "email",
-            id: "user_email",
-            aria: {
-              required: "true",
-              invalid: @user.errors[:email].any?,
-              errormessage: "email-error"
-            } %>
-        <% if @user.errors[:email].any? %>
-          <p id="email-error" class="mt-1 text-sm text-red-600">
-            <%= @user.errors[:email].join(", ") %>
-          </p>
-        <% end %>
-      </div>
+        <!-- Security Fields -->
+        <fieldset class="mb-4">
+          <legend class="sr-only">Security</legend>
+          <div class="mb-4">
+            <%= form.label :password, "Password", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <div class="relative" data-controller="visibility" data-visibility-timeout-value="5000">
+              <%= form.password_field :password, required: true, minlength: 6,
+                  class: "block w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm", # Added pr-10
+                  :"data-visibility-target" => "field", # Add target for Stimulus
+                  aria: { required: "true", invalid: @user.errors[:password].any?, errormessage: "password-error", describedby: "password-hint password-visibility-status-1" } %>
+              <button type="button"
+                      data-action="visibility#togglePassword"
+                      class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      aria-label="Show password"
+                      aria-pressed="false">
+                <svg class="h-5 w-5"
+                     data-visibility-target="icon"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     aria-hidden="true">
+                  <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              </button>
+              <div id="password-visibility-status-1" aria-live="polite" class="sr-only" data-visibility-target="status">
+                Password is hidden
+              </div>
+            </div>
+            <p id="password-hint" class="text-xs text-gray-700">Minimum 6 characters</p>
+            <% if @user.errors[:password].any? %>
+              <p id="password-error" role="alert" class="mt-1 text-sm text-red-600"><%= @user.errors[:password].join(", ") %></p>
+            <% end %>
+          </div>
+          <div class="mb-4">
+            <%= form.label :password_confirmation, "Confirm Password", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <div class="relative" data-controller="visibility" data-visibility-timeout-value="5000">
+              <%= form.password_field :password_confirmation, required: true, minlength: 6,
+                  class: "block w-full px-4 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm", # Added pr-10
+                  :"data-visibility-target" => "field", # Add target for Stimulus
+                  aria: { required: "true", invalid: @user.errors[:password_confirmation].any?, errormessage: "password-confirmation-error", describedby: "password-visibility-status-2" } %>
+              <button type="button"
+                      data-action="visibility#togglePassword"
+                      class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      aria-label="Show password"
+                      aria-pressed="false">
+                <svg class="h-5 w-5"
+                     data-visibility-target="icon"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     aria-hidden="true">
+                  <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              </button>
+              <div id="password-visibility-status-2" aria-live="polite" class="sr-only" data-visibility-target="status">
+                Password is hidden
+              </div>
+            </div>
+            <% if @user.errors[:password_confirmation].any? %>
+              <p id="password-confirmation-error" role="alert" class="mt-1 text-sm text-red-600"><%= @user.errors[:password_confirmation].join(", ") %></p>
+            <% end %>
+          </div>
+        </fieldset>
 
-      <!-- Password -->
-      <div class="mb-4">
-        <%= form.label :password, "Password", 
-                       class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.password_field :password, 
-            class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none
-                    focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-            minlength: 6,
-            required: true,
-            aria: {
-              required: "true",
-              invalid: @user.errors[:password].any?,
-              errormessage: "password-error"
-            } %>
-        <p class="text-xs text-gray-700">Minimum 6 characters</p>
-        <% if @user.errors[:password].any? %>
-          <p id="password-error" class="mt-1 text-sm text-red-600">
-            <%= @user.errors[:password].join(", ") %>
-          </p>
-        <% end %>
-      </div>
+        <!-- Date of Birth -->
+        <div class="mb-4" data-controller="date-input">
+          <%= form.label :date_of_birth, "Date of Birth", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= form.hidden_field :date_of_birth, value: @user.date_of_birth&.strftime('%Y-%m-%d'), data: { date_input_target: "hidden" } %>
+          <%= text_field_tag :visible_date_of_birth, @user.date_of_birth&.strftime('%m/%d/%Y'), required: true, placeholder: "MM/DD/YYYY",
+              class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm",
+              data: { date_input_target: "input" },
+              aria: { required: "true", invalid: @user.errors[:date_of_birth].any?, errormessage: "dob-error" } %>
+          <p id="dob-hint" class="text-xs text-gray-700">MM/DD/YYYY</p>
+          <% if @user.errors[:date_of_birth].any? %>
+            <p id="dob-error" role="alert" class="mt-1 text-sm text-red-600"><%= @user.errors[:date_of_birth].join(", ") %></p>
+          <% end %>
+        </div>
 
-      <!-- Confirm Password -->
-      <div class="mb-4">
-        <%= form.label :password_confirmation, "Confirm Password", 
-                       class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.password_field :password_confirmation, 
-            class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none
-                    focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-            minlength: 6,
-            required: true,
-            aria: {
-              required: "true",
-              invalid: @user.errors[:password_confirmation].any?,
-              errormessage: "password-confirmation-error"
-            } %>
-        <% if @user.errors[:password_confirmation].any? %>
-          <p id="password-confirmation-error" class="mt-1 text-sm text-red-600">
-            <%= @user.errors[:password_confirmation].join(", ") %>
-          </p>
-        <% end %>
-      </div>
-
-      <!-- Phone Number -->
-      <div class="mb-4">
-        <%= form.label :phone, "Phone Number", 
-                       class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.telephone_field :phone, 
-            class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none
-                    focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-            required: true,
-            pattern: "[0-9]{3}-?[0-9]{3}-?[0-9]{4}",
-            placeholder: "202-555-5555 or 2025555555",
-            aria: {
-              required: "true",
-              invalid: @user.errors[:phone].any?,
-              errormessage: "phone-error"
-            } %>
-        <p class="text-xs text-gray-700">10-digit number, with or without dashes</p>
-        <% if @user.errors[:phone].any? %>
-          <p id="phone-error" class="mt-1 text-sm text-red-600">
-            <%= @user.errors[:phone].join(", ") %>
-          </p>
-        <% end %>
-      </div>
-
-      <!-- Date of Birth -->
-      <div class="mb-4" data-controller="date-input">
-        <%= form.label :date_of_birth, "Date of Birth", 
-                       class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.hidden_field :date_of_birth,
-            value: @user.date_of_birth&.strftime('%Y-%m-%d'),
-            data: { date_input_target: "hidden" } %>
-        <%= text_field_tag :visible_date_of_birth,
-            @user.date_of_birth&.strftime('%m/%d/%Y'),
-            class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none
-                    focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-            required: true,
-            placeholder: "MM/DD/YYYY",
-            data: { date_input_target: "input" },
-            aria: {
-              required: "true",
-              invalid: @user.errors[:date_of_birth].any?,
-              errormessage: "dob-error"
-            } %>
-        <p class="text-xs text-gray-700">Enter date as MM/DD/YYYY or type numbers like 01011977</p>
-        <% if @user.errors[:date_of_birth].any? %>
-          <p id="dob-error" class="mt-1 text-sm text-red-600">
-            <%= @user.errors[:date_of_birth].join(", ") %>
-          </p>
-        <% end %>
-      </div>
-
-      <!-- Language Preference -->
-      <div class="mb-4">
-        <%= form.label :locale, "Language Preference", 
-                       class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.select :locale, 
-            [["English", "en"], ["Spanish", "es"], ["French", "fr"], ["Other", "other"]], 
-            { prompt: "Select Language" },
-            {
-              class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none
-                      focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+        <!-- Language Preference -->
+        <div class="mb-4">
+          <%= form.label :locale, "Language Preference", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= form.select :locale, [["English","en"],["Spanish","es"],["French","fr"],["Other","other"]], { prompt: "Select Language" },
+              class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm",
               required: true,
-              aria: {
-                required: "true",
-                invalid: @user.errors[:locale].any?,
-                errormessage: "locale-error"
-              }
-            } %>
-        <% if @user.errors[:locale].any? %>
-          <p id="locale-error" class="mt-1 text-sm text-red-600">
-            <%= @user.errors[:locale].join(", ") %>
-          </p>
-        <% end %>
-      </div>
+              aria: { required: "true", invalid: @user.errors[:locale].any?, errormessage: "locale-error" } %>
+          <% if @user.errors[:locale].any? %>
+            <p id="locale-error" role="alert" class="mt-1 text-sm text-red-600"><%= @user.errors[:locale].join(", ") %></p>
+          <% end %>
+        </div>
 
-      <!-- Notification Method -->
-      <div class="mb-4">
-        <%= form.label :communication_preference, "Notification Method", 
-                       class: "block text-sm font-medium text-gray-700 mb-1",
-                       id: "communication-preference-label" %>
-        <div class="mt-2 space-y-2" role="radiogroup" aria-labelledby="communication-preference-label">
-          <div class="flex items-center">
-            <%= form.radio_button :communication_preference, "email", 
-                class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500", 
-                checked: true,
-                aria: { describedby: "email-description" },
-                onclick: "toggleAddressFields(false);" %>
-            <%= form.label :communication_preference_email, "Email", class: "ml-3 text-sm text-gray-700" %>
-            <span id="email-description" class="sr-only">Selecting email means you'll receive notifications via email</span>
-          </div>
-          <div class="flex items-center">
-            <%= form.radio_button :communication_preference, "letter", 
-                class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500",
-                aria: { describedby: "letter-description" },
-                onclick: "toggleAddressFields(true);" %>
-            <%= form.label :communication_preference_letter, "Mailed Letter", class: "ml-3 text-sm text-gray-700" %>
-            <span id="letter-description" class="sr-only">Selecting mailed letter means you'll receive notifications via postal mail</span>
-          </div>
-        </div>
-        
-        <!-- Info box -->
-        <div id="mail_notification_info" class="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800 hidden"
-             aria-hidden="true">
-          <p><strong>Note:</strong> You will receive all notifications through printed letters mailed to your physical address. This includes important information about your application status and account details.</p>
-          <p class="mt-1">An email address is still recommended but not required if you prefer mailed communications.</p>
-          <p class="mt-1"><strong>Please provide your mailing address below.</strong></p>
-        </div>
-        
-        <!-- Address Fields - initially hidden -->
-        <div id="address_fields" class="mt-4 hidden" aria-hidden="true">
-          <div class="mb-4">
-            <%= form.label :physical_address_1, "Street Address", 
-                           class: "block text-sm font-medium text-gray-700 mb-1" %>
-            <%= form.text_field :physical_address_1, 
-                class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none
-                        focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-                aria: { required: "false" } %>
-          </div>
-          
-          <div class="mb-4">
-            <%= form.label :physical_address_2, "Apartment/Suite (Optional)", 
-                           class: "block text-sm font-medium text-gray-700 mb-1" %>
-            <%= form.text_field :physical_address_2, 
-                class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none
-                        focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" %>
-          </div>
-          
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div class="md:col-span-1">
-              <%= form.label :city, "City", 
-                             class: "block text-sm font-medium text-gray-700 mb-1" %>
-              <%= form.text_field :city, 
-                  class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none
-                          focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-                  aria: { required: "false" } %>
+        <!-- Notification Method -->
+        <fieldset class="mb-4">
+          <legend id="comm-pref-legend" class="block text-sm font-medium text-gray-700 mb-1">Notification Method</legend>
+          <div role="radiogroup" aria-labelledby="comm-pref-legend" aria-describedby="mail-notice" class="space-y-2">
+            <div class="flex items-center">
+              <%= form.radio_button :communication_preference, "email", id: "pref_email", checked: true,
+                     class: "h-4 w-4 focus:ring-indigo-500" %>
+              <%= form.label :communication_preference_email, "Email", for: "pref_email", class: "ml-3 text-sm text-gray-700" %>
             </div>
-            
-            <div class="md:col-span-1">
-              <%= form.label :state, "State", 
-                             class: "block text-sm font-medium text-gray-700 mb-1" %>
-              <%= form.select :state, 
-                  [
-                    ['Alabama', 'AL'], ['Alaska', 'AK'], ['Arizona', 'AZ'], ['Arkansas', 'AR'], 
-                    ['California', 'CA'], ['Colorado', 'CO'], ['Connecticut', 'CT'], ['Delaware', 'DE'], 
-                    ['Florida', 'FL'], ['Georgia', 'GA'], ['Hawaii', 'HI'], ['Idaho', 'ID'], 
-                    ['Illinois', 'IL'], ['Indiana', 'IN'], ['Iowa', 'IA'], ['Kansas', 'KS'], 
-                    ['Kentucky', 'KY'], ['Louisiana', 'LA'], ['Maine', 'ME'], ['Maryland', 'MD'], 
-                    ['Massachusetts', 'MA'], ['Michigan', 'MI'], ['Minnesota', 'MN'], ['Mississippi', 'MS'], 
-                    ['Missouri', 'MO'], ['Montana', 'MT'], ['Nebraska', 'NE'], ['Nevada', 'NV'], 
-                    ['New Hampshire', 'NH'], ['New Jersey', 'NJ'], ['New Mexico', 'NM'], ['New York', 'NY'], 
-                    ['North Carolina', 'NC'], ['North Dakota', 'ND'], ['Ohio', 'OH'], ['Oklahoma', 'OK'], 
-                    ['Oregon', 'OR'], ['Pennsylvania', 'PA'], ['Rhode Island', 'RI'], ['South Carolina', 'SC'], 
-                    ['South Dakota', 'SD'], ['Tennessee', 'TN'], ['Texas', 'TX'], ['Utah', 'UT'], 
-                    ['Vermont', 'VT'], ['Virginia', 'VA'], ['Washington', 'WA'], ['West Virginia', 'WV'], 
-                    ['Wisconsin', 'WI'], ['Wyoming', 'WY'], ['District of Columbia', 'DC']
-                  ],
-                  { include_blank: 'Select State' },
-                  {
-                    class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none
-                            focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-                    aria: { required: "false" }
-                  } %>
-            </div>
-            
-            <div class="md:col-span-1">
-              <%= form.label :zip_code, "Zip Code", 
-                             class: "block text-sm font-medium text-gray-700 mb-1" %>
-              <%= form.text_field :zip_code, 
-                  class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none
-                          focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-                  pattern: "[0-9]{5}(-[0-9]{4})?",
-                  placeholder: "12345 or 12345-6789",
-                  aria: { required: "false", describedby: "zip-format" } %>
-              <p id="zip-format" class="text-xs text-gray-700">5-digit or 9-digit format (12345 or 12345-6789)</p>
+            <div class="flex items-center">
+              <%= form.radio_button :communication_preference, "letter", id: "pref_letter",
+                     class: "h-4 w-4 focus:ring-indigo-500" %>
+              <%= form.label :communication_preference_letter, "Mailed Letter", for: "pref_letter", class: "ml-3 text-sm text-gray-700" %>
             </div>
           </div>
+
+          <div id="mail-notice" class="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800 hidden" aria-hidden="true">
+            <p><strong>Note:</strong> You will receive notifications by printed letter.</p>
+          </div>
+
+          <div id="address_fields" class="mt-4 hidden" aria-hidden="true">
+            <div class="mb-4">
+              <%= form.label :physical_address_1, "Street Address", class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= form.text_field :physical_address_1, id: "physical_address_1", disabled: true,
+                     class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm" %>
+            </div>
+            <div class="mb-4">
+              <%= form.label :physical_address_2, "Apt/Suite (Optional)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= form.text_field :physical_address_2, id: "physical_address_2", disabled: true,
+                     class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm" %>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <%= form.label :city, "City", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= form.text_field :city, id: "city", disabled: true,
+                       class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm" %>
+              </div>
+              <div>
+                <%= form.label :state, "State", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= form.select :state,
+                    [
+                      ['Alabama', 'AL'], ['Alaska', 'AK'], ['Arizona', 'AZ'], ['Arkansas', 'AR'],
+                      ['California', 'CA'], ['Colorado', 'CO'], ['Connecticut', 'CT'], ['Delaware', 'DE'],
+                      ['Florida', 'FL'], ['Georgia', 'GA'], ['Hawaii', 'HI'], ['Idaho', 'ID'],
+                      ['Illinois', 'IL'], ['Indiana', 'IN'], ['Iowa', 'IA'], ['Kansas', 'KS'],
+                      ['Kentucky', 'KY'], ['Louisiana', 'LA'], ['Maine', 'ME'], ['Maryland', 'MD'],
+                      ['Massachusetts', 'MA'], ['Michigan', 'MI'], ['Minnesota', 'MN'], ['Mississippi', 'MS'],
+                      ['Missouri', 'MO'], ['Montana', 'MT'], ['Nebraska', 'NE'], ['Nevada', 'NV'],
+                      ['New Hampshire', 'NH'], ['New Jersey', 'NJ'], ['New Mexico', 'NM'], ['New York', 'NY'],
+                      ['North Carolina', 'NC'], ['North Dakota', 'ND'], ['Ohio', 'OH'], ['Oklahoma', 'OK'],
+                      ['Oregon', 'OR'], ['Pennsylvania', 'PA'], ['Rhode Island', 'RI'], ['South Carolina', 'SC'],
+                      ['South Dakota', 'SD'], ['Tennessee', 'TN'], ['Texas', 'TX'], ['Utah', 'UT'],
+                      ['Vermont', 'VT'], ['Virginia', 'VA'], ['Washington', 'WA'], ['West Virginia', 'WV'],
+                      ['Wisconsin', 'WI'], ['Wyoming', 'WY'], ['District of Columbia', 'DC']
+                    ],
+                    { include_blank: 'Select State' },
+                    { id: "state", disabled: true,
+                      class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm" } %>
+              </div>
+              <div>
+                <%= form.label :zip_code, "Zip Code", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= form.text_field :zip_code, id: "zip_code", disabled: true, placeholder: "12345", pattern: "[0-9]{5}(-[0-9]{4})?",
+                       class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm" %>
+              </div>
+            </div>
+          </div>
+        </fieldset>
+
+        <!-- Submit -->
+        <div class="mb-4">
+          <%= form.submit "Create Account",
+              class: "w-full py-2 px-4 rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500",
+              data: { disable_with: "Creating account...", "aria-busy": "true" } %>
         </div>
-      </div>
 
-      <!-- Submit Button -->
-      <div class="mb-4">
-        <%= form.submit "Create Account",
-            class: "w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm 
-                    font-medium text-white bg-indigo-600 hover:bg-indigo-700 
-                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-            data: { 
-              disable_with: "Creating account...",
-              "aria-busy": "true" 
-            } %>
-      </div>
+        <!-- Sign In -->
+        <footer class="text-center">
+          <p class="text-sm text-gray-700">Already have an account? <%= link_to "Sign In", sign_in_path, class: "font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500" %></p>
+        </footer>
 
-      <!-- Sign In Prompt -->
-      <div class="text-center">
-        <p class="text-sm text-gray-700">
-          Already have an account?
-          <%= link_to "Sign In", 
-              sign_in_path, 
-              class: "ml-1 font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none 
-                      focus:ring-2 focus:ring-indigo-500 rounded" %>
-        </p>
-      </div>
-
-      <!-- JavaScript to handle the address fields toggle -->
-      <script>
-        // Improved function that handles both visibility and accessibility properties
-        function toggleAddressFields(show) {
-          const addressFields = document.getElementById('address_fields');
-          const infoBox = document.getElementById('mail_notification_info');
-          const emailField = document.getElementById('user_email');
-          
-          if (show) {
-            // Show address fields
-            addressFields.classList.remove('hidden');
-            addressFields.setAttribute('aria-hidden', 'false');
-            
-            // Enable address inputs for keyboard navigation and screen readers
-            const inputs = addressFields.querySelectorAll('input, select');
-            inputs.forEach(input => {
-              input.setAttribute('aria-required', 'true');
-              if (input.id === 'user_physical_address_1') {
-                input.required = true;
-              }
-              if (input.id === 'user_city') {
-                input.required = true;
-              }
-              if (input.id === 'user_state') {
-                input.required = true;
-              }
-              if (input.id === 'user_zip_code') {
-                input.required = true;
-              }
-            });
-            
-            // Show info box
-            infoBox.classList.remove('hidden');
-            infoBox.setAttribute('aria-hidden', 'false');
-            
-            // Email is optional when letter is selected
-            if (emailField) {
-              emailField.required = false;
-              emailField.setAttribute('aria-required', 'false');
-            }
-          } else {
-            // Hide address fields
-            addressFields.classList.add('hidden');
-            addressFields.setAttribute('aria-hidden', 'true');
-            
-            // Disable address inputs from keyboard navigation and screen readers
-            const inputs = addressFields.querySelectorAll('input, select');
-            inputs.forEach(input => {
-              input.setAttribute('aria-required', 'false');
-              input.required = false;
-            });
-            
-            // Hide info box
-            infoBox.classList.add('hidden');
-            infoBox.setAttribute('aria-hidden', 'true');
-            
-            // Email is required when email is selected
-            if (emailField) {
-              emailField.required = true;
-              emailField.setAttribute('aria-required', 'true');
-            }
-          }
-        }
-        
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', function() {
-          const letterRadio = document.querySelector('input[value="letter"][name="user[communication_preference]"]');
-          if (letterRadio && letterRadio.checked) {
-            toggleAddressFields(true);
-          }
-        });
-      </script>
-
-    <% end %>
+      <% end %>
+    </main>
   </div>
 </div>
+
+<script>
+  function toggleAddressFields(show) {
+    const addr = document.getElementById('address_fields');
+    const notice = document.getElementById('mail-notice');
+    const emailInput = document.getElementById('user_email'); // Assuming this ID is correct from the email field helper
+    const inputs = addr.querySelectorAll('input, select'); // Selects all inputs and selects within the address_fields div
+
+    // Define which address fields are required when 'letter' is chosen
+    const requiredAddressFields = ['physical_address_1', 'city', 'state', 'zip_code'];
+
+    if (show) {
+      addr.classList.remove('hidden'); addr.setAttribute('aria-hidden','false');
+      notice.classList.remove('hidden'); notice.setAttribute('aria-hidden','false');
+      inputs.forEach(el => {
+        el.disabled = false;
+        // Set required attribute only for specific fields
+        if (requiredAddressFields.includes(el.id)) {
+          el.required = true;
+          el.setAttribute('aria-required', 'true');
+        } else {
+          el.required = false; // Ensure optional fields like address_2 are not required
+          el.setAttribute('aria-required', 'false');
+        }
+      });
+      // Email is not required when letter is selected
+      emailInput.required = false; emailInput.setAttribute('aria-required','false');
+    } else {
+      addr.classList.add('hidden'); addr.setAttribute('aria-hidden','true');
+      notice.classList.add('hidden'); notice.setAttribute('aria-hidden','true');
+      inputs.forEach(el => {
+        el.disabled = true;
+        el.required = false; // Clear required status when hidden
+        el.setAttribute('aria-required', 'false');
+      });
+      // Email is required when email is selected
+      emailInput.required = true; emailInput.setAttribute('aria-required','true');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const emailRadio = document.getElementById('pref_email');
+    const letterRadio = document.getElementById('pref_letter');
+
+    if (emailRadio && letterRadio) { // Ensure elements exist before adding listeners
+      emailRadio.addEventListener('change', () => toggleAddressFields(false));
+      letterRadio.addEventListener('change', () => toggleAddressFields(true));
+
+      // Initialize based on current selection
+      // Need to check which radio is actually checked on load
+      toggleAddressFields(letterRadio.checked);
+    } else {
+      console.error("Could not find notification preference radio buttons.");
+    }
+  });
+</script>

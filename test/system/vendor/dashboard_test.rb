@@ -2,7 +2,7 @@
 
 require 'application_system_test_case'
 
-module Vendor
+module VendorPortal
   class DashboardTest < ApplicationSystemTestCase
     setup do
       @vendor = create(:vendor, :approved)

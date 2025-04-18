@@ -3,5 +3,9 @@
 require 'test_helper'
 
 class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
-  driven_by :selenium, using: :chrome, screen_size: [1400, 1400]
+  include SystemTestAuthentication # Include authentication helper
+  include SystemTestHelpers # Include helpers for working with Cuprite
+
+  # Switch from headless_chrome to cuprite
+  driven_by :cuprite
 end

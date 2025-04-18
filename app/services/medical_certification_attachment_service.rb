@@ -42,7 +42,7 @@ class MedicalCertificationAttachmentService
       end
 
       Rails.logger.info "Updating medical certification status to #{status} for application #{application.id}"
-      
+
       # Update status and create audit records in a single transaction
       update_certification_status_only(application, status, admin, submission_method, metadata)
 
@@ -117,6 +117,7 @@ class MedicalCertificationAttachmentService
       # Set blob size for metrics
       result[:blob_size] = blob_size
       result[:success] = true
+      result[:status] = status.to_s # Add status to the result hash
     rescue StandardError => e
       # Track failure with detailed information
       record_failure(application, e, admin, submission_method, metadata)

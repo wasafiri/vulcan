@@ -278,7 +278,7 @@ module ProofManageable
       error_field: :income_proof_status,
       label: 'Income proof'
     )
-    
+
     validate_not_reviewed_proof(
       proof: residency_proof,
       status_check_method: :residency_proof_status_not_reviewed?,
@@ -347,12 +347,12 @@ module ProofManageable
       }
     )
   end
-  
+
   def require_proof_attachments
     unless income_proof.attached?
       errors.add(:income_proof, 'must be attached. Please upload your income documentation.')
     end
-    
+
     unless residency_proof.attached?
       errors.add(:residency_proof, 'must be attached. Please upload your proof of Maryland residency.')
     end
@@ -361,20 +361,62 @@ module ProofManageable
   # Determines if we're in the process of resubmitting a previously rejected proof
   # This is used to conditionally skip validations in the resubmission flow
   def resubmitting_proof?
-    # First check if the thread local variable is set - this communicates context from controller
-    return true if Thread.current[:resubmitting_proof]
-    
-    # Then fall back to the original logic for backward compatibility
-    # Check if any proof that was previously rejected is now getting a new attachment
-    return true if income_proof_status_rejected? && 
-                  income_proof.attached? && 
-                  (respond_to?(:attachment_changes) && attachment_changes['income_proof'].present?)
-    
-    return true if residency_proof_status_rejected? && 
-                  residency_proof.attached? && 
-                  (respond_to?(:attachment_changes) && attachment_changes['residency_proof'].present?)
-    
+    # Check for explicit resubmission context first
+    return true if explicit_resubmission_context?
+
+    # Check for income proof resubmission
+    return true if resubmitting_income_proof?
+
+    # Check for residency proof resubmission
+    return true if resubmitting_residency_proof?
+
+    # No resubmission detected
     false
+  end
+
+  # Check if the thread local variable is set that communicates resubmission context from controller
+  def explicit_resubmission_context?
+    Thread.current[:resubmitting_proof].present?
+  end
+
+  # Check if income proof is being resubmitted
+  def resubmitting_income_proof?
+    proof_rejected_and_being_updated?('income')
+  end
+
+  # Check if residency proof is being resubmitted
+  def resubmitting_residency_proof?
+    proof_rejected_and_being_updated?('residency')
+  end
+
+  # Generic method to check if a specific proof type is rejected and being updated
+  def proof_rejected_and_being_updated?(proof_type)
+    status_rejected?(proof_type) && 
+      proof_attached?(proof_type) && 
+      proof_being_updated?(proof_type)
+  end
+
+  # Check if the proof status is rejected
+  def status_rejected?(proof_type)
+    status_method = "#{proof_type}_proof_status"
+    # Use string comparison for robustness, especially during initialization
+    send(status_method).to_s == 'rejected'
+  end
+
+  # Check if the proof is attached
+  def proof_attached?(proof_type)
+    attachment_name = "#{proof_type}_proof"
+    send(attachment_name).attached?
+  end
+
+  # Check if the proof is currently being updated
+  def proof_being_updated?(proof_type)
+    # Early return for new records or if attachment_changes is not available
+    return false if new_record? || !respond_to?(:attachment_changes) 
+
+    # Safely check for changes without assuming attachment_changes is a hash
+    attachment_name = "#{proof_type}_proof"
+    attachment_changes.is_a?(Hash) && attachment_changes[attachment_name].present?
   end
 
   def require_proof_validations?
@@ -383,10 +425,10 @@ module ProofManageable
     return false if status_draft?
     return true if saved_change_to_status? && status_before_last_save == 'draft'
     return true if submitted?
-    
+
     # Skip for paper applications processed by admins
     return false if Thread.current[:paper_application_context]
-    
+
     false
   end
 end

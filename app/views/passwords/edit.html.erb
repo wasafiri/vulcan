@@ -1,40 +1,96 @@
-<div class="min-h-screen flex items-center justify-center bg-gray-100">
-  <div class="bg-white p-8 rounded shadow-md w-full max-w-md">
-    <h2 class="text-2xl font-semibold mb-6 text-center">Reset Password</h2>
+<main role="main" class="min-h-screen flex items-center justify-center bg-gray-100">
+  <section id="password-reset-container" class="bg-white p-8 rounded shadow-md w-full max-w-md" aria-labelledby="reset-password-heading">
+    <h2 id="reset-password-heading" class="text-2xl font-semibold mb-6 text-center">Reset Password</h2>
 
     <% if flash[:alert] %>
-      <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+      <div role="alert" aria-live="assertive" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
         <span><%= flash[:alert] %></span>
       </div>
     <% end %>
 
-    <%= form_with(url: password_path, method: :patch, class: "space-y-6") do |form| %>
+    <%= form_with(url: password_path, method: :patch, html: { class: "space-y-6" }) do |form| %>
       <div>
-        <%= form.label :password_challenge, "Current Password", class: "block text-gray-700" %>
-        <%= form.password_field :password_challenge,
-            class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500",
-            required: true %>
+        <%= form.label :password_challenge, "Current Password", class: "block text-sm font-medium text-gray-700" %>
+        <div class="relative" data-controller="visibility" data-visibility-timeout-value="5000">
+          <%= form.password_field :password_challenge, { :class => "mt-1 block w-full px-4 py-2 pr-10 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500", :required => true, "aria-required" => true, "aria-invalid" => "false", :autocomplete => 'current-password', :autofocus => true, :"data-visibility-target" => "field", "aria-describedby" => "password-visibility-status-1" } %>
+          <button type="button"
+                  data-action="visibility#togglePassword"
+                  class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  aria-label="Show password"
+                  aria-pressed="false">
+            <svg class="h-5 w-5"
+                 data-visibility-target="icon"
+                 fill="none"
+                 viewBox="0 0 24 24"
+                 stroke="currentColor"
+                 aria-hidden="true">
+              <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          </button>
+          <div id="password-visibility-status-1" aria-live="polite" class="sr-only" data-visibility-target="status">
+            Password is hidden
+          </div>
+        </div>
       </div>
 
       <div>
-        <%= form.label :password, "New Password", class: "block text-gray-700" %>
-        <%= form.password_field :password,
-            class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500",
-            required: true %>
-        <p class="mt-1 text-sm text-gray-500">Minimum 12 characters</p>
+        <%= form.label :password, "New Password", class: "block text-sm font-medium text-gray-700" %>
+        <div class="relative" data-controller="visibility" data-visibility-timeout-value="5000">
+          <%= form.password_field :password, { :class => "mt-1 block w-full px-4 py-2 pr-10 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500", :required => true, "aria-required" => true, "aria-invalid" => "false", "aria-describedby" => 'password-hint password-visibility-status-2', :autocomplete => 'new-password', :"data-visibility-target" => "field" } %>
+          <button type="button"
+                  data-action="visibility#togglePassword"
+                  class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  aria-label="Show password"
+                  aria-pressed="false">
+            <svg class="h-5 w-5"
+                 data-visibility-target="icon"
+                 fill="none"
+                 viewBox="0 0 24 24"
+                 stroke="currentColor"
+                 aria-hidden="true">
+              <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          </button>
+          <div id="password-visibility-status-2" aria-live="polite" class="sr-only" data-visibility-target="status">
+            Password is hidden
+          </div>
+        </div>
+        <p id="password-hint" class="mt-1 text-sm text-gray-500" aria-live="polite">Minimum 12 characters</p>
       </div>
 
       <div>
-        <%= form.label :password_confirmation, "Confirm New Password", class: "block text-gray-700" %>
-        <%= form.password_field :password_confirmation,
-            class: "mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500",
-            required: true %>
+        <%= form.label :password_confirmation, "Confirm New Password", class: "block text-sm font-medium text-gray-700" %>
+        <div class="relative" data-controller="visibility" data-visibility-timeout-value="5000">
+          <%= form.password_field :password_confirmation, { :class => "mt-1 block w-full px-4 py-2 pr-10 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500", :required => true, "aria-required" => true, "aria-invalid" => "false", :autocomplete => 'new-password', :"data-visibility-target" => "field", "aria-describedby" => "password-visibility-status-3" } %>
+          <button type="button"
+                  data-action="visibility#togglePassword"
+                  class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  aria-label="Show password"
+                  aria-pressed="false">
+            <svg class="h-5 w-5"
+                 data-visibility-target="icon"
+                 fill="none"
+                 viewBox="0 0 24 24"
+                 stroke="currentColor"
+                 aria-hidden="true">
+              <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          </button>
+          <div id="password-visibility-status-3" aria-live="polite" class="sr-only" data-visibility-target="status">
+            Password is hidden
+          </div>
+        </div>
       </div>
 
       <div class="flex justify-end space-x-4">
-        <%= link_to "Cancel", sign_in_path, class: "px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
-        <%= form.submit "Reset Password", class: "px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+        <%= link_to "Cancel", sign_in_path,
+            class: "inline-flex items-center px-3 py-1 border border-gray-300 rounded-md shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+        <%= form.submit "Reset Password",
+            class: "inline-flex items-center px-3 py-1 rounded-md shadow-sm text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
       </div>
     <% end %>
-  </div>
-</div>
+  </section>
+</main>

@@ -13,7 +13,7 @@ module Admin
                         vendor: @vendor,
                         transaction_count: 2,
                         amount_per_transaction: 250.00)
-      sign_in @admin
+      sign_in(@admin)
     end
 
     test 'viewing and approving invoice' do

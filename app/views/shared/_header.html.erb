@@ -22,6 +22,9 @@
                      else
                        admin_applications_path
                      end
+    
+    # Check if user has 2FA set up
+    has_webauthn = user.webauthn_credentials.exists?
   end
 %>
 
@@ -83,10 +86,31 @@
           <!-- Auth Links -->
           <div class="flex items-center space-x-4">
             <% if user %>
-              <div class="flex items-center space-x-4">
-                <span class="text-gray-700 text-sm" aria-label="Welcome message">
-                  Hello, <%= user.first_name %>
-                </span>
+              <span class="text-gray-700 text-sm" aria-label="Welcome message">
+                Hello, <%= user.first_name %>
+              </span>
+              
+              <%# Use has_webauthn for consistency %>
+              <% unless has_webauthn %>
+                <%= link_to setup_two_factor_authentication_path, 
+                    class: "flex items-center px-4 py-2 rounded-md text-sm font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-500",
+                    aria: { label: "Set up two-factor authentication for your account" } do %>
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                    Secure Account
+                  <% end %>
+                <% else %>
+                  <%= link_to edit_profile_path, # Use correct helper: edit_profile_path
+                      class: "flex items-center px-4 py-2 rounded-md text-sm font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-500",
+                      aria: { label: "Edit your account settings" } do %>
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                    Secure Account
+                  <% end %>
+                <% end %>
+                
                 <%= link_to dashboard_path,
                     class: "px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
                     aria: { label: "Go to your dashboard" } do %>
@@ -95,11 +119,11 @@
                 <%= button_to "Sign Out",
                     sign_out_path,
                     method: :delete,
+                    data: { turbo: false },
                     class: "px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
                     aria: { label: "Sign out of your account" } %>
-              </div>
             <% else %>
-              <div class="flex space-x-2">
+              <div class="flex space-x-4">
                 <%= link_to "Sign In",
                     sign_in_path,
                     class: "px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
@@ -138,6 +162,19 @@
             <p class="text-base font-medium text-gray-800">
               Hello, <%= user.first_name %>
             </p>
+            
+            <% unless has_webauthn %>
+              <%= link_to setup_two_factor_authentication_path, 
+                  class: "mt-2 flex items-center w-full px-4 py-2 rounded-md text-sm font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500",
+                  role: "menuitem",
+                    aria: { label: "Set up two-factor authentication for your account" } do %>
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+                Secure Account <%# Standardized text %>
+              <% end %>
+            <% end %>
+            
             <%= link_to "Dashboard",
                 dashboard_path,
                 class: "mt-2 block w-full px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
@@ -146,6 +183,7 @@
             <%= button_to "Sign Out",
                 sign_out_path,
                 method: :delete,
+                data: { turbo: false },
                 class: "mt-1 block w-full px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
                 aria: { label: "Sign out of your account" } %>
           </div>

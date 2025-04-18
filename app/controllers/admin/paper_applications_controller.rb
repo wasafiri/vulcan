@@ -49,11 +49,14 @@ module Admin
       constituent_params = build_constituent_params
       notification_params = build_notification_params
 
-      if params[:communication_preference] == 'email'
+      # Handle both old and new parameter names for backward compatibility
+      communication_preference = params[:notification_method] || params[:communication_preference]
+
+      if communication_preference == 'email'
         ApplicationNotificationsMailer.income_threshold_exceeded(constituent_params, notification_params)
                                       .deliver_later
-        flash[:notice] = 'Rejection notification has been sent via email.'
-      elsif params[:communication_preference] == 'letter'
+        flash[:notice] = 'Rejection notification has been sent.'
+      elsif communication_preference == 'letter'
         flash[:notice] = 'Rejection letter has been queued for printing.'
       end
 

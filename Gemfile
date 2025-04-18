@@ -4,8 +4,6 @@ source 'https://rubygems.org'
 
 ruby '3.4.2'
 
-# authentication
-gem 'authentication-zero'
 # gem for hosting images & getting ocr functionality
 gem 'aws-sdk-s3'
 # for fax capabilities
@@ -30,6 +28,10 @@ gem 'propshaft'
 gem 'puma', '>= 6.6.0'
 # rails framework
 gem 'rails', '~> 8.0.2'
+# gem for one-time passwords for SMS 2fa
+gem 'rotp'
+# gem for QR code generation for TOTP
+gem 'rqrcode'
 # gem for creating zip files
 gem 'rubyzip', '3.0.0.rc2'
 # hotwire's modest JavaScript framework [https://stimulus.hotwired.dev]
@@ -48,6 +50,8 @@ gem 'mupdf', '~> 1.0'
 gem 'smarter_csv'
 # windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem 'tzinfo-data'
+# gem for 2fa
+gem 'webauthn', '~> 3.4'
 
 # use the database-backed adapters for Rails.cache, Active Job, and Action Cable
 gem 'solid_cable'
@@ -82,6 +86,7 @@ end
 group :test do
   # Use system testing [https://guides.rubyonrails.org/testing.html#system-testing]
   gem 'capybara'
+  gem 'cuprite' # Added Cuprite gem
   gem 'database_cleaner-active_record'
   gem 'factory_bot_rails'
   gem 'minitest-rails', '~> 8.0.0'
