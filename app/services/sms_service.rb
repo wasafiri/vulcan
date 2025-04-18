@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class SMSService
+class SmsService
   def self.send_message(phone_number, message)
     # In production, this would use a real SMS provider like Twilio
     # For now, we'll log the message and simulate delivery
