@@ -1,108 +1,118 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
+  static values = {
+    // Override via data‑controller‑fpl-url‑value if you ever need to.
+    fplUrl: String
+  }
+
   static targets = [
-    "householdSize", 
-    "annualIncome", 
+    "householdSize",
+    "annualIncome",
     "submitButton"
   ]
-  
+
   connect() {
-    // Initialize FPL thresholds - these will be populated from the server
-    this.fplThresholds = {};
-    this.fplModifier = 400; // Default to 400% if not set
-    
-    // Fetch FPL thresholds from the server
-    this.fetchFplThresholds();
-    
-    // Add warning element to the form
-    this.addIncomeThresholdWarning();
+    // --- state ---
+    this.fplThresholds = {}
+    this.fplModifier   = 400
+    this._validate     = this.validateIncomeThreshold.bind(this)
+    this.fetchController = null
+
+    // --- fetch & warn element ---
+    this.fetchFplThresholds()
+    this.addIncomeThresholdWarning()
+
+    // --- wire up live validation ---
+    this.householdSizeTarget.addEventListener("input", this._validate)
+    this.annualIncomeTarget.addEventListener("input", this._validate)
   }
-  
+
+  disconnect() {
+    // Abort any in‑flight fetch
+    if (this.fetchController) {
+      this.fetchController.abort()
+    }
+    // Clean up listeners
+    this.householdSizeTarget.removeEventListener("input", this._validate)
+    this.annualIncomeTarget.removeEventListener("input", this._validate)
+  }
+
   fetchFplThresholds() {
-    // Fetch FPL thresholds from the server
-    fetch('/constituent_portal/applications/fpl_thresholds')
-      .then(response => response.json())
+    const url = this.hasFplUrlValue
+      ? this.fplUrlValue
+      : "/constituent_portal/applications/fpl_thresholds"
+
+    // AbortController lets us cancel if the controller disconnects
+    this.fetchController = new AbortController()
+
+    fetch(url, { signal: this.fetchController.signal })
+      .then(res => res.json())
       .then(data => {
-        this.fplThresholds = data.thresholds;
-        this.fplModifier = data.modifier;
+        this.fplThresholds = data.thresholds || {}
+        this.fplModifier   = data.modifier  || this.fplModifier
+        // Re‑run validator in case inputs already have values
+        this.validateIncomeThreshold()
       })
-      .catch(error => {
-        console.error('Error fetching FPL thresholds:', error);
-      });
+      .catch(err => {
+        if (err.name === "AbortError") return
+        console.error("Failed to load FPL thresholds:", err)
+      })
   }
-  
+
   addIncomeThresholdWarning() {
-    // Create warning element
-    const warningElement = document.createElement('div');
-    warningElement.id = 'income-threshold-warning';
-    warningElement.className = 'hidden bg-red-100 border border-red-400 text-red-700 p-4 rounded mb-4';
-    warningElement.setAttribute('role', 'alert');
-    
-    // Add warning content
-    warningElement.innerHTML = `
+    // Avoid dupes if Stimulus hot‑reloads or controller reconnects
+    if (document.getElementById("income-threshold-warning")) return
+
+    const warning = document.createElement("div")
+    warning.id    = "income-threshold-warning"
+    warning.className =
+      "hidden bg-red-100 border border-red-400 text-red-700 p-4 rounded mb-4"
+    warning.setAttribute("role", "alert")
+    warning.innerHTML = `
       <h3 class="font-medium">Income Exceeds Threshold</h3>
       <p>Your annual income exceeds the maximum threshold for your household size.</p>
       <p>Applications with income above the threshold are not eligible for this program.</p>
-    `;
-    
-    // Insert warning at the top of the form, similar to flash messages
-    const formContainer = document.querySelector('.form-container');
-    const formElement = document.querySelector('form');
-    
-    // Insert before the form, after the heading
-    if (formContainer && formElement) {
-      const heading = formContainer.querySelector('h1');
-      if (heading) {
-        // Insert after the heading and main-content div
-        const mainContent = document.getElementById('main-content');
-        if (mainContent) {
-          mainContent.parentNode.insertBefore(warningElement, mainContent.nextSibling);
-        } else {
-          // Fallback: insert after heading
-          heading.parentNode.insertBefore(warningElement, heading.nextSibling);
-        }
-      } else {
-        // Fallback: insert at the beginning of the form
-        formElement.insertBefore(warningElement, formElement.firstChild);
-      }
+    `
+
+    // Insert right after #main-content if present, else fallback to top of form
+    const main = document.getElementById("main-content")
+    if (main && main.parentNode) {
+      main.parentNode.insertBefore(warning, main.nextSibling)
     } else {
-      // Fallback: insert at the beginning of the body
-      document.body.insertBefore(warningElement, document.body.firstChild);
+      const form = this.element.querySelector("form") || document.body
+      form.insertBefore(warning, form.firstChild)
     }
+
+    // Keep a ref so we don't querySelector each time
+    this.warningElement = warning
   }
-  
+
   validateIncomeThreshold() {
-    const householdSize = parseInt(this.householdSizeTarget.value) || 0;
-    const annualIncome = parseFloat(this.annualIncomeTarget.value) || 0;
-    
-    const warningElement = document.getElementById('income-threshold-warning');
-    const submitButton = document.querySelector('input[name="submit_application"]');
-    
-    // If there's not enough data to validate, hide the warning and enable the submit button
-    if (householdSize < 1 || annualIncome < 1) {
-      warningElement.classList.add('hidden');
-      submitButton.disabled = false;
-      submitButton.classList.remove('opacity-50', 'cursor-not-allowed');
-      return;
+    const size  = parseInt(this.householdSizeTarget.value, 10) || 0
+    const income = parseFloat(this.annualIncomeTarget.value)   || 0
+    const warning = this.warningElement
+    const btn     = this.submitButtonTarget
+
+    // If we don't have bona fide inputs yet, just clear state
+    if (size < 1 || income < 1) {
+      warning.classList.add("hidden")
+      btn.disabled = false
+      btn.classList.remove("opacity-50", "cursor-not-allowed")
+      return
     }
-    
-    // Get the base FPL amount for the household size (default to 8-person if larger)
-    const baseFpl = this.fplThresholds[Math.min(householdSize, 8)] || 0;
-    
-    // Calculate the threshold (base FPL * modifier percentage)
-    const threshold = baseFpl * (this.fplModifier / 100);
-    
-    if (annualIncome > threshold) {
-      // Income exceeds threshold - show warning and disable submit button
-      warningElement.classList.remove('hidden');
-      submitButton.disabled = true;
-      submitButton.classList.add('opacity-50', 'cursor-not-allowed');
+
+    const baseFpl = this.fplThresholds[Math.min(size, 8)] || 0
+    const threshold = baseFpl * (this.fplModifier / 100)
+
+    if (income > threshold) {
+      warning.classList.remove("hidden")
+      btn.disabled = true
+      btn.classList.add("opacity-50", "cursor-not-allowed")
     } else {
-      // Income is within threshold - hide warning and enable submit button
-      warningElement.classList.add('hidden');
-      submitButton.disabled = false;
-      submitButton.classList.remove('opacity-50', 'cursor-not-allowed');
+      warning.classList.add("hidden")
+      btn.disabled = false
+      btn.classList.remove("opacity-50", "cursor-not-allowed")
     }
   }
 }

@@ -1,332 +1,226 @@
+<%# Locals for common values and rejection strings %>
+<% time_query    = "?t=#{Time.now.to_i}" %>
+<% proof_files   = { income: @application.income_proof,
+                     residency: @application.residency_proof,
+                     medical: @application.medical_certification } %>
+<% proof_urls    = proof_files.transform_values { |f| f.attached? ? rails_blob_path(f, disposition: :inline) : nil } %>
+
+<%# Address components for rejection messages %>
+<% address_1 = @application.user&.physical_address_1.to_s %>
+<% address_2 = @application.user&.physical_address_2.presence || '' %>
+<% city      = @application.user&.city.to_s %>
+<% state     = @application.user&.state.to_s %>
+<% zip       = @application.user&.zip_code.to_s %>
+<% full_address = "#{address_1} #{address_2} #{city}, #{state} #{zip}".squish %>
+
+<%# Rejection message locals %>
+<% address_mismatch_income = h("The address provided on your income documentation does not match the application address. Please submit documentation that contains the address exactly matching the one shared in your application: #{full_address}") %>
+<% address_mismatch_residency = h("The address provided on your residency documentation does not match the application address. Please submit documentation that contains the address exactly matching the one shared in your application: #{full_address}") %>
+<% expired_income = h('The income documentation you provided is more than 1 year old or is expired. Please submit documentation that is less than 1 year old and which is not expired.') %>
+<% expired_residency = h('The residency documentation you provided is more than 1 year old or is expired. Please submit documentation that is less than 1 year old and which is not expired.') %>
+<% missing_name_income = h('The income documentation you provided does not show your name. Please submit documentation that clearly displays your full name as it appears on your application.') %>
+<% missing_name_residency = h('The residency documentation you provided does not show your name. Please submit documentation that clearly displays your full name as it appears on your application.') %>
+<% wrong_document_income = h('The document you submitted is not an acceptable type of income proof. Please submit one of the following: recent pay stubs, tax returns, Social Security benefit statements, or other official documentation that verifies your income.') %>
+<% wrong_document_residency = h('The document you submitted is not an acceptable type of residency proof. Please submit one of the following: utility bill, lease agreement, mortgage statement, or other official documentation that verifies your Maryland residence.') %>
+<% missing_amount_income = h('The income documentation you provided does not clearly show your income amount. Please submit documentation that clearly displays your income figures, such as pay stubs with earnings clearly visible or benefit statements showing payment amounts.') %>
+<% exceeds_threshold_income = h('Based on the income documentation you provided, your household income exceeds the maximum threshold to qualify for the MAT program. The program is designed to assist those with financial need, and unfortunately, your income level is above our current eligibility limits.') %>
+<% outdated_ss_award_income = h('Your Social Security benefit award letter is out-of-date. Please submit your most recent award letter, which should be dated within the last 12 months. You can obtain a new benefit verification letter by visiting the Social Security Administration website or contacting your local SSA office.') %>
+
+<%# Medical Rejection message locals %>
+<% missing_provider_credentials = h('The medical certification is missing required provider credentials or license number. Please ensure the resubmitted form includes the medical provider\'s full credentials and license information.') %>
+<% incomplete_disability_documentation = h('The documentation of the disability is incomplete. The certification must include a complete description of the disability and how it affects major life activities.') %>
+<% outdated_certification = h('The medical certification is outdated. Please provide a certification that has been completed within the last 12 months.') %>
+<% missing_signature = h('The medical certification is missing the required signature from the healthcare provider. Please ensure the resubmitted form is properly signed and dated.') %>
+<% missing_functional_limitations = h('The certification lacks sufficient detail about functional limitations. Please ensure the resubmitted form includes specific information about how the disability affects daily activities.') %>
+<% incorrect_form_used = h('The wrong certification form was used. Please ensure the healthcare provider completes the official Medical Certification Form for MAT program eligibility.') %>
+
+<%# Helper to render PDF/Image attachment preview %>
+<%
+def render_attachment(attachment, url, time_query)
+  return content_tag(:p, "No file attached.", class: "text-gray-500") unless attachment&.attached? && url.present?
+
+  if attachment.content_type.start_with?('application/pdf')
+    # Capture the PDF block as a string
+    pdf_block = capture do
+%>
+      <%#
+        IMPORTANT: PDF Preview Fix
+
+        Setting both src and data-original-src attributes is critical for PDF previews to work correctly.
+        Previous implementations only set data-original-src and relied on JavaScript to set the src,
+        but this was unreliable and often resulted in blank PDF previews.
+
+        The current implementation:
+        1. Sets the src attribute directly in the HTML
+        2. Also keeps data-original-src for the modal controller to use
+        3. Uses data-turbo="false" to prevent Turbo from interfering with the iframe
+
+        DO NOT REMOVE the src attribute or change this implementation without thorough testing.
+        Changes here have repeatedly broken PDF previews in the past.
+      %>
+      <div class="pdf-container">
+        <iframe
+          src="<%= url + time_query %>"
+          data-original-src="<%= url + time_query %>"
+          data-turbo="false"
+          width="100%"
+          height="500px"
+          class="border-0"
+          frameborder="0"></iframe>
+        <div class="pdf-fallback bg-gray-50 border rounded p-4 mt-2">
+          <p class="text-gray-700 mb-2">If the PDF doesn't display properly:</p>
+          <%= link_to "Open PDF in new window",
+              url,
+              target: "_blank",
+              class: "inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700" %>
+        </div>
+      </div>
+<%
+    end # capture
+    pdf_block # Return the captured block
+  else
+    # Return the image tag
+    image_tag url_for(attachment), class: "max-w-full h-auto"
+  end
+end
+%>
+
 <div id="modals">
   <!-- Certification History Modal -->
   <%= render "certification_history_modal" %>
-  <!-- Modal for Income Proof Review -->
-  <div id="incomeProofReviewModal" class="fixed inset-0 hidden" data-modal-target="container">
-    <!-- Backdrop -->
-    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-modal-target="overlay"></div>
-    <!-- Modal Container -->
-    <div class="fixed inset-0 flex items-center justify-center">
-      <div class="bg-white rounded-lg p-6 max-w-3xl w-full relative">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">Review Income Proof</h3>
 
-        <% if @application.user&.is_guardian? %>
-          <div class="mb-4 rounded-md bg-amber-50 p-4 border border-amber-300">
-            <div class="flex">
-              <div class="flex-shrink-0">
-                <!-- Alert icon -->
-                <svg class="h-5 w-5 text-amber-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fill-rule="evenodd" d="M8.485 3.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 3.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
-                </svg>
-              </div>
-              <div class="ml-3">
-                <h3 class="text-sm font-medium text-amber-800">Guardian Application</h3>
-                <div class="mt-1 text-sm text-amber-700">
-                  <p>This application was submitted by a <strong><%= @application.user&.guardian_relationship&.downcase || "guardian" %></strong> on behalf of a minor. Please verify this relationship when reviewing these proof documents.</p>
+  <%# Loop through proof types to generate modals %>
+  <% [
+    { id: 'incomeProofReviewModal',  key: :income,   title: 'Review Income Proof',   approve_path: update_proof_status_admin_application_path(@application), approve_params: { proof_type: 'income', status: 'approved' }, reject_modal_id: 'proofRejectionModal', reject_proof_type: 'income', confirm_message: "Approve income proof?" },
+    { id: 'residencyProofReviewModal', key: :residency, title: 'Review Residency Proof', approve_path: update_proof_status_admin_application_path(@application), approve_params: { proof_type: 'residency', status: 'approved' }, reject_modal_id: 'proofRejectionModal', reject_proof_type: 'residency', confirm_message: "Approve residency proof?" },
+    { id: 'medicalCertificationReviewModal', key: :medical, title: 'Review Medical Certification', approve_path: update_certification_status_admin_application_path(@application), approve_params: { status: 'accepted' }, reject_modal_id: 'medicalCertificationRejectionModal', reject_proof_type: 'medical', confirm_message: "Approve this medical certification?" }
+  ].each do |cfg| %>
+    <div id="<%= cfg[:id] %>" class="fixed inset-0 hidden" data-modal-target="container" role="dialog" aria-modal="true" aria-labelledby="<%= cfg[:id] %>-heading">
+      <!-- Backdrop -->
+      <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-modal-target="overlay"></div>
+      <!-- Modal Container -->
+      <div class="fixed inset-0 flex items-center justify-center">
+        <div class="bg-white rounded-lg p-6 max-w-3xl w-full relative">
+          <h3 id="<%= cfg[:id] %>-heading" class="text-lg font-medium text-gray-900 mb-4"><%= cfg[:title] %></h3>
+
+          <%# Guardian Alert (only for income/residency) %>
+          <% if cfg[:key] != :medical && @application.user&.is_guardian? %>
+            <div class="mb-4 rounded-md bg-amber-50 p-4 border border-amber-300">
+              <div class="flex">
+                <div class="flex-shrink-0">
+                  <!-- Alert icon -->
+                  <svg class="h-5 w-5 text-amber-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M8.485 3.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 3.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+                <div class="ml-3">
+                  <h3 class="text-sm font-medium text-amber-800">Guardian Application</h3>
+                  <div class="mt-1 text-sm text-amber-700">
+                    <p>This application was submitted by a <strong><%= @application.user&.guardian_relationship&.downcase || "guardian" %></strong> on behalf of a minor. Please verify this relationship when reviewing these proof documents.</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        <% end %>
-        <% if @application.income_proof.attached? && @application.income_proof.content_type.start_with?('application/pdf') %>
-          <%#
-            IMPORTANT: PDF Preview Fix
-
-            Setting both src and data-original-src attributes is critical for PDF previews to work correctly.
-            Previous implementations only set data-original-src and relied on JavaScript to set the src,
-            but this was unreliable and often resulted in blank PDF previews.
-
-            The current implementation:
-            1. Sets the src attribute directly in the HTML
-            2. Also keeps data-original-src for the modal controller to use
-            3. Uses data-turbo="false" to prevent Turbo from interfering with the iframe
-
-            DO NOT REMOVE the src attribute or change this implementation without thorough testing.
-            Changes here have repeatedly broken PDF previews in the past.
-          %>
-          <!-- PDF iframe with fallback -->
-          <div class="pdf-container">
-            <iframe
-              src="<%= rails_blob_path(@application.income_proof, disposition: :inline) %>?t=<%= Time.now.to_i %>"
-              data-original-src="<%= rails_blob_path(@application.income_proof, disposition: :inline) %>?t=<%= Time.now.to_i %>"
-              data-turbo="false"
-              width="100%"
-              height="500px"
-              class="border-0"
-              frameborder="0"></iframe>
-            <div class="pdf-fallback bg-gray-50 border rounded p-4 mt-2">
-              <p class="text-gray-700 mb-2">If the PDF doesn't display properly:</p>
-              <%= link_to "Open PDF in new window", 
-                  rails_blob_path(@application.income_proof, disposition: :inline),
-                  target: "_blank",
-                  class: "inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700" %>
-            </div>
-          </div>
-        <% elsif @application.income_proof.attached? && @application.income_proof.content_type.start_with?('image') %>
-          <%= image_tag url_for(@application.income_proof), class: "max-w-full h-auto" %>
-        <% end %>
-        <div class="mt-4 flex space-x-4">
-          <%= button_to update_proof_status_admin_application_path(@application), 
-              method: :patch,
-              params: { proof_type: 'income', status: 'approved' }, 
-              class: "inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md", 
-              data: {
-                turbo: true,
-                confirm: "Approve income proof?"
-              } do %>
-            Approve
           <% end %>
-          <button type="button"
-                  data-action="click->modal#open"
-                  data-modal-id="proofRejectionModal"
-                  data-proof-type="income"
-                  class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md">
-            Reject
-          </button>
-        </div>
-        <div class="mt-4">
-          <button type="button"
-                  data-action="click->modal#close"
-                  class="px-4 py-2 border border-gray-300 rounded-md text-gray-700">
-            Close
-          </button>
+
+          <%# Render attachment preview %>
+          <%= render_attachment(proof_files[cfg[:key]], proof_urls[cfg[:key]], time_query) %>
+
+          <%# Action Buttons %>
+          <div class="mt-4 flex space-x-4">
+            <%= button_to cfg[:approve_path],
+                method: :patch,
+                params: cfg[:approve_params],
+                class: "inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md",
+                data: {
+                  turbo: true,
+                  confirm: cfg[:confirm_message]
+                } do %>
+              Approve
+            <% end %>
+            <button type="button"
+                    data-action="click->modal#open"
+                    data-modal-id="<%= cfg[:reject_modal_id] %>"
+                    data-proof-type="<%= cfg[:reject_proof_type] %>"
+                    class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md">
+              Reject
+            </button>
+          </div>
+          <div class="mt-4">
+            <button type="button"
+                    data-action="click->modal#close"
+                    class="px-4 py-2 border border-gray-300 rounded-md text-gray-700">
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-
-  <!-- Modal for Residency Proof Review -->
-  <div id="residencyProofReviewModal" class="fixed inset-0 hidden" data-modal-target="container">
-    <!-- Backdrop -->
-    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-modal-target="overlay"></div>
-    <!-- Modal Container -->
-    <div class="fixed inset-0 flex items-center justify-center">
-      <div class="bg-white rounded-lg p-6 max-w-3xl w-full relative">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">Review Residency Proof</h3>
-
-        <% if @application.user&.is_guardian? %>
-          <div class="mb-4 rounded-md bg-amber-50 p-4 border border-amber-300">
-            <div class="flex">
-              <div class="flex-shrink-0">
-                <!-- Alert icon -->
-                <svg class="h-5 w-5 text-amber-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fill-rule="evenodd" d="M8.485 3.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 3.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
-                </svg>
-              </div>
-              <div class="ml-3">
-                <h3 class="text-sm font-medium text-amber-800">Guardian Application</h3>
-                <div class="mt-1 text-sm text-amber-700">
-                  <p>This application was submitted by a <strong><%= @application.user&.guardian_relationship&.downcase || "guardian" %></strong> on behalf of a minor. Please verify this relationship when reviewing these proof documents.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        <% end %>
-        <% if @application.residency_proof.attached? && @application.residency_proof.content_type.start_with?('application/pdf') %>
-          <%# 
-            IMPORTANT: PDF Preview Fix
-
-            Setting both src and data-original-src attributes is critical for PDF previews to work correctly.
-            Previous implementations only set data-original-src and relied on JavaScript to set the src,
-            but this was unreliable and often resulted in blank PDF previews.
-
-            The current implementation:
-            1. Sets the src attribute directly in the HTML
-            2. Also keeps data-original-src for the modal controller to use
-            3. Uses data-turbo="false" to prevent Turbo from interfering with the iframe
-
-            DO NOT REMOVE the src attribute or change this implementation without thorough testing.
-            Changes here have repeatedly broken PDF previews in the past.
-          %>
-          <!-- PDF iframe with fallback -->
-          <div class="pdf-container">
-            <iframe 
-              src="<%= rails_blob_path(@application.residency_proof, disposition: :inline) %>?t=<%= Time.now.to_i %>"
-              data-original-src="<%= rails_blob_path(@application.residency_proof, disposition: :inline) %>?t=<%= Time.now.to_i %>"
-              data-turbo="false"
-              width="100%"
-              height="500px"
-              class="border-0"
-              frameborder="0"></iframe>
-            <div class="pdf-fallback bg-gray-50 border rounded p-4 mt-2">
-              <p class="text-gray-700 mb-2">If the PDF doesn't display properly:</p>
-              <%= link_to "Open PDF in new window", 
-                  rails_blob_path(@application.residency_proof, disposition: :inline),
-                  target: "_blank",
-                  class: "inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700" %>
-            </div>
-          </div>
-        <% elsif @application.residency_proof.attached? && @application.residency_proof.content_type.start_with?('image') %>
-          <%= image_tag url_for(@application.residency_proof), class: "max-w-full h-auto" %>
-        <% end %>
-        <div class="mt-4 flex space-x-4">
-          <%= button_to update_proof_status_admin_application_path(@application), 
-              method: :patch,
-              params: { proof_type: 'residency', status: 'approved' }, 
-              class: "inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md", 
-              data: { 
-                turbo: true,
-                confirm: "Approve residency proof?" 
-              } do %>
-            Approve
-          <% end %>
-          <button type="button" 
-                  data-action="click->modal#open" 
-                  data-modal-id="proofRejectionModal"
-                  data-proof-type="residency" 
-                  class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md">
-            Reject
-          </button>
-        </div>
-        <div class="mt-4">
-          <button type="button" 
-                  data-action="click->modal#close"
-                  class="px-4 py-2 border border-gray-300 rounded-md text-gray-700">
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal for Medical Certification Review -->
-  <div id="medicalCertificationReviewModal" class="fixed inset-0 hidden" data-modal-target="container">
-    <!-- Backdrop -->
-    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-modal-target="overlay"></div>
-    <!-- Modal Container -->
-    <div class="fixed inset-0 flex items-center justify-center">
-      <div class="bg-white rounded-lg p-6 max-w-3xl w-full relative">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">Review Medical Certification</h3>
-        <% if @application.medical_certification.attached? %>
-          <% if @application.medical_certification.content_type.start_with?('application/pdf') %>
-            <%# 
-              IMPORTANT: PDF Preview Fix
-              
-              Setting both src and data-original-src attributes is critical for PDF previews to work correctly.
-              Previous implementations only set data-original-src and relied on JavaScript to set the src,
-              but this was unreliable and often resulted in blank PDF previews.
-              
-              The current implementation:
-              1. Sets the src attribute directly in the HTML
-              2. Also keeps data-original-src for the modal controller to use
-              3. Uses data-turbo="false" to prevent Turbo from interfering with the iframe
-              
-              DO NOT REMOVE the src attribute or change this implementation without thorough testing.
-              Changes here have repeatedly broken PDF previews in the past.
-            %>
-            <!-- PDF iframe with fallback -->
-            <div class="pdf-container">
-              <iframe 
-                src="<%= rails_blob_path(@application.medical_certification, disposition: :inline) %>?t=<%= Time.now.to_i %>"
-                data-original-src="<%= rails_blob_path(@application.medical_certification, disposition: :inline) %>?t=<%= Time.now.to_i %>"
-                data-turbo="false"
-                width="100%"
-                height="500px"
-                class="border-0"
-                frameborder="0"></iframe>
-              <div class="pdf-fallback bg-gray-50 border rounded p-4 mt-2">
-                <p class="text-gray-700 mb-2">If the PDF doesn't display properly:</p>
-                <%= link_to "Open PDF in new window", 
-                    rails_blob_path(@application.medical_certification, disposition: :inline),
-                    target: "_blank",
-                    class: "inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700" %>
-              </div>
-            </div>
-          <% else %>
-            <%= image_tag url_for(@application.medical_certification), class: "max-w-full h-auto" %>
-          <% end %>
-        <% else %>
-          <p class="text-gray-500">No certification file attached.</p>
-        <% end %>
-        <div class="mt-4 flex space-x-4">
-          <%= button_to update_certification_status_admin_application_path(@application), 
-              method: :patch, 
-              params: { status: 'accepted' }, 
-              class: "inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md", 
-              data: { confirm: "Approve this medical certification?" } do %>
-            Approve
-          <% end %>
-          <button type="button"
-                  data-action="click->modal#open"
-                  data-modal-id="medicalCertificationRejectionModal"
-                  data-proof-type="medical"
-                  class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md">
-            Reject
-          </button>
-        </div>
-        <div class="mt-4">
-          <button type="button" 
-                  data-action="click->modal#close"
-                  class="px-4 py-2 border border-gray-300 rounded-md text-gray-700">
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <% end %>
 
   <!-- Rejection Modal for Proof Reviews -->
   <div id="proofRejectionModal" class="fixed inset-0 hidden" data-modal-target="container" data-controller="rejection-form"
-       data-rejection-form-address-mismatch-income-value="<%= 'The address provided on your income documentation does not match the application address. Please submit documentation that contains the address exactly matching the one shared in your application: ' + (@application.user&.physical_address_1 || '') + (@application.user&.physical_address_2.present? ? ' ' + @application.user&.physical_address_2 : '') + ' ' + (@application.user&.city || '') + ', ' + (@application.user&.state || '') + ' ' + (@application.user&.zip_code || '') %>"
-       data-rejection-form-address-mismatch-residency-value="<%= 'The address provided on your residency documentation does not match the application address. Please submit documentation that contains the address exactly matching the one shared in your application: ' + (@application.user&.physical_address_1 || '') + (@application.user&.physical_address_2.present? ? ' ' + @application.user&.physical_address_2 : '') + ' ' + (@application.user&.city || '') + ', ' + (@application.user&.state || '') + ' ' + (@application.user&.zip_code || '') %>"
-       data-rejection-form-expired-income-value="The income documentation you provided is more than 1 year old or is expired. Please submit documentation that is less than 1 year old and which is not expired."
-       data-rejection-form-expired-residency-value="The residency documentation you provided is more than 1 year old or is expired. Please submit documentation that is less than 1 year old and which is not expired."
-       data-rejection-form-missing-name-income-value="The income documentation you provided does not show your name. Please submit documentation that clearly displays your full name as it appears on your application."
-       data-rejection-form-missing-name-residency-value="The residency documentation you provided does not show your name. Please submit documentation that clearly displays your full name as it appears on your application."
-       data-rejection-form-wrong-document-income-value="The document you submitted is not an acceptable type of income proof. Please submit one of the following: recent pay stubs, tax returns, Social Security benefit statements, or other official documentation that verifies your income."
-       data-rejection-form-wrong-document-residency-value="The document you submitted is not an acceptable type of residency proof. Please submit one of the following: utility bill, lease agreement, mortgage statement, or other official documentation that verifies your Maryland residence."
-       data-rejection-form-missing-amount-income-value="The income documentation you provided does not clearly show your income amount. Please submit documentation that clearly displays your income figures, such as pay stubs with earnings clearly visible or benefit statements showing payment amounts."
-       data-rejection-form-exceeds-threshold-income-value="Based on the income documentation you provided, your household income exceeds the maximum threshold to qualify for the MAT program. The program is designed to assist those with financial need, and unfortunately, your income level is above our current eligibility limits."
-       data-rejection-form-outdated-ss-award-income-value="Your Social Security benefit award letter is out-of-date. Please submit your most recent award letter, which should be dated within the last 12 months. You can obtain a new benefit verification letter by visiting the Social Security Administration website or contacting your local SSA office.">
+       role="dialog" aria-modal="true" aria-labelledby="proofRejectionModal-heading"
+       data-rejection-form-address-mismatch-income-value="<%= address_mismatch_income %>"
+       data-rejection-form-address-mismatch-residency-value="<%= address_mismatch_residency %>"
+       data-rejection-form-expired-income-value="<%= expired_income %>"
+       data-rejection-form-expired-residency-value="<%= expired_residency %>"
+       data-rejection-form-missing-name-income-value="<%= missing_name_income %>"
+       data-rejection-form-missing-name-residency-value="<%= missing_name_residency %>"
+       data-rejection-form-wrong-document-income-value="<%= wrong_document_income %>"
+       data-rejection-form-wrong-document-residency-value="<%= wrong_document_residency %>"
+       data-rejection-form-missing-amount-income-value="<%= missing_amount_income %>"
+       data-rejection-form-exceeds-threshold-income-value="<%= exceeds_threshold_income %>"
+       data-rejection-form-outdated-ss-award-income-value="<%= outdated_ss_award_income %>">
     <!-- Backdrop -->
     <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-modal-target="overlay"></div>
     <!-- Modal Container -->
     <div class="fixed inset-0 flex items-center justify-center">
       <div class="bg-white rounded-lg p-6 max-w-lg w-full relative">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">Enter Rejection Reason</h3>
+        <h3 id="proofRejectionModal-heading" class="text-lg font-medium text-gray-900 mb-4">Enter Rejection Reason</h3>
         <div class="mb-4">
           <p class="text-sm font-medium text-gray-700 mb-1">Predefined Rejection Reasons:</p>
           <div class="flex flex-wrap gap-2 mb-2 general-reasons">
-            <button type="button" 
-                    class="px-3 py-1 bg-gray-200 rounded" 
+            <button type="button"
+                    class="px-3 py-1 bg-gray-200 rounded"
                     data-action="click->rejection-form#selectPredefinedReason"
                     data-reason-type="addressMismatch">
               Address Mismatch
             </button>
-            <button type="button" 
-                    class="px-3 py-1 bg-gray-200 rounded" 
+            <button type="button"
+                    class="px-3 py-1 bg-gray-200 rounded"
                     data-action="click->rejection-form#selectPredefinedReason"
                     data-reason-type="expired">
               Expired Documentation
             </button>
-            <button type="button" 
-                    class="px-3 py-1 bg-gray-200 rounded" 
+            <button type="button"
+                    class="px-3 py-1 bg-gray-200 rounded"
                     data-action="click->rejection-form#selectPredefinedReason"
                     data-reason-type="missingName">
               Missing Name
             </button>
-            <button type="button" 
-                    class="px-3 py-1 bg-gray-200 rounded" 
+            <button type="button"
+                    class="px-3 py-1 bg-gray-200 rounded"
                     data-action="click->rejection-form#selectPredefinedReason"
                     data-reason-type="wrongDocument">
               Wrong Document Type
             </button>
           </div>
           <div class="flex flex-wrap gap-2 income-only-reasons hidden">
-            <button type="button" 
-                    class="px-3 py-1 bg-gray-200 rounded" 
+            <button type="button"
+                    class="px-3 py-1 bg-gray-200 rounded"
                     data-action="click->rejection-form#selectPredefinedReason"
                     data-reason-type="missingAmount">
               Missing Amount
             </button>
-            <button type="button" 
-                    class="px-3 py-1 bg-gray-200 rounded" 
+            <button type="button"
+                    class="px-3 py-1 bg-gray-200 rounded"
                     data-action="click->rejection-form#selectPredefinedReason"
                     data-reason-type="exceedsThreshold">
               Income Exceeds Threshold
             </button>
-            <button type="button" 
-                    class="px-3 py-1 bg-gray-200 rounded" 
+            <button type="button"
+                    class="px-3 py-1 bg-gray-200 rounded"
                     data-action="click->rejection-form#selectPredefinedReason"
                     data-reason-type="outdatedSsAward">
               Outdated SS Award Letter
@@ -337,12 +231,12 @@
                       method: :patch,
                       local: false,
                       class: "space-y-4",
-                        data: { 
+                        data: {
                           turbo: true,
                           action: "submit->rejection-form#validateForm"
                         } do |f| %>
           <%= f.hidden_field :status, value: "rejected" %>
-          <%= f.hidden_field :proof_type, 
+          <%= f.hidden_field :proof_type,
               id: "rejection-proof-type",
               data: { rejection_form_target: "proofType" } %>
           <div>
@@ -354,7 +248,7 @@
                 placeholder: "Please provide a detailed explanation...",
                 data: { rejection_form_target: "reasonField" } %>
           </div>
-          
+
           <div class="mt-4">
             <%= f.label :notes, "Additional Notes to Constituent", class: "block text-sm font-medium text-gray-700" %>
             <%= f.text_area :notes,
@@ -367,68 +261,69 @@
             </p>
           </div>
           <div class="flex justify-end space-x-3">
-            <button type="button" 
+            <button type="button"
                     data-action="click->modal#close"
                     class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
               Cancel
             </button>
-            <%= f.submit "Submit", 
+            <%= f.submit "Submit",
                 class: "px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700" %>
           </div>
         <% end %>
       </div>
     </div>
   </div>
-  
+
   <!-- Medical Certification Rejection Modal -->
   <div id="medicalCertificationRejectionModal" class="fixed inset-0 hidden" data-modal-target="container" data-controller="rejection-form"
-       data-rejection-form-missing-provider-credentials-value="The medical certification is missing required provider credentials or license number. Please ensure the resubmitted form includes the medical provider's full credentials and license information."
-       data-rejection-form-incomplete-disability-documentation-value="The documentation of the disability is incomplete. The certification must include a complete description of the disability and how it affects major life activities."
-       data-rejection-form-outdated-certification-value="The medical certification is outdated. Please provide a certification that has been completed within the last 12 months."
-       data-rejection-form-missing-signature-value="The medical certification is missing the required signature from the healthcare provider. Please ensure the resubmitted form is properly signed and dated."
-       data-rejection-form-missing-functional-limitations-value="The certification lacks sufficient detail about functional limitations. Please ensure the resubmitted form includes specific information about how the disability affects daily activities."
-       data-rejection-form-incorrect-form-used-value="The wrong certification form was used. Please ensure the healthcare provider completes the official Medical Certification Form for MAT program eligibility.">
+       role="dialog" aria-modal="true" aria-labelledby="medicalCertificationRejectionModal-heading"
+       data-rejection-form-missing-provider-credentials-value="<%= missing_provider_credentials %>"
+       data-rejection-form-incomplete-disability-documentation-value="<%= incomplete_disability_documentation %>"
+       data-rejection-form-outdated-certification-value="<%= outdated_certification %>"
+       data-rejection-form-missing-signature-value="<%= missing_signature %>"
+       data-rejection-form-missing-functional-limitations-value="<%= missing_functional_limitations %>"
+       data-rejection-form-incorrect-form-used-value="<%= incorrect_form_used %>">
     <!-- Backdrop -->
     <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-modal-target="overlay"></div>
     <!-- Modal Container -->
     <div class="fixed inset-0 flex items-center justify-center">
       <div class="bg-white rounded-lg p-6 max-w-lg w-full relative">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">Enter Medical Certification Rejection Reason</h3>
+        <h3 id="medicalCertificationRejectionModal-heading" class="text-lg font-medium text-gray-900 mb-4">Enter Medical Certification Rejection Reason</h3>
         <div class="mb-4">
           <p class="text-sm font-medium text-gray-700 mb-1">Predefined Rejection Reasons:</p>
           <div class="flex flex-wrap gap-2 mb-2 medical-only-reasons">
-            <button type="button" 
-                    class="px-3 py-1 bg-gray-200 rounded" 
+            <button type="button"
+                    class="px-3 py-1 bg-gray-200 rounded"
                     data-action="click->rejection-form#selectPredefinedReason"
                     data-reason-type="missingProviderCredentials">
               Missing Provider Credentials
             </button>
-            <button type="button" 
-                    class="px-3 py-1 bg-gray-200 rounded" 
+            <button type="button"
+                    class="px-3 py-1 bg-gray-200 rounded"
                     data-action="click->rejection-form#selectPredefinedReason"
                     data-reason-type="incompleteDisabilityDocumentation">
               Incomplete Disability Documentation
             </button>
-            <button type="button" 
-                    class="px-3 py-1 bg-gray-200 rounded" 
+            <button type="button"
+                    class="px-3 py-1 bg-gray-200 rounded"
                     data-action="click->rejection-form#selectPredefinedReason"
                     data-reason-type="outdatedCertification">
               Outdated Certification
             </button>
-            <button type="button" 
-                    class="px-3 py-1 bg-gray-200 rounded" 
+            <button type="button"
+                    class="px-3 py-1 bg-gray-200 rounded"
                     data-action="click->rejection-form#selectPredefinedReason"
                     data-reason-type="missingSignature">
               Missing Signature
             </button>
-            <button type="button" 
-                    class="px-3 py-1 bg-gray-200 rounded" 
+            <button type="button"
+                    class="px-3 py-1 bg-gray-200 rounded"
                     data-action="click->rejection-form#selectPredefinedReason"
                     data-reason-type="missingFunctionalLimitations">
               Missing Functional Limitations
             </button>
-            <button type="button" 
-                    class="px-3 py-1 bg-gray-200 rounded" 
+            <button type="button"
+                    class="px-3 py-1 bg-gray-200 rounded"
                     data-action="click->rejection-form#selectPredefinedReason"
                     data-reason-type="incorrectFormUsed">
               Incorrect Form Used
@@ -439,12 +334,12 @@
                       method: :patch,
                       local: false,
                       class: "space-y-4",
-                        data: { 
+                        data: {
                           turbo: true,
                           action: "submit->rejection-form#validateForm"
                         } do |f| %>
           <%= f.hidden_field :status, value: "rejected" %>
-          <%= f.hidden_field :proof_type, 
+          <%= f.hidden_field :proof_type,
               id: "medical-rejection-proof-type",
               value: "medical",
               data: { rejection_form_target: "proofType" } %>
@@ -457,7 +352,7 @@
                 placeholder: "Please provide a detailed explanation...",
                 data: { rejection_form_target: "reasonField" } %>
           </div>
-          
+
           <div class="mt-4">
             <%= f.label :notes, "Additional Notes to Medical Provider", class: "block text-sm font-medium text-gray-700" %>
             <%= f.text_area :notes,
@@ -470,12 +365,12 @@
             </p>
           </div>
           <div class="flex justify-end space-x-3">
-            <button type="button" 
+            <button type="button"
                     data-action="click->modal#close"
                     class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
               Cancel
             </button>
-            <%= f.submit "Submit", 
+            <%= f.submit "Submit",
                 class: "px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700" %>
           </div>
         <% end %>

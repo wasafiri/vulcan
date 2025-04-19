@@ -696,11 +696,15 @@ module Admin
 
     # Builds the array of turbo stream objects for the success response
     def build_turbo_streams_for_success
-      # Changed the order: add cleanup JS FIRST, then update content, finally remove modals
-      # This ensures cleanup runs before modal elements are removed from the DOM
       streams = []
-      streams << append_cleanup_js
-      streams.concat(update_content_streams)
+      streams << append_cleanup_js # Cleanup JS first
+
+      # Update necessary content sections (excluding #modals)
+      streams << turbo_stream.update('flash', partial: 'shared/flash')
+      streams << turbo_stream.update('attachments-section', partial: 'attachments')
+      streams << turbo_stream.update('audit-logs', partial: 'audit_logs')
+
+      # Explicitly remove the modals that should be closed
       streams.concat(remove_modals_streams)
       streams
     end

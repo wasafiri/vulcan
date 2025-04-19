@@ -1,84 +1,114 @@
-import * as WebAuthnJSON from "@github/webauthn-json"
+import * as WebAuthnJSON from "@github/webauthn-json";
+
+// Cached constants
+const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || null;
+const FETCH_TIMEOUT = 15000; // ms
+
+// Toggle verbose logging
+const DEBUG = false;
+
+// Endpoint mappings
+const ENDPOINTS = {
+  verify:    type => `/two_factor_authentication/verify/${type}`,
+  options:   type => `/two_factor_authentication/verification_options/${type}`,
+  create:    type => `/two_factor_authentication/credentials/${type}`,
+  success:   type => `/two_factor_authentication/credentials/${type}/success`, 
+  destroy:   (type, id) => `/two_factor_authentication/credentials/${type}/${id}`,
+  smsVerify:  id   => `/two_factor_authentication/credentials/sms/${id}/verify`,
+  smsConfirm: id   => `/two_factor_authentication/credentials/sms/${id}/confirm`,
+  smsResend:  id   => `/two_factor_authentication/credentials/sms/${id}/resend`
+};
+
+// Simple centralized logger
+const Logger = {
+  log: (...args) => { if (DEBUG) console.log(...args); },
+  warn: (...args) => { if (DEBUG) console.warn(...args); },
+  error: (...args) => console.error(...args) // could hook into external service here
+};
 
 const Auth = {
-  // Core fetch utilities
+  debug: DEBUG,
+
+  // Retrieve CSRF token (cached)
   getCSRFToken() {
-    const csrfToken = document.querySelector('meta[name="csrf-token"]');
-    return csrfToken ? csrfToken.getAttribute("content") : null;
+    return CSRF_TOKEN;
   },
-  
-  // Helper method to generate endpoint URLs for our unified routes
+
+  // Build endpoint URL
   getEndpointUrl(operation, type, id = null) {
-    const basePath = '/two_factor_authentication';
-    
-    switch(operation) {
-      case 'verify':
-        return `${basePath}/verify/${type}`;
-      case 'options':
-        return `${basePath}/verification_options/${type}`;
-      case 'create':
-        return `${basePath}/credentials/${type}`;
-      case 'success':
-        return `${basePath}/credentials/${type}/success`;
-      case 'destroy':
-        return `${basePath}/credentials/${type}/${id}`;
-      case 'smsVerify':
-        return `${basePath}/credentials/sms/${id}/verify`;
-      case 'smsConfirm':
-        return `${basePath}/credentials/sms/${id}/confirm`;
-      case 'smsResend':
-        return `${basePath}/credentials/sms/${id}/resend`;
-      default:
-        return basePath;
-    }
+    const fn = ENDPOINTS[operation];
+    return fn ? fn(type, id) : '/two_factor_authentication';
   },
 
+  // Core fetch with timeout and retries on 502/503
   async sendRequest(url, method, body = null) {
-    try {
-      const options = {
-        method: method,
-        headers: {
-          "Accept": "application/json",
-          "X-CSRF-Token": this.getCSRFToken()
-        },
-        credentials: 'same-origin'
-      };
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
 
-      if (body) {
-        options.headers["Content-Type"] = "application/json";
-        options.body = JSON.stringify(body);
-      }
-
-      const response = await fetch(url, options);
-      return this.handleResponse(response);
-    } catch (error) {
-      console.error(`Network error during ${method} to ${url}:`, error);
-      return this.formatError("Network error. Please check your connection and try again.");
+    const options = {
+      method,
+      headers: {
+        Accept: "application/json",
+        "X-CSRF-Token": this.getCSRFToken()
+      },
+      credentials: 'same-origin',
+      signal: controller.signal
+    };
+    if (body) {
+      options.headers["Content-Type"] = "application/json";
+      options.body = JSON.stringify(body);
     }
+
+    const maxRetries = 3;
+    let attempt = 0;
+    let backoff = 500;
+
+    while (attempt <= maxRetries) {
+      try {
+        const response = await fetch(url, options);
+        if ([502, 503].includes(response.status) && attempt < maxRetries) {
+          Logger.warn(`Transient ${response.status}, retry #${attempt + 1} in ${backoff}ms`);
+          attempt++;
+          await new Promise(res => setTimeout(res, backoff));
+          backoff *= 2;
+          continue;
+        }
+        clearTimeout(timeoutId);
+        return this.handleResponse(response);
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          clearTimeout(timeoutId);
+          return this.formatError("Request timed out. Please try again.");
+        }
+        clearTimeout(timeoutId);
+        Logger.error(`Network error during ${method} to ${url}:`, error);
+        return this.formatError("Network error. Please check your connection and try again.");
+      }
+    }
+
+    clearTimeout(timeoutId);
+    return this.formatError("Operation failed after multiple attempts.");
   },
 
+  // Handle fetch response
   async handleResponse(response) {
     if (response.ok) {
       const data = await response.json();
-      console.log("Operation successful:", data);
-      
-      // Handle redirect if provided, otherwise return success
-      if (data.redirect_url) {
-        window.location.replace(data.redirect_url);
-      }
+      Logger.log("Operation successful:", data);
+      if (data.redirect_url) window.location.replace(data.redirect_url);
       return { success: true, data };
     } else {
       try {
         const errorData = await response.json();
-        console.error(`Operation failed with status ${response.status}:`, errorData);
+        Logger.error(`Operation failed with status ${response.status}:`, errorData);
         return {
           success: false,
           message: errorData.error || 'Operation failed',
           details: errorData.details || ''
         };
-      } catch (e) {
+      } catch (_) {
         const errorText = await response.text();
-        console.error(`Operation failed with status ${response.status}:`, errorText);
+        Logger.error(`Operation failed with status ${response.status}:`, errorText);
         return {
           success: false,
           message: `Operation failed: ${errorText || 'Unknown error'}`,
@@ -88,197 +118,122 @@ const Auth = {
     }
   },
 
+  // Consistent error object
   formatError(message, details = "") {
-    return {
-      success: false,
-      message: message,
-      details: details
-    };
+    return { success: false, message, details };
   },
 
-  // UI feedback handling
-  updateFeedback(element, message, isError = true) {
-    if (!element) return;
-    
-    element.textContent = message;
-    element.classList.remove('hidden');
-    
-    if (isError) {
-      element.classList.add('error');
-    } else {
-      element.classList.remove('error');
+  // Feedback handler: accepts DOM element or callback
+  updateFeedback(target, message, isError = true) {
+    if (typeof target === 'function') {
+      target(message, isError);
+      return;
     }
+    if (!target) return;
+    target.textContent = message;
+    target.classList.remove('hidden');
+    isError ? target.classList.add('error') : target.classList.remove('error');
   },
 
-  // Common error message mapper
+  // Map WebAuthn errors to user messages
   getErrorMessage(error) {
-    const errorMessages = {
-      'NotAllowedError': "The operation was cancelled or timed out.",
-      'NotSupportedError': "Your browser doesn't support this feature or device.",
-      'SecurityError': "The operation was blocked for security reasons.",
-      'AbortError': "The operation was aborted.",
-      'InvalidStateError': "The device is not in a valid state for this operation."
+    const map = {
+      NotAllowedError:   "The operation was cancelled or timed out.",
+      NotSupportedError: "Your browser doesn't support this feature or device.",
+      SecurityError:     "The operation was blocked for security reasons.",
+      AbortError:        "The operation was aborted.",
+      InvalidStateError: "The device is not in a valid state for this operation."
     };
-
-    return errorMessages[error.name] || "Failed to complete operation.";
+    return map[error.name] || "Failed to complete operation.";
   },
 
-  // WebAuthn operations
-  async registerWebAuthnCredential(callbackUrl, credentialOptions, nickname, feedbackElement) { // Added nickname parameter
-    if (feedbackElement) {
-      this.updateFeedback(feedbackElement, "Preparing to register security key...", false);
-    }
-
-    try {
-      // Create credential with browser API
-      console.log("Requesting credential creation with options:", credentialOptions);
-      const credential = await WebAuthnJSON.create({ 
-        publicKey: credentialOptions 
-      });
-      console.log("Browser WebAuthn credential creation successful:", credential);
-
-      // Nickname should be passed explicitly or already be part of the credential object
-      // before calling sendRequest. We remove the problematic URL parsing here.
-
-      // The callbackUrl might contain query params (like nickname), but the controller
-      // expects the nickname in the POST body. We should POST to the base path.
-      const postUrl = callbackUrl.split('?')[0]; 
-
-      console.log(`Sending credential to server at: ${postUrl} with data:`, credential);
-      // Add the nickname to the credential object before sending
-      if (nickname) {
-        credential.credential_nickname = nickname;
-        console.log(`Added nickname to credential object: ${nickname}`);
-      } else {
-        console.warn("Nickname was not provided to registerWebAuthnCredential");
-      }
-      
-      // Structure the data as expected by the controller:
-      // Separate nickname from the main credential data.
-      const postData = {
-        ...credential, // Spread the credential data from WebAuthnJSON.create()
-        credential_nickname: nickname // Add nickname as a separate top-level key
-      };
-
-      const result = await this.sendRequest(postUrl, 'POST', postData); 
-      
-      if (!result.success && feedbackElement) {
-        this.updateFeedback(feedbackElement, result.message);
-      }
-      
-      return result;
-    } catch (error) {
-      console.error("WebAuthn credential creation failed:", error);
-      const message = this.getErrorMessage(error);
-      this.updateFeedback(feedbackElement, message);
-      return this.formatError(message, error.message);
-    }
-  },
-
-  async verifyWebAuthnCredential(credentialOptions, callbackUrl, feedbackElement) {
-    if (feedbackElement) {
-      this.updateFeedback(feedbackElement, "Preparing to verify security key...", false);
-    }
-
-    try {
-      // Get assertion with browser API
-      console.log("Requesting credential assertion with options:", credentialOptions);
-      const credential = await WebAuthnJSON.get({ 
-        publicKey: credentialOptions 
-      });
-      console.log("Credential assertion successful, sending to server:", credential);
-
-      // Wrap the credential in two_factor_authentication as expected by the controller
-      const wrappedCredential = { two_factor_authentication: credential };
-      console.log("Sending wrapped credential to server:", wrappedCredential);
-      
-      // Send to server and handle result
-      const result = await this.sendRequest(callbackUrl || this.getEndpointUrl('verify', 'webauthn'), 'POST', wrappedCredential);
-      
-      if (!result.success && feedbackElement) {
-        this.updateFeedback(feedbackElement, result.message);
-      }
-      
-      return result;
-    } catch (error) {
-      console.error("Credential assertion failed:", error);
-      const message = this.getErrorMessage(error);
-      this.updateFeedback(feedbackElement, message);
-      return this.formatError(message, error.message);
-    }
-  },
-
-  // TOTP operations
-  async verifyTotpCode(code, callbackUrl, feedbackElement) {
-    if (feedbackElement) {
-      this.updateFeedback(feedbackElement, "Verifying code...", false);
-    }
-
-    console.log("Verifying TOTP code");
-    const result = await this.sendRequest(callbackUrl, 'POST', { 
-      code: code, 
-      method: 'totp' 
-    });
-
-    if (!result.success && feedbackElement) {
-      this.updateFeedback(feedbackElement, result.message);
-    }
-
+  // Generic code verifier for TOTP/SMS
+  async verifyCode(method, code, callbackUrl, feedback) {
+    this.updateFeedback(feedback, `Verifying ${method.toUpperCase()} code...`, false);
+    Logger.log(`Verifying ${method.toUpperCase()} code`);
+    const result = await this.sendRequest(callbackUrl, 'POST', { code, method });
+    if (!result.success) this.updateFeedback(feedback, result.message);
     return result;
   },
 
-  // SMS operations
-  async verifySmsCode(code, callbackUrl, feedbackElement) {
-    if (feedbackElement) {
-      this.updateFeedback(feedbackElement, "Verifying code...", false);
+  // WebAuthn registration
+  async registerWebAuthnCredential(callbackUrl, credentialOptions, nickname, feedback) {
+    this.updateFeedback(feedback, "Preparing to register security key...", false);
+    try {
+      Logger.log("Requesting credential creation with options:", credentialOptions);
+      const credential = await WebAuthnJSON.create({ publicKey: credentialOptions });
+      Logger.log("Credential creation successful:", credential);
+
+      const urlObj = new URL(callbackUrl, window.location.origin);
+      const postUrl = urlObj.pathname;
+      if (nickname) credential.credential_nickname = nickname;
+      else Logger.warn("No nickname provided");
+
+      const postData = { ...credential, credential_nickname: nickname };
+      const result = await this.sendRequest(postUrl, 'POST', postData);
+      if (!result.success) this.updateFeedback(feedback, result.message);
+      return result;
+    } catch (error) {
+      Logger.error("Registration failed:", error);
+      const msg = this.getErrorMessage(error);
+      this.updateFeedback(feedback, msg);
+      return this.formatError(msg, error.message);
     }
-
-    console.log("Verifying SMS code");
-    const result = await this.sendRequest(callbackUrl, 'POST', { 
-      code: code, 
-      method: 'sms' 
-    });
-
-    if (!result.success && feedbackElement) {
-      this.updateFeedback(feedbackElement, result.message);
-    }
-
-    return result;
   },
 
-  async requestSmsCode(url, feedbackElement) {
-    if (feedbackElement) {
-      this.updateFeedback(feedbackElement, "Sending verification code...", false);
-    }
+  // WebAuthn verification
+  async verifyWebAuthnCredential(credentialOptions, callbackUrl, feedback) {
+    this.updateFeedback(feedback, "Preparing to verify security key...", false);
+    try {
+      Logger.log("Requesting credential assertion with options:", credentialOptions);
+      const credential = await WebAuthnJSON.get({ publicKey: credentialOptions });
+      Logger.log("Assertion successful:", credential);
 
-    console.log("Requesting SMS verification code");
+      const wrapped = { two_factor_authentication: credential };
+      const url = callbackUrl || this.getEndpointUrl('verify', 'webauthn');
+      const result = await this.sendRequest(url, 'POST', wrapped);
+      if (!result.success) this.updateFeedback(feedback, result.message);
+      return result;
+    } catch (error) {
+      Logger.error("Verification failed:", error);
+      const msg = this.getErrorMessage(error);
+      this.updateFeedback(feedback, msg);
+      return this.formatError(msg, error.message);
+    }
+  },
+
+  // Request SMS code
+  async requestSmsCode(url, feedback) {
+    this.updateFeedback(feedback, "Sending verification code...", false);
+    Logger.log("Requesting SMS code");
     const result = await this.sendRequest(url, 'POST');
-
-    if (result.success && feedbackElement) {
-      this.updateFeedback(feedbackElement, "Verification code sent. Please check your phone.", false);
-    } else if (!result.success && feedbackElement) {
-      this.updateFeedback(feedbackElement, result.message);
-    }
-
+    if (result.success) this.updateFeedback(feedback, "Verification code sent. Please check your phone.", false);
+    else this.updateFeedback(feedback, result.message);
     return result;
   }
 };
 
-// Export both the Auth object and individual functions for backward compatibility
-// Updated 'create' signature to include nickname
-const create = (callbackUrl, credentialOptions, nickname, feedbackElement) => 
-  Auth.registerWebAuthnCredential(callbackUrl, credentialOptions, nickname, feedbackElement);
+// Named exports for clarity
+const registerWebAuthn = (callbackUrl, credentialOptions, nickname, feedback) =>
+  Auth.registerWebAuthnCredential(callbackUrl, credentialOptions, nickname, feedback);
 
-const get = (credentialOptions, callbackUrl, feedbackElement) => 
-  Auth.verifyWebAuthnCredential(credentialOptions, callbackUrl, feedbackElement);
+const verifyWebAuthn = (credentialOptions, callbackUrl, feedback) =>
+  Auth.verifyWebAuthnCredential(credentialOptions, callbackUrl, feedback);
 
-const verifyTotpCode = (code, callbackUrl, feedbackElement) => 
-  Auth.verifyTotpCode(code, callbackUrl, feedbackElement);
+const verifyTotpCode = (code, callbackUrl, feedback) =>
+  Auth.verifyCode('totp', code, callbackUrl, feedback);
 
-const verifySmsCode = (code, callbackUrl, feedbackElement) => 
-  Auth.verifySmsCode(code, callbackUrl, feedbackElement);
+const verifySmsCode = (code, callbackUrl, feedback) =>
+  Auth.verifyCode('sms', code, callbackUrl, feedback);
 
-const requestSmsCode = (url, feedbackElement) => 
-  Auth.requestSmsCode(url, feedbackElement);
+const requestSmsCode = (url, feedback) =>
+  Auth.requestSmsCode(url, feedback);
 
-export { Auth as default, create, get, verifyTotpCode, verifySmsCode, requestSmsCode };
+export {
+  Auth as default,
+  registerWebAuthn,
+  verifyWebAuthn,
+  verifyTotpCode,
+  verifySmsCode,
+  requestSmsCode
+};

@@ -229,8 +229,8 @@ class TwoFactorAuthenticationsController < ApplicationController
     # Get authenticator type from params (platform for biometric, cross-platform for security keys)
     authenticator_type = params[:authenticator_type]
 
-    # Generate WebAuthn options
-    current_user.update!(webauthn_id: WebAuthn.generate_user_id) if current_user.webauthn_id.blank?
+    # Generate WebAuthn options - using update_column to bypass validations
+    current_user.update_column(:webauthn_id, WebAuthn.generate_user_id) if current_user.webauthn_id.blank?
 
     # Create options based on authenticator type
     create_options = if authenticator_type == 'platform'
