@@ -7,9 +7,9 @@ class PrintQueueItemTest < ActiveSupport::TestCase
   include CupriteTestBridge if defined?(CupriteTestBridge)
 
   def setup
-    @constituent = users(:constituent_alex)
-    @admin = users(:admin_david)
-    @application = applications(:one)
+    @constituent = create(:constituent)
+    @admin = create(:admin)
+    @application = create(:application, user: @constituent)
 
     # Create a new print queue item first
     @pending_letter = PrintQueueItem.new(

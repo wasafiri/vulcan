@@ -128,13 +128,16 @@ class ProofSubmissionMailbox < ApplicationMailbox
   end
 
   def validate_attachments
-    if mail.attachments.empty?
+    # Check if attachments are present *before* iterating
+    if mail.attachments.blank?
       bounce_with_notification(
         :no_attachments,
         'No attachments found in email'
       )
+      return # Ensure we stop processing if bounced
     end
 
+    # Iterate and validate each attachment
     mail.attachments.each do |attachment|
       ProofAttachmentValidator.validate!(attachment)
     rescue ProofAttachmentValidator::ValidationError => e
@@ -142,6 +145,7 @@ class ProofSubmissionMailbox < ApplicationMailbox
         :invalid_attachment,
         "Invalid attachment: #{e.message}"
       )
+      break # Stop processing on first invalid attachment
     end
   end
 

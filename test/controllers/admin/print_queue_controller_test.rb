@@ -4,17 +4,32 @@ require 'test_helper'
 
 module Admin
   class PrintQueueControllerTest < ActionDispatch::IntegrationTest
-    def setup
-      @admin = users(:admin_david)
-      @pending_letter = print_queue_items(:pending_letter_1)
-      @pending_letter2 = print_queue_items(:pending_letter_2)
-      @printed_letter = print_queue_items(:printed_letter)
+    # Add fixtures declaration to fix 'undefined method users' error
+    # fixtures :users, :print_queue_items
 
-      # Attach test PDF files to the letters
+    def setup
+      # Use factories instead of fixtures
+      @admin = create(:admin, email: 'admin_test@example.com')
+
+      # Create test PDF file
       test_pdf = fixture_file_upload('test.pdf', 'application/pdf')
+
+      # Create constituent
+      constituent = create(:constituent)
+
+      # Create print queue items with attached PDFs (important: we need to create & attach in one step to avoid validation errors)
+      @pending_letter = build(:print_queue_item, status: :pending, constituent: constituent)
       @pending_letter.pdf_letter.attach(io: test_pdf.open, filename: 'test_letter.pdf')
+      @pending_letter.save!
+
+      @pending_letter2 = build(:print_queue_item, status: :pending, constituent: constituent)
       @pending_letter2.pdf_letter.attach(io: test_pdf.open, filename: 'test_letter2.pdf')
+      @pending_letter2.save!
+
+      @printed_letter = build(:print_queue_item, status: :printed, constituent: constituent,
+                                                 admin: @admin, printed_at: 1.day.ago)
       @printed_letter.pdf_letter.attach(io: test_pdf.open, filename: 'printed_letter.pdf')
+      @printed_letter.save!
 
       @headers = {
         'HTTP_USER_AGENT' => 'Rails Testing',
@@ -57,9 +72,7 @@ module Admin
       assert @pending_letter2.pdf_letter.attached?
 
       # Manually skip this test if the attachments don't exist yet (for CI environments)
-      if !@pending_letter.pdf_letter.attached? || !@pending_letter2.pdf_letter.attached?
-        skip 'Test attachments not properly set up'
-      end
+      skip 'Test attachments not properly set up' if !@pending_letter.pdf_letter.attached? || !@pending_letter2.pdf_letter.attached?
 
       # Mock the zip file creation to avoid issues in test environment
       mock_zipfile = Tempfile.new('test.zip')

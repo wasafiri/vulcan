@@ -5,8 +5,8 @@ require 'test_helper'
 module Admin
   class ProductsControllerTest < ActionDispatch::IntegrationTest
     def setup
-      @admin = users(:admin_david)
-      @product = products(:ipad_air)
+      @admin = create(:admin, email: 'admin@example.com')
+      @product = create(:product, name: 'iPad Air', device_types: ['Tablet'])
 
       # Use sign_in_as to authenticate the user for the test
       sign_in_as(@admin)
@@ -94,8 +94,8 @@ module Admin
     end
 
     def test_non_admin_cannot_access
-      # Sign in as a non-admin user (using a fixture that exists)
-      @user = users(:constituent_alex)
+      # Sign in as a non-admin user (using factory instead of fixture)
+      @user = create(:constituent)
       sign_in(@user)
 
       # Try to access admin functionality
