@@ -7,8 +7,7 @@ class PasswordsControllerTest < ActionDispatch::IntegrationTest
     # Track performance for monitoring
     @start_time = Time.current
 
-    # Use fixture instead of factory for consistency
-    @user = users(:constituent_john)
+    @user = create(:constituent, password: 'password123', password_confirmation: 'password123')
     @original_password_digest = @user.password_digest
 
     # Standard sign-in for controller tests
@@ -44,7 +43,7 @@ class PasswordsControllerTest < ActionDispatch::IntegrationTest
   def test_should_update_password_with_valid_inputs
     result = safe_request do
       patch password_path, params: {
-        password_challenge: 'password123', # Use fixture password
+        password_challenge: 'password123',
         password: 'NewValid*Password123',
         password_confirmation: 'NewValid*Password123'
       }
@@ -54,7 +53,7 @@ class PasswordsControllerTest < ActionDispatch::IntegrationTest
 
     assert_redirected_to sign_in_path
     follow_redirect!
-    assert_equal 'Password successfully updated', flash[:notice]
+    assert_equal 'Password successfully updated.', flash[:notice]
 
     # Verify password was actually changed
     @user.reload
@@ -71,7 +70,7 @@ class PasswordsControllerTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_entity
-    assert_equal 'Current password is incorrect', flash[:alert]
+    assert_equal 'Current password is incorrect.', flash[:alert] # Add period
 
     # Verify password was not changed
     @user.reload
@@ -81,14 +80,14 @@ class PasswordsControllerTest < ActionDispatch::IntegrationTest
   def test_should_not_update_password_with_mismatched_confirmation
     safe_request do
       patch password_path, params: {
-        password_challenge: 'password123',
+        password_challenge: 'password123', # Use the password set in setup
         password: 'NewValid*Password123',
         password_confirmation: 'DifferentPassword123'
       }
     end
 
     assert_response :unprocessable_entity
-    assert_equal 'New password and confirmation do not match', flash[:alert]
+    assert_equal 'New password and confirmation do not match.', flash[:alert] # Add period
 
     # Verify password was not changed
     @user.reload
@@ -98,7 +97,7 @@ class PasswordsControllerTest < ActionDispatch::IntegrationTest
   def test_should_not_update_password_with_invalid_new_password
     safe_request do
       patch password_path, params: {
-        password_challenge: 'password123',
+        password_challenge: 'password123', # Use the password set in setup
         password: 'short',
         password_confirmation: 'short'
       }
@@ -106,7 +105,7 @@ class PasswordsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :unprocessable_entity
     # Check for model validation error message in the flash
-    assert_equal 'Unable to update password', flash[:alert]
+    assert_equal 'Unable to update password. Please check requirements.', flash[:alert] # Add extra text
 
     # Verify password was not changed
     @user.reload
