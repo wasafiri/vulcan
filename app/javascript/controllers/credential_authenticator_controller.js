@@ -1,5 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
-import Auth, { get as webauthnGet } from "../auth";
+import Auth from "../auth";
 
 export default class extends Controller {
   connect() {
@@ -45,24 +45,14 @@ export default class extends Controller {
   async verifyKey(options) {
     console.debug("[CredentialAuth] processing options:", options);
 
-    let credential;
-    try {
-      console.debug("[CredentialAuth] calling navigator.credentials.get()...");
-      credential = await webauthnGet(options);
-      console.debug("[CredentialAuth] credential received:", credential);
-    } catch (err) {
-      // Re-enable the verify button if it exists
-      const button = document.querySelector('[data-action*="credential-authenticator#startVerification"]');
-      if (button) button.disabled = false;
-      
-      console.error("[CredentialAuth] WebAuthn get() failed:", err);
-      return alert("Authentication failed on device:\n" + err.message);
-    }
+    // The Auth module now handles the browser interaction (WebAuthnJSON.get) internally.
+    // We just need to call the verification method with the options.
 
     try {
       const verifyUrl = Auth.getEndpointUrl('verify', 'webauthn');
-      console.debug("[CredentialAuth] sending credential to server at:", verifyUrl);
-      const verification = await Auth.verifyWebAuthnCredential(credential, verifyUrl);
+      console.debug("[CredentialAuth] initiating verification with server at:", verifyUrl);
+      // Pass the options directly; Auth.verifyWebAuthnCredential handles the browser prompt and server call.
+      const verification = await Auth.verifyWebAuthnCredential(options, verifyUrl); 
       console.debug("[CredentialAuth] server verification response:", verification);
       
       // Handle success case - redirect if we got a redirect URL

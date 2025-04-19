@@ -1,5 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
-import Auth, { create } from "../auth.js";
+import Auth, { registerWebAuthn } from "../auth.js";
 
 export default class extends Controller {
   // Define the expected value for the callback URL
@@ -81,7 +81,7 @@ export default class extends Controller {
       const callbackUrl = `${this.callbackUrlValue}?credential_nickname=${encodeURIComponent(nickname)}`;
       console.log("Using callback URL:", callbackUrl);
       // Step 3: Call the WebAuthn API using the new Auth module, passing nickname explicitly
-      const result = await create(callbackUrl, credentialOptions, nickname, this.statusMessageTarget);
+      const result = await registerWebAuthn(callbackUrl, credentialOptions, nickname, this.statusMessageTarget);
       
       // Step 4: Handle non-redirect result (errors)
       if (!result.success) {
