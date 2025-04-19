@@ -38,19 +38,6 @@ module AuthenticationTestHelper
     user
   end
 
-  # Unified sign in method that works across different test types
-  # @param user [User] The user to authenticate as
-  # @return [User] The user that was authenticated
-  def sign_in(user)
-    if defined?(@request) && @request.respond_to?(:headers)
-      # Integration test
-      sign_in_with_headers(user)
-    else
-      # Controller test
-      sign_in_as(user)
-    end
-  end
-
   # Authenticate with headers for integration tests
   # @param user [User] The user to authenticate as
   # @return [User] The user that was authenticated
@@ -67,8 +54,8 @@ module AuthenticationTestHelper
     # Also set the cookies directly for maximum compatibility
     if cookies.respond_to?(:signed)
       cookies.signed[:session_token] = session.session_token if respond_to?(:cookies)
-    else
-      cookies[:session_token] = session.session_token if respond_to?(:cookies)
+    elsif respond_to?(:cookies)
+      cookies[:session_token] = session.session_token
     end
 
     # Set test user ID for test environment authentication bypass
@@ -110,11 +97,11 @@ module AuthenticationTestHelper
   # Assert that a user is authenticated as the expected user
   # @param expected_user [User] The user that should be authenticated
   def assert_authenticated(expected_user)
-    if defined?(@controller) && @controller.respond_to?(:current_user, true)
-      actual_user = @controller.send(:current_user)
-      assert_equal expected_user.id, actual_user&.id, 
-        "Expected to be authenticated as #{expected_user.email}, got #{actual_user&.email || 'nil'}"
-    end
+    return unless defined?(@controller) && @controller.respond_to?(:current_user, true)
+
+    actual_user = @controller.send(:current_user)
+    assert_equal expected_user.id, actual_user&.id,
+                 "Expected to be authenticated as #{expected_user.email}, got #{actual_user&.email || 'nil'}"
   end
 
   # Assert that a request was rejected due to insufficient authentication
@@ -140,13 +127,17 @@ module AuthenticationTestHelper
     # Verify session is active in database
     session = Session.find_by(user_id: user.id)
     assert session.present?, 'No active session found for user'
-    assert !session.expired?, 'Session should not be expired' if session.respond_to?(:expired?)
+    assert_not session.expired?, 'Session should not be expired' if session.respond_to?(:expired?)
   end
 
   # Skip tests that depend on authentication if authentication is broken
   # This prevents cascading test failures when authentication itself is broken
   def skip_unless_authentication_working
-    get root_path rescue nil
+    begin
+      get root_path
+    rescue StandardError
+      nil
+    end
     skip 'Authentication not working properly' if response&.redirect? && response&.location.to_s.include?('sign_in')
   end
 end

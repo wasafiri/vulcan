@@ -2,7 +2,7 @@
 
 require 'test_helper'
 
-class TwoFactorAuthTest < ActiveSupport::TestCase # Renamed class
+class TwoFactorAuthTest < ActiveSupport::TestCase
   setup do
     @user = users(:confirmed_user)
     @session = {}

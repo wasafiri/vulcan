@@ -112,7 +112,7 @@ module Authentication
     return if current_user.present?
 
     store_location
-    redirect_to sign_in_path, alert: 'Please sign in to continue'
+    redirect_to sign_in_path, alert: 'Please sign in to continue' and return
   end
 
   def store_location
@@ -138,10 +138,10 @@ module Authentication
 
   def debug_auth_info
     debug_info = {
-      called_from:            caller(1..1).first,
-      current_user:           current_user&.email || 'nil',
-      test_user_id:           ENV.fetch('TEST_USER_ID', 'nil'),
-      cookies:                cookies.to_h
+      called_from: caller(1..1).first,
+      current_user: current_user&.email || 'nil',
+      test_user_id: ENV.fetch('TEST_USER_ID', 'nil'),
+      cookies: cookies.to_h
     }
 
     if (token = cookies[:session_token])

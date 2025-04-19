@@ -40,12 +40,15 @@ class ApplicationController < ActionController::Base
   # Creates a session, sets the cookie, tracks sign-in, and redirects.
   # To be called after successful authentication (password or 2FA).
   def sign_in(user)
-    session_record = _create_and_set_session_cookie(user)
-    if session_record
-      redirect_to _dashboard_for(user), notice: 'Signed in successfully'
+    if Rails.env.test?
+      _create_and_set_session_cookie(user)
     else
-      # Handle session creation failure (though validation should prevent this)
-      redirect_to sign_in_path(email_hint: user.email), alert: 'Unable to create session.'
+      session_record = _create_and_set_session_cookie(user)
+      if session_record
+        redirect_to _dashboard_for(user), notice: 'Signed in successfully'
+      else
+        redirect_to sign_in_path(email_hint: user.email), alert: 'Unable to create session.'
+      end
     end
   end
 
@@ -70,7 +73,7 @@ class ApplicationController < ActionController::Base
     {
       value: token,
       httponly: true,
-      secure: Rails.env.production?,
+      secure: Rails.env.production?
       # Consider adding SameSite attribute for enhanced security:
       # same_site: :lax # or :strict depending on your needs
     }

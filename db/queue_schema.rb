@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_04_16_200553) do
+ActiveRecord::Schema[8.0].define(version: 2025_04_18_143517) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -545,7 +545,12 @@ ActiveRecord::Schema[8.0].define(version: 2025_04_16_200553) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.text "reschedule_reason"
+    t.datetime "cancelled_at"
+    t.text "cancellation_reason"
+    t.bigint "product_trained_on_id"
+    t.text "no_show_notes"
     t.index ["application_id"], name: "index_training_sessions_on_application_id"
+    t.index ["product_trained_on_id"], name: "index_training_sessions_on_product_trained_on_id"
     t.index ["trainer_id"], name: "index_training_sessions_on_trainer_id"
   end
 
@@ -744,6 +749,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_04_16_200553) do
   add_foreign_key "solid_queue_scheduled_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "totp_credentials", "users"
   add_foreign_key "training_sessions", "applications"
+  add_foreign_key "training_sessions", "products", column: "product_trained_on_id"
   add_foreign_key "training_sessions", "users", column: "trainer_id"
   add_foreign_key "users", "users", column: "evaluator_id"
   add_foreign_key "users", "users", column: "guardian_id"

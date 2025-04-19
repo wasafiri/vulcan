@@ -30,82 +30,6 @@
       </div>
     </div>
 
-    <!-- Evaluation and Training Status Section -->
-    <% if @application.status_approved? %>
-      <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="evaluation-status-title">
-        <h2 id="evaluation-status-title" class="text-xl font-semibold text-gray-900 mb-4">
-          Evaluation and Training Status
-        </h2>
-        <div class="mb-6">
-          <% latest_evaluation = @application.latest_evaluation %>
-          
-          <!-- Evaluator Section -->
-          <%= render "assignment_section", 
-            type: "evaluator", 
-            entity: latest_evaluation, 
-            assigned_person: latest_evaluation&.evaluator, 
-            status_badge_method: :evaluation_status_badge,
-            scheduled_date: latest_evaluation&.evaluation_date,
-            scheduled_time: false,
-            view_path: latest_evaluation.present? ? evaluators_evaluation_path(latest_evaluation) : nil,
-            assign_path: ->(evaluator) { assign_evaluator_admin_application_path(@application, evaluator_id: evaluator.id) },
-            available_assignees: Users::Evaluator.available
-          %>
-          
-          <!-- Trainer Section -->
-          <% latest_training = @application.training_sessions.where(status: [:requested, :scheduled, :confirmed]).order(created_at: :desc).first %>
-          <% 
-            # Get trainers by type and by capability
-            trainers_by_type = User.where(type: "Users::Trainer", status: :active)
-            trainers_by_capability = User.joins(:role_capabilities).where(role_capabilities: { capability: "can_train" }, status: :active)
-            
-            # Combine the two sets of trainers
-            trainer_ids = trainers_by_type.pluck(:id) + trainers_by_capability.pluck(:id)
-            trainers = User.where(id: trainer_ids.uniq)
-          %>
-          
-          <%= render "assignment_section", 
-            type: "trainer", 
-            entity: latest_training, 
-            assigned_person: latest_training&.trainer, 
-            status_badge_method: :training_session_status_badge,
-            scheduled_date: latest_training&.scheduled_for,
-            scheduled_time: true,
-            view_path: latest_training.present? ? trainers_training_session_path(latest_training) : nil,
-            assign_path: ->(trainer) { assign_trainer_admin_application_path(@application, trainer_id: trainer.id) },
-            available_assignees: trainers
-          %>
-        </div>
-        <% if latest_evaluation&.status_completed? %>
-          <div>
-            <h3 class="text-sm font-medium text-gray-500 mb-2">Training Sessions</h3>
-            <% if @application.training_sessions.any? %>
-              <div class="space-y-4">
-                <% @application.training_sessions.order(scheduled_for: :desc).each do |session| %>
-                  <div class="bg-gray-50 p-4 rounded-md shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center">
-                    <div class="flex items-center space-x-4">
-                      <p class="text-sm font-medium text-gray-900"><%= session.trainer.full_name %></p>
-                      <%= training_session_status_badge(session) %>
-                    </div>
-                    <div class="flex space-x-2 mt-2 md:mt-0">
-                      <% if session.status_scheduled? %>
-                        <%= button_to complete_training_admin_application_path(@application, training_session_id: session.id),
-                            method: :patch,
-                            class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500",
-                            data: { confirm: "Mark training session with #{session.trainer.full_name} as completed?" } do %>
-                          Complete
-                        <% end %>
-                      <% end %>
-                    </div>
-                  </div>
-                <% end %>
-              </div>
-            <% end %>
-          </div>
-        <% end %>
-      </section>
-    <% end %>
-
     <!-- Applicant Information Section -->
     <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="applicant-info-title">
       <h2 id="applicant-info-title" class="text-xl font-semibold text-gray-900 mb-4">Applicant Information</h2>
@@ -209,7 +133,7 @@
       <div class="mt-6 space-y-4">
         <!-- Fax Upload Form and History -->
         <%= render "medical_certification_upload" %>
-      
+
         <!-- Provider Information -->
         <% if @application.medical_provider_name.present? %>
           <div class="mb-4" data-testid="provider-information">
@@ -231,14 +155,14 @@
             </div>
           </div>
         <% end %>
-        
+
         <!-- Action Buttons -->
         <div class="mt-6">
-          <% 
+          <%
             # Use instance variables that might be preloaded in the controller
             # or load them once if not already available
             request_count = @application.medical_certification_request_count || 0
-            
+
             if !defined?(@latest_certification_request) || @latest_certification_request.nil?
               @latest_certification_request = Notification
                 .where(notifiable: @application, action: "medical_certification_requested")
@@ -246,7 +170,7 @@
                 .limit(1)
                 .first
             end
-            
+
             if !defined?(@latest_certification_reject) || @latest_certification_reject.nil?
               @latest_certification_reject = Notification
                 .where(notifiable: @application, action: "medical_certification_rejected")
@@ -254,14 +178,14 @@
                 .limit(1)
                 .first
             end
-            
+
             # Check if we have both a request and a rejection, and if the request is more recent than the rejection
-            requested_after_rejection = @latest_certification_request.present? && 
-                                       @latest_certification_reject.present? && 
+            requested_after_rejection = @latest_certification_request.present? &&
+                                       @latest_certification_reject.present? &&
                                        @latest_certification_request.created_at > @latest_certification_reject.created_at
           %>
-          
-          <% if @application.medical_certification_status == "not_requested" || 
+
+          <% if @application.medical_certification_status == "not_requested" ||
                 @application.medical_certification_status == "rejected" ||
                 (@application.medical_certification_status == "requested" && !@application.medical_certification.attached?) %>
             <!-- Send Request button -->
@@ -274,9 +198,9 @@
                 } do %>
               <%= button_text %>
             <% end %>
-          <% elsif (@application.medical_certification_status == "received" || 
+          <% elsif (@application.medical_certification_status == "received" ||
                  (@application.medical_certification_status == "requested" && @application.medical_certification.attached?) ||
-                 requested_after_rejection) && 
+                 requested_after_rejection) &&
                  !["approved"].include?(@application.medical_certification_status) %>
             <!-- Review button - Show this only when we have a certification to review AND it's not already accepted/approved -->
             <button type="button"
@@ -287,7 +211,7 @@
             </button>
           <!-- View Certification Button Moved to Medical Certification Upload Partial -->
           <% end %>
-          
+
           <%# View History button removed - history already shown in the certification section %>
         </div>
       </div>
@@ -360,6 +284,117 @@
         <% end %>
       </div>
     </section>
+    
+    <!-- Evaluation and Training Status Section -->
+    <% if @application.status_approved? %>
+      <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="evaluation-status-title">
+        <h2 id="evaluation-status-title" class="text-xl font-semibold text-gray-900 mb-4">
+          Evaluation and Training Status
+        </h2>
+        <div class="mb-6">
+          <% latest_evaluation = @application.latest_evaluation %>
+
+          <!-- Evaluator Section -->
+          <%= render "assignment_section",
+            type: "evaluator",
+            entity: latest_evaluation,
+            assigned_person: latest_evaluation&.evaluator,
+            status_badge_method: :evaluation_status_badge,
+            scheduled_date: latest_evaluation&.evaluation_date,
+            scheduled_time: false,
+            view_path: latest_evaluation.present? ? evaluators_evaluation_path(latest_evaluation) : nil,
+            assign_path: ->(evaluator) { assign_evaluator_admin_application_path(@application, evaluator_id: evaluator.id) },
+            available_assignees: Users::Evaluator.available
+          %>
+
+          <!-- Trainer Section (Conditional based on policy limit) -->
+          <% if @completed_training_sessions_count < @max_training_sessions %>
+            <% latest_training = @application.training_sessions.where(status: [:requested, :scheduled, :confirmed]).order(created_at: :desc).first %>
+            <%
+              # Get trainers by type and by capability
+              trainers_by_type = User.where(type: "Users::Trainer", status: :active)
+              trainers_by_capability = User.joins(:role_capabilities).where(role_capabilities: { capability: "can_train" }, status: :active)
+
+              # Combine the two sets of trainers
+              trainer_ids = trainers_by_type.pluck(:id) + trainers_by_capability.pluck(:id)
+              trainers = User.where(id: trainer_ids.uniq)
+            %>
+            <%= render "assignment_section",
+              type: "trainer",
+              entity: latest_training,
+              assigned_person: latest_training&.trainer,
+              status_badge_method: :training_session_status_badge,
+              scheduled_date: latest_training&.scheduled_for,
+              scheduled_time: true,
+              view_path: latest_training.present? ? trainers_training_session_path(latest_training) : nil,
+              assign_path: ->(trainer) { assign_trainer_admin_application_path(@application, trainer_id: trainer.id) },
+              available_assignees: trainers
+            %>
+            
+            <p class="text-sm text-gray-500 mb-4">
+              Training provided to date: <%= @completed_training_sessions_count %> / <%= @max_training_sessions %>
+            </p>
+          <% else %>
+            <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+              <div class="flex">
+                <div class="flex-shrink-0">
+                  <svg class="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+                <div class="ml-3">
+                  <p class="text-sm text-blue-700">
+                    This constituent has reached the maximum number of allowed training sessions (<%= @max_training_sessions %>).
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <p class="text-sm text-gray-500 mb-4">
+              Training provided to date: <%= @completed_training_sessions_count %> / <%= @max_training_sessions %> <strong>Maximum Reached</strong>
+            </p>
+          <% end %>
+        </div>
+        <% if latest_evaluation&.status_completed? %>
+          <div>
+            <h3 class="text-sm font-medium text-gray-500 mb-2">Training Sessions (<%= @application.training_sessions.count %>)</h3>
+            <% if @application.training_sessions.any? %>
+              <div class="space-y-4">
+                <% @application.training_sessions.order(scheduled_for: :desc).each do |session| %>
+                  <div class="bg-gray-50 p-4 rounded-md shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center">
+                    <div class="flex items-center space-x-4">
+                      <p class="text-sm font-medium text-gray-900"><%= session.trainer.full_name %></p>
+                      <%= training_session_status_badge(session) %>
+                    </div>
+                    <div class="flex space-x-2 mt-2 md:mt-0">
+                      <% if session.status_scheduled? %>
+                        <%= button_to complete_training_admin_application_path(@application, training_session_id: session.id),
+                            method: :patch,
+                            class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500",
+                            data: { confirm: "Mark training session with #{session.trainer.full_name} as completed?" } do %>
+                          Complete
+                        <% end %>
+                      <% end %>
+                      <% if session.status_completed? %>
+                        <span class="text-sm text-gray-600">Completed on <%= session.completed_at&.strftime("%B %d, %Y") %></span>
+                      <% end %>
+                    </div>
+                  </div>
+                  <% if session.status_completed? %>
+                    <div class="bg-gray-100 p-4 rounded-md mt-2">
+                      <p class="text-sm font-medium text-gray-700 mb-1">Product Trained On:</p>
+                      <p class="text-sm text-gray-900"><%= session.product_trained_on&.name || "Not specified" %></p>
+                      <p class="text-sm font-medium text-gray-700 mt-2 mb-1">Notes:</p>
+                      <p class="text-sm text-gray-900"><%= simple_format(session.notes).presence || "No notes provided" %></p>
+                    </div>
+                  <% end %>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+      </section>
+    <% end %>
 
     <!-- Audit Logs Section -->
     <%= render "audit_logs" %>

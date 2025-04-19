@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class AddVoucherVerificationMaxAttemptsPolicy < ActiveRecord::Migration[7.0]
+class AddVoucherVerificationMaxAttemptsPolicy < ActiveRecord::Migration[8.0]
   def up
     # Add policy for maximum verification attempts
     policy = Policy.find_or_initialize_by(key: 'voucher_verification_max_attempts')

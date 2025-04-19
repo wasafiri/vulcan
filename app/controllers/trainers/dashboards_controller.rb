@@ -27,9 +27,8 @@ module Trainers
       @completed_sessions = training_sessions.where(status: :completed)
       @followup_sessions = training_sessions.where(status: %i[no_show cancelled])
 
-      # Get upcoming training sessions for the next 7 days
-      @upcoming_sessions = @scheduled_sessions.where(scheduled_for: Time.current..7.days.from_now)
-                                              .order(scheduled_for: :asc)
+      # Get all scheduled training sessions for the upcoming section
+      @upcoming_sessions = @scheduled_sessions.order(scheduled_for: :asc)
                                               .includes(application: :user)
 
       # Get count for any training sessions assigned to this user
@@ -63,7 +62,8 @@ module Trainers
       @requested_sessions_display = []
       @upcoming_sessions_display = []
       @recent_completed_sessions = []
-      
+      @recent_followup_sessions = [] # Added for default display
+
       # If we're filtering, don't load all the display data
       return if @current_filter.present?
 
@@ -71,6 +71,7 @@ module Trainers
       @requested_sessions_display = @requested_sessions.includes(application: :user).limit(10)
       @upcoming_sessions_display = @upcoming_sessions.limit(10)
       @recent_completed_sessions = @completed_sessions.includes(application: :user).order(completed_at: :desc).limit(5)
+      @recent_followup_sessions = @followup_sessions.includes(application: :user).order(updated_at: :desc).limit(5) # Added for default display
     end
 
     def training_sessions

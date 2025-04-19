@@ -25,8 +25,7 @@ require_relative 'controllers/webhooks/test_base_controller'
 require_relative 'controllers/webhooks/test_email_events_controller'
 
 # Load and draw test routes
-require_relative 'controllers/webhooks/test_routes'
-Rails.application.reload_routes!
+# require_relative 'controllers/webhooks/test_routes'
 
 # Override the standard request methods in integration tests to include default headers
 # NOTE: These overrides apply ONLY in the test environment
@@ -42,8 +41,8 @@ module ActionDispatch
     # Override the standard request methods to include default headers
     %i[get post patch put delete].each do |method_name|
       define_method(method_name) do |path, **args|
-        # Only add default headers if the class includes AuthenticationTestHelper
-        if self.class.included_modules.include?(AuthenticationTestHelper)
+        # Only add default headers if default_headers is available
+        if respond_to?(:default_headers)
           # Merge default headers with any provided headers
           args[:headers] = default_headers.merge(args[:headers] || {})
         end
@@ -69,6 +68,9 @@ module ActiveSupport
     include AttachmentTestHelper # Use standardized attachment mocking
     include ProofTestHelper
 
+    # Provide shorthand for @product in controller tests
+    attr_reader :product
+
     # --- Database Cleaner Configuration ---
     # Clean the database completely before the suite starts
     # Note: Ensure DatabaseCleaner gem is in the :test group of your Gemfile
@@ -87,14 +89,9 @@ module ActiveSupport
 
     # Wrap tests in DatabaseCleaner start/clean calls
     # Use Minitest's setup/teardown hooks
-    # Clean BEFORE each test
-    setup do
-      DatabaseCleaner.clean if defined?(DatabaseCleaner)
-    end
-
-    # Start AFTER each test (less critical with truncation, but good practice)
+    # Clean AFTER each test
     teardown do
-      DatabaseCleaner.start if defined?(DatabaseCleaner)
+      DatabaseCleaner.clean if defined?(DatabaseCleaner)
     end
     # --- End Database Cleaner Configuration ---
 
@@ -162,10 +159,18 @@ module ActiveSupport
 
     # Default headers for integration tests
     def default_headers
-      {
+      headers = {
         'HTTP_USER_AGENT' => 'Rails Testing',
         'REMOTE_ADDR' => '127.0.0.1'
       }
+
+      # Include the session token in headers for integration tests if we have one
+      if defined?(@session_token) && @session_token.present?
+        headers['Cookie'] = "session_token=#{@session_token}"
+        puts "TEST AUTH: Added session_token cookie to headers: #{@session_token}" if ENV['DEBUG_AUTH'] == 'true'
+      end
+
+      headers
     end
 
     # Sign in a user for testing purposes
@@ -175,52 +180,30 @@ module ActiveSupport
     # @param user [User] The user to sign in
     # @return [User] The signed-in user (for method chaining)
     def sign_in(user)
-      # Set the TEST_USER_ID environment variable to override authentication
-      # This is the most reliable way to authenticate in tests
-      ENV['TEST_USER_ID'] = user.id.to_s
-      puts "TEST AUTH: Setting TEST_USER_ID=#{user.id} for user: #{user.email}" if ENV['DEBUG_AUTH'] == 'true'
-
-      # Create a fresh session for this user to ensure consistent state
-      test_session = user.sessions.create!(
-        user_agent: 'Rails Testing',
-        ip_address: '127.0.0.1',
-        created_at: Time.current
+      # Create a session record for the user, providing required attributes
+      session = Session.create!(
+        user: user,
+        ip_address: default_headers['REMOTE_ADDR'], # Provide dummy IP
+        user_agent: default_headers['HTTP_USER_AGENT'] # Provide dummy User Agent
       )
 
-      puts "TEST AUTH: Created test session: #{test_session.id}, token: #{test_session.session_token}" if ENV['DEBUG_AUTH'] == 'true'
+      # Store the session token for use in HTTP headers for all requests
+      @session_token = session.session_token
 
-      # Set both signed and unsigned cookies for maximum compatibility
-      if respond_to?(:cookies)
-        # Set unsigned cookie
-        cookies[:session_token] = test_session.session_token
+      puts "TEST AUTH: Created session #{session.id} with token #{@session_token} for user: #{user.email}" if ENV['DEBUG_AUTH'] == 'true'
 
-        # Set signed cookie if possible
-        if cookies.respond_to?(:signed) && cookies.signed.respond_to?(:[]=)
-          cookies.signed[:session_token] = { value: test_session.session_token, httponly: true }
-          puts 'TEST AUTH: Set signed cookie' if ENV['DEBUG_AUTH'] == 'true'
-        end
-
-        puts "TEST AUTH: Set cookies for user #{user.email}" if ENV['DEBUG_AUTH'] == 'true'
-      elsif ENV['DEBUG_AUTH'] == 'true'
-        puts 'TEST AUTH: No cookies method available, relying on TEST_USER_ID'
+      # Set the session token cookie directly for controller tests
+      # For integration tests, we'll use the HTTP_COOKIE header instead (via default_headers)
+      begin
+        cookies.signed[:session_token] = { value: @session_token, httponly: true }
+        puts "TEST AUTH: Set signed cookie session_token=#{@session_token}" if ENV['DEBUG_AUTH'] == 'true'
+      rescue NoMethodError
+        # This is expected in integration tests - we use headers instead
+        puts 'TEST AUTH: Using HTTP_COOKIE header for session instead of cookies.signed' if ENV['DEBUG_AUTH'] == 'true'
       end
 
-      # For integration tests, authenticate via the sign-in flow as well
-      if respond_to?(:post)
-        post sign_in_path, params: { email: user.email, password: 'password123' }
-        follow_redirect! if response.redirect?
-        puts "TEST AUTH: Posted to sign_in_path for #{user.email}" if ENV['DEBUG_AUTH'] == 'true'
-      end
-
-      # Verify current_user is set correctly if we can
-      if defined?(@controller) && @controller.respond_to?(:current_user, true)
-        current_user = @controller.send(:current_user)
-        if current_user
-          puts "TEST AUTH: current_user is set to #{current_user.email}" if ENV['DEBUG_AUTH'] == 'true'
-        elsif ENV['DEBUG_AUTH'] == 'true'
-          puts 'TEST AUTH: WARNING - current_user is nil after sign_in!'
-        end
-      end
+      # Clear the ENV override just in case
+      ENV['TEST_USER_ID'] = nil
 
       user # Return the user for method chaining
     end
@@ -229,22 +212,33 @@ module ActiveSupport
     def sign_out
       puts 'TEST AUTH: Signing out user' if ENV['DEBUG_AUTH'] == 'true'
 
-      # Clear the TEST_USER_ID environment variable
+      # Find and destroy the session based on the cookie
+      token = nil
+      if respond_to?(:cookies) && cookies.respond_to?(:signed)
+        token = cookies.signed[:session_token]
+        cookies.delete(:session_token) # Delete cookie in integration tests
+      elsif defined?(@request) && @request.respond_to?(:cookie_jar)
+        token = @request.cookie_jar.signed[:session_token]
+        @request.cookie_jar.delete(:session_token) # Delete cookie in controller tests
+      end
+
+      if token
+        session = Session.find_by(session_token: token)
+        if session
+          session.destroy
+          puts "TEST AUTH: Destroyed session #{session.id}" if ENV['DEBUG_AUTH'] == 'true'
+        elsif ENV['DEBUG_AUTH'] == 'true'
+          puts "TEST AUTH: No session found for token #{token} during sign_out."
+        end
+      elsif ENV['DEBUG_AUTH'] == 'true'
+        puts 'TEST AUTH: No session token found in cookies during sign_out.'
+      end
+
+      # Clear the ENV override
       ENV['TEST_USER_ID'] = nil
 
-      if respond_to?(:delete)
-        # Integration test
-        delete sign_out_path
-        follow_redirect! if response.redirect?
-      else
-        # Controller/Model test - use the helper if available
-        return sign_out_with_headers if respond_to?(:sign_out_with_headers)
-
-        # Direct fallback if helper not available
-        return cookies.signed.delete(:session_token) if cookies.respond_to?(:signed) && cookies.signed.respond_to?(:delete)
-
-        cookies.delete(:session_token)
-      end
+      # Perform logout request in integration tests if applicable
+      delete sign_out_path if respond_to?(:delete)
     end
 
     # Helper method for debugging authentication state

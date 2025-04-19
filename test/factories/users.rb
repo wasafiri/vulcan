@@ -36,6 +36,13 @@ FactoryBot.define do
         end
       end
 
+      factory :trainer, class: 'Users::Trainer' do
+        sequence(:email) { |n| "trainer#{n}@example.com" }
+        type { 'Users::Trainer' }
+        first_name { 'Test' }
+        last_name { 'Trainer' }
+      end
+
       factory :constituent, class: 'Users::Constituent' do # Match class name used in controller/associations
         type { 'Users::Constituent' } # Set type explicitly to match controller expectation
         physical_address_1 { '123 Main St' }

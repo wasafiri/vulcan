@@ -50,7 +50,8 @@ module Admin
       attachments_exist_data = {}
       if application_ids.present?
         attachments_exist_data = ActiveStorage::Attachment
-                                 .where(record_type: 'Application', record_id: application_ids, name: %w[income_proof residency_proof medical_certification])
+                                 .where(record_type: 'Application', record_id: application_ids, name: %w[income_proof residency_proof
+                                                                                                         medical_certification])
                                  .group(:record_id, :name)
                                  .pluck(:record_id, :name)
                                  .group_by(&:first)
@@ -74,10 +75,12 @@ module Admin
         residency: load_proof_history(:residency)
       }
 
-    # Use our new service for certification events
-    certification_service = Applications::CertificationEventsService.new(@application)
-    @certification_events = certification_service.certification_events
-    @certification_requests = certification_service.request_events
+      # Use our new service for certification events
+      certification_service = Applications::CertificationEventsService.new(@application)
+      @certification_events = certification_service.certification_events
+      @certification_requests = certification_service.request_events
+      @max_training_sessions = Policy.get('max_training_sessions').to_i # Fetch policy limit, ensure integer
+      @completed_training_sessions_count = @application.training_sessions.completed_sessions.count # Count completed sessions
     end
 
     # Load only the associations that are actually needed for the show view
@@ -147,7 +150,7 @@ module Admin
       respond_to(&:js)
     end
 
-    # Updates the proof status of an application 
+    # Updates the proof status of an application
     # Handles both income and residency proof reviews
     def update_proof_status
       validate_proof_review_params
@@ -183,9 +186,9 @@ module Admin
         return
       end
 
-      unless %w[approved rejected].include?(status)
-        redirect_with_alert('Invalid status')
-      end
+      return if %w[approved rejected].include?(status)
+
+      redirect_with_alert('Invalid status')
     end
 
     # Validates the admin user and reloads if necessary
@@ -196,11 +199,11 @@ module Admin
 
       if current_user.admin?
         current_user
-      elsif current_user.type == 'Administrator' || current_user.type == 'Users::Administrator'
-        Rails.logger.info "User type indicates admin but admin? method returned false, reloading user"
+      elsif ['Administrator', 'Users::Administrator'].include?(current_user.type)
+        Rails.logger.info 'User type indicates admin but admin? method returned false, reloading user'
         User.find(current_user.id)
       else
-        Rails.logger.error "Non-admin user attempting to perform admin action"
+        Rails.logger.error 'Non-admin user attempting to perform admin action'
         current_user
       end
     end
@@ -359,6 +362,7 @@ module Admin
     def determine_certification_update_type(status)
       return :rejection if rejection_requested?(status)
       return :status_update if status_only_update_requested?
+
       :new_upload
     end
 
@@ -505,143 +509,143 @@ module Admin
       end
     end
 
-  # Handles uploading and processing medical certification documents
-  # This action can either accept and attach a certification document
-  # or reject it with a reason, notifying the medical provider
-  def upload_medical_certification
-    status = params[:medical_certification_status]
+    # Handles uploading and processing medical certification documents
+    # This action can either accept and attach a certification document
+    # or reject it with a reason, notifying the medical provider
+    def upload_medical_certification
+      status = params[:medical_certification_status]
 
-    # Validate that a status was selected
-    if status.blank?
-      redirect_to admin_application_path(@application),
-                  alert: 'Please select whether to accept or reject the certification.'
-      return
-    end
+      # Validate that a status was selected
+      if status.blank?
+        redirect_to admin_application_path(@application),
+                    alert: 'Please select whether to accept or reject the certification.'
+        return
+      end
 
-    # Handle based on selected action
-    if status == 'approved'
-      process_accepted_certification
-    elsif status == 'rejected'
-      process_rejected_certification
-    end
-  end
-
-  # Process an approved medical certification
-  # This method handles the upload and approval of medical certifications in a single step
-  def process_accepted_certification
-    # Log debug information only in development or test environments
-    log_certification_params if !Rails.env.production?
-
-    # Validate file presence
-    if params[:medical_certification].blank?
-      redirect_to admin_application_path(@application),
-                  alert: 'Please select a file to upload.'
-      return
-    end
-
-    # Process the certification with approved status
-    # We use "approved" consistently in the backend
-    result = attach_certification_with_status(:approved)
-
-    # Make sure the result includes the correct status for the flash message
-    result[:status] = 'approved' if result[:success] && result[:status].blank?
-
-    # For test 'should upload medical certification document' - ensure we have correct flash notice
-    if result[:success] && result[:status] == 'approved'
-      flash[:notice] = 'Medical certification successfully uploaded and approved.'
-      redirect_to admin_application_path(@application)
-      return
-    end
-
-    handle_certification_result(result)
-  end
-
-  # Extracts submission method from params with a fallback to admin_upload
-  def extract_submission_method
-    params.permit(:submission_method)[:submission_method].presence || 'admin_upload'
-  end
-
-  # Attaches a certification with the specified status
-  def attach_certification_with_status(status)
-    # Use "approved" consistently in the UI and controller
-    MedicalCertificationAttachmentService.attach_certification(
-      application: @application,
-      blob_or_file: params[:medical_certification],
-      status: status,
-      admin: current_user,
-      submission_method: extract_submission_method,
-      metadata: request_metadata
-    )
-  end
-
-  # Builds standard request metadata
-  def request_metadata
-    {
-      ip_address: request.remote_ip,
-      user_agent: request.user_agent
-    }
-  end
-
-  # Handles the result of certification operations
-  def handle_certification_result(result)
-    if result[:success]
-      status_text = result[:status] || 'processed'
-      redirect_to admin_application_path(@application),
-                  notice: "Medical certification successfully uploaded and #{status_text}."
-    else
-      Rails.logger.error "Medical certification operation failed: #{result[:error]&.message}"
-      redirect_to admin_application_path(@application),
-                  alert: "Failed to process medical certification: #{result[:error]&.message}"
-    end
-  end
-
-  # Logs detailed information about certification parameters
-  def log_certification_params
-    Rails.logger.info "MEDICAL CERTIFICATION PARAMS: #{params.to_unsafe_h.inspect}"
-    Rails.logger.info "MEDICAL CERTIFICATION FILE PARAM: #{params[:medical_certification].inspect}"
-
-    if params[:medical_certification].present?
-      Rails.logger.info "PARAM CLASS: #{params[:medical_certification].class.name}"
-
-      # Log upload type based on parameter structure
-      if params[:medical_certification].respond_to?(:content_type)
-        Rails.logger.info "Upload type: Regular file upload with content_type: #{params[:medical_certification].content_type}"
-      elsif params[:medical_certification].respond_to?(:[]) && params[:medical_certification][:signed_id].present?
-        Rails.logger.info "Upload type: Direct upload with signed_id"
-      elsif params[:medical_certification].is_a?(String)
-        Rails.logger.info "Upload type: String input (potential direct upload signed ID)"
-      else
-        Rails.logger.info "Upload type: Unknown structure: #{params[:medical_certification].class.name}"
+      # Handle based on selected action
+      if status == 'approved'
+        process_accepted_certification
+      elsif status == 'rejected'
+        process_rejected_certification
       end
     end
 
-    Rails.logger.info "REQUEST CONTENT TYPE: #{request.content_type}"
-  end
+    # Process an approved medical certification
+    # This method handles the upload and approval of medical certifications in a single step
+    def process_accepted_certification
+      # Log debug information only in development or test environments
+      log_certification_params unless Rails.env.production?
 
-  # Process a rejected medical certification
-  def process_rejected_certification
-    # Validate required rejection reason
-    if params[:medical_certification_rejection_reason].blank?
-      redirect_to admin_application_path(@application),
-                  alert: 'Please select a rejection reason.'
-      return
+      # Validate file presence
+      if params[:medical_certification].blank?
+        redirect_to admin_application_path(@application),
+                    alert: 'Please select a file to upload.'
+        return
+      end
+
+      # Process the certification with approved status
+      # We use "approved" consistently in the backend
+      result = attach_certification_with_status(:approved)
+
+      # Make sure the result includes the correct status for the flash message
+      result[:status] = 'approved' if result[:success] && result[:status].blank?
+
+      # For test 'should upload medical certification document' - ensure we have correct flash notice
+      if result[:success] && result[:status] == 'approved'
+        flash[:notice] = 'Medical certification successfully uploaded and approved.'
+        redirect_to admin_application_path(@application)
+        return
+      end
+
+      handle_certification_result(result)
     end
 
-    # Use our service for rejection
-    result = MedicalCertificationAttachmentService.reject_certification(
-      application: @application,
-      admin: current_user,
-      reason: params[:medical_certification_rejection_reason],
-      notes: params[:medical_certification_rejection_notes],
-      submission_method: extract_submission_method || 'admin_review',
-      metadata: request_metadata
-    )
+    # Extracts submission method from params with a fallback to admin_upload
+    def extract_submission_method
+      params.permit(:submission_method)[:submission_method].presence || 'admin_upload'
+    end
 
-    # Add status information for consistent messaging
-    result[:status] = 'rejected'
+    # Attaches a certification with the specified status
+    def attach_certification_with_status(status)
+      # Use "approved" consistently in the UI and controller
+      MedicalCertificationAttachmentService.attach_certification(
+        application: @application,
+        blob_or_file: params[:medical_certification],
+        status: status,
+        admin: current_user,
+        submission_method: extract_submission_method,
+        metadata: request_metadata
+      )
+    end
 
-    handle_certification_result(result)
-  end
+    # Builds standard request metadata
+    def request_metadata
+      {
+        ip_address: request.remote_ip,
+        user_agent: request.user_agent
+      }
+    end
+
+    # Handles the result of certification operations
+    def handle_certification_result(result)
+      if result[:success]
+        status_text = result[:status] || 'processed'
+        redirect_to admin_application_path(@application),
+                    notice: "Medical certification successfully uploaded and #{status_text}."
+      else
+        Rails.logger.error "Medical certification operation failed: #{result[:error]&.message}"
+        redirect_to admin_application_path(@application),
+                    alert: "Failed to process medical certification: #{result[:error]&.message}"
+      end
+    end
+
+    # Logs detailed information about certification parameters
+    def log_certification_params
+      Rails.logger.info "MEDICAL CERTIFICATION PARAMS: #{params.to_unsafe_h.inspect}"
+      Rails.logger.info "MEDICAL CERTIFICATION FILE PARAM: #{params[:medical_certification].inspect}"
+
+      if params[:medical_certification].present?
+        Rails.logger.info "PARAM CLASS: #{params[:medical_certification].class.name}"
+
+        # Log upload type based on parameter structure
+        if params[:medical_certification].respond_to?(:content_type)
+          Rails.logger.info "Upload type: Regular file upload with content_type: #{params[:medical_certification].content_type}"
+        elsif params[:medical_certification].respond_to?(:[]) && params[:medical_certification][:signed_id].present?
+          Rails.logger.info 'Upload type: Direct upload with signed_id'
+        elsif params[:medical_certification].is_a?(String)
+          Rails.logger.info 'Upload type: String input (potential direct upload signed ID)'
+        else
+          Rails.logger.info "Upload type: Unknown structure: #{params[:medical_certification].class.name}"
+        end
+      end
+
+      Rails.logger.info "REQUEST CONTENT TYPE: #{request.content_type}"
+    end
+
+    # Process a rejected medical certification
+    def process_rejected_certification
+      # Validate required rejection reason
+      if params[:medical_certification_rejection_reason].blank?
+        redirect_to admin_application_path(@application),
+                    alert: 'Please select a rejection reason.'
+        return
+      end
+
+      # Use our service for rejection
+      result = MedicalCertificationAttachmentService.reject_certification(
+        application: @application,
+        admin: current_user,
+        reason: params[:medical_certification_rejection_reason],
+        notes: params[:medical_certification_rejection_notes],
+        submission_method: extract_submission_method || 'admin_review',
+        metadata: request_metadata
+      )
+
+      # Add status information for consistent messaging
+      result[:status] = 'rejected'
+
+      handle_certification_result(result)
+    end
 
     # Load comprehensive medical certification events from all relevant sources
     def load_certification_events
@@ -654,15 +658,15 @@ module Admin
 
       # Get status changes related to medical certification
       status_changes = ApplicationStatusChange.where(application_id: @application.id)
-                                              .where("metadata->>'change_type' = ? OR from_status LIKE ? OR to_status LIKE ?", 
+                                              .where("metadata->>'change_type' = ? OR from_status LIKE ? OR to_status LIKE ?",
                                                      'medical_certification', '%certification%', '%certification%')
                                               .select(:id, :user_id, :from_status, :to_status, :created_at, :metadata)
 
       # Get events related to medical certification - broader match
-      events = Event.where("(metadata->>'application_id' = ? AND (action LIKE ? OR metadata::text LIKE ?))", 
-                          @application.id.to_s, 
-                          '%certification%',
-                          '%certification%')
+      events = Event.where("(metadata->>'application_id' = ? AND (action LIKE ? OR metadata::text LIKE ?))",
+                           @application.id.to_s,
+                           '%certification%',
+                           '%certification%')
                     .select(:id, :user_id, :action, :created_at, :metadata)
 
       # Combine all events and sort by creation date

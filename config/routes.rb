@@ -250,25 +250,25 @@ Rails.application.routes.draw do
     end
   end
 
+  # Trainers routes
   namespace :trainers do
     resource :dashboard, only: [:show], controller: :dashboards
-    resources :training_sessions do
+
+    resources :training_sessions, only: %i[index show] do
+      collection do
+        get :filter
+        get :requested
+        get :scheduled
+        get :completed
+        get :needs_followup
+        get 'filter(/:scope)(/:status)', to: 'training_sessions#filter', as: :filtered # Add filter route
+      end
       member do
         patch :update_status
         post :complete
         post :schedule
         post :reschedule
-      end
-
-      collection do
-        # Status filters
-        get :requested
-        get :scheduled
-        get :completed
-        get :needs_followup
-
-        # Scope+status filters (mine vs all)
-        get 'filter(/:scope)(/:status)', to: 'training_sessions#filter', as: :filtered
+        post :cancel
       end
     end
   end
