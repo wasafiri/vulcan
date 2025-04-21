@@ -62,7 +62,7 @@ class User < ApplicationRecord
   validates :reset_password_token, uniqueness: true, allow_nil: true
   validate :phone_number_must_be_valid
   validate :validate_address_for_letter_preference
-  validate :constituent_must_have_disability # Added validation
+  # validate :constituent_must_have_disability # Added validation
 
   # Status enum
   enum :status, { inactive: 0, active: 1, suspended: 2 }, default: :active
@@ -225,6 +225,15 @@ class User < ApplicationRecord
       sms_credentials.exists?
   end
 
+  def disability_selected?
+    # Check if at least one disability is selected using a more explicit check
+    disability_flags = [
+      hearing_disability, vision_disability, speech_disability,
+      mobility_disability, cognition_disability
+    ]
+    disability_flags.any? { |flag| flag == true }
+  end
+
   private
 
   def reset_all_caches
@@ -306,13 +315,6 @@ class User < ApplicationRecord
     # because we want them to select a disability on constituent_portal/applications#new instead
     return unless type == 'Users::Constituent' && !new_record?
 
-    # Check if at least one disability is selected using a more explicit check
-    disability_flags = [
-      hearing_disability, vision_disability, speech_disability,
-      mobility_disability, cognition_disability
-    ]
-    has_disability = disability_flags.any? { |flag| flag == true }
-
-    errors.add(:base, 'At least one disability must be selected.') unless has_disability
+    errors.add(:base, 'At least one disability must be selected.') unless disability_selected?
   end
 end

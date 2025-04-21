@@ -5,7 +5,7 @@ require 'test_helper'
 module ConstituentPortal
   class ApplicationsDisabilityTest < ActionDispatch::IntegrationTest
     setup do
-      @constituent = users(:constituent_john)
+      @constituent = create(:constituent)
       sign_in(@constituent)
 
       @application_params = {
@@ -14,9 +14,16 @@ module ConstituentPortal
           annual_income: '50000',
           maryland_resident: '1',
           self_certify_disability: '1',
-          medical_provider_name: 'Dr. Smith',
-          medical_provider_phone: '555-123-4567',
-          medical_provider_email: 'dr.smith@example.com',
+          medical_provider_attributes: {
+            name: 'Dr. Smith',
+            phone: '555-123-4567',
+            email: 'dr.smith@example.com'
+          },
+          income_proof: fixture_file_upload(Rails.root.join('test/fixtures/files/income_proof.pdf'), 'application/pdf'),
+          residency_proof: fixture_file_upload(Rails.root.join('test/fixtures/files/residency_proof.pdf'), 'application/pdf'),
+          terms_accepted: '1',
+          information_verified: '1',
+          medical_release_authorized: '1',
           # No disabilities selected initially
           hearing_disability: '0',
           vision_disability: '0',
@@ -28,7 +35,6 @@ module ConstituentPortal
     end
 
     test 'should not create application when submitting with no disabilities' do
-      skip 'Skipping due to authentication issues in integration tests'
       # Ensure constituent has no disabilities
       @constituent.update(
         hearing_disability: false,
@@ -43,11 +49,11 @@ module ConstituentPortal
       end
 
       assert_response :unprocessable_entity
+      puts "Validation errors: #{response.body}"
       assert_match(/At least one disability must be selected/, response.body)
     end
 
     test 'should create application when submitting with one disability' do
-      skip 'Skipping due to authentication issues in integration tests'
       # Set one disability in the params
       @application_params[:application][:hearing_disability] = '1'
 
@@ -61,7 +67,6 @@ module ConstituentPortal
     end
 
     test 'should create application when submitting with multiple disabilities' do
-      skip 'Skipping due to authentication issues in integration tests'
       # Set multiple disabilities in the params
       @application_params[:application][:hearing_disability] = '1'
       @application_params[:application][:vision_disability] = '1'
@@ -79,7 +84,6 @@ module ConstituentPortal
     end
 
     test 'should save draft application even with no disabilities' do
-      skip 'Skipping due to authentication issues in integration tests'
       assert_difference 'Application.count', 1 do
         post constituent_portal_applications_path, params: @application_params
       end
@@ -89,16 +93,29 @@ module ConstituentPortal
     end
 
     test 'should update application when adding disabilities' do
-      skip 'Skipping due to authentication issues in integration tests'
       # First create a draft application
       post constituent_portal_applications_path, params: @application_params
       application = Application.last
 
-      # Now update with disabilities and submit
+      # Now update with disabilities and required fields for submission
       put constituent_portal_application_path(application), params: {
         application: {
           hearing_disability: '1',
-          vision_disability: '1'
+          vision_disability: '1',
+          maryland_resident: '1',
+          household_size: 2,
+          annual_income: '50000',
+          self_certify_disability: '1',
+          medical_provider_attributes: {
+            name: 'Dr. Smith',
+            phone: '555-123-4567',
+            email: 'dr.smith@example.com'
+          },
+          income_proof: fixture_file_upload(Rails.root.join('test/fixtures/files/income_proof.pdf'), 'application/pdf'),
+          residency_proof: fixture_file_upload(Rails.root.join('test/fixtures/files/residency_proof.pdf'), 'application/pdf'),
+          terms_accepted: '1',
+          information_verified: '1',
+          medical_release_authorized: '1'
         },
         submit_application: true
       }
@@ -110,7 +127,6 @@ module ConstituentPortal
     end
 
     test 'should properly process all disability types' do
-      skip 'Skipping due to authentication issues in integration tests'
       # Test each disability type individually
       disability_types = %i[hearing vision speech mobility cognition]
 
@@ -137,26 +153,52 @@ module ConstituentPortal
     end
 
     test 'should handle disability validation when transitioning from draft to submitted' do
-      skip 'Skipping due to authentication issues in integration tests'
       # Create a draft application first
       post constituent_portal_applications_path, params: @application_params
       application = Application.last
       assert_equal 'draft', application.status
 
-      # Try to submit without disabilities
+      # Try to submit without disabilities but with other required fields
       put constituent_portal_application_path(application), params: {
-        application: { household_size: 3 },
+        application: {
+          household_size: 3,
+          maryland_resident: '1',
+          annual_income: '50000',
+          self_certify_disability: '1',
+          medical_provider_attributes: {
+            name: 'Dr. Smith',
+            phone: '555-123-4567',
+            email: 'dr.smith@example.com'
+          },
+          terms_accepted: '1',
+          information_verified: '1',
+          medical_release_authorized: '1'
+        },
         submit_application: true
       }
 
       assert_response :unprocessable_entity
+      puts "Validation errors: #{response.body}"
       assert_match(/At least one disability must be selected/, response.body)
 
-      # Now add a disability and try again
+      # Now add a disability along with required fields
       put constituent_portal_application_path(application), params: {
         application: {
           household_size: 3,
-          cognition_disability: '1'
+          maryland_resident: '1',
+          annual_income: '50000',
+          self_certify_disability: '1',
+          cognition_disability: '1',
+          medical_provider_attributes: {
+            name: 'Dr. Smith',
+            phone: '555-123-4567',
+            email: 'dr.smith@example.com'
+          },
+          income_proof: fixture_file_upload(Rails.root.join('test/fixtures/files/income_proof.pdf'), 'application/pdf'),
+          residency_proof: fixture_file_upload(Rails.root.join('test/fixtures/files/residency_proof.pdf'), 'application/pdf'),
+          terms_accepted: '1',
+          information_verified: '1',
+          medical_release_authorized: '1'
         },
         submit_application: true
       }

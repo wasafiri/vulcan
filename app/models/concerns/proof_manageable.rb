@@ -176,14 +176,10 @@ module ProofManageable
     return false unless attachment.attached?
 
     # Check using attachment_changes (newer Rails versions)
-    if respond_to?(:attachment_changes) && attachment_changes["#{proof_type}_proof"].present?
-      return true
-    end
+    return true if respond_to?(:attachment_changes) && attachment_changes["#{proof_type}_proof"].present?
 
     # Check using saved_change_to_attribute? (older Rails versions/association changes)
-    if respond_to?(:saved_change_to_attribute?) && saved_change_to_attribute?("#{proof_type}_proof_attachment_id")
-      return true
-    end
+    return true if respond_to?(:saved_change_to_attribute?) && saved_change_to_attribute?("#{proof_type}_proof_attachment_id")
 
     false
   end
@@ -238,9 +234,9 @@ module ProofManageable
   end
 
   def log_proof_debug_info
-    Rails.logger.debug("Validating proof attachments for application #{id || 'new'}")
-    Rails.logger.debug("Income proof status: #{income_proof_status}, attached: #{income_proof.attached?}")
-    Rails.logger.debug("Residency proof status: #{residency_proof_status}, attached: #{residency_proof.attached?}")
+    Rails.logger.debug { "Validating proof attachments for application #{id || 'new'}" }
+    Rails.logger.debug { "Income proof status: #{income_proof_status}, attached: #{income_proof.attached?}" }
+    Rails.logger.debug { "Residency proof status: #{residency_proof_status}, attached: #{residency_proof.attached?}" }
   end
 
   def validate_approved_proofs
@@ -268,7 +264,7 @@ module ProofManageable
   def validate_not_reviewed_proofs
     # Skip this set of validations for paper applications, when reviewing a single proof,
     # or when resubmitting any proof
-    return if Thread.current[:paper_application_context] || 
+    return if Thread.current[:paper_application_context] ||
               Thread.current[:reviewing_single_proof] ||
               resubmitting_proof?
 
@@ -349,13 +345,11 @@ module ProofManageable
   end
 
   def require_proof_attachments
-    unless income_proof.attached?
-      errors.add(:income_proof, 'must be attached. Please upload your income documentation.')
-    end
+    errors.add(:income_proof, 'must be attached. Please upload your income documentation.') unless income_proof.attached?
 
-    unless residency_proof.attached?
-      errors.add(:residency_proof, 'must be attached. Please upload your proof of Maryland residency.')
-    end
+    return if residency_proof.attached?
+
+    errors.add(:residency_proof, 'must be attached. Please upload your proof of Maryland residency.')
   end
 
   # Determines if we're in the process of resubmitting a previously rejected proof
@@ -391,8 +385,8 @@ module ProofManageable
 
   # Generic method to check if a specific proof type is rejected and being updated
   def proof_rejected_and_being_updated?(proof_type)
-    status_rejected?(proof_type) && 
-      proof_attached?(proof_type) && 
+    status_rejected?(proof_type) &&
+      proof_attached?(proof_type) &&
       proof_being_updated?(proof_type)
   end
 
@@ -412,7 +406,7 @@ module ProofManageable
   # Check if the proof is currently being updated
   def proof_being_updated?(proof_type)
     # Early return for new records or if attachment_changes is not available
-    return false if new_record? || !respond_to?(:attachment_changes) 
+    return false if new_record? || !respond_to?(:attachment_changes)
 
     # Safely check for changes without assuming attachment_changes is a hash
     attachment_name = "#{proof_type}_proof"
@@ -420,9 +414,11 @@ module ProofManageable
   end
 
   def require_proof_validations?
-    # Only validate proofs when submitting (not for drafts)
-    # This checks if the application is being changed from draft to another status
+    # Skip validation for new records (attachments handled by AS on initial save)
+    return false if new_record?
+    # Skip validation for drafts
     return false if status_draft?
+    # Validate when transitioning from draft or already submitted
     return true if saved_change_to_status? && status_before_last_save == 'draft'
     return true if submitted?
 

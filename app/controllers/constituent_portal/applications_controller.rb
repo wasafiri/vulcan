@@ -155,6 +155,7 @@ module ConstituentPortal
 
     def new
       @application = current_user.applications.new
+      @application.medical_provider_attributes ||= {}
 
       # Pre-populate address fields from user profile
       @address = Address.new(
@@ -173,19 +174,50 @@ module ConstituentPortal
     # with clear responsibilities for each component.
     # @return [void] Redirects to application path or renders form with errors
     def create
-      # Extract user attributes from params
       user_attrs = extract_user_attributes(params)
-
-      # Initialize application as nil
-      @application = nil
-
-      # Pre-validate guardian relationship
+      is_submission = params[:submit_application].present?
       return render_guardian_validation_error(user_attrs) if guardian_relationship_missing?(user_attrs)
 
-      # Process the application creation within a transaction
-      success = process_application_creation(user_attrs)
+      # Update user attributes before initializing the application to avoid unsaved instance validations
+      attrs_to_update = user_attrs
+      begin
+        update_user_attributes(attrs_to_update)
+      rescue ActiveRecord::RecordInvalid => e
+        log_error("User update failed outside transaction: #{e.message}", e)
+        @application = current_user.applications.new(filtered_application_params)
+        @application.medical_provider_attributes ||= {}
+        initialize_address
+        build_medical_provider_for_form
+        return render :new, status: :unprocessable_entity
+      end
 
-      # Handle the result of the creation attempt
+      # Initialize application after user update
+      log_debug("Raw application_params: #{application_params.inspect}")
+      filtered_params = filtered_application_params
+      log_debug("Filtered application_params: #{filtered_params.inspect}")
+      @application = current_user.applications.new(filtered_params)
+
+      success = ActiveRecord::Base.transaction do
+        if is_submission && !current_user.disability_selected?
+          @application.errors.add(:base, 'At least one disability must be selected before submitting an application.')
+          raise ActiveRecord::Rollback
+        end
+
+        set_guardian_status(@application, user_attrs)
+        set_initial_application_attributes(@application, is_submission)
+        set_medical_provider_details(@application)
+        @application.assign_attributes(submission_params) if is_submission
+
+        begin
+          save_application_with_event_log!
+        rescue ActiveRecord::RecordInvalid => e
+          log_error("Application save failed: #{@application.errors.full_messages.join(', ')}", e)
+          raise ActiveRecord::Rollback
+        end
+
+        true
+      end
+
       handle_application_creation_result(success)
     end
 
@@ -212,79 +244,6 @@ module ConstituentPortal
       initialize_address
 
       render :new, status: :unprocessable_entity
-    end
-
-    # Process application creation within a transaction
-    # @param user_attrs [Hash] User attributes from params
-    # @return [Boolean] Whether the creation was successful
-    def process_application_creation(user_attrs)
-      ActiveRecord::Base.transaction do
-        # Step 1: Update user attributes
-        return false unless update_user_with_error_handling(user_attrs)
-
-        # Step 2: Verify disability attributes
-        return false unless validate_disability_selection
-
-        # Step 3: Create and configure the application
-        return false unless build_and_save_application(user_attrs)
-
-        true
-      rescue ActiveRecord::RecordInvalid => e
-        handle_transaction_failure(e, 'application creation')
-        false
-      end
-    end
-
-    # Update user and handle any errors
-    # @param user_attrs [Hash] User attributes to update
-    # @return [Boolean] Whether the update was successful
-    def update_user_with_error_handling(user_attrs)
-      unless update_user_attributes(user_attrs)
-        # User update failed, prepare application with errors
-        @application = current_user.applications.new(filtered_application_params)
-        @application.errors.merge!(current_user.errors)
-        return false
-      end
-
-      # Force reload the user to ensure we have the latest state
-      current_user.reload
-      true
-    end
-
-    # Validate that the user has selected at least one disability
-    # @return [Boolean] Whether validation passed
-    def validate_disability_selection
-      return true if current_user.has_disability_selected?
-
-      # Log the error and prepare application with error
-      log_error("User does not have any disability selected after update: #{current_user.attributes.inspect}")
-      @application = current_user.applications.new(filtered_application_params)
-      @application.errors.add(:base, 'At least one disability must be selected before submitting an application.')
-
-      # Flag for view preparation
-      @prepare_view_for_disability_error = true
-      false
-    end
-
-    # Build, configure and save the application
-    # @param user_attrs [Hash] User attributes (used for guardian status)
-    # @return [Boolean] Whether the application was successfully created
-    def build_and_save_application(user_attrs)
-      # Create new application
-      @application = current_user.applications.new(filtered_application_params)
-
-      # Set guardian status
-      set_guardian_status(@application, user_attrs)
-
-      # Set initial attributes and medical provider details
-      set_initial_application_attributes(@application)
-      set_medical_provider_details(@application)
-
-      # Log application info for debugging if needed
-      debug_application_info(@application, params) unless @application.new_record?
-
-      # Validate and save
-      save_application_with_event_log
     end
 
     # Set guardian status on application
@@ -392,7 +351,46 @@ module ConstituentPortal
       log_update_debug_info(user_attrs)
 
       # Process the application update within a transaction
-      success = process_application_update(application_attrs, user_attrs)
+      is_submission = params[:submit_application].present?
+      success = ActiveRecord::Base.transaction do
+        # Ensure user association is maintained (important before user update)
+        @application.user = current_user
+
+        # Update user attributes
+        # Let update! raise error on failure, causing transaction rollback
+        attrs_to_update = user_attrs
+        update_user_attributes(attrs_to_update) # Calls update!
+
+        # Validate disability ONLY if submitting from draft
+        if is_submission && original_status == 'draft'
+          # Check disability flags directly from the processed user_attrs instead of reloading current_user
+          disability_flags = [
+            user_attrs[:hearing_disability], user_attrs[:vision_disability], user_attrs[:speech_disability],
+            user_attrs[:mobility_disability], user_attrs[:cognition_disability]
+          ]
+          unless disability_flags.any? { |flag| flag == true }
+            log_error("User attributes do not indicate any disability selected during update submission: #{user_attrs.inspect}")
+            @application.errors.add(:base, 'At least one disability must be selected before submitting.')
+            raise ActiveRecord::Rollback # Rollback transaction
+          end
+        end
+
+        # Assign application attributes
+        @application.assign_attributes(application_attrs)
+
+        # Save application with potential status change (raises error on failure)
+        save_application_with_status_update!(is_submission) # Use bang method
+
+        true # Transaction successful
+      rescue ActiveRecord::RecordInvalid => e # Catch validation errors
+        log_error("Application update failed validation: #{e.message}", e)
+        # Merge errors onto the @application instance AFTER transaction
+        @application.errors.merge!(current_user.errors) if current_user.errors.any? && @application.errors.empty?
+        false # Transaction failed
+      rescue StandardError => e # Catch other potential errors
+        handle_transaction_failure(e, 'application update')
+        false # Transaction failed
+      end
 
       # Handle the result of the update
       handle_application_update_result(success, original_status)
@@ -401,24 +399,28 @@ module ConstituentPortal
     # Prepare application attributes with proper formatting
     # @return [Hash] Application attributes ready for update
     def prepare_application_attributes
-      # Ensure we're not passing user address fields to the application
+      # Use filtered_application_params to exclude user/disability fields
+      # Merge formatted income
       filtered_application_params.merge(
         annual_income: params[:application][:annual_income]&.gsub(/[^\d.]/, '')
-      ).except(:physical_address_1, :physical_address_2, :city, :state, :zip_code)
+      )
     end
 
     # Prepare user attributes from params for update operation
-    # @return [Hash] User attributes with proper types
+    # Assumes cast_boolean_params before_action has already run
+    # @return [Hash] User attributes extracted from params
     def prepare_user_attributes_for_update
-      {
-        is_guardian: ['1', true].include?(params[:application][:is_guardian]),
-        guardian_relationship: params[:application][:guardian_relationship],
-        hearing_disability: ['1', true].include?(params[:application][:hearing_disability]),
-        vision_disability: ['1', true].include?(params[:application][:vision_disability]),
-        speech_disability: ['1', true].include?(params[:application][:speech_disability]),
-        mobility_disability: ['1', true].include?(params[:application][:mobility_disability]),
-        cognition_disability: ['1', true].include?(params[:application][:cognition_disability])
-      }
+      # Permit only the user-related attributes from the application params
+      # Use .to_h.symbolize_keys to ensure we get a hash with symbol keys
+      params.require(:application).permit(
+        :is_guardian,
+        :guardian_relationship,
+        :hearing_disability,
+        :vision_disability,
+        :speech_disability,
+        :mobility_disability,
+        :cognition_disability
+      ).to_h.symbolize_keys
     end
 
     # Log debug information relevant to the update
@@ -430,57 +432,9 @@ module ConstituentPortal
       log_debug "Before transaction - Current user ID: #{current_user.id}"
     end
 
-    # Process application update within a transaction
-    # @param application_attrs [Hash] Application attributes to update
-    # @param user_attrs [Hash] User attributes to update
-    # @return [Boolean] Whether the update was successful
-    def process_application_update(application_attrs, user_attrs)
-      ActiveRecord::Base.transaction do
-        # Ensure user association is maintained
-        @application.user = current_user
-        @application.assign_attributes(application_attrs)
-
-        # Update user attributes
-        user_update_success = update_user_attributes(user_attrs)
-
-        # Double-check user association is still intact
-        ensure_user_association_maintained
-
-        # Save application with potential status change
-        save_application_with_status_update(user_update_success)
-      rescue ActiveRecord::RecordInvalid => e
-        handle_transaction_failure(e, 'application update')
-        false
-      end
-    end
-
-    # Ensure the user association is maintained after attribute assignment
-    # @return [void]
-    def ensure_user_association_maintained
-      return unless @application.user_id.nil?
-
-      log_error 'User association lost after attribute assignment'
-      @application.user = current_user
-    end
-
-    # Save application with potential status update
-    # @param user_update_success [Boolean] Whether user update was successful
-    # @return [Boolean] Whether the save was successful
-    def save_application_with_status_update(user_update_success)
-      return false unless user_update_success && @application.save
-
-      # Update status if submitting a draft application
-      if params[:submit_application].present? && @application.draft?
-        log_debug 'Setting application status to in_progress'
-        @application.status = :in_progress
-        @application.save!
-      end
-
-      true
-    rescue StandardError => e
-      log_error "Failed to save application: #{@application.errors.full_messages.join(', ')}", e
-      false
-    end
+    # Removed process_application_update - logic moved into update action transaction
+    # Removed ensure_user_association_maintained - handled within transaction
+    # Removed save_application_with_status_update - replaced with bang version below
 
     # Handle the result of an application update
     # @param success [Boolean] Whether the update was successful
@@ -519,7 +473,8 @@ module ConstituentPortal
     # @param original_status [Symbol] The original status of the application
     # @return [String] The notice message
     def determine_update_notice(original_status)
-      if @application.status != original_status && @application.in_progress?
+      # Use the correct enum check method: status_in_progress?
+      if @application.status != original_status && @application.status_in_progress?
         'Application submitted successfully!'
       else
         'Application saved successfully.'
@@ -785,10 +740,63 @@ module ConstituentPortal
       render json: { thresholds: thresholds, modifier: modifier }
     end
 
+    # Save application with potential status update (bang version)
+    # @param is_submission [Boolean] Whether this is a submission
+    # @return [void] Raises ActiveRecord::RecordInvalid on failure
+    def save_application_with_status_update!(is_submission)
+      # Assign status based on submission flag *before* saving
+      # Use the correct enum check method: status_draft?
+      if is_submission && @application.status_draft?
+        log_debug 'Setting application status to in_progress for submission'
+        @application.status = :in_progress
+      end
+      @application.save! # Use bang method
+    end
+
+    # Removed validate_disability_selection_for_update - logic moved into transaction
+
+    # Helper to filter out disability attributes
+    # @param attrs [Hash] Original user attributes hash
+    # @return [Hash] Attributes hash without disability keys
+    def user_attrs_without_disabilities(attrs)
+      attrs.except(
+        :hearing_disability, :vision_disability, :speech_disability,
+        :mobility_disability, :cognition_disability
+      )
+    end
+
     private
 
-    def set_initial_application_attributes(app)
-      app.status = params[:submit_application] ? :in_progress : :draft
+    # Update user attributes (simplified - raises error on failure)
+    # @param attrs [Hash] The attributes to update
+    # @return [void] Raises ActiveRecord::RecordInvalid on failure
+    def update_user_attributes(attrs)
+      processed_attrs = process_user_attributes(attrs)
+      ensure_consistent_constituent_type(processed_attrs)
+      current_user.update!(processed_attrs) # Use bang method
+      current_user.reload # Reload after successful update
+      log_user_update_details
+    end
+
+    # Save application and create event log (bang version)
+    # @return [void] Raises ActiveRecord::RecordInvalid on failure
+    def save_application_with_event_log!
+      @application.save! # Use bang method
+
+      Event.create!(
+        user: current_user,
+        action: 'application_created',
+        metadata: {
+          application_id: @application.id,
+          submission_method: 'online',
+          initial_status: @application.status,
+          timestamp: Time.current.iso8601
+        }
+      )
+    end
+
+    def set_initial_application_attributes(app, is_submission)
+      app.status = is_submission ? :in_progress : :draft
       app.application_date = Time.current
       app.submission_method = :online
       app.application_type ||= :new
@@ -802,13 +810,8 @@ module ConstituentPortal
         vision_disability: ['1', true].include?(p[:application][:vision_disability]),
         speech_disability: ['1', true].include?(p[:application][:speech_disability]),
         mobility_disability: ['1', true].include?(p[:application][:mobility_disability]),
-        cognition_disability: ['1', true].include?(p[:application][:cognition_disability]),
-        # Address fields
-        physical_address_1: p[:application][:physical_address_1],
-        physical_address_2: p[:application][:physical_address_2],
-        city: p[:application][:city],
-        state: p[:application][:state],
-        zip_code: p[:application][:zip_code]
+        cognition_disability: ['1', true].include?(p[:application][:cognition_disability])
+        # Address fields removed - handle profile updates separately
       }
     end
 
@@ -839,6 +842,7 @@ module ConstituentPortal
     end
 
     def build_medical_provider_for_form
+      @application.medical_provider_attributes ||= {} if @application
       @medical_provider = MedicalProviderInfo.new(
         name: find_param_value(:name, :medical_provider),
         phone: find_param_value(:phone, :medical_provider),
@@ -859,7 +863,9 @@ module ConstituentPortal
     end
 
     def filtered_application_params
+      # Exclude medical_provider_attributes as they are handled separately
       application_params.except(
+        :medical_provider_attributes,
         :is_guardian,
         :guardian_relationship,
         :hearing_disability,
@@ -902,26 +908,13 @@ module ConstituentPortal
     # Find application using the standard association
     # @return [Application, nil] The found application or nil
     def find_application_by_standard_query
-      application = current_user.applications.find_by(id: params[:id])
-      log_debug("Standard query for application #{params[:id]} result: #{application&.id || 'not found'}")
-      application
+      current_user.applications.find_by(id: params[:id])
     end
 
     # Find application using a more flexible query to work around STI issues
     # @return [Application, nil] The found application or nil
     def find_application_by_flexible_query
-      # Direct query bypassing association to handle potential STI type issues
-      application = Application.where(id: params[:id])
-                               .where(user_id: current_user.id)
-                               .first
-
-      if application
-        log_debug("Found application #{application.id} using flexible query")
-      else
-        log_debug("Application #{params[:id]} not found with flexible query")
-      end
-
-      application
+      Application.find_by(id: params[:id], user_id: current_user.id)
     end
 
     # Handle the case when application is not found
@@ -939,7 +932,7 @@ module ConstituentPortal
     end
 
     def application_params
-      base_params = params.require(:application).permit(
+      params.require(:application).permit(
         :application_type,
         :submission_method,
         :maryland_resident,
@@ -960,47 +953,41 @@ module ConstituentPortal
         :speech_disability,
         :mobility_disability,
         :cognition_disability,
-        # Address fields that will be used for the user model
         :physical_address1,
         :physical_address2,
         :city,
         :state,
         :zip_code,
+        # Permit nested attributes directly
         medical_provider_attributes: %i[name phone fax email]
       )
-      if base_params[:medical_provider_attributes].present?
-        mp = base_params.delete(:medical_provider_attributes)
-        base_params.merge(mp.transform_keys { |key| "medical_provider_#{key}" })
-      else
-        base_params
-      end
+      # Remove the key transformation logic
+      # Return params with nested attributes if present
     end
 
     def user_params
-      params.require(:application).permit(
-        :is_guardian,
-        :guardian_relationship,
-        :hearing_disability,
-        :vision_disability,
-        :speech_disability,
-        :mobility_disability,
-        :cognition_disability
-      ).transform_values { |v| ActiveModel::Type::Boolean.new.cast(v) }
+      params.expect(application: %i[is_guardian guardian_relationship
+                                    hearing_disability vision_disability
+                                    speech_disability mobility_disability
+                                    cognition_disability]).transform_values { |v| ActiveModel::Type::Boolean.new.cast(v) }
     end
 
+    # Strong params for the verify step
     def verification_params
-      params.require(:application).permit(
-        :terms_accepted,
-        :information_verified,
-        :medical_release_authorized
-      )
+      params
+        .expect(application: %i[terms_accepted information_verified medical_release_authorized])
     end
 
+    # Extract and prefix nested medical_provider attributes (if present)
     def medical_provider_params
       if params.dig(:application, :medical_provider_attributes).present?
-        params[:application].require(:medical_provider_attributes)
-                            .permit(:name, :phone, :fax, :email)
-                            .transform_keys { |key| "medical_provider_#{key}" }
+        mp = params
+             .require(:application)
+             .require(:medical_provider_attributes)
+             .permit(:name, :phone, :fax, :email)
+
+        # Use transform_keys with symbol interpolation
+        mp.transform_keys { |key| :"medical_provider_#{key}" }
       else
         {}
       end
@@ -1010,27 +997,6 @@ module ConstituentPortal
       return if current_user&.constituent?
 
       redirect_to root_path, alert: 'Access denied. Constituent-only area.'
-    end
-
-    # Update user attributes with proper type handling and error management
-    # @param attrs [Hash] The attributes to update
-    # @return [Boolean] Whether the update was successful
-    def update_user_attributes(attrs)
-      log_debug("Updating user attributes: #{attrs.inspect}")
-
-      begin
-        # Process attributes with proper type casting
-        processed_attrs = process_user_attributes(attrs)
-
-        # Ensure constituent type for proper STI handling
-        ensure_consistent_constituent_type(processed_attrs)
-
-        # Save the user attributes
-        save_user_with_error_handling(processed_attrs)
-      rescue StandardError => e
-        log_error('User attribute update failed', e)
-        false
-      end
     end
 
     # Process user attributes with type casting
@@ -1066,12 +1032,10 @@ module ConstituentPortal
     end
 
     # Process address attributes for user
-    # @param attrs [Hash] Raw attributes from params
-    # @param processed_attrs [Hash] Hash to add processed attributes to
-    def process_address_attributes(attrs, processed_attrs)
-      %i[physical_address_1 physical_address_2 city state zip_code].each do |attr|
-        processed_attrs[attr] = attrs[attr] if attrs[attr].present?
-      end
+    # @param _attrs [Hash] Raw attributes from params (unused)
+    # @param _processed_attrs [Hash] Hash to add processed attributes to (unused)
+    def process_address_attributes(_attrs, _processed_attrs)
+      # No-op: Address updates should be handled separately from application creation/update
     end
 
     # Ensure the user has the correct STI type for associations
@@ -1080,7 +1044,6 @@ module ConstituentPortal
       # IMPORTANT: Set type to "Users::Constituent" to match Application model's association
       # This fixes the STI type mismatch between Constituent and Users::Constituent
       processed_attrs[:type] = 'Users::Constituent'
-      log_debug("Setting user type to 'Users::Constituent' to match association (was: #{current_user.type})")
     end
 
     # Save user with proper error handling and logging
@@ -1142,7 +1105,6 @@ module ConstituentPortal
         value = params[:application][field]
         value = value.last if value.is_a?(Array)
         params[:application][field] = ActiveModel::Type::Boolean.new.cast(value)
-        log_debug("#{field} after casting: #{params[:application][field].inspect}")
       end
     end
 

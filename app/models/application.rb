@@ -4,6 +4,9 @@
 # Manages the application lifecycle including proof submission, review,
 # medical certification, training sessions, evaluations, and voucher issuance
 class Application < ApplicationRecord
+  # Virtual attribute to hold nested medical provider params for the form
+  attr_accessor :medical_provider_attributes
+
   delegate :guardian_relationship, :guardian_relationship=, to: :user, allow_nil: true
 
   # Concerns
@@ -23,7 +26,6 @@ class Application < ApplicationRecord
              inverse_of: :applications
   belongs_to :income_verified_by,
              class_name: 'User',
-             foreign_key: :income_verified_by_id,
              optional: true,
              inverse_of: :income_verified_applications
   has_many :training_sessions, class_name: 'TrainingSession'
@@ -65,14 +67,13 @@ class Application < ApplicationRecord
 
   # Validations
   validates :user, :application_date, :status, presence: true
-  validates :maryland_resident, inclusion: { in: [true],
-                                             message: 'You must be a Maryland resident to apply' }
+  validates :maryland_resident, inclusion: { in: [true], message: 'You must be a Maryland resident to apply' }, unless: :status_draft?
   validates :terms_accepted, :information_verified, :medical_release_authorized,
             acceptance: { accept: true }, if: :submitted?
   validates :medical_provider_name, :medical_provider_phone, :medical_provider_email,
             presence: true, unless: :status_draft?
-  validates :household_size, :annual_income, presence: true
-  validates :self_certify_disability, inclusion: { in: [true, false] }
+  validates :household_size, :annual_income, presence: true, unless: :status_draft?
+  validates :self_certify_disability, inclusion: { in: [true, false] }, unless: :status_draft?
   validates :guardian_relationship, presence: true, if: :is_guardian?
 
   validate :waiting_period_completed, on: :create
@@ -92,9 +93,18 @@ class Application < ApplicationRecord
   scope :approved, -> { where(status: :approved) }
 
   # Alias scopes for approved applications
-  scope :complete, -> { approved }
-  scope :needs_evaluation, -> { approved }
-  scope :needs_training, -> { approved }
+  # Alias scope for approved applications
+  scope :complete, lambda {
+    where.not(status: :draft) # Application submitted
+         .where(residency_proof_status: :approved)      # Residency approved
+         .where(income_proof_status: :approved)         # Income approved
+         .joins(:vouchers)                              # Must have at least one voucher issued
+         .where(
+           'NOT EXISTS (SELECT 1 FROM vouchers v WHERE v.application_id = applications.id AND v.status != ?)',
+           Voucher.statuses[:redeemed]
+         )
+         .distinct # Avoid duplicates due to the join
+  }
 
   scope :needs_income_review, -> { where(income_proof_status: :not_reviewed) }
   scope :needs_residency_review, -> { where(residency_proof_status: :not_reviewed) }
@@ -180,7 +190,7 @@ class Application < ApplicationRecord
     return true if latest_review.nil? && latest_audit.present?
 
     # Case 2: Has a new submission after the last review
-    return latest_audit.present? && latest_review.present? && latest_audit.created_at > latest_review.created_at
+    latest_audit.present? && latest_review.present? && latest_audit.created_at > latest_review.created_at
   end
 
   # Determines the appropriate proof review button text based on proof status
@@ -274,7 +284,7 @@ class Application < ApplicationRecord
   end
 
   # === Compatibility Methods ===
-  # These methods ensure backward compatibility with code that expects 
+  # These methods ensure backward compatibility with code that expects
   # the previous enum method naming pattern with suffix
 
   # Income proof status compatibility methods
@@ -347,9 +357,9 @@ class Application < ApplicationRecord
     return unless last_app
 
     waiting_period = Policy.get('waiting_period_years') || 3
-    if last_app.application_date > waiting_period.years.ago
-      errors.add(:base, "You must wait #{waiting_period} years before submitting a new application.")
-    end
+    return unless last_app.application_date > waiting_period.years.ago
+
+    errors.add(:base, "You must wait #{waiting_period} years before submitting a new application.")
   end
 
   def user_applications_except_current
@@ -389,10 +399,10 @@ class Application < ApplicationRecord
 
   def is_guardian?
     # Get the value from the form submission if it's being processed
-    if @attributes && @attributes["is_guardian"].present?
+    if @attributes && @attributes['is_guardian'].present?
       # Use the form-submitted value
-      ActiveModel::Type::Boolean.new.cast(@attributes["is_guardian"].value)
-    elsif user&.changed? && user.changes.include?("is_guardian")
+      ActiveModel::Type::Boolean.new.cast(@attributes['is_guardian'].value)
+    elsif user&.changed? && user.changes.include?('is_guardian')
       # User has pending changes that aren't saved yet
       user.is_guardian_will_change
     else
