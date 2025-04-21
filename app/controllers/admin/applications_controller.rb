@@ -150,45 +150,28 @@ module Admin
       respond_to(&:js)
     end
 
-    # Updates the proof status of an application
+    # Updates the proof status of an application using ProofReviewService
     # Handles both income and residency proof reviews
     def update_proof_status
-      validate_proof_review_params
-
       admin_user = validate_and_prepare_admin_user
 
-      log_proof_review_start
+      # Instantiate and call the service
+      service = ProofReviewService.new(@application, admin_user, params)
+      result = service.call
 
-      Thread.current[:reviewing_single_proof] = true
-
-      begin
-        execute_proof_review(admin_user)
-        handle_successful_review
-      rescue StandardError => e
-        handle_review_error(e)
-      ensure
-        Thread.current[:reviewing_single_proof] = nil
+      # Handle the result from the service
+      if result.success?
+        handle_successful_review # This handles both HTML and Turbo Stream success
+      else
+        # Handle failure for both HTML and Turbo Stream
+        respond_to do |format|
+          format.html { render :show, status: :unprocessable_entity, alert: result.message }
+          format.turbo_stream do
+            flash.now[:error] = result.message
+            render turbo_stream: turbo_stream.update('flash', partial: 'shared/flash')
+          end
+        end
       end
-    end
-
-    # Validates proof review parameters
-    def validate_proof_review_params
-      proof_type = params[:proof_type]
-      status = params[:status]
-
-      if proof_type.blank? || status.blank?
-        redirect_with_alert('Proof type and status are required')
-        return
-      end
-
-      unless %w[income residency].include?(proof_type)
-        redirect_with_alert('Invalid proof type')
-        return
-      end
-
-      return if %w[approved rejected].include?(status)
-
-      redirect_with_alert('Invalid status')
     end
 
     # Validates the admin user and reloads if necessary
@@ -208,51 +191,12 @@ module Admin
       end
     end
 
-    # Executes the proof review using the ProofReviewer service
-    # @param admin_user [User] The admin user performing the review
-    def execute_proof_review(admin_user)
-      Rails.logger.info "Admin user prepared for proof review: #{admin_user.inspect}"
-      Rails.logger.info "Prepared admin - Type: #{admin_user.type}, admin? result: #{admin_user.admin?}"
-
-      reviewer = Applications::ProofReviewer.new(@application, admin_user)
-
-      reviewer.review(
-        proof_type: params[:proof_type],
-        status: params[:status],
-        rejection_reason: params[:rejection_reason],
-        notes: params[:notes]
-      )
-
-      Rails.logger.info 'Proof review completed successfully'
-    end
-
     # Handles a successful proof review
     def handle_successful_review
       respond_to do |format|
         format.html { redirect_with_notice("#{params[:proof_type].capitalize} proof #{params[:status]} successfully.") }
         format.turbo_stream { handle_turbo_stream_success }
       end
-    end
-
-    # Handles errors during proof review
-    # @param error [StandardError] The error that occurred
-    def handle_review_error(error)
-      log_review_error(error)
-
-      respond_to do |format|
-        format.html { render :show, status: :unprocessable_entity, alert: error.message }
-        format.turbo_stream do
-          flash.now[:error] = error.message
-          render turbo_stream: turbo_stream.update('flash', partial: 'shared/flash')
-        end
-      end
-    end
-
-    # Logs detailed information about review errors
-    # @param error [StandardError] The error that occurred
-    def log_review_error(error)
-      Rails.logger.error "Proof review failed: #{error.message}"
-      Rails.logger.error error.backtrace.join("\n")
     end
 
     # Handles turbo_stream success response for proof review
@@ -677,11 +621,6 @@ module Admin
     end
 
     private
-
-    def log_proof_review_start
-      Rails.logger.info 'Starting proof review in controller'
-      Rails.logger.info "Parameters: proof_type=#{params[:proof_type]}, status=#{params[:status]}"
-    end
 
     # --- Turbo Stream Success Helpers ---
 
