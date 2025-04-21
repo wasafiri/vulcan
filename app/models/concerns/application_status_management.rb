@@ -90,18 +90,10 @@ module ApplicationStatusManagement
     !status_draft?
   end
 
-  # Status update methods
-  def approve!
-    update!(status: :approved)
-  end
-
-  def reject!
-    update!(status: :rejected)
-  end
-
-  def request_documents!
-    update!(status: :awaiting_documents)
-  end
+  # NOTE: Basic status update methods (approve!, reject!, request_documents!)
+  # were previously defined here but are now overridden in the Application model
+  # to delegate to service objects. They have been removed from this concern
+  # to avoid confusion.
 
   private
 
@@ -161,7 +153,7 @@ module ApplicationStatusManagement
 
     begin
       Event.create!(
-        user: nil,  # nil user indicates system action
+        user: nil, # nil user indicates system action
         action: 'application_auto_approved',
         metadata: {
           application_id: id,

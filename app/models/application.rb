@@ -127,47 +127,25 @@ class Application < ApplicationRecord
 
   # Status methods - using the robust implementation from the class (with events and voucher creation)
   # (Note: these override the simpler implementations from ApplicationStatusManagement)
-  def approve!
-    with_lock do
-      update!(status: :approved)
-
-      # Create event for approval
-      Event.create!(
-        user: Current.user,
-        action: 'application_approved',
-        metadata: {
-          application_id: id,
-          timestamp: Time.current.iso8601
-        }
-      )
-
-      # Create initial voucher
-      create_initial_voucher if can_create_voucher?
-    end
-  rescue StandardError => e
-    Rails.logger.error "Failed to approve application #{id}: #{e.message}"
-    false
+  # Delegates approval logic to the Applications::Approver service object
+  # @param user [User] The user performing the action (defaults to Current.user)
+  # @return [Boolean] Result from the service call
+  def approve!(user: Current.user)
+    Applications::Approver.new(self, by: user).call
   end
 
-  def reject!
-    with_lock do
-      update!(status: :rejected)
-    end
-  rescue StandardError => e
-    Rails.logger.error "Failed to reject application #{id}: #{e.message}"
-    false
+  # Delegates rejection logic to the Applications::Rejecter service object
+  # @param user [User] The user performing the action (defaults to Current.user)
+  # @return [Boolean] Result from the service call
+  def reject!(user: Current.user)
+    Applications::Rejecter.new(self, by: user).call
   end
 
-  def request_documents!
-    with_lock do
-      update!(status: :awaiting_documents)
-      Notification.create!(
-        recipient: user,
-        actor: Current.user,
-        action: 'documents_requested',
-        notifiable: self
-      )
-    end
+  # Delegates document request logic to the Applications::DocumentRequester service object
+  # @param user [User] The user performing the action (defaults to Current.user)
+  # @return [Boolean] Result from the service call
+  def request_documents!(user: Current.user)
+    Applications::DocumentRequester.new(self, by: user).call
   end
 
   def constituent_full_name
