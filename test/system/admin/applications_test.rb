@@ -99,5 +99,65 @@ module Admin
       @application.reload
       assert_equal 'rejected', @application.medical_certification_status
     end
+
+    test 'audit log shows medical certification requested event after proofs approved' do
+      # Override status for this specific test, ensuring proofs are pending review
+      @application.update!(medical_certification_status: :not_requested,
+                           income_proof_status: :pending,
+                           residency_proof_status: :pending)
+
+      # Ensure proofs are attached (redundant if setup guarantees it, but safe)
+      unless @application.income_proof.attached?
+        @application.income_proof.attach(io: File.open(Rails.root.join('test/fixtures/files/income_proof.pdf')),
+                                         filename: 'income_proof.pdf', content_type: 'application/pdf')
+      end
+      unless @application.residency_proof.attached?
+        @application.residency_proof.attach(io: File.open(Rails.root.join('test/fixtures/files/residency_proof.pdf')),
+                                            filename: 'residency_proof.pdf', content_type: 'application/pdf')
+      end
+
+      visit admin_application_path(@application)
+
+      # Approve Income Proof
+      # Assuming a structure like: <div class="proof-section ..."> ... <h3>Income Proof</h3> ... <a ...>Review Proof</a> ... </div>
+      # And a modal with id #incomeProofReviewModal
+      within '#attachments-section .proof-section', text: /Income Proof/ do
+        click_on 'Review Proof'
+      end
+      within '#incomeProofReviewModal' do # Adjust modal ID if needed based on actual implementation
+        click_on 'Approve'
+      end
+      # Wait for potential AJAX updates and check status text within the specific proof section
+      within '#attachments-section .proof-section', text: /Income Proof/ do
+        assert_text 'Status: Approved', wait: 5 # Adjust text if needed (e.g., "Approved")
+      end
+
+      # Approve Residency Proof
+      # Assuming a structure like: <div class="proof-section ..."> ... <h3>Residency Proof</h3> ... <a ...>Review Proof</a> ... </div>
+      # And a modal with id #residencyProofReviewModal
+      within '#attachments-section .proof-section', text: /Residency Proof/ do
+        click_on 'Review Proof'
+      end
+      within '#residencyProofReviewModal' do # Adjust modal ID if needed based on actual implementation
+        click_on 'Approve'
+      end
+      # Wait for potential AJAX updates and check status text within the specific proof section
+      within '#attachments-section .proof-section', text: /Residency Proof/ do
+        assert_text 'Status: Approved', wait: 5 # Adjust text if needed (e.g., "Approved")
+      end
+
+      # Verify Audit Log Entry
+      # Refresh the page to ensure the audit log reflects the latest events triggered by callbacks
+      visit admin_application_path(@application)
+      within '#audit-logs' do
+        assert_text 'Medical certification requested (triggered by: All Proofs Approved)'
+      end
+
+      # Verify application state
+      @application.reload
+      assert_equal 'requested', @application.medical_certification_status
+      assert_equal 'approved', @application.income_proof_status
+      assert_equal 'approved', @application.residency_proof_status
+    end
   end
 end

@@ -186,6 +186,9 @@
                     when "application_auto_approved"
                       trigger = log.metadata['trigger'].to_s.gsub('proof_', '').titleize
                       "Application automatically approved after all proofs validated (triggered by: #{trigger})"
+                    when "medical_certification_requested"
+                      trigger = log.metadata['trigger']&.titleize || 'System'
+                      "Medical certification requested (triggered by: #{trigger})"
                     when "voucher_assigned"
                       "Voucher #{log.metadata['voucher_code']} assigned with value #{number_to_currency(log.metadata['initial_value'])}"
                     when "voucher_redeemed"
