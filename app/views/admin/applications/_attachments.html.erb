@@ -125,14 +125,14 @@
             <% end %>
           <% else %>
             <!-- Show review button for pending submissions or non-approved proofs -->
-            <button type="button"
-                    data-action="click->modal#open"
-                    data-modal-id="incomeProofReviewModal"
-                    data-proof-type="income"
-                    class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white <%= @application.proof_review_button_class('income') %> focus:outline-none">
-              <%= @application.proof_review_button_text("income") %>
-            </button>
-          <% end %>
+                  <button type="button"
+                          data-action="click->proof-review#openModal"
+                          data-proof-type="income"
+                          class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white <%= proof_review_button_class(@application, 'income') %> focus:outline-none">
+                    <%= heroicon "document-magnifying-glass", options: { class: "h-5 w-5 mr-2" } %>
+                    <%= proof_review_button_text(@application, "income") %>
+                  </button>
+                <% end %>
         <% else %>
           <span class="text-sm text-gray-500">Not Attached</span>
         <% end %>
@@ -266,14 +266,14 @@
             <% end %>
           <% else %>
             <!-- Show review button for pending submissions or non-approved proofs -->
-            <button type="button"
-                    data-action="click->modal#open"
-                    data-modal-id="residencyProofReviewModal"
-                    data-proof-type="residency"
-                    class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white <%= @application.proof_review_button_class('residency') %> focus:outline-none">
-              <%= @application.proof_review_button_text("residency") %>
-            </button>
-          <% end %>
+                  <button type="button"
+                          data-action="click->proof-review#openModal"
+                          data-proof-type="residency"
+                          class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white <%= proof_review_button_class(@application, 'residency') %> focus:outline-none">
+                    <%= heroicon "document-magnifying-glass", options: { class: "h-5 w-5 mr-2" } %>
+                    <%= proof_review_button_text(@application, "residency") %>
+                  </button>
+                <% end %>
         <% else %>
           <span class="text-sm text-gray-500">Not Attached</span>
         <% end %>

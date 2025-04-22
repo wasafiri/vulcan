@@ -90,11 +90,6 @@ module ApplicationStatusManagement
     !status_draft?
   end
 
-  # NOTE: Basic status update methods (approve!, reject!, request_documents!)
-  # were previously defined here but are now overridden in the Application model
-  # to delegate to service objects. They have been removed from this concern
-  # to avoid confusion.
-
   private
 
   def handle_status_change

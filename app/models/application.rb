@@ -170,43 +170,6 @@ class Application < ApplicationRecord
     latest_audit.present? && latest_review.present? && latest_audit.created_at > latest_review.created_at
   end
 
-  # Determines the appropriate proof review button text based on proof status
-  # @param proof_type [String] The type of proof ("income" or "residency")
-  # @return [String] The appropriate button text
-  def proof_review_button_text(proof_type)
-    latest_review, latest_audit = latest_review_and_audit(proof_type)
-
-    if latest_review&.status_rejected?
-      if latest_audit && latest_review && latest_audit.created_at > latest_review.created_at
-        'Review Resubmitted Proof'
-      else
-        'Review Rejected Proof'
-      end
-    else
-      'Review Proof'
-    end
-  end
-
-  # Determines the appropriate CSS classes for the proof review button
-  # @param proof_type [String] The type of proof ("income" or "residency")
-  # @return [String] The appropriate CSS class string for the button
-  def proof_review_button_class(proof_type)
-    latest_review, latest_audit = latest_review_and_audit(proof_type)
-
-    if latest_review&.status_rejected?
-      if latest_audit && latest_review && latest_audit.created_at > latest_review.created_at
-        # Resubmitted proof - keep blue
-        'bg-blue-600 hover:bg-blue-700'
-      else
-        # Rejected proof - use red
-        'bg-red-600 hover:bg-red-700'
-      end
-    else
-      # Initial review - keep blue
-      'bg-blue-600 hover:bg-blue-700'
-    end
-  end
-
   # Application status change tracking
   def update_status(new_status, user: nil, notes: nil)
     old_status = status
@@ -289,15 +252,6 @@ class Application < ApplicationRecord
   end
 
   private
-
-  # Fetches the latest proof review and submission audit for a given proof type
-  # @param type [String] The proof type ('income' or 'residency')
-  # @return [Array<ProofReview, ProofSubmissionAudit>] An array containing the latest review and audit, or nils
-  def latest_review_and_audit(type)
-    latest_review = proof_reviews.where(proof_type: type).order(created_at: :desc).first
-    latest_audit = proof_submission_audits.where(proof_type: type).order(created_at: :desc).first
-    [latest_review, latest_audit]
-  end
 
   def log_status_change
     # Guard clause to prevent infinite recursion
