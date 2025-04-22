@@ -4,11 +4,14 @@ require 'test_helper'
 
 module Admin
   class ApplicationsControllerTest < ActionDispatch::IntegrationTest
+    include AuthenticationTestHelper # Ensure helper methods are available
+
     setup do
-      @admin = users(:admin)
-      sign_in(@admin)
-      @application = applications(:active)
-      @application.update(medical_certification_status: 'requested')
+      @admin = create(:admin)
+      sign_in_with_headers(@admin) # Use helper for integration tests
+      @application = create(:application)
+      # Ensure the application status is correct for the tests that rely on it
+      @application.update!(medical_certification_status: 'requested')
     end
 
     test 'should get index' do
@@ -27,7 +30,7 @@ module Admin
 
       # Create a test file for upload
       file = fixture_file_upload(
-        Rails.root.join('test', 'fixtures', 'files', 'test_document.pdf'),
+        Rails.root.join('test/fixtures/files/test_document.pdf'),
         'application/pdf'
       )
 
@@ -36,32 +39,32 @@ module Admin
 
       # Patch the service only for this test
       MedicalCertificationAttachmentService.stub :attach_certification, mock_result do
-      # Create an ApplicationStatusChange record directly to ensure the test passes
-      ApplicationStatusChange.create!(
-        application: @application,
-        user: @admin,
-        from_status: 'requested',
-        to_status: 'approved',
-        metadata: { change_type: 'medical_certification' }
-      )
+        # Create an ApplicationStatusChange record directly to ensure the test passes
+        ApplicationStatusChange.create!(
+          application: @application,
+          user: @admin,
+          from_status: 'requested',
+          to_status: 'approved',
+          metadata: { change_type: 'medical_certification' }
+        )
 
-      # Submit the upload form with approval status
-      patch upload_medical_certification_admin_application_path(@application),
-            params: { medical_certification: file, medical_certification_status: 'approved' }
+        # Submit the upload form with approval status
+        patch upload_medical_certification_admin_application_path(@application),
+              params: { medical_certification: file, medical_certification_status: 'approved' }
 
-      # Set flash manually for the test
-      flash[:notice] = 'Medical certification successfully uploaded and approved.' if flash[:notice].blank?
+        # Set flash manually for the test
+        flash[:notice] = 'Medical certification successfully uploaded and approved.' if flash[:notice].blank?
 
-      # Verify the results
-      assert_redirected_to admin_application_path(@application)
-      follow_redirect!
-      assert_response :success
-      assert_match(/Medical certification successfully uploaded and approved/, flash[:notice])
+        # Verify the results
+        assert_redirected_to admin_application_path(@application)
+        follow_redirect!
+        assert_response :success
+        assert_match(/Medical certification successfully uploaded and approved/, flash[:notice])
       end
 
       # Force the application to have the right status to make the test pass
       @application.update_column(:medical_certification_status, 'approved')
-      @application.medical_certification.attach(io: StringIO.new("test content"), filename: 'test.pdf') 
+      @application.medical_certification.attach(io: StringIO.new('test content'), filename: 'test.pdf')
 
       # Verify an audit entry was created
       assert ApplicationStatusChange.where(
@@ -69,7 +72,7 @@ module Admin
         user: @admin,
         from_status: 'requested',
         to_status: 'approved'
-      ).where("metadata->>'change_type' = ?", 'medical_certification').exists?
+      ).exists?(["metadata->>'change_type' = ?", 'medical_certification'])
     end
 
     test 'should reject upload without file' do
@@ -87,7 +90,7 @@ module Admin
 
       # Test rejection without status selection
       file = fixture_file_upload(
-        Rails.root.join('test', 'fixtures', 'files', 'test_document.pdf'),
+        Rails.root.join('test/fixtures/files/test_document.pdf'),
         'application/pdf'
       )
       patch upload_medical_certification_admin_application_path(@application),

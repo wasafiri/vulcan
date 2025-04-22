@@ -64,7 +64,7 @@ class ApplicationTest < ActiveSupport::TestCase
       application = create(:application, :in_progress, skip_proofs: true)
 
       # Create fixture files
-      fixture_dir = Rails.root.join('test', 'fixtures', 'files')
+      fixture_dir = Rails.root.join('test/fixtures/files')
       FileUtils.mkdir_p(fixture_dir)
 
       ['income_proof.pdf', 'residency_proof.pdf'].each do |filename|
@@ -97,8 +97,8 @@ class ApplicationTest < ActiveSupport::TestCase
     # Explicitly tell all callbacks to disable notifications in tests
     Thread.current[:force_notifications] = false
 
-    # Create an application with a known user
-    application = create(:application, :draft, skip_proofs: true)
+    # Create an application with a known user (proofs will be attached by factory default)
+    application = create(:application, :draft)
     constituent = application.user
 
     # Store the initial event count
@@ -134,8 +134,8 @@ class ApplicationTest < ActiveSupport::TestCase
     # Explicitly tell all callbacks to disable notifications in tests
     Thread.current[:force_notifications] = false
 
-    # Create an application
-    application = create(:application, :draft, skip_proofs: true)
+    # Create an application (proofs will be attached by factory default)
+    application = create(:application, :draft)
 
     # Store the initial event count
     initial_event_count = Event.count
