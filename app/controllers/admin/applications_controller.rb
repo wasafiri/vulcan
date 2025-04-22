@@ -8,7 +8,7 @@ module Admin
     include ActionView::Helpers::TagHelper
     include ActionView::Helpers::JavaScriptHelper
     include RedirectHelper
-    include AutoApprovalHelper
+    include Admin::ApplicationStatusProcessor
     before_action :set_application, only: %i[
       show edit update
       verify_income request_documents review_proof update_proof_status
@@ -207,24 +207,14 @@ module Admin
       render turbo_stream: streams
     end
 
-    def process_application_status(action)
-      past_tense = { 'approve' => 'approved', 'reject' => 'rejected' }
-      if @application.send("#{action}!")
-        flash[:notice] = "Application #{past_tense[action.to_s]}."
-        redirect_to admin_application_path(@application)
-      else
-        handle_application_failure(action)
-      end
-    rescue ::ActiveRecord::RecordInvalid => e
-      handle_application_failure(action, e.record.errors.full_messages.to_sentence)
-    end
+    # Removed original process_application_status method - logic moved to concern
 
     def approve
-      process_application_status(:approve)
+      process_application_status_update(:approve)
     end
 
     def reject
-      process_application_status(:reject)
+      process_application_status_update(:reject)
     end
 
     def assign_evaluator
@@ -285,8 +275,9 @@ module Admin
     # Updates medical certification status and handles file uploads
     # Accepts various status changes including approvals and rejections
     def update_certification_status
-      status = normalize_certification_status(params[:status])
-      update_type = determine_certification_update_type(status)
+      # Use methods moved to Application model (via CertificationManagement concern)
+      status = @application.normalize_certification_status(params[:status])
+      update_type = @application.determine_certification_update_type(status, params)
 
       case update_type
       when :rejection
@@ -298,41 +289,6 @@ module Admin
       else
         redirect_with_alert('Invalid certification update type')
       end
-    end
-
-    # Determines the type of certification update
-    # @param status [Symbol] The normalized certification status
-    # @return [Symbol] The type of update (:rejection, :status_update, :new_upload)
-    def determine_certification_update_type(status)
-      return :rejection if rejection_requested?(status)
-      return :status_update if status_only_update_requested?
-
-      :new_upload
-    end
-
-    # Normalizes certification status for consistent handling
-    # @param status [String, Symbol] The status from params
-    # @return [Symbol] Normalized status symbol
-    def normalize_certification_status(status)
-      return nil unless status
-
-      status = status.to_sym if status.respond_to?(:to_sym)
-      # Convert any 'accepted' to 'approved' for consistency with the Application model enum
-      status = :approved if status == :accepted
-      status
-    end
-
-    # Determines if a certification rejection was requested
-    # @param status [Symbol] The normalized status
-    # @return [Boolean] True if rejection was requested with reason
-    def rejection_requested?(status)
-      status == :rejected && params[:rejection_reason].present?
-    end
-
-    # Determines if this is a status-only update (no new file)
-    # @return [Boolean] True if updating status on existing certification
-    def status_only_update_requested?
-      @application.medical_certification.attached? && params[:medical_certification].blank?
     end
 
     # Processes a certification rejection using the reviewer service
@@ -385,35 +341,21 @@ module Admin
       end
     end
 
-    # Handles successful status updates, including potential auto-approval
-    # @param status [Symbol] The normalized certification status
-    def handle_successful_status_update(status)
-      if should_auto_approve?(status)
-        perform_auto_approval
-        redirect_with_notice('Medical certification approved and application approved.')
+    # Handles successful status updates
+    # Auto-approval is now handled by the Application model's after_save callback
+    # @param status [Symbol] The normalized certification status (unused here, but kept for potential future use)
+    def handle_successful_status_update(_status)
+      # The model's after_save :auto_approve_if_eligible callback handles the approval logic
+      # We just need to redirect with a generic success message here.
+      # The application object might have been reloaded and status changed by the callback.
+      @application.reload # Ensure we have the latest status after callbacks
+      if @application.status_approved?
+        # If the callback auto-approved it, show that message
+        redirect_with_notice('Medical certification status updated and application auto-approved.')
       else
+        # Otherwise, just show the certification status update message
         redirect_with_notice('Medical certification status updated.')
       end
-    end
-
-    # Determines if auto-approval conditions are met
-    # @param status [Symbol] The normalized certification status
-    # @return [Boolean] True if conditions for auto-approval are met
-    def should_auto_approve?(status)
-      (status == :approved) &&
-        @application.income_proof_status_approved? &&
-        @application.residency_proof_status_approved? &&
-        !@application.status_approved?
-    end
-
-    # Performs application auto-approval
-    def perform_auto_approval
-      Rails.logger.info 'Auto-approval conditions met but application was not auto-approved.'
-      Rails.logger.info "Manually triggering approval for application #{@application.id}"
-
-      # Ensure we have fresh data
-      @application.reload
-      @application.approve!
     end
 
     # Redirects with a notice message
@@ -650,8 +592,6 @@ module Admin
 
     # --- Other Private Helpers ---
 
-    # Removed duplicate handle_html_success and handle_turbo_stream_success methods (defined earlier)
-
     def handle_html_error(error)
       flash[:error] = "Failed to update proof status: #{error.message}"
       render :show, status: :unprocessable_entity
@@ -791,12 +731,6 @@ module Admin
           }
         }, { once: true });
       JS
-    end
-
-    def handle_application_failure(action, error_message = nil)
-      error_message ||= @application.errors.full_messages.to_sentence
-      flash[:alert] = "Failed to #{action} Application ##{@application.id}: #{error_message}"
-      render :show, status: :unprocessable_entity
     end
 
     def load_proof_history(type)
