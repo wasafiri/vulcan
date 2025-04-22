@@ -277,8 +277,8 @@ For more detailed information about WebAuthn implementation and testing, see [We
 5. **Test What Users Care About**: Focus on user-visible behavior rather than implementation details
 6. **Write Resilient Selectors**: Use data attributes instead of CSS classes that might change
 7. **Mock External Services**: Use WebMock or similar tools to avoid external dependencies
-8. **Use Factories**: Create test data consistently with FactoryBot
-9. **Handle Special Features Appropriately**: Use specialized approaches for WebAuthn and other platform-specific features
+8. **Use Factories**: Create test data consistently with FactoryBot. Note: Fixtures are being actively phased out in favor of factories, especially for system and integration tests. See the [Test Suite Fixing Guide](test_suite_fixing_guide.md) for details on this ongoing effort.
+9. **Handle Special Features Appropriately**: Use specialized approaches for WebAuthn and other platform-specific features. Create feature-specific helper modules (e.g., `PaperApplicationsTestHelper`) for complex scenarios to keep tests clean.
 10. **Leverage Mocha for Mocking/Stubbing**: Mocha is configured (`mocha/minitest`) and available for creating mock objects and stubbing methods in unit or integration tests, or within helpers (e.g., see `test/support/attachment_test_helper.rb` for mocking ActiveStorage). Use it judiciously to isolate components or simplify test setup where appropriate, complementing full-stack system tests.
 
 ## References
@@ -287,3 +287,4 @@ For more detailed information about WebAuthn implementation and testing, see [We
 - [Rails System Testing Guide](https://guides.rubyonrails.org/testing.html#system-testing)
 - [Capybara Documentation](https://github.com/teamcapybara/capybara)
 - [WebAuthn Testing Guide](https://github.com/cedarcode/webauthn-ruby/blob/master/README.md#testing)
+- [Test Suite Fixing Guide (Internal)](test_suite_fixing_guide.md) - Tracks ongoing efforts to refactor tests.
