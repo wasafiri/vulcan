@@ -23,9 +23,7 @@ class SessionsController < ApplicationController
       else
         # User doesn't have 2FA, sign them in directly using the ApplicationController helper
         sign_in(user) # This now calls the refactored method in ApplicationController
-
-        # Redirect to the appropriate dashboard after successful sign-in
-        redirect_to _dashboard_for(user), notice: 'Signed in successfully'
+        # The sign_in method handles the redirect
       end
     else
       handle_invalid_credentials # Keep existing invalid credential handling
