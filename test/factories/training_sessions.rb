@@ -53,17 +53,4 @@ FactoryBot.define do
 
     # Add other traits as needed for specific test scenarios
   end
-
-  # Assuming a product factory exists or will be created
-  # If not, you'll need to create Product instances manually in tests
-  factory :product do
-    sequence(:name) { |n| "Product #{n}" }
-    description { 'A test product' }
-    price { 100.00 }
-    quantity { 10 }
-    manufacturer { 'Test Manufacturer' }
-    model_number { 'TM-1000' }
-    # Ensure device_types is an array of valid strings based on Product model validation/enum
-    device_types { ['Tablet'] } # Example: Use a valid type like 'Tablet' or 'Laptop'
-  end
 end

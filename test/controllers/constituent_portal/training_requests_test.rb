@@ -6,22 +6,23 @@ require_relative '../../support/notification_delivery_stub'
 module ConstituentPortal
   class TrainingRequestsTest < ActionDispatch::IntegrationTest
     setup do
-      @constituent = users(:constituent_john)
-      @application = applications(:one)
+      # Create constituent and admin users with FactoryBot
+      @constituent = create(:constituent)
+      @admin = create(:admin)
+
+      # Create and approve an application
+      @application = create(:application, user: @constituent)
 
       # Set Current.user to avoid validation errors in callbacks
-      Current.user = users(:admin_david)
+      Current.user = @admin
       @application.update!(status: :approved)
       Current.reset
 
       # Set up training session policy
       Policy.find_or_create_by(key: 'max_training_sessions').update(value: 3)
 
-      # Set up authentication
-      @headers = { 'HTTP_USER_AGENT' => 'Rails Testing', 'REMOTE_ADDR' => '127.0.0.1' }
-      post sign_in_path, params: { email: @constituent.email, password: 'password123' }, headers: @headers
-      assert_response :redirect
-      follow_redirect!
+      # Set up authentication using sign_in helper
+      sign_in(@constituent)
 
       # Set Current.user for the controller actions
       Current.user = @constituent
@@ -32,8 +33,11 @@ module ConstituentPortal
     end
 
     test 'should create training request notification' do
+      # Use mocha to stub the log_training_request method instead of trying to mock the Activity class
+      ConstituentPortal::ApplicationsController.any_instance.stubs(:log_training_request).returns(nil)
+
       # Count admin users to determine expected notification count
-      admin_count = User.where(type: 'Admin').count
+      admin_count = User.where(type: ['Administrator', 'Users::Administrator']).count
 
       assert_difference "Notification.where(action: 'training_requested').count", admin_count do
         post request_training_constituent_portal_application_path(@application)
@@ -56,7 +60,7 @@ module ConstituentPortal
 
     test 'should not create training request if application not approved' do
       # Set Current.user to avoid validation errors in callbacks
-      Current.user = users(:admin_david)
+      Current.user = @admin
       @application.update!(status: :in_progress)
       Current.reset
 
@@ -69,15 +73,24 @@ module ConstituentPortal
     end
 
     test 'should not create training request if max sessions reached' do
+      # Create trainer user
+      trainer = create(:trainer)
+
       # Create 3 training sessions (max allowed)
-      3.times do
+      # Each session requires notes when status is completed
+      3.times do |i|
         TrainingSession.create!(
           application: @application,
-          trainer: users(:trainer_jane),
+          trainer: trainer,
           scheduled_for: 1.day.from_now,
-          status: :completed
+          status: :completed,
+          notes: "Training session #{i + 1} completed successfully", # Add notes to satisfy the validation
+          completed_at: Time.current # Add completed_at date
         )
       end
+
+      # Stub the log_training_request method in ApplicationsController
+      ConstituentPortal::ApplicationsController.any_instance.stubs(:log_training_request).returns(nil)
 
       assert_no_difference 'Notification.count' do
         post request_training_constituent_portal_application_path(@application)

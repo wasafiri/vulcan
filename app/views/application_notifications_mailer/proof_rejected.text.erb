@@ -26,7 +26,7 @@ OPTION 1: EMAIL REPLY
 * Make sure files are clearly visible and complete
 
 OPTION 2: ONLINE UPLOAD
-* Sign in to your account at <%= login_url(host: Rails.application.config.action_mailer.default_url_options[:host]) %>
+* Sign in to your account at <%= sign_in_url(host: Rails.application.config.action_mailer.default_url_options[:host]) %>
 * Once signed in, visit your application page to upload new documentation
 <% elsif @reapply_date %>
 Please note that this was your final attempt to submit this document. Your application (ID: <%= @application.id %>) has been archived. You are welcome to start a new application after <%= format_date(@reapply_date) %>.
@@ -38,7 +38,7 @@ OPTION 1: EMAIL REPLY
 * Make sure files are clearly visible and complete
 
 OPTION 2: ONLINE UPLOAD
-* Sign in to your account at <%= login_url(host: Rails.application.config.action_mailer.default_url_options[:host]) %>
+* Sign in to your account at <%= sign_in_url(host: Rails.application.config.action_mailer.default_url_options[:host]) %>
 * Once signed in, visit your application page to upload new documentation
 <% end %>
 

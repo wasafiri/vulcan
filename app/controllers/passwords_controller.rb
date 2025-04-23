@@ -68,7 +68,7 @@ class PasswordsController < ApplicationController
   def set_user
     return unless params[:token].present?
 
-    @user = User.find_by(reset_password_token: params[:token])
+    @user = User.find_by_token_for(:password_reset, params[:token])
     redirect_to new_password_path, alert: 'Invalid or expired reset link.' unless @user
   end
 end

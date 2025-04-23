@@ -13,18 +13,20 @@ module Applications
       Application.any_instance.stubs(:require_proof_validations?).returns(false)
       Application.any_instance.stubs(:verify_proof_attachments).returns(true)
 
-      @application = applications(:complete)
-      prepare_application_for_test(@application,
-                                   status: 'approved',
-                                   income_proof_status: 'approved',
-                                   residency_proof_status: 'approved',
-                                   stub_attachments: true)
+      # Create application using factory with appropriate traits
+      @application = create(:application,
+                            :approved,
+                            income_proof_status: :approved,
+                            residency_proof_status: :approved)
+
+      # Prepare the application for testing
+      prepare_application_for_test(@application, stub_attachments: true)
 
       # Set up mocks for ActiveStorage attachments to prevent byte_size() errors
       setup_attachment_mocks_for_audit_logs
 
-      @admin = users(:admin)
-      @user = users(:confirmed_user)
+      @admin = create(:admin)
+      @user = create(:constituent)
 
       # Create some test data that we can verify in our audit logs
       @status_change = ApplicationStatusChange.create!(

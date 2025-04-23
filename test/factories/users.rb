@@ -20,19 +20,19 @@ FactoryBot.define do
         first_name { 'Admin' }
       end
 
-      factory :evaluator, class: 'Evaluator' do
-        type { 'Evaluator' }
+      factory :evaluator, class: 'Users::Evaluator' do
+        type { 'Users::Evaluator' }
         first_name { 'Test' }
         last_name { 'Evaluator' }
         availability_schedule { { monday: ['9:00', '17:00'] } }
-        status { :evaluator_active }
+        status { :active }
 
         trait :inactive do
-          status { :evaluator_inactive }
+          status { :inactive }
         end
 
         trait :suspended do
-          status { :evaluator_suspended }
+          status { :suspended }
         end
       end
 

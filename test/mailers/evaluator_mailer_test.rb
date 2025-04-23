@@ -4,7 +4,8 @@ require 'test_helper'
 
 class EvaluatorMailerTest < ActionMailer::TestCase
   setup do
-    @evaluation = evaluations(:one)
+    # Create test data using FactoryBot
+    @evaluation = create(:evaluation)
     @evaluator = @evaluation.evaluator
     @constituent = @evaluation.constituent
     @application = @evaluation.application

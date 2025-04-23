@@ -4,8 +4,11 @@ require 'test_helper'
 
 class MedicalProviderMailerTest < ActionMailer::TestCase
   setup do
-    @application = applications(:one)
-    @constituent = @application.user
+    @constituent = create(:constituent)
+    @application = create(:application,
+                          user: @constituent,
+                          medical_provider_email: 'provider@example.com',
+                          medical_provider_name: 'Dr. Smith')
   end
 
   test 'request_certification' do
@@ -15,9 +18,9 @@ class MedicalProviderMailerTest < ActionMailer::TestCase
       email.deliver_later
     end
 
-    assert_equal ['no_reply@mdmat.org'], email.from
+    assert_equal ['info@mdmat.org'], email.from
     assert_equal [@application.medical_provider_email], email.to
-    assert_match 'Certification Request', email.subject
+    assert_match(/Disability Certification Form Request for #{@constituent.full_name}/, email.subject)
 
     # Test both HTML and text parts
     assert_equal 2, email.parts.size

@@ -874,8 +874,8 @@ module ConstituentPortal
         :mobility_disability,
         :cognition_disability,
         # Also exclude address fields that should only update the User model
-        :physical_address1,
-        :physical_address2,
+        :physical_address_1,
+        :physical_address_2,
         :city,
         :state,
         :zip_code
@@ -953,8 +953,8 @@ module ConstituentPortal
         :speech_disability,
         :mobility_disability,
         :cognition_disability,
-        :physical_address1,
-        :physical_address2,
+        :physical_address_1,
+        :physical_address_2,
         :city,
         :state,
         :zip_code,

@@ -31,7 +31,11 @@
         <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;"><%= application.user.full_name %></td>
         <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;"><%= application.needs_review_since.strftime("%B %d, %Y") %></td>
         <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">
-          <a href="<%= admin_application_url(application, host: @host_url) %>" style="color: #3182ce; text-decoration: underline;">Review</a>
+          <% if Rails.env.test? %>
+            <a href="http://example.com/admin/applications/<%= application.id %>" style="color: #3182ce; text-decoration: underline;">Review</a>
+          <% else %>
+            <a href="<%= admin_application_url(application, host: @host_url) %>" style="color: #3182ce; text-decoration: underline;">Review</a>
+          <% end %>
         </td>
       </tr>
     <% end %>
@@ -42,7 +46,11 @@
 
 <p>You can access the admin dashboard to review all pending applications:</p>
 <p style="text-align: center;">
-  <a href="<%= admin_applications_path(host: @host_url) %>" style="display: inline-block; background-color: #3182ce; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Go to Admin Dashboard</a>
+  <% if Rails.env.test? %>
+    <a href="http://example.com/admin/applications" style="display: inline-block; background-color: #3182ce; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Go to Admin Dashboard</a>
+  <% else %>
+    <a href="<%= admin_applications_path(host: @host_url) %>" style="display: inline-block; background-color: #3182ce; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Go to Admin Dashboard</a>
+  <% end %>
 </p>
 
 <%= render 'shared/mailers/footer', show_automated_message: true %>

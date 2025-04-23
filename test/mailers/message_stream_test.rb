@@ -4,8 +4,9 @@ require 'test_helper'
 
 class MessageStreamTest < ActionMailer::TestCase
   test 'notifications mailer uses correct message stream' do
-    applications(:complete)
-    constituent = users(:constituent)
+    # Create a constituent user and application using FactoryBot
+    application = create(:application, :completed)
+    constituent = application.user
     temp_password = 'tempPassword123'
 
     email = ApplicationNotificationsMailer.account_created(constituent, temp_password)
@@ -14,9 +15,10 @@ class MessageStreamTest < ActionMailer::TestCase
   end
 
   test 'transactional mailer uses correct message stream' do
-    user = users(:admin)
+    # Create an admin user using FactoryBot
+    admin = create(:admin)
 
-    email = UserMailer.with(user: user).password_reset
+    email = UserMailer.with(user: admin).password_reset
 
     assert_equal 'outbound', email.message_stream
   end

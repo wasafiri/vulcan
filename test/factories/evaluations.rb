@@ -3,13 +3,13 @@
 # test/factories/evaluations.rb
 FactoryBot.define do
   factory :evaluation do
-    evaluator
+    association :evaluator, type: 'Users::Evaluator'
     constituent
     application
     evaluation_date { Time.current }
     evaluation_type { :initial }
-    status { :pending }
-    notes { 'Default evaluation notes' } # Default notes to avoid validation error
+    status { :requested }
+    notes { 'Default evaluation notes' }
     report_submitted { false }
     location { 'Main Office' }
     needs { 'Additional support for mobility.' }
@@ -22,11 +22,11 @@ FactoryBot.define do
       ]
     end
 
-    # Set up default products using fixtures
+    # Set up default products
     after(:build) do |evaluation|
-      # Get our known iPad fixtures
-      ipad_air = Product.find_by(name: 'iPad Air') || products(:ipad_air)
-      ipad_mini = Product.find_by(name: 'iPad Mini') || products(:ipad_mini)
+      # Create products directly
+      ipad_air = create(:product, name: 'iPad Air')
+      ipad_mini = create(:product, name: 'iPad Mini')
 
       # Set up products tried
       evaluation.products_tried = [
@@ -45,7 +45,7 @@ FactoryBot.define do
     end
 
     trait :pending do
-      status { :pending }
+      status { :scheduled }
       notes { 'Pending evaluation notes' }
     end
 
@@ -59,8 +59,8 @@ FactoryBot.define do
 
     trait :with_mobile_devices do
       after(:build) do |evaluation|
-        iphone = Product.find_by(name: 'iPhone') || products(:iphone)
-        pixel = Product.find_by(name: 'Pixel') || products(:pixel)
+        iphone = create(:product, name: 'iPhone')
+        pixel = create(:product, name: 'Pixel')
 
         evaluation.products_tried = [
           { 'product_id' => iphone.id, 'reaction' => 'Very Satisfied' },
@@ -72,7 +72,7 @@ FactoryBot.define do
 
     trait :with_single_product do
       after(:build) do |evaluation|
-        ipad = Product.find_by(name: 'iPad Air') || products(:ipad_air)
+        ipad = create(:product, name: 'iPad Air')
         evaluation.products_tried = [
           { 'product_id' => ipad.id, 'reaction' => 'Very Satisfied' }
         ]

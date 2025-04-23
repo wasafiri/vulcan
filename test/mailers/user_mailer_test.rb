@@ -4,15 +4,27 @@ require 'test_helper'
 
 class UserMailerTest < ActionMailer::TestCase
   setup do
-    @user = users(:one)
+    @user = create(:user)
+    # Stub token generation to return predictable values for testing
+    # This is needed because the application might not have explicitly set up
+    # generates_token_for with these specific purposes
+    @user.stubs(:generate_token_for).with(:password_reset).returns('test-password-reset-token')
+    @user.stubs(:generate_token_for).with(:email_verification).returns('test-email-verification-token')
+
+    # Stub the URL helpers that our mailer uses
+    UserMailer.any_instance.stubs(:edit_password_url).returns('http://example.com/password/edit?token=test-password-reset-token')
+    UserMailer.any_instance.stubs(:verify_constituent_portal_application_url).returns('http://example.com/constituent_portal/applications/verify?token=test-email-verification-token')
   end
 
   test 'password_reset' do
-    email = UserMailer.with(user: @user).password_reset
-
-    assert_emails 1 do
-      email.deliver_later
+    # Using Rails 7.1.0+ capture_emails helper
+    emails = capture_emails do
+      UserMailer.with(user: @user).password_reset.deliver_now
     end
+
+    # Verify we captured an email
+    assert_equal 1, emails.size
+    email = emails.first
 
     assert_equal ['no_reply@mdmat.org'], email.from
     assert_equal [@user.email], email.to
@@ -25,19 +37,24 @@ class UserMailerTest < ActionMailer::TestCase
     html_part = email.parts.find { |part| part.content_type.include?('text/html') }
     assert_includes html_part.body.to_s, 'password'
     assert_includes html_part.body.to_s, 'reset'
+    assert_includes html_part.body.to_s, 'test-password-reset-token'
 
     # Text part
     text_part = email.parts.find { |part| part.content_type.include?('text/plain') }
     assert_includes text_part.body.to_s, 'password'
     assert_includes text_part.body.to_s, 'reset'
+    assert_includes text_part.body.to_s, 'test-password-reset-token'
   end
 
   test 'email_verification' do
-    email = UserMailer.with(user: @user).email_verification
-
-    assert_emails 1 do
-      email.deliver_later
+    # Using Rails 7.1.0+ capture_emails helper
+    emails = capture_emails do
+      UserMailer.with(user: @user).email_verification.deliver_now
     end
+
+    # Verify we captured an email
+    assert_equal 1, emails.size
+    email = emails.first
 
     assert_equal ['no_reply@mdmat.org'], email.from
     assert_equal [@user.email], email.to
@@ -50,10 +67,12 @@ class UserMailerTest < ActionMailer::TestCase
     html_part = email.parts.find { |part| part.content_type.include?('text/html') }
     assert_includes html_part.body.to_s, 'verify'
     assert_includes html_part.body.to_s, 'email'
+    assert_includes html_part.body.to_s, 'test-email-verification-token'
 
     # Text part
     text_part = email.parts.find { |part| part.content_type.include?('text/plain') }
     assert_includes text_part.body.to_s, 'verify'
     assert_includes text_part.body.to_s, 'email'
+    assert_includes text_part.body.to_s, 'test-email-verification-token'
   end
 end

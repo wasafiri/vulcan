@@ -1,4 +1,4 @@
-Your Voucher Has Expired
+<%= render partial: 'shared/mailers/header', formats: [:text], locals: { title: "Your Voucher Has Expired" } %>
 
 Dear <%= @user.first_name %>,
 
@@ -8,15 +8,14 @@ Expired Voucher Details:
 - Voucher Code: <%= @voucher.code %>
 - Initial Value: <%= number_to_currency(@voucher.initial_value) %>
 - Unused Value: <%= number_to_currency(@voucher.remaining_value) %>
-- Expiration Date: <%= @voucher.expiration_date.strftime("%B %d, %Y") %>
+- Expiration Date: <%= @voucher.expiration_date&.strftime("%B %d, %Y") %>
 
 <% if @voucher.transactions.any? %>
 Transaction History:
-<% @voucher.transactions.order(processed_at: :desc).each do |transaction %>
-* <%= transaction.processed_at.strftime("%B %d, %Y") %>
-  Amount: <%= number_to_currency(transaction.amount) %>
-  Vendor: <%= transaction.vendor.business_name %>
-
+<% @voucher.transactions.order(processed_at: :desc).each do |t| %>
+* <%= t.processed_at&.strftime("%B %d, %Y") %>
+  Amount: <%= number_to_currency(t.amount) %>
+  Vendor: <%= t.vendor&.business_name %>
 <% end %>
 <% end %>
 
@@ -29,3 +28,5 @@ If you believe this voucher expired in error or have any questions, please conta
 
 Best regards,
 The MAT Program Team
+
+<%= render partial: 'shared/mailers/footer', formats: [:text], locals: { show_automated_message: true } %>

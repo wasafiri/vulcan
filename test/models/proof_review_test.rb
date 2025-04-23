@@ -4,37 +4,20 @@ require 'test_helper'
 
 class ProofReviewTest < ActiveSupport::TestCase
   def setup
-    @admin = users(:admin_david)
-    @application = create(:application, :in_progress)
+    @admin = create(:admin)
+    # Create a simple application without using problematic traits
+    @application = create(:application, :in_progress, skip_proofs: true)
 
-    # Ensure test files exist
-    fixture_dir = Rails.root.join('test', 'fixtures', 'files')
-    FileUtils.mkdir_p(fixture_dir)
-
-    ['test_proof.pdf', 'test_income_proof.pdf', 'test_residency_proof.pdf'].each do |filename|
-      file_path = fixture_dir.join(filename)
-      File.write(file_path, "test content for #{filename}") unless File.exist?(file_path)
-    end
-
-    # Attach proofs to the application
-    attach_test_proofs(@application)
-  end
-
-  # Helper method to attach test proofs to an application
-  def attach_test_proofs(application)
-    # Attach income proof
-    income_proof_path = Rails.root.join('test', 'fixtures', 'files', 'test_income_proof.pdf')
-    application.income_proof.attach(
-      io: File.open(income_proof_path),
-      filename: 'test_income_proof.pdf',
+    # Manually attach proofs using direct methods to avoid the factory issues
+    @application.income_proof.attach(
+      io: StringIO.new('income proof content'),
+      filename: 'income.pdf',
       content_type: 'application/pdf'
     )
 
-    # Attach residency proof
-    residency_proof_path = Rails.root.join('test', 'fixtures', 'files', 'test_residency_proof.pdf')
-    application.residency_proof.attach(
-      io: File.open(residency_proof_path),
-      filename: 'test_residency_proof.pdf',
+    @application.residency_proof.attach(
+      io: StringIO.new('residency proof content'),
+      filename: 'residency.pdf',
       content_type: 'application/pdf'
     )
   end
@@ -110,7 +93,7 @@ class ProofReviewTest < ActiveSupport::TestCase
     @application.update!(status: :archived)
 
     @application.reload
-    assert @application.archived?
+    assert @application.status_archived?
   end
 
   def test_prevents_review_of_archived_application

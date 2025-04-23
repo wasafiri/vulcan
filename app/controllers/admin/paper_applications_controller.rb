@@ -14,7 +14,7 @@ module Admin
     def create
       log_file_and_form_params
       service_params = paper_application_params
-      Rails.logger.debug "Service params before service call: #{service_params.keys.inspect}"
+      Rails.logger.debug { "Service params before service call: #{service_params.keys.inspect}" }
 
       service = Applications::PaperApplicationService.new(
         params: service_params,
@@ -68,14 +68,14 @@ module Admin
     # Logging helpers for create action
     def log_file_and_form_params
       Rails.logger.debug 'CONTROLLER - File params present:'
-      Rails.logger.debug "income_proof present: #{params[:income_proof].present?}"
-      Rails.logger.debug "residency_proof present: #{params[:residency_proof].present?}"
+      Rails.logger.debug { "income_proof present: #{params[:income_proof].present?}" }
+      Rails.logger.debug { "residency_proof present: #{params[:residency_proof].present?}" }
       return unless params[:income_proof].present?
 
-      Rails.logger.debug "income_proof class: #{params[:income_proof].class}"
+      Rails.logger.debug { "income_proof class: #{params[:income_proof].class}" }
       return unless params[:income_proof].respond_to?(:original_filename)
 
-      Rails.logger.debug("income_proof filename: #{params[:income_proof].original_filename}")
+      Rails.logger.debug { "income_proof filename: #{params[:income_proof].original_filename}" }
     end
 
     # Generates a success message based on rejected proofs
@@ -103,7 +103,7 @@ module Admin
         application: application_params
       }
       add_proof_params(service_params)
-      Rails.logger.debug "Final service params: #{service_params.keys.inspect}"
+      Rails.logger.debug { "Final service params: #{service_params.keys.inspect}" }
       service_params
     end
 
@@ -114,8 +114,8 @@ module Admin
         :last_name,
         :email,
         :phone,
-        :physical_address1,
-        :physical_address2,
+        :physical_address_1,
+        :physical_address_2,
         :city,
         :state,
         :zip_code,

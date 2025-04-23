@@ -4,12 +4,24 @@ require 'test_helper'
 
 class VoucherNotificationsMailerTest < ActionMailer::TestCase
   setup do
-    @voucher = vouchers(:one)
-    @application = @voucher.application
+    # Create test data using FactoryBot
+    @application = create(:application)
     @user = @application.user
-    @transaction = voucher_transactions(:one)
-    @transaction.voucher = @voucher
-    @vendor = @transaction.vendor
+    # Set issued_at to 6 months ago - the expiration_date will be calculated using the Policy
+    @voucher = create(:voucher,
+                      application: @application,
+                      issued_at: 6.months.ago)
+
+    # Stub the Policy.get method to return the appropriate values for testing
+    Policy.stubs(:get).with('voucher_validity_period_months').returns(12)
+    Policy.stubs(:get).with('voucher_minimum_redemption_amount').returns(10)
+    Policy.stubs(:voucher_validity_period).returns(12.months)
+    @vendor = create(:vendor, :approved)
+    @transaction = create(:voucher_transaction,
+                          voucher: @voucher,
+                          vendor: @vendor,
+                          status: :transaction_completed,
+                          amount: 100.00)
   end
 
   test 'voucher_assigned' do
@@ -103,13 +115,13 @@ class VoucherNotificationsMailerTest < ActionMailer::TestCase
 
     # HTML part
     html_part = email.parts.find { |part| part.content_type.include?('text/html') }
-    assert_includes html_part.body.to_s, 'redeemed'
+    assert_includes html_part.body.to_s, 'Transaction Confirmation'
     assert_includes html_part.body.to_s, @voucher.code
     assert_includes html_part.body.to_s, @vendor.business_name
 
     # Text part
     text_part = email.parts.find { |part| part.content_type.include?('text/plain') }
-    assert_includes text_part.body.to_s, 'redeemed'
+    assert_includes text_part.body.to_s, 'Transaction Confirmation'
     assert_includes text_part.body.to_s, @voucher.code
     assert_includes text_part.body.to_s, @vendor.business_name
   end

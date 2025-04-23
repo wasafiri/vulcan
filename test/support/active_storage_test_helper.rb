@@ -17,6 +17,8 @@
 # For mocking, use AttachmentTestHelper.mock_attached_file or the application factory
 # traits (:with_mocked_income_proof, :with_mocked_residency_proof, etc.)
 module ActiveStorageTestHelper
+  # Make these class methods so they can be called directly
+  extend self
   # Attaches real StringIO objects as income and residency proofs to an application.
   #
   # @param application [Application] The application to attach proofs to

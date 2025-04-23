@@ -6,13 +6,13 @@ class EvaluationTest < ActiveSupport::TestCase
   test 'creates a valid evaluation' do
     evaluation = create(:evaluation)
     assert evaluation.valid?
-    assert_equal :pending, evaluation.status
+    assert_equal 'requested', evaluation.status
   end
 
   test 'creates a completed evaluation' do
     evaluation = create(:evaluation, :completed)
     assert evaluation.valid?
-    assert_equal :completed, evaluation.status
+    assert_equal 'completed', evaluation.status
     assert evaluation.report_submitted
   end
 
@@ -25,7 +25,9 @@ class EvaluationTest < ActiveSupport::TestCase
   test 'creates an evaluation with mobile devices' do
     evaluation = create(:evaluation, :with_mobile_devices)
     assert_equal 2, evaluation.products_tried.size
-    assert_equal 'iPhone', evaluation.products_tried.first['product_id'].name
-    assert_equal 'Pixel', evaluation.products_tried.second['product_id'].name
+    iphone = Product.find_by(name: 'iPhone')
+    pixel = Product.find_by(name: 'Pixel')
+    assert_equal iphone.id, evaluation.products_tried.first['product_id']
+    assert_equal pixel.id, evaluation.products_tried.second['product_id']
   end
 end

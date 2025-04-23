@@ -2,6 +2,10 @@
 
 # User model that serves as the base class for all user types in the system
 class User < ApplicationRecord
+  # Token generation for email verification and password reset
+  generates_token_for :password_reset, expires_in: 20.minutes
+  generates_token_for :email_verification, expires_in: 1.day
+
   # Class methods
   def self.system_user
     @system_user ||= begin
@@ -298,7 +302,7 @@ class User < ApplicationRecord
     return unless communication_preference.to_s == 'letter' || communication_preference == :letter
 
     # Validate that address fields are present when letter preference is selected
-    errors.add(:physical_address1, 'is required when notification method is set to letter') if physical_address_1.blank?
+    errors.add(:physical_address_1, 'is required when notification method is set to letter') if physical_address_1.blank?
 
     errors.add(:city, 'is required when notification method is set to letter') if city.blank?
 

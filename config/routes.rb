@@ -24,6 +24,12 @@ Rails.application.routes.draw do
   delete 'sign_out', to: 'sessions#destroy'
   get 'sessions', to: 'sessions#index'
 
+  # Identity namespace for authentication-related actions
+  namespace :identity do
+    resources :password_resets, only: %i[edit update], param: :token
+    resources :email_verifications, only: [:show], param: :token
+  end
+
   # Registration
   get 'sign_up', to: 'registrations#new'
   post 'sign_up', to: 'registrations#create'

@@ -4,7 +4,7 @@ class UserMailer < ApplicationMailer
   def password_reset
     @user = params[:user]
     @token = @user.generate_token_for(:password_reset)
-    @reset_url = edit_identity_password_reset_url(token: @token)
+    @reset_url = edit_password_url(token: @token)
 
     mail(
       to: @user.email,
@@ -15,12 +15,15 @@ class UserMailer < ApplicationMailer
     )
   rescue StandardError => e
     Rails.logger.error("Failed to send password reset email: #{e.message}")
+    Rails.logger.error(e.backtrace.join("\n")) # Add backtrace for better debugging
+    raise e if Rails.env.test? # Re-raise in test environment for better error visibility
   end
 
   def email_verification
     @user = params[:user]
+    # Using the user verification path within constituent portal
     @token = @user.generate_token_for(:email_verification)
-    @verification_url = identity_email_verification_url(token: @token)
+    @verification_url = verify_constituent_portal_application_url(id: @user.id, token: @token)
 
     mail(
       to: @user.email,
@@ -31,5 +34,7 @@ class UserMailer < ApplicationMailer
     )
   rescue StandardError => e
     Rails.logger.error("Failed to send verification email: #{e.message}")
+    Rails.logger.error(e.backtrace.join("\n")) # Add backtrace for better debugging
+    raise e if Rails.env.test? # Re-raise in test environment for better error visibility
   end
 end

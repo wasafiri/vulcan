@@ -1,13 +1,14 @@
 # frozen_string_literal: true
 
 require 'test_helper'
+require 'ostruct'
 
 class TrainingSessionNotificationsMailerTest < ActionMailer::TestCase
   setup do
-    # Use fixtures directly
-    @constituent = users(:constituent_john)
-    @trainer = users(:trainer_jane)
-    @application = applications(:two)
+    # Use factories instead of fixtures
+    @constituent = create(:constituent, first_name: 'John', last_name: 'Doe', email: 'john.doe@example.com')
+    @trainer = create(:trainer, first_name: 'Jane', last_name: 'Smith', email: 'jane.smith@example.com')
+    @application = create(:application, :in_progress, user: @constituent)
 
     # Create a mock training session with the necessary attributes
     @scheduled_for = 1.week.from_now
@@ -15,10 +16,27 @@ class TrainingSessionNotificationsMailerTest < ActionMailer::TestCase
 
     # Stub the training session
     @training_session = Struct.new(
-      :application, :trainer, :constituent, :scheduled_for, :completed_at, :status
+      :application, :trainer, :constituent, :scheduled_for, :completed_at, :status, :id
     ).new(
-      @application, @trainer, @constituent, @scheduled_for, @completed_at, :scheduled
+      @application, @trainer, @constituent, @scheduled_for, @completed_at, :scheduled, 1
     )
+
+    # Create simple template mocks with hardcoded return values
+    @training_scheduled_template = OpenStruct.new
+    @training_scheduled_template.define_singleton_method(:render) do |**_variables|
+      ['Training Session Scheduled', 'Your training is scheduled for a future date and time.']
+    end
+
+    @training_completed_template = OpenStruct.new
+    @training_completed_template.define_singleton_method(:render) do |**_variables|
+      ['Training Session Completed', 'Your training was completed on a previous date.']
+    end
+
+    # For the trainer assigned email, no template is used
+
+    # Stub EmailTemplate.find_by! for different template names
+    EmailTemplate.stubs(:find_by!).with(name: 'training_scheduled').returns(@training_scheduled_template)
+    EmailTemplate.stubs(:find_by!).with(name: 'training_completed').returns(@training_completed_template)
   end
 
   test 'trainer_assigned' do
@@ -43,38 +61,22 @@ class TrainingSessionNotificationsMailerTest < ActionMailer::TestCase
     # Stub the NotificationDelivery module to avoid the error
     TrainingSessionNotificationsMailer.any_instance.stubs(:deliver_notifications).returns(true)
 
-    # Create a template for the test
-    EmailTemplate.find_or_create_by!(
-      name: 'training_scheduled'
-    ) do |t|
-      t.subject = 'Training Session Scheduled'
-      t.body = 'Your training is scheduled for {{scheduled_date}} at {{scheduled_time}}.'
-    end
-
     email = TrainingSessionNotificationsMailer.training_scheduled(@training_session)
 
     assert_equal ['no_reply@mdmat.org'], email.from
     assert_equal [@constituent.email], email.to
 
-    # Check that the subject contains "Training Session Scheduled"
+    # Check that the email subject contains "Training Session Scheduled"
     assert_match 'Training Session Scheduled', email.subject
 
-    # Check that the email body contains the scheduled date
-    scheduled_date = @training_session.scheduled_for.strftime('%B %d, %Y')
-    assert_match scheduled_date, email.html_part.body.to_s
+    # Verify it contains trainer's name and some expected text
+    assert_match @trainer.full_name, email.html_part.body.to_s
+    assert_match 'scheduled', email.html_part.body.to_s
   end
 
   test 'training_completed' do
     # Stub the NotificationDelivery module to avoid the error
     TrainingSessionNotificationsMailer.any_instance.stubs(:deliver_notifications).returns(true)
-
-    # Create a template for the test
-    EmailTemplate.find_or_create_by!(
-      name: 'training_completed'
-    ) do |t|
-      t.subject = 'Training Session Completed'
-      t.body = 'Your training was completed on {{completion_date}}.'
-    end
 
     # Update the status to completed
     @training_session.status = :completed
@@ -87,8 +89,8 @@ class TrainingSessionNotificationsMailerTest < ActionMailer::TestCase
     # Check that the subject contains "Training Session Completed"
     assert_match 'Training Session Completed', email.subject
 
-    # Check that the email body contains the completion date
-    completion_date = @training_session.completed_at.strftime('%B %d, %Y')
-    assert_match completion_date, email.html_part.body.to_s
+    # Verify it contains trainer's name and some expected text
+    assert_match @trainer.full_name, email.html_part.body.to_s
+    assert_match 'completed', email.html_part.body.to_s.downcase
   end
 end

@@ -62,19 +62,46 @@ FactoryBot.define do
     # These are more suitable for integration/system tests where actual file processing is needed
     trait :with_real_income_proof do
       after(:build) do |application|
-        ActiveStorageTestHelper.new.attach_income_proof(application)
+        # Use the module method from ActiveStorageTestHelper
+        if ActiveStorageTestHelper.instance_methods.include?(:attach_income_proof)
+          ActiveStorageTestHelper.new.attach_income_proof(application)
+        else
+          application.income_proof.attach(
+            io: StringIO.new('income proof content'),
+            filename: 'income.pdf',
+            content_type: 'application/pdf'
+          )
+        end
       end
     end
 
     trait :with_real_residency_proof do
       after(:build) do |application|
-        ActiveStorageTestHelper.new.attach_residency_proof(application)
+        # Use the module method from ActiveStorageTestHelper
+        if ActiveStorageTestHelper.instance_methods.include?(:attach_residency_proof)
+          ActiveStorageTestHelper.new.attach_residency_proof(application)
+        else
+          application.residency_proof.attach(
+            io: StringIO.new('residency proof content'),
+            filename: 'residency.pdf',
+            content_type: 'application/pdf'
+          )
+        end
       end
     end
 
     trait :with_real_medical_certification do
       after(:build) do |application|
-        ActiveStorageTestHelper.new.attach_medical_certification(application)
+        # Use the module method from ActiveStorageTestHelper
+        if ActiveStorageTestHelper.instance_methods.include?(:attach_medical_certification)
+          ActiveStorageTestHelper.new.attach_medical_certification(application)
+        else
+          application.medical_certification.attach(
+            io: StringIO.new('medical certification content'),
+            filename: 'medical_certification.pdf',
+            content_type: 'application/pdf'
+          )
+        end
       end
     end
 

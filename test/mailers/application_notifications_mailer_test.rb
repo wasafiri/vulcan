@@ -6,10 +6,21 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
   include ActiveJob::TestHelper
 
   setup do
-    @application = applications(:one)
+    @application = create(:application)
     @user = @application.user
-    @proof_review = proof_reviews(:income_approved)
-    @admin = users(:admin_david)
+    @proof_review = create(:proof_review, :with_income_proof, application: @application)
+    @admin = create(:admin)
+
+    # Stub URL helpers that are used in the mailer templates
+    ApplicationNotificationsMailer.any_instance.stubs(:sign_in_url).returns('http://example.com/sign_in')
+    ApplicationNotificationsMailer.any_instance.stubs(:login_url).returns('http://example.com/sign_in') # Alias or alternate reference
+    ApplicationNotificationsMailer.any_instance.stubs(:constituent_portal_dashboard_url).returns('http://example.com/dashboard')
+    ApplicationNotificationsMailer.any_instance.stubs(:new_constituent_portal_application_url).returns('http://example.com/applications/new')
+    # Correctly stub the admin_applications_path to accept optional arguments
+    Rails.application.routes.named_routes.path_helpers_module.define_method(:admin_applications_path) do |*args|
+      '/admin/applications'
+    end
+    ApplicationNotificationsMailer.any_instance.stubs(:admin_application_url).with(anything, anything).returns('http://example.com/admin/applications/1')
 
     # Set needs_review_since for the application
     @application.update_column(:needs_review_since, 4.days.ago)
@@ -106,12 +117,16 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     # This is needed for the @stale_reviews to be populated
     @application.stubs(:needs_review_since).returns(4.days.ago)
 
-    email = ApplicationNotificationsMailer.proof_needs_review_reminder(@admin, applications)
-
-    assert_emails 1 do
-      email.deliver_later
+    # Use the capture_emails helper instead of assert_emails
+    emails = capture_emails do
+      ApplicationNotificationsMailer.proof_needs_review_reminder(@admin, applications).deliver_now
     end
 
+    # Verify we captured exactly one email
+    assert_equal 1, emails.size
+    email = emails.first
+
+    # Test email content
     assert_equal ['no_reply@mdmat.org'], email.from
     assert_equal [@admin.email], email.to
     assert_match 'Awaiting Proof Review', email.subject
@@ -219,6 +234,11 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
       password_confirmation: 'password',
       hearing_disability: true
     )
+
+    # Stub Vendor.active.order to return an empty array
+    active_vendors = []
+    Vendor.stubs(:active).returns(Vendor.none)
+    Vendor.none.stubs(:order).returns(active_vendors)
 
     # Verify email is delivered when we process the job
     assert_difference -> { ActionMailer::Base.deliveries.size }, 1 do
