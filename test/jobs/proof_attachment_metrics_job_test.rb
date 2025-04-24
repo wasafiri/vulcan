@@ -7,9 +7,9 @@ class ProofAttachmentMetricsJobTest < ActiveJob::TestCase
     # Clear all notifications
     Notification.delete_all
 
-    # Create test audits
-    @application = applications(:one) # Reference an existing application fixture
-    @admin = users(:admin_david)
+    # Create test application and admin using factories instead of fixtures
+    @application = create(:application, skip_proofs: true) # Skip default proof attachments
+    @admin = create(:admin)
 
     # Create some successful audits
     8.times do |i|
@@ -52,9 +52,9 @@ class ProofAttachmentMetricsJobTest < ActiveJob::TestCase
       metadata: {
         success: false,
         error_message: 'Old error',
-        timestamp: (Time.current - 2.days).iso8601
+        timestamp: 2.days.ago.iso8601
       },
-      created_at: Time.current - 2.days
+      created_at: 2.days.ago
     )
   end
 

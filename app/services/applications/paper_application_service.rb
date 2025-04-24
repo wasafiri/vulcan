@@ -31,6 +31,47 @@ module Applications
       false
     end
 
+    def update(application)
+      # Set the paper application context flag
+      Thread.current[:paper_application_context] = true
+      Rails.logger.debug { "UPDATE: Set paper_application_context to #{Thread.current[:paper_application_context].inspect}" }
+
+      begin
+        ActiveRecord::Base.transaction do
+          @application = application
+          @constituent = application.user
+
+          # Double-check the context is still set
+          Rails.logger.debug do
+            "UPDATE (before process_proof_uploads): paper_application_context is #{Thread.current[:paper_application_context].inspect}"
+          end
+
+          # The process_proof_uploads method also sets and clears the context, so we need to ensure
+          # it's set correctly before and after the call
+          result = process_proof_uploads
+
+          # Re-set the context in case process_proof_uploads cleared it
+          Thread.current[:paper_application_context] = true
+          Rails.logger.debug do
+            "UPDATE (after process_proof_uploads): paper_application_context is #{Thread.current[:paper_application_context].inspect}"
+          end
+
+          return failure('Proof upload failed') unless result
+
+          handle_successful_application if @application.persisted?
+          return true
+        end
+      rescue StandardError => e
+        log_error(e, 'Failed to update paper application')
+        @errors << e.message
+        false
+      ensure
+        # Always clear the thread-local variable
+        Rails.logger.debug { 'UPDATE (ensure): Clearing paper_application_context' }
+        Thread.current[:paper_application_context] = nil
+      end
+    end
+
     private
 
     def failure(message)
@@ -79,16 +120,16 @@ module Applications
     end
 
     def log_proof_debug_info(type)
-      Rails.logger.debug "==== PROCESS_PROOF(#{type}) STARTED ===="
-      Rails.logger.debug "Params class: #{params.class.name}"
-      Rails.logger.debug "Params keys: #{params.keys.inspect}"
-      Rails.logger.debug "Param key as symbol: #{params[:"#{type}_proof_action"].inspect}"
-      Rails.logger.debug "Param key as string: #{params["#{type}_proof_action"].inspect}"
-      Rails.logger.debug "File param present? #{params["#{type}_proof"].present?}"
+      Rails.logger.debug { "==== PROCESS_PROOF(#{type}) STARTED ====" }
+      Rails.logger.debug { "Params class: #{params.class.name}" }
+      Rails.logger.debug { "Params keys: #{params.keys.inspect}" }
+      Rails.logger.debug { "Param key as symbol: #{params[:"#{type}_proof_action"].inspect}" }
+      Rails.logger.debug { "Param key as string: #{params["#{type}_proof_action"].inspect}" }
+      Rails.logger.debug { "File param present? #{params["#{type}_proof"].present?}" }
       return unless params["#{type}_proof"].present?
 
-      Rails.logger.debug "File param type: #{params["#{type}_proof"].class.name}"
-      Rails.logger.debug "File param details: #{params["#{type}_proof"].inspect}"
+      Rails.logger.debug { "File param type: #{params["#{type}_proof"].class.name}" }
+      Rails.logger.debug { "File param details: #{params["#{type}_proof"].inspect}" }
     end
 
     def extract_proof_action(type)
@@ -96,32 +137,40 @@ module Applications
     end
 
     def process_accept_proof(type)
-      Rails.logger.debug "Accepting #{type} proof"
+      Rails.logger.debug { "Accepting #{type} proof" }
+
+      # Check for either direct file upload or signed_id
       if params["#{type}_proof"].present?
-        result = ProofAttachmentService.attach_proof(
-          application: @application,
-          proof_type: type,
-          blob_or_file: params["#{type}_proof"],
-          status: :approved,
-          admin: @admin,
-          submission_method: :paper,
-          metadata: {}
-        )
-        unless result[:success]
-          add_error("Error processing #{type} proof: #{result[:error]&.message}")
-          return false
-        end
-        Rails.logger.debug "Successfully attached #{type} proof for application #{@application.id}"
-        true
+        blob_or_file = params["#{type}_proof"]
+      elsif params["#{type}_proof_signed_id"].present?
+        blob_or_file = params["#{type}_proof_signed_id"]
       else
-        Rails.logger.debug "No file provided for #{type}"
+        Rails.logger.debug { "No file or signed_id provided for #{type}" }
         add_error("Please upload a file for #{type} proof")
-        false
+        return false
       end
+
+      result = ProofAttachmentService.attach_proof(
+        application: @application,
+        proof_type: type,
+        blob_or_file: blob_or_file,
+        status: :approved,
+        admin: @admin,
+        submission_method: :paper,
+        metadata: {}
+      )
+
+      unless result[:success]
+        add_error("Error processing #{type} proof: #{result[:error]&.message}")
+        return false
+      end
+
+      Rails.logger.debug { "Successfully attached #{type} proof for application #{@application.id}" }
+      true
     end
 
     def process_reject_proof(type)
-      Rails.logger.debug "Rejecting #{type} proof"
+      Rails.logger.debug { "Rejecting #{type} proof" }
       result = ProofAttachmentService.reject_proof_without_attachment(
         application: @application,
         proof_type: type,
@@ -136,7 +185,7 @@ module Applications
         add_error("Error rejecting #{type} proof: #{result[:error]&.message}")
         return false
       end
-      Rails.logger.debug "Successfully rejected #{type} proof"
+      Rails.logger.debug { "Successfully rejected #{type} proof" }
       true
     end
 
@@ -184,7 +233,7 @@ module Applications
         # No need to set type as it will automatically be "Constituent" based on class name
       end
 
-      Rails.logger.debug "Creating new constituent with type: #{@constituent.type}"
+      Rails.logger.debug { "Creating new constituent with type: #{@constituent.type}" }
 
       if @constituent.save
         # Store temp password for later notification in send_notifications
@@ -249,20 +298,22 @@ module Applications
 
       # Enhanced debugging
       Rails.logger.debug '==== PAPER APPLICATION PROOF UPLOAD STARTED ===='
-      Rails.logger.debug "Current params: #{params.inspect}"
+      Rails.logger.debug { "Current params: #{params.inspect}" }
 
       begin
         # Process income proof
         Rails.logger.debug 'About to process income proof'
         income_result = process_proof(:income)
-        Rails.logger.debug "Income proof processing result: #{income_result}"
+        Rails.logger.debug { "Income proof processing result: #{income_result}" }
+        return false unless income_result # Stop if income proof processing failed
 
         # Process residency proof
         Rails.logger.debug 'About to process residency proof'
         residency_result = process_proof(:residency)
-        Rails.logger.debug "Residency proof processing result: #{residency_result}"
+        Rails.logger.debug { "Residency proof processing result: #{residency_result}" }
+        return false unless residency_result # Stop if residency proof processing failed
 
-        # Return true if we reach here
+        # Return true only if both succeeded
         Rails.logger.debug '==== PAPER APPLICATION PROOF UPLOAD FINISHED ===='
         true
       ensure
@@ -274,10 +325,10 @@ module Applications
     def process_proof(type)
       log_proof_debug_info(type)
       action = extract_proof_action(type)
-      Rails.logger.debug "Action determined: #{action.inspect}"
+      Rails.logger.debug { "Action determined: #{action.inspect}" }
 
       unless %w[accept reject].include?(action)
-        Rails.logger.debug "No valid action for #{type}, returning true"
+        Rails.logger.debug { "No valid action for #{type}, returning true" }
         return true
       end
 
@@ -288,7 +339,7 @@ module Applications
                  process_reject_proof(type)
                end
 
-      Rails.logger.debug "==== PROCESS_PROOF(#{type}) COMPLETED SUCCESSFULLY ===="
+      Rails.logger.debug { "==== PROCESS_PROOF(#{type}) COMPLETED SUCCESSFULLY ====" }
       result
     end
 
@@ -355,11 +406,16 @@ module Applications
     def income_within_threshold?(household_size, annual_income)
       return false unless household_size.present? && annual_income.present?
 
-      base_fpl = Policy.get("fpl_#{[household_size.to_i, 8].min}_person").to_i
+      hs_int = household_size.to_i
+      policy_key = "fpl_#{[hs_int, 8].min}_person"
+      base_fpl = Policy.get(policy_key).to_i
+
       modifier = Policy.get('fpl_modifier_percentage').to_i
+
       threshold = base_fpl * (modifier / 100.0)
 
-      annual_income.to_f <= threshold
+      income_float = annual_income.to_f
+      income_float <= threshold
     end
 
     def add_error(message)

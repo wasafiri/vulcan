@@ -32,7 +32,7 @@ class MedicalCertificationAttachmentServiceTest < ActiveSupport::TestCase
 
   test 'handles failed blob creation gracefully with fallback' do
     # Mock Blob.create_and_upload! to simulate a failure
-    ActiveStorage::Blob.stub :create_and_upload!, ->(_args) { raise StandardError, 'Simulated blob creation failure' } do
+    ActiveStorage::Blob.stub :create_and_upload!, ->(*_args) { raise StandardError, 'Simulated blob creation failure' } do
       assert_difference 'ActiveStorage::Attachment.count' do
         result = MedicalCertificationAttachmentService.attach_certification(
           application: @application,

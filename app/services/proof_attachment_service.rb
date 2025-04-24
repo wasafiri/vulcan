@@ -96,15 +96,12 @@ class ProofAttachmentService
       # Log pre-attachment info
       Rails.logger.info "PRE-ATTACHMENT CHECK: Application #{application.id}, #{proof_type}_proof attached? #{application.send("#{proof_type}_proof").attached?}"
 
-      # Step 2: Direct attachment first, outside any transaction
+      # Step 2: Attach directly to the application instance
       Rails.logger.info "EXECUTING ATTACHMENT: #{proof_type}_proof to application #{application.id}"
+      application.send("#{proof_type}_proof").attach(attachment_param)
 
-      # Create a fresh attachment: attach directly to a record obtained from a fresh query
-      fresh_application = Application.unscoped.find(application.id)
-      fresh_application.send("#{proof_type}_proof").attach(attachment_param)
-
-      # Force a reload of the application to ensure we see latest changes
-      application = Application.unscoped.find(application.id)
+      # Force a reload of the application *before* the transaction to ensure attachment is recognized
+      application.reload
 
       # Log details to help debug attachments
       Rails.logger.debug do
@@ -115,29 +112,31 @@ class ProofAttachmentService
         Rails.logger.info "Attachment confirmed - ID: #{attachment.id}, Blob ID: #{attachment.blob_id}"
       end
 
-      # Verify attachment succeeded before proceeding
-      unless application.send("#{proof_type}_proof").attached?
-        # Try one last manual DB query to check if attachment exists
-        attachment_exists = ActiveStorage::Attachment.where(
-          record_type: 'Application',
-          record_id: application.id,
-          name: "#{proof_type}_proof"
-        ).exists?
-
-        raise "Failed to verify attachment: #{proof_type}_proof not attached after direct attachment" unless attachment_exists
-
-        Rails.logger.warn 'Attachment exists in DB but not detected in model - forcing reload'
-        application.send("#{proof_type}_proof").reset
-      end
-
-      Rails.logger.info "Successfully verified #{proof_type} proof attachment for application #{application.id}"
+      # Verify attachment succeeded before proceeding within the transaction
+      Rails.logger.info "Successfully attached #{proof_type} proof for application #{application.id}, proceeding to update status."
 
       # Step 3: Update status and create audit record in a single transaction
       ActiveRecord::Base.transaction do
         # Update status
         status_attrs = { "#{proof_type}_proof_status" => status }
         status_attrs[:needs_review_since] = Time.current if status == :not_reviewed
-        application.update!(status_attrs)
+
+        # Preserve the paper_application_context flag during update
+        # This ensures validations that check this flag work correctly
+        original_context = Thread.current[:paper_application_context]
+        begin
+          # If this is a paper application submission, ensure the flag is set
+          if submission_method.to_sym == :paper
+            Thread.current[:paper_application_context] = true
+            Rails.logger.debug { "ProofAttachmentService: Setting paper_application_context=true for #{proof_type} update" }
+          end
+
+          application.update!(status_attrs)
+        ensure
+          # Restore the original context value
+          Thread.current[:paper_application_context] = original_context
+          Rails.logger.debug { "ProofAttachmentService: Restored paper_application_context=#{original_context.inspect}" }
+        end
 
         Rails.logger.info "Updated #{proof_type} proof status to #{status} for application #{application.id}"
 
@@ -200,13 +199,28 @@ class ProofAttachmentService
     result = { success: false, error: nil, duration_ms: 0 }
 
     begin
-      # Use the existing method that's been verified to work
-      success = application.reject_proof_without_attachment!(
-        proof_type,
-        admin: admin,
-        reason: reason,
-        notes: notes || 'Rejected during paper application submission'
-      )
+      # Preserve the paper_application_context flag during rejection
+      # This ensures validations that check this flag work correctly
+      original_context = Thread.current[:paper_application_context]
+      begin
+        # If this is a paper application submission, ensure the flag is set
+        if submission_method.to_sym == :paper
+          Thread.current[:paper_application_context] = true
+          Rails.logger.debug { "ProofAttachmentService: Setting paper_application_context=true for #{proof_type} rejection" }
+        end
+
+        # Use the existing method that's been verified to work
+        success = application.reject_proof_without_attachment!(
+          proof_type,
+          admin: admin,
+          reason: reason,
+          notes: notes || 'Rejected during paper application submission'
+        )
+      ensure
+        # Restore the original context value
+        Thread.current[:paper_application_context] = original_context
+        Rails.logger.debug { "ProofAttachmentService: Restored paper_application_context=#{original_context.inspect}" }
+      end
 
       if success
         # Create audit record for tracking and metrics

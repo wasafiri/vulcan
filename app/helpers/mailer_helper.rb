@@ -169,7 +169,7 @@ module MailerHelper
     when :short
       date.strftime('%m/%d/%Y')
     when :long
-      date.strftime('%B %d %Y')
+      date.strftime('%B %d, %Y')
     when :full
       date.strftime('%B %d %Y at %I:%M %p')
     else

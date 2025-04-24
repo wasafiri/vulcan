@@ -7,7 +7,8 @@ module ConstituentPortal
     include ActionDispatch::TestProcess::FixtureFile
 
     setup do
-      @user = users(:constituent_john)
+      # Use factory instead of fixture
+      @user = create(:constituent)
       @valid_pdf = fixture_file_upload('test/fixtures/files/income_proof.pdf', 'application/pdf')
       @valid_image = fixture_file_upload('test/fixtures/files/residency_proof.pdf', 'application/pdf')
 
@@ -16,7 +17,7 @@ module ConstituentPortal
 
     test 'should create application with guardian information' do
       assert_difference('Application.count') do
-        assert_difference('Event.count') do
+        assert_difference('Event.count', 2) do # Expect 2 events: application_created and guardian_application_submitted
           post constituent_portal_applications_path, params: {
             application: {
               maryland_resident: true,

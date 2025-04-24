@@ -3,21 +3,29 @@
 require 'test_helper'
 
 class UrlHelpersInMailersTest < ActionMailer::TestCase
-  fixtures :all
-
   setup do
-    # Set up application and related objects
-    @application = applications(:one)
-    @user = @application.user
-    @proof_review = proof_reviews(:income_approved)
+    # Set up application and related objects using factories instead of fixtures
+    @user = create(:constituent)
+    @application = create(:application, user: @user)
+
+    # Create a proof review with approved status for the application
+    @proof_review = create(:proof_review,
+                           application: @application,
+                           proof_type: 'income',
+                           status: :approved,
+                           admin: create(:admin))
 
     # Set up evaluation and related objects
-    @evaluation = evaluations(:one)
-    @evaluator = @evaluation.evaluator
-    @constituent = @evaluation.constituent
+    @evaluator = create(:evaluator)
+    @constituent = create(:constituent)
+    # Let the factory handle products implicitly, don't try to set product directly
+    @evaluation = create(:evaluation,
+                         evaluator: @evaluator,
+                         constituent: @constituent,
+                         status: :requested)
 
-    # Set up vendor using FactoryBot
-    @vendor = FactoryBot.create(:vendor)
+    # Set up vendor
+    @vendor = create(:vendor)
 
     # Configure default URL options for testing
     Rails.application.config.action_mailer.default_url_options = { host: 'test.example.com' }

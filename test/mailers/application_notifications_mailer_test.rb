@@ -17,7 +17,7 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     ApplicationNotificationsMailer.any_instance.stubs(:constituent_portal_dashboard_url).returns('http://example.com/dashboard')
     ApplicationNotificationsMailer.any_instance.stubs(:new_constituent_portal_application_url).returns('http://example.com/applications/new')
     # Correctly stub the admin_applications_path to accept optional arguments
-    Rails.application.routes.named_routes.path_helpers_module.define_method(:admin_applications_path) do |*args|
+    Rails.application.routes.named_routes.path_helpers_module.define_method(:admin_applications_path) do |*_args|
       '/admin/applications'
     end
     ApplicationNotificationsMailer.any_instance.stubs(:admin_application_url).with(anything, anything).returns('http://example.com/admin/applications/1')

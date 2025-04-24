@@ -21,6 +21,7 @@ module ProofManageable
     after_save :create_proof_submission_audit, if: :proof_attachments_changed?
     after_save :set_proof_status_to_unreviewed, if: :proof_attachments_changed?
     after_save :notify_admins_of_new_proofs, if: -> { needs_review_since_changed? && needs_review_since.present? }
+    after_save :purge_proof_if_rejected # Add the purge callback
   end
 
   def proof_attachments_changed?
@@ -161,6 +162,40 @@ module ProofManageable
     false
   end
 
+  # Method called explicitly by ProofReviewer to purge a proof after status is set to rejected
+  def purge_rejected_proof(proof_type_key)
+    attachment_name = :"#{proof_type_key}_proof"
+    attachment = public_send(attachment_name)
+
+    if attachment.attached?
+      Rails.logger.info "[ProofManageable][purge_rejected_proof] Purging #{attachment_name} for App ##{id}."
+      attachment.purge_later
+    else
+      Rails.logger.info "[ProofManageable][purge_rejected_proof] Skipping purge for #{attachment_name} on App ##{id} - not attached."
+    end
+  end
+
+  # Purges the relevant proof attachment if its status was just saved as rejected.
+  # Uses saved_change_to_attribute? which checks the most recent save operation.
+  # NOTE: This callback might still be useful for other save operations, but not for ProofReviewer updates.
+  def purge_proof_if_rejected
+    # Purge income proof if it was just saved as rejected
+    if saved_change_to_income_proof_status? && income_proof_status_rejected? && income_proof.attached?
+      Rails.logger.info "[ProofManageable][purge] Purging income proof for App ##{id} due to status saved as rejected."
+      income_proof.purge_later
+    else
+      Rails.logger.info "[ProofManageable][purge] Skipping income proof purge for App ##{id}. Saved change? #{saved_change_to_income_proof_status?}, Rejected? #{income_proof_status_rejected?}, Attached? #{income_proof.attached?}"
+    end
+
+    # Purge residency proof if it was just saved as rejected
+    if saved_change_to_residency_proof_status? && residency_proof_status_rejected? && residency_proof.attached?
+      Rails.logger.info "[ProofManageable][purge] Purging residency proof for App ##{id} due to status saved as rejected."
+      residency_proof.purge_later
+    else
+      Rails.logger.info "[ProofManageable][purge] Skipping residency proof purge for App ##{id}. Saved change? #{saved_change_to_residency_proof_status?}, Rejected? #{residency_proof_status_rejected?}, Attached? #{residency_proof.attached?}"
+    end
+  end
+
   private
 
   # --- Refactored Audit Logic ---
@@ -205,9 +240,12 @@ module ProofManageable
   # --- Original Private Methods ---
 
   def correct_proof_mime_type
-    return unless residency_proof.attached? && !ALLOWED_TYPES.include?(residency_proof.content_type)
+    # Check residency proof
+    if residency_proof.attached? && !ALLOWED_TYPES.include?(residency_proof.content_type)
+      errors.add(:residency_proof, 'must be a PDF or an image file (jpg, jpeg, png, tiff, bmp)')
+    end
 
-    errors.add(:residency_proof, 'must be a PDF or an image file (jpg, jpeg, png, tiff, bmp)')
+    # Check income proof independently
     return unless income_proof.attached? && !ALLOWED_TYPES.include?(income_proof.content_type)
 
     errors.add(:income_proof, 'must be a PDF or an image file (jpg, jpeg, png, tiff, bmp)')
@@ -226,7 +264,17 @@ module ProofManageable
 
   # Verifies that proofs have the right attachment state based on status
   def verify_proof_attachments
-    return if new_record? || Thread.current[:skip_proof_validation]
+    # --- DEBUG LOGGING ---
+    Rails.logger.debug do
+      "[ProofManageable] Checking verify_proof_attachments. Paper context: #{Thread.current[:paper_application_context].inspect}"
+    end
+    # --- END DEBUG ---
+
+    # Skip for new records, explicit skips, OR during paper application processing
+    if new_record? || Thread.current[:skip_proof_validation] || Thread.current[:paper_application_context]
+      Rails.logger.debug '[ProofManageable] Skipping verify_proof_attachments.'
+      return
+    end
 
     log_proof_debug_info
     validate_approved_proofs
@@ -414,6 +462,15 @@ module ProofManageable
   end
 
   def require_proof_validations?
+    # --- DEBUG LOGGING ---
+    Rails.logger.debug do
+      "[ProofManageable] Checking require_proof_validations?. Paper context: #{Thread.current[:paper_application_context].inspect}"
+    end
+    # --- END DEBUG ---
+
+    # Skip for paper applications processed by admins - CHECK THIS FIRST
+    return false if Thread.current[:paper_application_context]
+
     # Skip validation for new records (attachments handled by AS on initial save)
     return false if new_record?
     # Skip validation for drafts
@@ -421,9 +478,6 @@ module ProofManageable
     # Validate when transitioning from draft or already submitted
     return true if saved_change_to_status? && status_before_last_save == 'draft'
     return true if submitted?
-
-    # Skip for paper applications processed by admins
-    return false if Thread.current[:paper_application_context]
 
     false
   end

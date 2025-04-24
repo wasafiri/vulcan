@@ -9,11 +9,9 @@ module VendorPortal
 
     def index
       @vouchers = current_user.processed_vouchers.order(updated_at: :desc)
-      
-      if params[:code].blank?
-        return
-      end
-      
+
+      return if params[:code].blank?
+
       voucher = Voucher.where(status: :active).find_by(code: params[:code])
       if voucher
         redirect_to verify_vendor_voucher_path(voucher.code)
@@ -21,25 +19,25 @@ module VendorPortal
         flash.now[:alert] = t('alerts.invalid_voucher_code', default: 'Invalid voucher code')
       end
     end
-    
+
     def verify
       # Initialize the verification attempts
       reset_verification_attempts
     end
-    
+
     def verify_dob
       # Use the verification service to check the DOB
       verification_service = VoucherVerificationService.new(
-        @voucher, 
-        params[:date_of_birth], 
+        @voucher,
+        params[:date_of_birth],
         session
       )
-      
+
       result = verification_service.verify
-      
+
       # Record verification attempt in events
       record_verification_event(result.success?)
-      
+
       if result.success?
         flash[:notice] = t(result.message_key)
         redirect_to redeem_vendor_voucher_path(@voucher.code)
@@ -49,7 +47,7 @@ module VendorPortal
                         else
                           t(result.message_key)
                         end
-        
+
         if result.attempts_left&.zero?
           redirect_to vendor_vouchers_path
         else
@@ -71,8 +69,8 @@ module VendorPortal
         return
       end
 
-      # Validate the voucher can be redeemed
-      unless @voucher.active?
+      # Validate the voucher can be redeemed using the correct enum helper
+      unless @voucher.voucher_active? # Use the prefixed helper method
         flash[:alert] = 'This voucher is not active or has already been processed'
         redirect_to vendor_vouchers_path
         return
@@ -87,7 +85,7 @@ module VendorPortal
 
       # Validate the redemption amount
       redemption_amount = params[:amount].to_f
-      available_amount = @voucher.amount - @voucher.redeemed_amount
+      available_amount = @voucher.remaining_value
 
       if redemption_amount <= 0
         flash[:alert] = 'Redemption amount must be greater than zero'
@@ -117,10 +115,11 @@ module VendorPortal
       end
 
       if transaction.save
-        # Update voucher redeemed amount
+        # Update voucher remaining value
+        new_remaining_value = @voucher.remaining_value - redemption_amount
         @voucher.update(
-          redeemed_amount: @voucher.redeemed_amount + redemption_amount,
-          status: (@voucher.redeemed_amount + redemption_amount >= @voucher.amount) ? :completed : :active
+          remaining_value: new_remaining_value,
+          status: new_remaining_value.zero? ? :redeemed : :active
         )
 
         flash[:notice] = 'Voucher successfully processed'
@@ -134,33 +133,34 @@ module VendorPortal
     private
 
     def set_voucher
-      @voucher = Voucher.find_by!(code: params[:id])
+      # Use params[:code] as defined in the routes, not params[:id]
+      @voucher = Voucher.find_by!(code: params[:code])
     end
-    
+
     def check_voucher_active
-      unless @voucher.active?
-        flash[:alert] = 'This voucher is not active or has already been processed'
-        redirect_to vendor_vouchers_path
-      end
+      return if @voucher.active?
+
+      flash[:alert] = 'This voucher is not active or has already been processed'
+      redirect_to vendor_vouchers_path
     end
-    
+
     def check_identity_verified
-      unless identity_verified?(@voucher)
-        flash[:alert] = 'Identity verification is required before redemption'
-        redirect_to verify_vendor_voucher_path(@voucher.code)
-      end
+      return if identity_verified?(@voucher)
+
+      flash[:alert] = 'Identity verification is required before redemption'
+      redirect_to verify_vendor_voucher_path(@voucher.code)
     end
-    
+
     def identity_verified?(voucher)
-      session[:verified_vouchers].present? && 
-      session[:verified_vouchers].include?(voucher.id)
+      session[:verified_vouchers].present? &&
+        session[:verified_vouchers].include?(voucher.id)
     end
-    
+
     def reset_verification_attempts
       session[:voucher_verification_attempts] ||= {}
       session[:voucher_verification_attempts][@voucher.id.to_s] = 0
     end
-    
+
     def record_verification_event(successful)
       Event.create!(
         user: current_user,

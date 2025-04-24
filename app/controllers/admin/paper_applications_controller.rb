@@ -25,12 +25,60 @@ module Admin
         redirect_to admin_application_path(service.application),
                     notice: generate_success_message(service.application)
       else
-        flash.now[:alert] = service.errors.first if service.errors.any?
+        # For better debugging, output all errors
+        if service.errors.any?
+          error_message = service.errors.join('; ')
+          Rails.logger.error "Paper application creation failed: #{error_message}"
+          flash.now[:alert] = error_message
+        end
         @paper_application = {
           application: service.application || Application.new,
           constituent: service.constituent || Constituent.new
         }
         render :new, status: :unprocessable_entity
+      end
+    end
+
+    def update
+      log_file_and_form_params
+      service_params = paper_application_params
+      Rails.logger.debug { "Service params for update: #{service_params.keys.inspect}" }
+
+      application = Application.find(params[:id])
+      Rails.logger.info "CONTROLLER UPDATE: Application #{application.id} found"
+      Rails.logger.info "CONTROLLER UPDATE: Income proof status: #{application.income_proof_status}, attached? #{application.income_proof.attached?}"
+      Rails.logger.info "CONTROLLER UPDATE: Residency proof status: #{application.residency_proof_status}, attached? #{application.residency_proof.attached?}"
+      Rails.logger.info "CONTROLLER UPDATE: Income proof action: #{params[:income_proof_action]}, Residency proof action: #{params[:residency_proof_action]}"
+      Rails.logger.info "CONTROLLER UPDATE: Income proof signed_id present? #{params[:income_proof_signed_id].present?}, Residency proof signed_id present? #{params[:residency_proof_signed_id].present?}"
+
+      service = Applications::PaperApplicationService.new(
+        params: service_params,
+        admin: current_user
+      )
+
+      Rails.logger.info 'CONTROLLER UPDATE: About to call service.update'
+      result = service.update(application)
+      Rails.logger.info "CONTROLLER UPDATE: Service update result: #{result}"
+
+      if result
+        Rails.logger.info 'CONTROLLER UPDATE: Update successful, redirecting'
+        redirect_to admin_application_path(application),
+                    notice: generate_success_message(application)
+      else
+        # For better debugging, output all errors
+        if service.errors.any?
+          error_message = service.errors.join('; ')
+          Rails.logger.error "CONTROLLER UPDATE: Paper application update failed: #{error_message}"
+          flash.now[:alert] = error_message
+        else
+          Rails.logger.error 'CONTROLLER UPDATE: Paper application update failed with no specific errors'
+        end
+        @paper_application = {
+          application: application,
+          constituent: application.user
+        }
+        Rails.logger.info 'CONTROLLER UPDATE: Rendering edit with unprocessable_entity status'
+        render :edit, status: :unprocessable_entity
       end
     end
 
@@ -152,8 +200,16 @@ module Admin
       %w[income residency].each do |type|
         action_key = "#{type}_proof_action"
         service_params[action_key] = params[action_key]
+
+        # Add the file if present
         file_key = "#{type}_proof"
         service_params[file_key] = params[file_key] if params[file_key].present?
+
+        # Add the signed_id if present
+        signed_id_key = "#{type}_proof_signed_id"
+        service_params[signed_id_key] = params[signed_id_key] if params[signed_id_key].present?
+
+        # Add rejection info if present
         service_params["#{type}_proof_rejection_reason"] = params["#{type}_proof_rejection_reason"]
         service_params["#{type}_proof_rejection_notes"] = params["#{type}_proof_rejection_notes"]
       end

@@ -179,7 +179,7 @@ class TrainingSessionTest < ActiveSupport::TestCase
     assert_not training_session.rescheduling? # Initially false
 
     # Simulate ActiveRecord status_was persistence
-    original_status = training_session.status
+    training_session.status
     training_session.scheduled_for = 2.days.from_now
 
     # Manually set status_was since it's only set during actual saves

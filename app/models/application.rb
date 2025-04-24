@@ -45,6 +45,17 @@ class Application < ApplicationRecord
              inverse_of: :medical_certification_verified_applications
 
   # Enums
+  enum :status, {
+    draft: 0,               # Constituent still working on application
+    in_progress: 1,         # Submitted by constituent, being processed
+    approved: 2,            # Application approved
+    rejected: 3,            # Application rejected
+    needs_information: 4,   # Additional info needed from constituent
+    reminder_sent: 5,       # Reminder sent to constituent
+    awaiting_documents: 6,  # Waiting for specific documents
+    archived: 7             # Historical record
+  }, prefix: true, validate: true
+
   enum :income_proof_status, {
     not_reviewed: 0,
     approved: 1,

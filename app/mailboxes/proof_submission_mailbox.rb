@@ -119,7 +119,9 @@ class ProofSubmissionMailbox < ApplicationMailbox
   end
 
   def check_max_rejections
-    return unless application.total_rejections >= Policy.get('max_proof_rejections')
+    max_rejections = Policy.get('max_proof_rejections')
+    return unless max_rejections.present? && application.total_rejections.present?
+    return unless application.total_rejections >= max_rejections
 
     bounce_with_notification(
       :max_rejections_reached,

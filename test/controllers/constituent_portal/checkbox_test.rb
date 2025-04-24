@@ -5,8 +5,16 @@ require 'test_helper'
 module ConstituentPortal
   class CheckboxTest < ActionDispatch::IntegrationTest
     setup do
-      @user = users(:constituent_john)
+      @user = create(:constituent) # Already using factory instead of fixture
       sign_in(@user)
+    end
+
+    # Helper method to simulate a checked checkbox that returns an array value
+    # This helper was likely missing in the original implementation
+    def checkbox_params(value)
+      # HTML forms send array values for checked checkboxes
+      # This simulates the behavior of a checkbox in HTML form
+      value ? ['1'] : ['0']
     end
 
     test 'should handle array values for self_certify_disability' do

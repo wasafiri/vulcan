@@ -6,14 +6,39 @@ class PaperApplicationDirectUploadTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
 
   setup do
-    @admin = users(:admin)
+    # Use factory bot instead of fixture
+    @admin = create(:admin)
     sign_in(@admin)
+
+    # Set up FPL policies for income threshold validation
+    setup_fpl_policies
+  end
+
+  # Set up the necessary FPL policies for income threshold checking
+  def setup_fpl_policies
+    # Stub the log_change method to avoid validation errors
+    Policy.class_eval do
+      def log_change
+        # No-op in test environment
+      end
+    end
+
+    # Create basic FPL policies needed for application creation
+    Policy.find_or_create_by(key: 'fpl_1_person').update(value: 15_000)
+    Policy.find_or_create_by(key: 'fpl_2_person').update(value: 20_000)
+    Policy.find_or_create_by(key: 'fpl_3_person').update(value: 25_000)
+    Policy.find_or_create_by(key: 'fpl_4_person').update(value: 30_000)
+    Policy.find_or_create_by(key: 'fpl_5_person').update(value: 35_000)
+    Policy.find_or_create_by(key: 'fpl_6_person').update(value: 40_000)
+    Policy.find_or_create_by(key: 'fpl_7_person').update(value: 45_000)
+    Policy.find_or_create_by(key: 'fpl_8_person').update(value: 50_000)
+    Policy.find_or_create_by(key: 'fpl_modifier_percentage').update(value: 400)
   end
 
   test 'direct upload for paper applications should work with signed_ids' do
-    # Set up sample proof files
-    income_proof = fixture_file_upload('test/fixtures/files/sample_income.pdf', 'application/pdf')
-    residency_proof = fixture_file_upload('test/fixtures/files/sample_residency.pdf', 'application/pdf')
+    # Set up sample proof files using existing fixtures in test/fixtures/files/
+    income_proof = fixture_file_upload('income_proof.pdf', 'application/pdf')
+    residency_proof = fixture_file_upload('residency_proof.pdf', 'application/pdf')
 
     # Create blobs using direct upload
     income_blob = create_direct_upload_blob(income_proof)
@@ -46,9 +71,9 @@ class PaperApplicationDirectUploadTest < ActionDispatch::IntegrationTest
           medical_provider_email: 'smith@example.com'
         },
         income_proof_action: 'accept',
-        income_proof: income_blob.signed_id,
+        income_proof_signed_id: income_blob.signed_id,
         residency_proof_action: 'accept',
-        residency_proof: residency_blob.signed_id
+        residency_proof_signed_id: residency_blob.signed_id
       }
     end
 
@@ -83,7 +108,6 @@ class PaperApplicationDirectUploadTest < ActionDispatch::IntegrationTest
     blob
   end
 
-  def sign_in(user)
-    post '/sign_in', params: { email: user.email, password: 'password' }
-  end
+  # Use the sign_in helper from test_helper.rb rather than defining our own
+  # This ensures consistency with other tests
 end

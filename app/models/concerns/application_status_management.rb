@@ -4,17 +4,6 @@ module ApplicationStatusManagement
   extend ActiveSupport::Concern
 
   included do
-    enum :status, {
-      draft: 0,               # Constituent still working on application
-      in_progress: 1,         # Submitted by constituent, being processed
-      approved: 2,            # Application approved
-      rejected: 3,            # Application rejected
-      needs_information: 4,   # Additional info needed from constituent
-      reminder_sent: 5,       # Reminder sent to constituent
-      awaiting_documents: 6,  # Waiting for specific documents
-      archived: 7             # Historical record
-    }, prefix: true, validate: true
-
     after_save :handle_status_change, if: :saved_change_to_status?
     after_save :auto_approve_if_eligible, if: :requirements_met_for_approval?
 
@@ -36,7 +25,7 @@ module ApplicationStatusManagement
       failed: 2
     }, prefix: true
 
-    # Status-related scopes
+    # Status-related scopes - These rely on the enum defined in the model
     scope :active, -> { where(status: %i[in_progress needs_information reminder_sent awaiting_documents]) }
     scope :draft, -> { where(status: :draft) }
     scope :submitted, -> { where.not(status: :draft) }
@@ -75,15 +64,6 @@ module ApplicationStatusManagement
         order(application_date: :desc)
       end
     }
-  end
-
-  # Status check methods
-  def active?
-    status_in_progress? || status_needs_information? || status_reminder_sent? || status_awaiting_documents?
-  end
-
-  def editable?
-    status_draft?
   end
 
   def submitted?

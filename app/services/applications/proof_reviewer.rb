@@ -31,6 +31,10 @@ module Applications
         # Update application status directly
         update_application_status
         Rails.logger.info 'Updated application status'
+
+        # Explicitly purge if status was set to rejected
+        purge_if_rejected
+        Rails.logger.info 'Checked for purge after status update'
       end
 
       # Return true to indicate success
@@ -56,7 +60,13 @@ module Applications
         end
       end
 
-      # Use update_column to bypass validations for this specific field only
+      # IMPORTANT: Using update_column bypasses ActiveRecord callbacks and validations.
+      # This means after_save callbacks like purge_proof_if_rejected won't be triggered.
+      # We must explicitly call purge_if_rejected method below for rejected proofs.
+      # This design pattern is important for handling attachment purges when rejecting proofs.
+      column_name = "#{@proof_type_key}_proof_status"
+      status_enum_value = Application.send(column_name.pluralize.to_s).fetch(@status_key.to_sym)
+      @application.update_column(column_name, status_enum_value)
       column_name = "#{@proof_type_key}_proof_status"
       status_enum_value = Application.send(column_name.pluralize.to_s).fetch(@status_key.to_sym)
       @application.update_column(column_name, status_enum_value)
@@ -66,6 +76,15 @@ module Applications
 
       # Check if auto-approval is now possible
       check_for_auto_approval
+    end
+
+    # Explicitly call purge logic on the application if the status was just set to rejected
+    def purge_if_rejected
+      return unless @status_key == 'rejected'
+
+      Rails.logger.info "[ProofReviewer] Status is rejected for #{@proof_type_key}, attempting purge."
+      # Call a method on the application model to handle the purge
+      @application.purge_rejected_proof(@proof_type_key)
     end
 
     def check_for_auto_approval

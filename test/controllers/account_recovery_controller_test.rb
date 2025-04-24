@@ -5,7 +5,7 @@ require 'test_helper'
 class AccountRecoveryControllerTest < ActionDispatch::IntegrationTest
   setup do
     # Set up a test user with WebAuthn credentials
-    @user = users(:confirmed_user)
+    @user = create(:user) # Replaced fixture with factory
     @webauthn_credential = setup_webauthn_credential_for(@user)
   end
 
@@ -18,7 +18,7 @@ class AccountRecoveryControllerTest < ActionDispatch::IntegrationTest
     assert_select 'input[type=email]'
     assert_select 'textarea' # For details field
     # Form submission could be either button or input
-    assert(css_select('button[type=submit]').any? || css_select('input[type=submit]').any?, 
+    assert(css_select('button[type=submit]').any? || css_select('input[type=submit]').any?,
            'Form must have a submit button or input')
   end
 

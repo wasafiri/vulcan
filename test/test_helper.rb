@@ -16,6 +16,7 @@ require 'support/active_storage_helper'
 require 'support/active_storage_test_helper'
 require 'support/proof_test_helper'
 require 'support/attachment_test_helper' # Added for standardized attachment mocking
+require 'support/mailbox_test_helper'    # Added for standardized mailbox testing
 require 'support/system_test_authentication' # Added for system tests
 require 'support/system_test_helpers' # Added for Cuprite system test helpers
 require 'webauthn/fake_client' # Added for WebAuthn testing

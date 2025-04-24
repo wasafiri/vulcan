@@ -5,7 +5,8 @@ require 'test_helper'
 module ConstituentPortal
   class IncomeThresholdTest < ActionDispatch::IntegrationTest
     setup do
-      @user = users(:constituent_john)
+      # Use factory bot instead of fixture
+      @user = create(:constituent)
       sign_in(@user)
 
       # Set up FPL policies for testing

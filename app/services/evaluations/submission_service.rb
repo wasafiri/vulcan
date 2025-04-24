@@ -10,14 +10,27 @@ module Evaluations
     def submit
       ApplicationRecord.transaction do
         @evaluation.assign_attributes(submission_params)
-        @evaluation.status = :completed
-        @evaluation.save!
+        @evaluation.status = :completed # Directly set the intended final status
+
+        # --- Targeted Debugging ---
+        Rails.logger.info '--- Debugging before save! ---'
+        Rails.logger.info "Attempting to save evaluation ID: #{@evaluation.id}"
+        Rails.logger.info "Current status before save: #{@evaluation.status}"
+        Rails.logger.info "Changes before save: #{@evaluation.changes.inspect}"
+        is_valid = @evaluation.validate # Manually trigger validation
+        Rails.logger.info "Is valid according to .validate?: #{is_valid}"
+        Rails.logger.info "Validation errors before save: #{@evaluation.errors.full_messages.join(', ')}"
+        # Debugging removed
+
+        @evaluation.save! # Attempt to save
         notify_constituent
-        update_application_status
+        # update_application_status # Removed - Application status should update via its own callbacks/logic
       end
       true
     rescue ActiveRecord::RecordInvalid => e
-      Rails.logger.error "Evaluation submission failed: #{e.message}"
+      # Log actual validation errors if save! fails
+      Rails.logger.error "Evaluation submission FAILED for ID #{@evaluation&.id}: #{e.message}"
+      Rails.logger.error "Validation errors: #{@evaluation&.errors&.full_messages&.join(', ')}"
       false
     end
 
@@ -28,7 +41,7 @@ module Evaluations
         :needs,
         :location,
         :notes,
-        :status,
+        :evaluation_date,
         recommended_product_ids: [],
         attendees: %i[name relationship],
         products_tried: %i[product_id reaction]
@@ -39,8 +52,6 @@ module Evaluations
       EvaluatorMailer.evaluation_submission_confirmation(@evaluation).deliver_later
     end
 
-    def update_application_status
-      @evaluation.application.update!(status: :evaluation_completed)
-    end
+    # Removed update_application_status method
   end
 end

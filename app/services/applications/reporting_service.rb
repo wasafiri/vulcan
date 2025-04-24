@@ -153,11 +153,11 @@ module Applications
                                        .count
 
       # Use grouped status counts for charts
-      draft_count = status_counts['draft']
-      submitted_count = status_counts['submitted']
-      in_review_count = status_counts['in_review']
-      approved_count = status_counts['approved']
-      rejected_count = status_counts['rejected']
+      draft_count = status_counts[Application.statuses[:draft]]
+      submitted_count = status_counts[Application.statuses[:submitted]]
+      in_review_count = status_counts[Application.statuses[:in_review]]
+      approved_count = status_counts[Application.statuses[:approved]]
+      rejected_count = status_counts[Application.statuses[:rejected]]
 
       # Application Pipeline data for funnel chart
       total_submitted_or_later = submitted_count + in_review_count + approved_count + rejected_count # Approximation

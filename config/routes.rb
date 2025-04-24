@@ -78,6 +78,10 @@ Rails.application.routes.draw do
   end
 
   # Action Mailbox routes
+  # First, mount the engine to provide all standard ActionMailbox functionality
+  mount ActionMailbox::Engine => '/rails/action_mailbox'
+
+  # Our custom namespace for specific functionality
   namespace :rails do
     namespace :action_mailbox do
       namespace :postmark do
