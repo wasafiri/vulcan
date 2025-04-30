@@ -8,7 +8,7 @@ class ProofAttachmentFallbackTest < ActiveSupport::TestCase
 
   setup do
     @application = applications(:draft_application)
-    @admin = users(:admin_david)
+    @admin = create(:admin)
     # Clear out any existing audit records to ensure our tests are isolated
     ProofSubmissionAudit.delete_all
   end
