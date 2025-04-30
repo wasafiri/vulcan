@@ -22,6 +22,7 @@ Rails.application.routes.draw do
   get 'sign_in', to: 'sessions#new'
   post 'sign_in', to: 'sessions#create'
   delete 'sign_out', to: 'sessions#destroy'
+  get 'sign_out', to: 'sessions#destroy' # Allow GET for browsers without JS or direct URL access
   get 'sessions', to: 'sessions#index'
 
   # Identity namespace for authentication-related actions

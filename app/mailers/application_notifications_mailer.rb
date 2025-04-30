@@ -72,7 +72,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
       proof_type_formatted: proof_type_formatted,
       header_text: header_text(title: header_title, logo_url: header_logo_url),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
-                               show_automated_message: footer_show_automated_message),
+                               organization_name: organization_name, show_automated_message: footer_show_automated_message),
       all_proofs_approved_message_text: all_proofs_approved_message_text, # Optional
       header_logo_url: header_logo_url, # Optional
       header_subtitle: nil # Optional
@@ -635,6 +635,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
 
     # Prepare variables
     header_title = 'Welcome to the Maryland Accessible Telecommunications Program'
+    organization_name = Policy.get('organization_name') || 'Maryland Accessible Telecommunications'
     footer_contact_email = Policy.get('support_email') || 'support@example.com'
     footer_website_url = root_url(host: default_url_options[:host])
     footer_show_automated_message = true
@@ -658,7 +659,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
       new_application_url: new_constituent_portal_application_url(host: default_url_options[:host]),
       header_text: header_text(title: header_title, logo_url: header_logo_url),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
-                               show_automated_message: footer_show_automated_message),
+                               organization_name: organization_name, show_automated_message: footer_show_automated_message),
       active_vendors_text_list: active_vendors_text_list, # Optional
       header_logo_url: header_logo_url, # Optional
       header_subtitle: nil # Optional

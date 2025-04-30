@@ -54,7 +54,6 @@ class User < ApplicationRecord
            inverse_of: :income_verified_by,
            dependent: :nullify
   has_many :role_capabilities, dependent: :destroy
-  # removed: has_many :activities, dependent: :destroy
 
   has_and_belongs_to_many :products,
                           join_table: 'products_users'
@@ -73,7 +72,7 @@ class User < ApplicationRecord
   validates :reset_password_token, uniqueness: true, allow_nil: true
   validate :phone_number_must_be_valid
   validate :validate_address_for_letter_preference
-  validate :constituent_must_have_disability # Uncommented validation
+  validate :constituent_must_have_disability, if: :validate_constituent_disability? # Only validate when appropriate
 
   # Status enum
   enum :status, { inactive: 0, active: 1, suspended: 2 }, default: :active
@@ -333,5 +332,16 @@ class User < ApplicationRecord
 
     # Add error if no disability is selected
     errors.add(:base, 'At least one disability must be selected.') unless disability_selected?
+  end
+
+  # Determine when to validate constituent disability
+  # This should not run during initial account creation
+  def validate_constituent_disability?
+    return false unless type == 'Users::Constituent'
+    return false if new_record? # Skip during initial creation
+
+    # Only validate when updating existing users with applications
+    # or when explicitly requested via an application submission
+    applications.exists? || @validate_disability_required
   end
 end
