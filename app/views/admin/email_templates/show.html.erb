@@ -1,0 +1,223 @@
+<main class="container mx-auto px-4 py-8" role="main" aria-labelledby="template-title">
+  <div class="max-w-7xl mx-auto">
+    <%# Header Section %>
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+      <h1 id="template-title" class="text-3xl font-bold text-gray-900 mb-4 md:mb-0">
+        Template: <%= @email_template.name %> (<%= @email_template.format.titleize %>)
+      </h1>
+      <div class="flex space-x-3">
+        <%= link_to admin_email_templates_path,
+            class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+            aria: { label: "Return to email templates list" } do %>
+          <span>Back to List</span>
+        <% end %>
+        <%= link_to new_test_email_admin_email_template_path(@email_template),
+            class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+            aria: { label: "Send a test email using this template" } do %>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          <span>Send Test Email</span>
+        <% end %>
+        <%= link_to edit_admin_email_template_path(@email_template),
+            class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+            aria: { label: "Edit this email template" } do %>
+          <span>Edit Template</span>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Template Details Section %>
+    <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="template-details-title">
+      <h2 id="template-details-title" class="text-xl font-semibold text-gray-900 mb-4">Template Details</h2>
+      <dl class="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Template ID</dt>
+          <dd class="mt-1 text-sm text-gray-900"><%= @email_template.name %></dd>
+        </div>
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Format</dt>
+          <dd class="mt-1 text-sm text-gray-900"><%= @email_template.format.titleize %></dd>
+        </div>
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Version</dt>
+          <dd class="mt-1 text-sm text-gray-900"><%= @email_template.version %></dd>
+        </div>
+        <div class="md:col-span-3">
+          <dt class="text-sm font-medium text-gray-500">Template Purpose</dt>
+          <dd class="mt-1 text-sm text-gray-900"><%= @template_definition[:description].presence || "No description provided." %></dd>
+        </div>
+        <div class="md:col-span-3">
+          <dt class="text-sm font-medium text-gray-500">Email Subject</dt>
+          <dd class="mt-1 text-sm text-gray-900"><%= @email_template.subject %></dd>
+        </div>
+      </dl>
+    </section>
+
+    <%# Template Body Section %>
+    <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="template-body-title">
+      <h2 id="template-body-title" class="text-xl font-semibold text-gray-900 mb-4">Template Body (Version <%= @email_template.version %>)</h2>
+      
+      <% 
+        # Parse body to separate variable placeholders at the top from actual content
+        body_lines = @email_template.body.split("\n")
+        variable_lines = []
+        content_lines = []
+        
+        body_lines.each do |line|
+          if line.strip.match?(/^%\{[a-z_]+\}$/)
+            variable_lines << line
+          else
+            content_lines << line
+          end
+        end
+        
+        # Join content lines back together, starting from the first non-variable line
+        cleaned_body = content_lines.join("\n")
+        
+        # Find the corresponding template in the other format (html <-> text)
+        other_format = @email_template.format == 'html' ? 'text' : 'html'
+        other_template = EmailTemplate.find_by(name: @email_template.name, format: other_format)
+      %>
+      
+      <div class="mb-4">
+        <h3 class="text-lg font-medium text-gray-900 mb-2">
+          Template Content
+        </h3>
+        <div class="prose max-w-none bg-gray-50 p-4 rounded border border-gray-200 overflow-x-auto">
+          <pre class="text-sm"><%= cleaned_body %></pre>
+        </div>
+      </div>
+    </section>
+
+    <%# Template Preview Section %>
+    <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="template-preview-title">
+      <h2 id="template-preview-title" class="text-xl font-semibold text-gray-900 mb-4">Rendered Preview</h2>
+      
+      <% 
+        # Get sample data for this template
+        sample_data = sample_data_for_template(@email_template.name)
+        
+        # Render template with sample data
+        begin
+          rendered_subject, rendered_body = @email_template.render(**sample_data)
+        rescue => e
+          rendered_subject = "Error rendering subject: #{e.message}"
+          rendered_body = "Error rendering template: #{e.message}"
+        end
+      %>
+      
+      <div class="mb-4">
+        <h3 class="text-lg font-medium text-gray-900 mb-2">
+          Subject: <span class="font-normal"><%= rendered_subject %></span>
+        </h3>
+      </div>
+      
+      <div class="prose max-w-none mb-4">
+        <h3 class="text-lg font-medium text-gray-900 mb-2">
+          Body Preview
+        </h3>
+        
+        <div class="border border-gray-300 rounded-lg shadow-sm p-4 bg-white">
+          <% if @email_template.format == 'html' %>
+            <div class="email-preview">
+              <%= raw rendered_body %>
+            </div>
+          <% else %>
+            <pre class="whitespace-pre-wrap text-sm"><%= rendered_body %></pre>
+          <% end %>
+        </div>
+      </div>
+      
+      <div class="text-sm text-gray-600 mt-2 italic">
+        <p>Preview uses sample data with placeholder values. All variables, headers, and footers are rendered.</p>
+      </div>
+    </section>
+
+    <%# Available Variables Section %>
+    <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="variables-title">
+      <h2 id="variables-title" class="text-xl font-semibold text-gray-900 mb-4">Available Variables</h2>
+      
+      <% 
+        # Extract variable names from variable_lines
+        detected_vars = variable_lines.map do |line|
+          line.strip.match(/%\{([a-z_]+)\}/) ? $1 : nil
+        end.compact
+        
+        # Combine detected variables with those from the template definition
+        required_vars = @template_definition[:required_vars] || []
+        optional_vars = @template_definition[:optional_vars] || []
+        
+        # Add any detected variables not in required/optional to required list (if not empty)
+        detected_vars.each do |var|
+          unless required_vars.include?(var) || optional_vars.include?(var)
+            required_vars << var
+          end
+        end
+      %>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <h3 class="text-lg font-medium text-gray-700 mb-2">Required Variables</h3>
+          <% if required_vars.any? %>
+            <ul class="list-disc list-inside space-y-1">
+              <% required_vars.each do |var| %>
+                <li class="text-sm">
+                  <code class="text-sm bg-gray-100 px-1 py-0.5 rounded"><%= var %></code>
+                  <% if detected_vars.include?(var) %>
+                    <span class="text-xs text-indigo-600">(detected in template)</span>
+                  <% end %>
+                </li>
+              <% end %>
+            </ul>
+          <% else %>
+            <p class="text-sm text-gray-500">No required variables defined for this template.</p>
+          <% end %>
+        </div>
+        <div>
+          <h3 class="text-lg font-medium text-gray-700 mb-2">Optional Variables</h3>
+          <% if optional_vars.any? %>
+            <ul class="list-disc list-inside space-y-1">
+              <% optional_vars.each do |var| %>
+                <li class="text-sm">
+                  <code class="text-sm bg-gray-100 px-1 py-0.5 rounded"><%= var %></code>
+                  <% if detected_vars.include?(var) %>
+                    <span class="text-xs text-indigo-600">(detected in template)</span>
+                  <% end %>
+                </li>
+              <% end %>
+            </ul>
+          <% else %>
+            <p class="text-sm text-gray-500">No optional variables defined for this template.</p>
+          <% end %>
+        </div>
+      </div>
+    </section>
+
+    <%# Previous Version Section (Conditional) %>
+    <% if @email_template.version.to_i > 1 && (@email_template.previous_subject.present? || @email_template.previous_body.present?) %>
+      <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="previous-version-title">
+        <h2 id="previous-version-title" class="text-xl font-semibold text-gray-900 mb-4">Previous Version (v<%= @email_template.version - 1 %>)</h2>
+        <dl class="space-y-4">
+          <% if @email_template.previous_subject.present? %>
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Previous Subject</dt>
+              <dd class="mt-1 text-sm text-gray-900"><%= @email_template.previous_subject %></dd>
+            </div>
+          <% end %>
+          <% if @email_template.previous_body.present? %>
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Previous Body</dt>
+              <dd class="mt-1">
+                <div class="prose max-w-none bg-gray-50 p-4 rounded border border-gray-200 overflow-x-auto">
+                  <pre class="text-sm"><%= @email_template.previous_body %></pre>
+                </div>
+              </dd>
+            </div>
+          <% end %>
+        </dl>
+      </section>
+    <% end %>
+
+  </div>
+</main>

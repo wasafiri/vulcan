@@ -153,6 +153,13 @@ Rails.application.routes.draw do
       resources :scanned_proofs, only: %i[new create] # Added missing routes
     end
 
+    resources :email_templates, only: %i[index show edit update] do
+      member do
+        get :new_test_email
+        post :send_test
+      end
+    end
+
     resources :constituents_dashboard, only: %i[index show]
 
     resources :proof_reviews, only: %i[index show new create]

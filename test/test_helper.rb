@@ -3,6 +3,7 @@
 ENV['RAILS_ENV'] ||= 'test'
 require_relative '../config/environment'
 require 'rails/test_help'
+Rails.application.load_seed if Rails.env.test?
 require 'minitest/mock'
 require 'mocha/minitest'
 require 'capybara/rails'
@@ -199,8 +200,11 @@ module ActiveSupport
         cookies.signed[:session_token] = { value: @session_token, httponly: true }
         puts "TEST AUTH: Set signed cookie session_token=#{@session_token}" if ENV['DEBUG_AUTH'] == 'true'
       rescue NoMethodError
-        # This is expected in integration tests - we use headers instead
-        puts 'TEST AUTH: Using HTTP_COOKIE header for session instead of cookies.signed' if ENV['DEBUG_AUTH'] == 'true'
+        # Handle NoMethodError for system tests where `cookies` is undefined
+      rescue NameError
+        # Handle NameError for system tests where `cookies` is undefined
+        # This is expected in integration/system tests - we use headers or browser context instead
+        puts 'TEST AUTH: Using HTTP_COOKIE header or browser context for session instead of cookies.signed' if ENV['DEBUG_AUTH'] == 'true'
       end
 
       # Clear the ENV override just in case

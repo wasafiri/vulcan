@@ -88,6 +88,15 @@ FactoryBot.define do
             create(:application, user: constituent)
           end
         end
+
+        trait :with_address_and_phone do
+          physical_address_1 { '456 Oak Ave' }
+          physical_address_2 { 'Apt 101' }
+          city { 'Silver Spring' }
+          state { 'MD' }
+          zip_code { '20901' }
+          phone { '111-222-3333' }
+        end
       end
     end
   end

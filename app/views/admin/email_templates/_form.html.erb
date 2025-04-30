@@ -1,0 +1,122 @@
+<%= form_with(model: [:admin, email_template], class: "space-y-4") do |form| %>
+  <% if email_template.errors.any? %>
+    <div id="error_explanation" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+      <strong class="font-bold">Holy smokes!</strong>
+      <span class="block sm:inline"><%= pluralize(email_template.errors.count, "error") %> prohibited this email_template from being saved:</span>
+      <ul class="mt-3 list-disc list-inside text-sm">
+        <% email_template.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div>
+    <%= form.label :description, "Template Purpose", class: "block text-sm font-medium text-gray-700" %>
+    <%= form.text_area :description, rows: 2, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm", placeholder: "Brief description of when this email is sent" %>
+    <p class="mt-2 text-sm text-gray-500">
+      Explain when and why this email is sent (e.g., "Sent when a constituent registers a new account").
+    </p>
+  </div>
+
+  <div>
+    <%= form.label :subject, "Email Subject", class: "block text-sm font-medium text-gray-700" %>
+    <%= form.text_field :subject, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" %>
+  </div>
+
+  <div>
+    <%= form.label :body, class: "block text-sm font-medium text-gray-700" %>
+    <%= form.text_area :body, rows: 20, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm font-mono" %>
+    <p class="mt-2 text-sm text-gray-500">
+      Use <code class="text-sm bg-gray-100 px-1 py-0.5 rounded">%{variable_name}</code> syntax for interpolation.
+    </p>
+  </div>
+
+  <%# Preview Section %>
+  <div class="mt-6 mb-6 p-4 border border-gray-200 rounded-md bg-white">
+    <h3 class="text-lg font-medium text-gray-700 mb-3">Template Preview with Sample Data</h3>
+    
+    <% 
+      # Get sample data for this template
+      sample_data = sample_data_for_template(email_template.name)
+      
+      # Render template with sample data
+      begin
+        # Create a temporary EmailTemplate object with current form values to preview unsaved changes
+        temp_template = EmailTemplate.new(
+          name: email_template.name,
+          format: email_template.format,
+          subject: email_template.subject,
+          body: email_template.body
+        )
+        rendered_subject, rendered_body = temp_template.render(**sample_data)
+      rescue => e
+        rendered_subject = "Error rendering subject: #{e.message}"
+        rendered_body = "Error rendering template: #{e.message}"
+      end
+    %>
+    
+    <div class="mb-4">
+      <h4 class="text-md font-medium text-gray-600 mb-2">
+        Subject Preview: <span class="font-normal"><%= rendered_subject %></span>
+      </h4>
+    </div>
+    
+    <div class="prose max-w-none mb-4">
+      <h4 class="text-md font-medium text-gray-600 mb-2">
+        Body Preview
+      </h4>
+      
+      <div class="border border-gray-300 rounded-lg shadow-sm p-4 bg-white">
+        <% if email_template.format == 'html' %>
+          <div class="email-preview">
+            <%= raw rendered_body %>
+          </div>
+        <% else %>
+          <pre class="whitespace-pre-wrap text-sm"><%= rendered_body %></pre>
+        <% end %>
+      </div>
+    </div>
+    
+    <div class="text-sm text-gray-600 mt-2 italic">
+      <p>Preview uses sample data with placeholder values. All variables, headers, and footers are rendered.</p>
+    </div>
+  </div>
+
+  <%# Available Variables Section (for reference during editing) %>
+  <div class="mt-6 p-4 border border-gray-200 rounded-md bg-gray-50">
+    <h3 class="text-lg font-medium text-gray-700 mb-3">Available Variables Reference</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div>
+        <h4 class="text-md font-medium text-gray-600 mb-2">Required Variables</h4>
+        <% required_vars = template_definition[:required_vars] || [] %>
+        <% if required_vars.any? %>
+          <ul class="list-disc list-inside space-y-1">
+            <% required_vars.each do |var| %>
+              <li class="text-sm"><code class="text-sm bg-gray-200 px-1 py-0.5 rounded"><%= var %></code></li>
+            <% end %>
+          </ul>
+        <% else %>
+          <p class="text-sm text-gray-500">None defined.</p>
+        <% end %>
+      </div>
+      <div>
+        <h4 class="text-md font-medium text-gray-600 mb-2">Optional Variables</h4>
+        <% optional_vars = template_definition[:optional_vars] || [] %>
+        <% if optional_vars.any? %>
+          <ul class="list-disc list-inside space-y-1">
+            <% optional_vars.each do |var| %>
+              <li class="text-sm"><code class="text-sm bg-gray-200 px-1 py-0.5 rounded"><%= var %></code></li>
+            <% end %>
+          </ul>
+        <% else %>
+          <p class="text-sm text-gray-500">None defined.</p>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex justify-end pt-4">
+    <%= form.submit "Update Template", class: "inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+  </div>
+<% end %>

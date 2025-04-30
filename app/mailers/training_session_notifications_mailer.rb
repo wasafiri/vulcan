@@ -1,215 +1,387 @@
 # frozen_string_literal: true
 
 class TrainingSessionNotificationsMailer < ApplicationMailer
-  def trainer_assigned(training_session)
-    @training_session = training_session
-    @constituent = training_session.constituent
-    @trainer = training_session.trainer
-    @application = training_session.application
+  include Rails.application.routes.url_helpers
+  # Include helpers for rendering shared partials
+  include Mailers::SharedPartialHelpers # Use the extracted shared helper module
+
+  def self.default_url_options
+    Rails.application.config.action_mailer.default_url_options
+  end
+
+  # Notify a trainer that a new training session has been assigned
+  # Expects training_session passed via .with(training_session: ...)
+  def trainer_assigned
+    training_session = params[:training_session] # Use params
+    template_name = 'training_session_notifications_trainer_assigned'
+    begin
+      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      text_template = EmailTemplate.find_by!(name: template_name, format: :text)
+    rescue ActiveRecord::RecordNotFound => e
+      Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
+      raise "Email templates not found for #{template_name}"
+    end
+
+    # Prepare variables
+    constituent = training_session.constituent
+    trainer = training_session.trainer
+    application = training_session.application
+
+    # Common elements for shared partials
+    header_title = "New Training Assignment - Application ##{application.id}"
+    footer_contact_email = Policy.get('support_email') || 'support@example.com'
+    footer_website_url = root_url(host: default_url_options[:host])
+    footer_show_automated_message = true
+    header_logo_url = begin
+      ActionController::Base.helpers.asset_path('logo.png', host: default_url_options[:host])
+    rescue StandardError
+      nil
+    end
+
+    variables = {
+      trainer_full_name: trainer.full_name,
+      constituent_full_name: constituent.full_name,
+      application_id: application.id,
+      # Shared partial variables (rendered content)
+      header_html: header_html(title: header_title, logo_url: header_logo_url),
+      header_text: header_text(title: header_title, logo_url: header_logo_url),
+      footer_html: footer_html(contact_email: footer_contact_email, website_url: footer_website_url,
+                               show_automated_message: footer_show_automated_message),
+      footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
+                               show_automated_message: footer_show_automated_message),
+      header_logo_url: header_logo_url, # Optional, passed for potential use in template body
+      header_subtitle: nil # Optional
+    }.compact
+
+    # Render subject and bodies
+    rendered_subject, rendered_html_body = html_template.render(**variables)
+    _, rendered_text_body = text_template.render(**variables)
 
     # Send email to trainer
     mail(
-      to: @trainer.email,
-      subject: "New Training Assignment - Application ##{@application.id}",
+      to: trainer.email,
+      subject: rendered_subject,
       message_stream: 'notifications'
-    )
+    ) do |format|
+      format.html { render html: rendered_html_body.presence || '' }
+      format.text { render plain: rendered_text_body.to_s }
+    end
   rescue StandardError => e
+    # Update error logging to include template name and variables
     Event.create!(
-      user: @trainer,
+      user: trainer, # Use local variable
       action: 'email_delivery_error',
       user_agent: Current.user_agent,
       ip_address: Current.ip_address,
       metadata: {
         error_message: e.message,
         error_class: e.class.name,
-        template_name: 'trainer_assigned',
-        variables: {
-          constituent_name: @constituent.full_name,
-          trainer_name: @trainer.full_name,
-          application_id: @application.id
-        },
+        template_name: template_name, # Use local variable
+        variables: variables, # Use local variable
         backtrace: e.backtrace&.first(5)
       }
     )
     raise
   end
 
-  def training_scheduled(training_session)
-    @training_session = training_session
-    @constituent = training_session.constituent
-    @trainer = training_session.trainer
+  # Notify constituent that training is scheduled
+  # Expects training_session passed via .with(training_session: ...)
+  def training_scheduled
+    training_session = params[:training_session] # Use params
+    template_name = 'training_session_notifications_training_scheduled'
+    begin
+      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      text_template = EmailTemplate.find_by!(name: template_name, format: :text)
+    rescue ActiveRecord::RecordNotFound => e
+      Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
+      raise "Email templates not found for #{template_name}"
+    end
 
-    template = EmailTemplate.find_by!(name: 'training_scheduled')
+    # Prepare variables
+    constituent = training_session.constituent
+    trainer = training_session.trainer
+    application = training_session.application
+
+    # Common elements for shared partials
+    header_title = "Training Scheduled - Application ##{application.id}"
+    footer_contact_email = Policy.get('support_email') || 'support@example.com'
+    footer_website_url = root_url(host: default_url_options[:host])
+    footer_show_automated_message = true
+    header_logo_url = begin
+      ActionController::Base.helpers.asset_path('logo.png', host: default_url_options[:host])
+    rescue StandardError
+      nil
+    end
+
     variables = {
-      constituent_name: @constituent.full_name || 'Valued Constituent',
-      trainer_name: @trainer.full_name || 'Your Trainer',
-      scheduled_date: @training_session.scheduled_for.strftime('%B %d, %Y'),
-      scheduled_time: @training_session.scheduled_for.strftime('%I:%M %p'),
-      application_id: @training_session.application.id
-    }
+      constituent_name: constituent.full_name || 'Valued Constituent',
+      trainer_name: trainer.full_name || 'Your Trainer',
+      scheduled_date: training_session.scheduled_for.strftime('%B %d, %Y'),
+      scheduled_time: training_session.scheduled_for.strftime('%I:%M %p'),
+      application_id: application.id,
+      # Shared partial variables
+      header_html: header_html(title: header_title, logo_url: header_logo_url),
+      header_text: header_text(title: header_title, logo_url: header_logo_url),
+      footer_html: footer_html(contact_email: footer_contact_email, website_url: footer_website_url,
+                               show_automated_message: footer_show_automated_message),
+      footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
+                               show_automated_message: footer_show_automated_message),
+      header_logo_url: header_logo_url, # Optional
+      header_subtitle: nil # Optional
+    }.compact
 
-    # Use the render method which returns [subject, body]
-    subject, body = template.render(**variables)
-    @rendered_body = body # Make the body available to the view
+    # Render subject and bodies
+    rendered_subject, rendered_html_body = html_template.render(**variables)
+    _, rendered_text_body = text_template.render(**variables)
 
+    # Send email
     mail(
-      to: @constituent.email,
-      subject: subject,
+      to: trainer.email,
+      subject: rendered_subject,
       message_stream: 'notifications'
-    )
+    ) do |format|
+      format.html { render html: rendered_html_body.presence || '' }
+      format.text { render plain: rendered_text_body.to_s }
+    end
   rescue StandardError => e
+    # Log error with more details
     Event.create!(
-      user: @trainer,
+      user: trainer, # Use local variable if available, otherwise nil
       action: 'email_delivery_error',
       user_agent: Current.user_agent,
       ip_address: Current.ip_address,
       metadata: {
         error_message: e.message,
         error_class: e.class.name,
-        template_name: 'training_scheduled',
-        variables: {
-          constituent_name: @constituent.full_name,
-          trainer_name: @trainer.full_name,
-          scheduled_date: @training_session.scheduled_for.strftime('%B %d, %Y'),
-          scheduled_time: @training_session.scheduled_for.strftime('%I:%M %p'),
-          application_id: @training_session.application.id
-        },
+        template_name: template_name, # Use local variable
+        variables: variables, # Use local variable
         backtrace: e.backtrace&.first(5)
       }
     )
     raise
   end
 
-  def training_completed(training_session)
-    @training_session = training_session
-    @constituent = training_session.constituent
-    @trainer = training_session.trainer
+  # Notify constituent that training is completed
+  # Expects training_session passed via .with(training_session: ...)
+  def training_completed
+    training_session = params[:training_session] # Use params
+    template_name = 'training_session_notifications_training_completed'
+    begin
+      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      text_template = EmailTemplate.find_by!(name: template_name, format: :text)
+    rescue ActiveRecord::RecordNotFound => e
+      Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
+      raise "Email templates not found for #{template_name}"
+    end
 
-    template = EmailTemplate.find_by!(name: 'training_completed')
+    # Prepare variables
+    constituent = training_session.constituent
+    trainer = training_session.trainer
+    application = training_session.application
+
+    # Common elements for shared partials
+    header_title = "Training Completed - Application ##{application.id}"
+    footer_contact_email = Policy.get('support_email') || 'support@example.com'
+    footer_website_url = root_url(host: default_url_options[:host])
+    footer_show_automated_message = true
+    header_logo_url = begin
+      ActionController::Base.helpers.asset_path('logo.png', host: default_url_options[:host])
+    rescue StandardError
+      nil
+    end
+
     variables = {
-      constituent_name: @constituent.full_name || 'Valued Constituent',
-      trainer_name: @trainer.full_name || 'Your Trainer',
-      completion_date: @training_session.completed_at.strftime('%B %d, %Y'),
-      application_id: @training_session.application.id
-    }
+      constituent_name: constituent.full_name || 'Valued Constituent',
+      trainer_name: trainer.full_name || 'Your Trainer',
+      completion_date: training_session.completed_at.strftime('%B %d, %Y'),
+      application_id: application.id,
+      # Shared partial variables
+      header_html: header_html(title: header_title, logo_url: header_logo_url),
+      header_text: header_text(title: header_title, logo_url: header_logo_url),
+      footer_html: footer_html(contact_email: footer_contact_email, website_url: footer_website_url,
+                               show_automated_message: footer_show_automated_message),
+      footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
+                               show_automated_message: footer_show_automated_message),
+      header_logo_url: header_logo_url, # Optional
+      header_subtitle: nil # Optional
+    }.compact
 
-    # Use the render method which returns [subject, body]
-    subject, body = template.render(**variables)
-    @rendered_body = body # Make the body available to the view
+    # Render subject and bodies
+    rendered_subject, rendered_html_body = html_template.render(**variables)
+    _, rendered_text_body = text_template.render(**variables)
 
+    # Send email
     mail(
-      to: @constituent.email,
-      subject: subject,
+      to: constituent.email,
+      subject: rendered_subject,
       message_stream: 'notifications'
-    )
+    ) do |format|
+      format.html { render html: rendered_html_body.presence || '' }
+      format.text { render plain: rendered_text_body.to_s }
+    end
   rescue StandardError => e
+    # Log error with more details
     Event.create!(
-      user: @trainer,
+      user: trainer, # Use local variable if available, otherwise nil
       action: 'email_delivery_error',
       user_agent: Current.user_agent,
       ip_address: Current.ip_address,
       metadata: {
         error_message: e.message,
         error_class: e.class.name,
-        template_name: 'training_completed',
-        variables: {
-          constituent_name: @constituent.full_name,
-          trainer_name: @trainer.full_name,
-          completion_date: @training_session.completed_at.strftime('%B %d, %Y'),
-          application_id: @training_session.application.id
-        },
+        template_name: template_name, # Use local variable
+        variables: variables, # Use local variable
         backtrace: e.backtrace&.first(5)
       }
     )
     raise
   end
 
+  # Notify constituent that training is cancelled
   def training_cancelled(training_session)
-    @training_session = training_session
-    @constituent = training_session.constituent
-    @trainer = training_session.trainer
+    template_name = 'training_session_notifications_training_cancelled'
+    begin
+      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      text_template = EmailTemplate.find_by!(name: template_name, format: :text)
+    rescue ActiveRecord::RecordNotFound => e
+      Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
+      raise "Email templates not found for #{template_name}"
+    end
 
-    template = EmailTemplate.find_by!(name: 'training_cancelled')
+    # Prepare variables
+    constituent = training_session.constituent
+    trainer = training_session.trainer
+    application = training_session.application
+
+    # Common elements for shared partials
+    header_title = "Training Cancelled - Application ##{application.id}"
+    footer_contact_email = Policy.get('support_email') || 'support@example.com'
+    footer_website_url = root_url(host: default_url_options[:host])
+    footer_show_automated_message = true
+    header_logo_url = begin
+      ActionController::Base.helpers.asset_path('logo.png', host: default_url_options[:host])
+    rescue StandardError
+      nil
+    end
+
     variables = {
-      constituent_name: @constituent.full_name || 'Valued Constituent',
-      trainer_name: @trainer.full_name || 'Your Trainer',
-      scheduled_date: @training_session.scheduled_for.strftime('%B %d, %Y'),
-      scheduled_time: @training_session.scheduled_for.strftime('%I:%M %p'),
-      application_id: @training_session.application.id
-    }
+      constituent_name: constituent.full_name || 'Valued Constituent',
+      trainer_name: trainer.full_name || 'Your Trainer',
+      scheduled_date: training_session.scheduled_for.strftime('%B %d, %Y'),
+      scheduled_time: training_session.scheduled_for.strftime('%I:%M %p'),
+      application_id: application.id,
+      # Shared partial variables
+      header_html: header_html(title: header_title, logo_url: header_logo_url),
+      header_text: header_text(title: header_title, logo_url: header_logo_url),
+      footer_html: footer_html(contact_email: footer_contact_email, website_url: footer_website_url,
+                               show_automated_message: footer_show_automated_message),
+      footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
+                               show_automated_message: footer_show_automated_message),
+      header_logo_url: header_logo_url, # Optional
+      header_subtitle: nil # Optional
+    }.compact
 
-    # Use the render method which returns [subject, body]
-    subject, body = template.render(**variables)
-    @rendered_body = body # Make the body available to the view
+    # Render subject and bodies
+    rendered_subject, rendered_html_body = html_template.render(**variables)
+    _, rendered_text_body = text_template.render(**variables)
 
+    # Send email
     mail(
-      to: @constituent.email,
-      subject: subject,
+      to: constituent.email,
+      subject: rendered_subject,
       message_stream: 'notifications'
-    )
+    ) do |format|
+      format.html { render html: rendered_html_body.presence || '' }
+      format.text { render plain: rendered_text_body.to_s }
+    end
   rescue StandardError => e
+    # Log error with more details
     Event.create!(
-      user: @trainer,
+      user: trainer, # Use local variable if available, otherwise nil
       action: 'email_delivery_error',
       user_agent: Current.user_agent,
       ip_address: Current.ip_address,
       metadata: {
         error_message: e.message,
         error_class: e.class.name,
-        template_name: 'training_cancelled',
-        variables: {
-          constituent_name: @constituent.full_name,
-          trainer_name: @trainer.full_name,
-          scheduled_date: @training_session.scheduled_for.strftime('%B %d, %Y'),
-          scheduled_time: @training_session.scheduled_for.strftime('%I:%M %p'),
-          application_id: @training_session.application.id
-        },
+        template_name: template_name, # Use local variable
+        variables: variables, # Use local variable
         backtrace: e.backtrace&.first(5)
       }
     )
     raise
   end
 
+  # Notify constituent about a no-show for training
   def no_show_notification(training_session)
-    @training_session = training_session
-    @constituent = training_session.constituent
-    @trainer = training_session.trainer
+    # Use full template name as defined in the constant
+    template_name = 'training_session_notifications_training_no_show'
+    begin
+      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      text_template = EmailTemplate.find_by!(name: template_name, format: :text)
+    rescue ActiveRecord::RecordNotFound => e
+      Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
+      raise "Email templates not found for #{template_name}"
+    end
 
-    template = EmailTemplate.find_by!(name: 'training_no_show')
+    # Prepare variables
+    constituent = training_session.constituent
+    trainer = training_session.trainer
+    application = training_session.application
+
+    # Common elements for shared partials
+    header_title = "Training Session Missed - Application ##{application.id}"
+    footer_contact_email = Policy.get('support_email') || 'support@example.com'
+    footer_website_url = root_url(host: default_url_options[:host])
+    footer_show_automated_message = true
+    header_logo_url = begin
+      ActionController::Base.helpers.asset_path('logo.png', host: default_url_options[:host])
+    rescue StandardError
+      nil
+    end
+
     variables = {
-      constituent_name: @constituent.full_name || 'Valued Constituent',
-      trainer_name: @trainer.full_name || 'Your Trainer',
-      missed_date: @training_session.scheduled_for.strftime('%B %d, %Y'),
-      missed_time: @training_session.scheduled_for.strftime('%I:%M %p'),
-      application_id: @training_session.application.id
-    }
+      constituent_name: constituent.full_name || 'Valued Constituent',
+      trainer_name: trainer.full_name || 'Your Trainer',
+      missed_date: training_session.scheduled_for.strftime('%B %d, %Y'),
+      missed_time: training_session.scheduled_for.strftime('%I:%M %p'),
+      application_id: application.id,
+      # Shared partial variables
+      header_html: header_html(title: header_title, logo_url: header_logo_url),
+      header_text: header_text(title: header_title, logo_url: header_logo_url),
+      footer_html: footer_html(contact_email: footer_contact_email, website_url: footer_website_url,
+                               show_automated_message: footer_show_automated_message),
+      footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
+                               show_automated_message: footer_show_automated_message),
+      header_logo_url: header_logo_url, # Optional
+      header_subtitle: nil # Optional
+    }.compact
 
-    # Use the render method which returns [subject, body]
-    subject, body = template.render(**variables)
-    @rendered_body = body # Make the body available to the view
+    # Render subject and bodies
+    rendered_subject, rendered_html_body = html_template.render(**variables)
+    _, rendered_text_body = text_template.render(**variables)
 
+    # Send email
     mail(
-      to: @constituent.email,
-      subject: subject,
+      to: constituent.email,
+      subject: rendered_subject,
       message_stream: 'notifications'
-    )
+    ) do |format|
+      format.html { render html: rendered_html_body.presence || '' }
+      format.text { render plain: rendered_text_body.to_s }
+    end
   rescue StandardError => e
+    # Log error with more details
     Event.create!(
-      user: @trainer,
+      user: trainer, # Use local variable if available, otherwise nil
       action: 'email_delivery_error',
       user_agent: Current.user_agent,
       ip_address: Current.ip_address,
       metadata: {
         error_message: e.message,
         error_class: e.class.name,
-        template_name: 'training_no_show',
-        variables: {
-          constituent_name: @constituent.full_name,
-          trainer_name: @trainer.full_name,
-          missed_date: @training_session.scheduled_for.strftime('%B %d, %Y'),
-          missed_time: @training_session.scheduled_for.strftime('%I:%M %p'),
-          application_id: @training_session.application.id
-        },
+        template_name: template_name, # Use local variable
+        variables: variables, # Use local variable
         backtrace: e.backtrace&.first(5)
       }
     )

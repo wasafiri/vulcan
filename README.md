@@ -77,7 +77,7 @@ Vulcan is a Ruby on Rails application that facilitates Maryland Accessible Telec
 
 ### Core Functionality
 - [Inbound Email Processing Guide](doc/inbound_email_processing_guide.md) - Setup and usage of email-based proof submission
-- [Email/Letter Consistency](doc/email_letter_consistency.md) - Guidelines for maintaining consistent communication
+- [Email/Letter Template Management](doc/mailer_template_management.md) - Documentation on the database email template and letter generation system
 - [Constituent Type Standardization](doc/constituent_type_standardization.md) - Standards for constituent type handling
 
 ### Proof System
@@ -118,6 +118,12 @@ Vulcan is a Ruby on Rails application that facilitates Maryland Accessible Telec
    bin/rails db:migrate
    bin/rails db:seed
    ```
+
+3a. Seed email templates:
+   ```bash
+   bin/rails db:seed:email_templates
+   ```
+   This command populates the `email_templates` table with the default email and letter templates used by the application.
 
 4. Set up environment variables:
    ```bash

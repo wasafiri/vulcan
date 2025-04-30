@@ -1,0 +1,37 @@
+# Seed File for "voucher_notifications_voucher_expired"
+# EmailTemplate.find_by(name: 'voucher_notifications_voucher_expired').deliver(user: user, voucher: voucher)
+# (Suggest saving as db/seeds/email_templates/constituent_notifications_voucher_expired.rb)
+# --------------------------------------------------
+EmailTemplate.create_or_find_by!(name: 'constituent_notifications_voucher_expired', format: :text) do |template|
+  template.subject = 'Your Voucher Has Expired'
+  template.description = 'Sent to the constituent when their assigned voucher has expired.'
+  template.body = <<~TEXT
+    %<header_text>s
+
+    Dear %<user_first_name>s,
+
+    We regret to inform you that your voucher has expired.
+
+    Expired Voucher Details:
+    - Voucher Code: %<voucher_code>s
+    - Initial Value: %<initial_value_formatted>s
+    - Unused Value: %<unused_value_formatted>s
+    - Expiration Date: %<expiration_date_formatted>s
+
+    %<transaction_history_text>s
+
+    What This Means:
+    * The voucher can no longer be used for purchases
+    * Any remaining balance has been forfeited
+    * You may be eligible for a new voucher in the future
+
+    If you believe this voucher expired in error or have any questions, please contact us immediately.
+
+    Best regards,
+    The MAT Program Team
+
+    %<footer_text>s
+  TEXT
+  template.version = 1
+end
+puts 'Seeded constituent_notifications_voucher_expired (text)'

@@ -377,26 +377,55 @@ module Applications
           # Use the stored temp_password if available, otherwise generate a new one
           temp_password = @temp_password || SecureRandom.hex(8)
           @constituent.update(password: temp_password, password_confirmation: temp_password)
-          Letters::LetterGeneratorService.new(
-            template_type: 'account_created',
-            constituent: @constituent,
-            data: { temp_password: temp_password }
+
+          # Use the TextTemplateToPdfService with database templates
+          Letters::TextTemplateToPdfService.new(
+            template_name: 'application_notifications_account_created',
+            recipient: @constituent,
+            variables: {
+              constituent_first_name: @constituent.first_name,
+              constituent_email: @constituent.email,
+              temp_password: temp_password,
+              sign_in_url: new_session_url, # Assuming new_session_url helper exists
+              # Shared partial variables for text template
+              header_text: Mailers::SharedPartialHelpers.header_text(
+                title: 'Your Maryland Accessible Telecommunications Account',
+                logo_url: ActionController::Base.helpers.asset_path('logo.png',
+                                                                    host: Rails.application.config.action_mailer.default_url_options[:host])
+              ),
+              footer_text: Mailers::SharedPartialHelpers.footer_text(
+                contact_email: Policy.get('support_email') || 'support@example.com',
+                website_url: root_url(host: Rails.application.config.action_mailer.default_url_options[:host]),
+                show_automated_message: true
+              )
+            }
           ).queue_for_printing
         end
 
-        # Proof rejection letters
+        # Proof rejection letters using  TextTemplateToPdfService with database templates
         @application.proof_reviews.reload.each do |review|
           next unless review.status_rejected?
 
-          Letters::LetterGeneratorService.new(
-            template_type: 'proof_rejected',
-            constituent: @constituent,
-            application: @application,
-            data: {
-              proof_review: review,
-              proof_type: review.proof_type,
-              rejection_reason: review.rejection_reason,
-              rejection_notes: review.notes
+          Letters::TextTemplateToPdfService.new(
+            template_name: 'application_notifications_proof_rejected',
+            recipient: @constituent,
+            variables: {
+              constituent_full_name: @constituent.full_name, # Assuming User model has a full_name method
+              organization_name: Policy.get('organization_name') || 'MAT Program', # Use Policy for organization name
+              proof_type_formatted: review.proof_type.humanize,
+              rejection_reason: review.rejection_reason || 'Document did not meet requirements',
+              # Shared partial variables for text template
+              header_text: Mailers::SharedPartialHelpers.header_text(
+                title: 'Document Verification Follow-up Required',
+                logo_url: ActionController::Base.helpers.asset_path('logo.png',
+                                                                    host: Rails.application.config.action_mailer.default_url_options[:host])
+              ),
+              footer_text: Mailers::SharedPartialHelpers.footer_text(
+                contact_email: Policy.get('support_email') || 'support@example.com',
+                website_url: root_url(host: Rails.application.config.action_mailer.default_url_options[:host]),
+                show_automated_message: true
+              )
+              # Omitting optional variables for now
             }
           ).queue_for_printing
         end

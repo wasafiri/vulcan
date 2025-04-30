@@ -4,16 +4,16 @@ require 'test_helper'
 
 class VendorPortal::DashboardControllerTest < ActionDispatch::IntegrationTest
   setup do
-    @vendor = Users::Vendor.find(users(:vendor_raz).id)
+    @vendor = create(:vendor)
   end
 
-  test "dashboard requires authentication" do
+  test 'dashboard requires authentication' do
     # Access without logging in should redirect to sign in
     get vendor_dashboard_path
     assert_redirected_to sign_in_path
   end
 
-  test "gets show when authenticated" do
+  test 'gets show when authenticated' do
     # Stub the authentication method to bypass full authentication flow
     ENV['TEST_USER_ID'] = @vendor.id.to_s
 

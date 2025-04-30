@@ -1,0 +1,470 @@
+# User Fixtures
+
+# Basic test fixtures required by tests
+admin:
+  type: Users::Administrator
+  email: admin@example.com
+  first_name: Admin
+  last_name: User
+  password_digest: <%= User.digest('password123') %>
+  email_verified: true
+  date_of_birth: <%= 45.years.ago.to_date %>
+  status: active
+  physical_address_1: 100 State Circle
+  city: Annapolis
+  state: MD
+  zip_code: 21401
+
+confirmed_user:
+  type: Users::Constituent
+  email: user@example.com
+  first_name: Test
+  last_name: User
+  password_digest: <%= User.digest('password123') %>
+  email_verified: true
+  hearing_disability: true
+  date_of_birth: <%= 32.years.ago.to_date %>
+  status: active
+  phone: 555-123-4567
+  physical_address_1: 401 Washington Ave
+  city: Towson
+  state: MD
+  zip_code: 21204
+
+confirmed_user2:
+  type: Users::Constituent
+  email: user2@example.com
+  first_name: Jane
+  last_name: Doe
+  password_digest: <%= User.digest('password123') %>
+  email_verified: true
+  hearing_disability: true
+  date_of_birth: <%= 29.years.ago.to_date %>
+  status: active
+  phone: 555-987-6543
+  physical_address_1: 8401 Corporate Dr
+  city: Landover
+  state: MD
+  zip_code: 20785
+
+unconfirmed_user:
+  type: Users::Constituent
+  email: unconfirmed@example.com
+  first_name: New
+  last_name: User
+  password_digest: <%= User.digest('password123') %>
+  email_verified: false
+  hearing_disability: true
+  date_of_birth: <%= 27.years.ago.to_date %>
+  status: active
+  phone: 555-222-3333
+  physical_address_1: 305 Elm Street
+  city: Frederick
+  state: MD
+  zip_code: 21701
+
+trainer:
+  type: Users::Trainer
+  email: trainer@example.com
+  first_name: Trainer
+  last_name: Person
+  password_digest: <%= User.digest('password123') %>
+  email_verified: true
+  date_of_birth: <%= 39.years.ago.to_date %>
+  status: active
+  physical_address_1: 5500 Coastal Highway
+  city: Ocean City
+  state: MD
+  zip_code: 21842
+
+evaluator:
+  type: Users::Evaluator
+  email: evaluator@example.com
+  first_name: Evaluator
+  last_name: Person
+  password_digest: <%= User.digest('password123') %>
+  email_verified: true
+  date_of_birth: <%= 42.years.ago.to_date %>
+  status: active
+  physical_address_1: 7800 Harkins Rd
+  city: Lanham
+  state: MD
+  zip_code: 20706
+
+medical_provider:
+  type: Users::MedicalProvider
+  email: medical@example.com
+  first_name: Doctor
+  last_name: Smith
+  password_digest: <%= User.digest('password123') %>
+  email_verified: true
+  date_of_birth: <%= 48.years.ago.to_date %>
+  status: active
+  physical_address_1: 9000 Franklin Square Dr
+  city: Baltimore
+  state: MD
+  zip_code: 21237
+
+# Custom users needed for seeding
+
+# Admins
+admin_david:
+  type: Users::Administrator
+  email: david.bahar@maryland.gov
+  first_name: David
+  last_name: Bahar
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0001
+  date_of_birth: <%= 44.years.ago.to_date %>
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  hearing_disability: true
+  email_verified: true
+  status: active
+  physical_address_1: 45 Calvert Street
+  city: Annapolis
+  state: MD
+  zip_code: 21401
+
+admin_kevin:
+  type: Users::Administrator
+  email: kevin.steffy@maryland.gov
+  first_name: Kevin
+  last_name: Steffy
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0001
+  date_of_birth: <%= 55.years.ago.to_date %>
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  hearing_disability: true
+  email_verified: true
+  status: active
+  physical_address_1: 201 W Preston St
+  city: Baltimore
+  state: MD
+  zip_code: 21201
+
+admin_jane:
+  type: Users::Administrator
+  email: jane.hager@maryland.gov
+  first_name: Jane
+  last_name: Hager
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0001
+  date_of_birth: <%= 55.years.ago.to_date %>
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  hearing_disability: true
+  email_verified: true
+  status: active
+  physical_address_1: 6 St. Paul Street
+  city: Baltimore
+  state: MD
+  zip_code: 21202
+
+admin_brandie:
+  type: Users::Administrator
+  email: brandie.callender@maryland.gov
+  first_name: Brandie
+  last_name: Callender
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0001
+  date_of_birth: <%= 35.years.ago.to_date %>
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  hearing_disability: true
+  email_verified: true
+  status: active
+  physical_address_1: 300 East Joppa Road
+  city: Towson
+  state: MD
+  zip_code: 21286
+
+# Constituents
+constituent_alex:
+  type: Users::Constituent
+  email: alex.smith@example.com
+  first_name: Alex
+  last_name: Smith
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0002
+  date_of_birth: <%= 30.years.ago.to_date %>
+  physical_address_1: 127 Main St
+  city: Baltimore
+  state: MD
+  zip_code: 21201
+  hearing_disability: true
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+  guardian_relationship: parent
+  status: active
+
+constituent_john:
+  type: Users::Constituent
+  email: john.doe@example.com
+  first_name: John
+  last_name: Doe
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0002
+  date_of_birth: <%= 45.years.ago.to_date %>
+  physical_address_1: 123 Main St
+  city: Baltimore
+  state: MD
+  zip_code: 21201
+  hearing_disability: true
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+  guardian_relationship: parent
+  status: active
+
+constituent_jane:
+  type: Users::Constituent
+  email: jane.doe@example.com
+  first_name: Jane
+  last_name: Doe
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0002
+  date_of_birth: <%= 25.years.ago.to_date %>
+  physical_address_1: 124 Main St
+  city: Baltimore
+  state: MD
+  zip_code: 21201
+  mobility_disability: true
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+  guardian_relationship: parent
+  status: active
+
+constituent_kenneth:
+  type: Users::Constituent
+  email: kenneth.klein@example.com
+  first_name: Kenneth
+  last_name: Klein
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0002
+  date_of_birth: <%= 25.years.ago.to_date %>
+  physical_address_1: 125 Main St
+  city: Baltimore
+  state: MD
+  zip_code: 21201
+  cognition_disability: true
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+  guardian_relationship: parent
+  status: active
+
+constituent_wilbur:
+  type: Users::Constituent
+  email: wilbur.wright@example.com
+  first_name: Wilbur
+  last_name: Wright
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0008
+  date_of_birth: <%= 29.years.ago.to_date %>
+  physical_address_1: 129 Main St
+  city: Baltimore
+  state: MD
+  zip_code: 21201
+  cognition_disability: true
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+  status: active
+
+constituent_steven:
+  type: Users::Constituent
+  email: steven.cooper@example.com
+  first_name: Steven
+  last_name: Cooper
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0002
+  date_of_birth: <%= 25.years.ago.to_date %>
+  physical_address_1: 126 Main St
+  city: Baltimore
+  state: MD
+  zip_code: 21201
+  speech_disability: true
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+  guardian_relationship: parent
+  status: active
+
+constituent_mark:
+  type: Users::Constituent
+  email: mark.jones@example.com
+  first_name: Mark
+  last_name: Jones
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0002
+  date_of_birth: <%= 20.years.ago.to_date %>
+  physical_address_1: 128 Main St
+  city: Baltimore
+  state: MD
+  zip_code: 21201
+  hearing_disability: true
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+  guardian_relationship: parent
+  status: active
+
+constituent_rex:
+  type: Users::Constituent
+  email: rex.canine@example.com
+  first_name: Rex
+  last_name: Canine
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0005
+  date_of_birth: <%= 18.years.ago.to_date %>
+  physical_address_1: "300 Oar Street"
+  city: Baltimore
+  state: MD
+  zip_code: "21203"
+  hearing_disability: true
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+  guardian_relationship: parent
+  status: active
+
+one:
+  type: Users::Constituent
+  email: test1@example.com
+  first_name: Test1
+  last_name: User
+  password_digest: <%= User.digest('password123') %>
+  email_verified: true
+  date_of_birth: <%= 32.years.ago.to_date %>
+  status: active
+  phone: 555-123-4567
+  physical_address_1: 401 Washington Ave
+  city: Towson
+  state: MD
+  zip_code: 21204
+
+# Evaluator
+evaluator_betsy:
+  type: Users::Evaluator
+  email: betsya.hein@maryland.gov
+  first_name: Betsy
+  last_name: Hein
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0003
+  date_of_birth: <%= 50.years.ago.to_date %>
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+  status: active
+  availability_schedule:
+    monday: ["9:00", "17:00"]
+    wednesday: ["9:00", "17:00"]
+    friday: ["9:00", "17:00"]
+  physical_address_1: 1 Center Drive
+  city: Columbia
+  state: MD
+  zip_code: 21044
+
+# Vendor
+vendor_raz:
+  type: Users::Vendor
+  email: raz@testemail.com
+  first_name: Raz
+  last_name: Vendor
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0004
+  date_of_birth: <%= 50.years.ago.to_date %>
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+  status: approved
+  website_url: http://www.razmobility.com
+  physical_address_1: 8600 Georgia Avenue
+  city: Silver Spring
+  state: MD
+  zip_code: 20910
+
+# Vendor
+vendor_teltex:
+  type: Users::Vendor
+  email: teltex@testemail.com
+  first_name: Teltex
+  last_name: Vendor
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0007
+  date_of_birth: <%= 50.years.ago.to_date %>
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+  status: approved
+  website_url: https://teltex.com
+  physical_address_1: 200 Research Blvd
+  city: Rockville
+  state: MD
+  zip_code: 20850
+
+# Trainers
+trainer_jane:
+  type: Users::Trainer
+  email: jane.trainer@maryland.gov
+  first_name: Jane
+  last_name: Trainer
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0005
+  date_of_birth: <%= 40.years.ago.to_date %>
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+  status: active
+  availability_schedule:
+    monday: ["9:00", "17:00"]
+    wednesday: ["9:00", "17:00"]
+    friday: ["9:00", "17:00"]
+  physical_address_1: 7852 Walker Drive
+  city: Greenbelt
+  state: MD
+  zip_code: 20770
+
+trainer_john:
+  type: Users::Trainer
+  email: john.trainer@maryland.gov
+  first_name: John
+  last_name: Trainer
+  password_digest: <%= User.digest('password123') %>
+  phone: 555-555-0006
+  date_of_birth: <%= 35.years.ago.to_date %>
+  timezone: "Eastern Time (US & Canada)"
+  locale: en
+  email_verified: true
+  status: active
+  availability_schedule:
+    tuesday: ["9:00", "17:00"]
+    thursday: ["9:00", "17:00"]
+  physical_address_1: 4500 Woodlawn Drive
+  city: Bethesda
+  state: MD
+  zip_code: 20814
+
+# User with webauthn credentials for testing
+constituent_with_webauthn:
+  type: Users::Constituent
+  email: webauthn@example.com
+  first_name: Secure
+  last_name: User
+  password_digest: <%= User.digest('password123') %>
+  email_verified: true
+  hearing_disability: true
+  date_of_birth: <%= 28.years.ago.to_date %>
+  status: active
+  phone: 555-123-9876
+  physical_address_1: 505 Security Ave
+  city: Towson
+  state: MD
+  zip_code: 21204
+  webauthn_id: <%= SecureRandom.uuid %>
+  timezone: "Eastern Time (US & Canada)"
+  locale: en

@@ -2,96 +2,278 @@
 
 class VoucherNotificationsMailer < ApplicationMailer
   include Rails.application.routes.url_helpers
+  include ActionView::Helpers::NumberHelper # For number_to_currency
 
   def self.default_url_options
     Rails.application.config.action_mailer.default_url_options
   end
 
-  def prepare_email(voucher, template_name:, subject:, extra_setup: nil)
-    Rails.logger.info "Preparing #{template_name} email for Voucher ID: #{voucher.id}"
-    Rails.logger.info "Delivery method: #{ActionMailer::Base.delivery_method}"
+  # Removed prepare_email helper
 
-    @voucher = voucher
-    @application = voucher.application
-    @user = @application.user
+  def voucher_assigned
+    voucher = params[:voucher]
+    user = voucher.application.user
+    template_name = 'voucher_notifications_voucher_assigned'
 
-    extra_setup&.call
+    begin
+      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      text_template = EmailTemplate.find_by!(name: template_name, format: :text)
+    rescue ActiveRecord::RecordNotFound => e
+      Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
+      raise "Email templates not found for #{template_name}"
+    end
 
-    mail_obj = mail(
-      to: @user.email,
-      subject: subject,
-      template_path: 'voucher_notifications_mailer',
-      template_name: template_name,
+    # Prepare variables
+    variables = {
+      user_first_name: user.first_name,
+      voucher_code: voucher.code,
+      initial_value_formatted: number_to_currency(voucher.initial_value),
+      # Use Policy.get for configuration values
+      expiration_date_formatted: (voucher.issued_at + (Policy.get('voucher_validity_period_months') || 6).months).strftime('%B %d, %Y'),
+      validity_period_months: Policy.get('voucher_validity_period_months') || 6,
+      minimum_redemption_amount_formatted: number_to_currency(Policy.get('minimum_voucher_redemption_amount') || 0)
+    }.compact
+
+    # Render subject and bodies
+    rendered_subject, rendered_html_body = html_template.render(**variables)
+    _, rendered_text_body = text_template.render(**variables)
+
+    # Send email
+    mail(
+      to: user.email,
+      subject: rendered_subject,
       message_stream: 'notifications'
-    )
-
-    Rails.logger.info "Email body: #{mail_obj.body}"
-    mail_obj
-  end
-
-  def voucher_assigned(voucher)
-    prepare_email(
-      voucher,
-      template_name: 'voucher_assigned',
-      subject: 'Your Voucher Has Been Assigned'
-    )
+    ) do |format|
+      format.html { render html: rendered_html_body.html_safe }
+      format.text { render plain: rendered_text_body }
+    end
   rescue StandardError => e
-    Rails.logger.error("Failed to send voucher assigned email: #{e.message}")
-    Rails.logger.error(e.backtrace.join("\n"))
-    raise e
-  end
-
-  def voucher_expiring_soon(voucher)
-    prepare_email(
-      voucher,
-      template_name: 'voucher_expiring_soon',
-      subject: 'Your Voucher Will Expire Soon',
-      extra_setup: lambda {
-        @days_remaining = ((voucher.issued_at + Policy.voucher_validity_period) - Time.current).to_i / 1.day
-        @expiration_date = (voucher.issued_at + Policy.voucher_validity_period).strftime('%B %d, %Y')
+    # Log error with more details
+    Event.create!(
+      user: user,
+      action: 'email_delivery_error',
+      user_agent: Current.user_agent,
+      ip_address: Current.ip_address,
+      metadata: {
+        error_message: e.message,
+        error_class: e.class.name,
+        template_name: template_name,
+        variables: variables,
+        backtrace: e.backtrace&.first(5)
       }
     )
-  rescue StandardError => e
-    Rails.logger.error("Failed to send voucher expiring soon email: #{e.message}")
-    Rails.logger.error(e.backtrace.join("\n"))
     raise e
   end
 
-  def voucher_expired(voucher)
-    prepare_email(
-      voucher,
-      template_name: 'voucher_expired',
-      subject: 'Your Voucher Has Expired'
-    )
-  rescue StandardError => e
-    Rails.logger.error("Failed to send voucher expired email: #{e.message}")
-    Rails.logger.error(e.backtrace.join("\n"))
-    raise e
-  end
+  def voucher_expiring_soon
+    voucher = params[:voucher]
+    user = voucher.application.user
+    template_name = 'voucher_notifications_voucher_expiring_soon'
 
-  def voucher_redeemed(transaction)
-    Rails.logger.info "Preparing voucher_redeemed email for Transaction ID: #{transaction.id}"
-    Rails.logger.info "Delivery method: #{ActionMailer::Base.delivery_method}"
+    begin
+      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      text_template = EmailTemplate.find_by!(name: template_name, format: :text)
+    rescue ActiveRecord::RecordNotFound => e
+      Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
+      raise "Email templates not found for #{template_name}"
+    end
 
-    @transaction = transaction
-    @voucher = transaction.voucher
-    @application = @voucher.application
-    @user = @application.user
-    @vendor = transaction.vendor
+    # Prepare variables
+    # Use Policy.get for configuration values
+    expiration_date = voucher.issued_at + (Policy.get('voucher_validity_period_months') || 6).months
+    days_remaining = (expiration_date - Time.current).to_i / 1.day
 
-    mail_obj = mail(
-      to: @user.email,
-      subject: 'Your Voucher Has Been Redeemed',
-      template_path: 'voucher_notifications_mailer',
-      template_name: 'voucher_redeemed',
+    variables = {
+      user_first_name: user.first_name,
+      voucher_code: voucher.code,
+      days_remaining: days_remaining,
+      expiration_date_formatted: expiration_date.strftime('%B %d, %Y')
+      # Add other required variables from AVAILABLE_TEMPLATES if needed
+    }.compact
+
+    # Render subject and bodies
+    rendered_subject, rendered_html_body = html_template.render(**variables)
+    _, rendered_text_body = text_template.render(**variables)
+
+    # Send email
+    mail(
+      to: user.email,
+      subject: rendered_subject,
       message_stream: 'notifications'
-    )
-
-    Rails.logger.info "Email body: #{mail_obj.body}"
-    mail_obj
+    ) do |format|
+      format.html { render html: rendered_html_body.html_safe }
+      format.text { render plain: rendered_text_body }
+    end
   rescue StandardError => e
-    Rails.logger.error("Failed to send voucher redeemed email: #{e.message}")
-    Rails.logger.error(e.backtrace.join("\n"))
+    # Log error with more details
+    Event.create!(
+      user: user,
+      action: 'email_delivery_error',
+      user_agent: Current.user_agent,
+      ip_address: Current.ip_address,
+      metadata: {
+        error_message: e.message,
+        error_class: e.class.name,
+        template_name: template_name,
+        variables: variables,
+        backtrace: e.backtrace&.first(5)
+      }
+    )
+    raise e
+  end
+
+  def voucher_expired
+    voucher = params[:voucher]
+    user = voucher.application.user
+    template_name = 'voucher_notifications_voucher_expired'
+
+    begin
+      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      text_template = EmailTemplate.find_by!(name: template_name, format: :text)
+    rescue ActiveRecord::RecordNotFound => e
+      Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
+      raise "Email templates not found for #{template_name}"
+    end
+
+    # Prepare variables
+    # Optional: Render transaction history if needed for the template
+    transaction_history_html = ''
+    transaction_history_text = ''
+    if voucher.transactions.any?
+      transaction_history_html = '<ul>' + voucher.transactions.order(created_at: :desc).map do |t|
+        "<li>#{t.created_at.strftime('%m/%d/%Y')}: #{number_to_currency(t.amount)} at #{t.vendor.business_name}</li>"
+      end.join + '</ul>'
+      transaction_history_text = voucher.transactions.order(created_at: :desc).map do |t|
+        "- #{t.created_at.strftime('%m/%d/%Y')}: #{number_to_currency(t.amount)} at #{t.vendor.business_name}"
+      end.join("\n")
+    end
+
+    variables = {
+      user_first_name: user.first_name,
+      voucher_code: voucher.code,
+      initial_value_formatted: number_to_currency(voucher.initial_value),
+      unused_value_formatted: number_to_currency(voucher.remaining_value), # Assuming remaining_value is correct
+      # Use Policy.get for configuration values
+      expiration_date_formatted: (voucher.issued_at + (Policy.get('voucher_validity_period_months') || 6).months).strftime('%B %d, %Y'),
+      validity_period_months: Policy.get('voucher_validity_period_months') || 6,
+      minimum_redemption_amount_formatted: number_to_currency(Policy.get('minimum_voucher_redemption_amount') || 0),
+      # Optional variables
+      transaction_history_html: transaction_history_html,
+      transaction_history_text: transaction_history_text
+    }.compact
+
+    # Render subject and bodies
+    rendered_subject, rendered_html_body = html_template.render(**variables)
+    _, rendered_text_body = text_template.render(**variables)
+
+    # Send email
+    mail(
+      to: user.email,
+      subject: rendered_subject,
+      message_stream: 'notifications'
+    ) do |format|
+      format.html { render html: rendered_html_body.html_safe }
+      format.text { render plain: rendered_text_body }
+    end
+  rescue StandardError => e
+    # Log error with more details
+    Event.create!(
+      user: user,
+      action: 'email_delivery_error',
+      user_agent: Current.user_agent,
+      ip_address: Current.ip_address,
+      metadata: {
+        error_message: e.message,
+        error_class: e.class.name,
+        template_name: template_name,
+        variables: variables,
+        backtrace: e.backtrace&.first(5)
+      }
+    )
+    raise e
+  end
+
+  def voucher_redeemed
+    transaction = params[:transaction]
+    voucher = transaction.voucher
+    user = voucher.application.user
+    vendor = transaction.vendor
+    template_name = 'voucher_notifications_voucher_redeemed'
+
+    begin
+      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      text_template = EmailTemplate.find_by!(name: template_name, format: :text)
+    rescue ActiveRecord::RecordNotFound => e
+      Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
+      raise "Email templates not found for #{template_name}"
+    end
+
+    # Prepare variables
+    remaining_balance_formatted = number_to_currency(voucher.remaining_value) # After transaction
+    # Use Policy.get for configuration values
+    expiration_date_formatted = (voucher.issued_at + (Policy.get('voucher_validity_period_months') || 6).months).strftime('%B %d, %Y')
+    minimum_redemption_amount_formatted = number_to_currency(Policy.get('minimum_voucher_redemption_amount') || 0)
+
+    # Optional message blocks (logic might need refinement based on template content)
+    remaining_value_message_html = ''
+    remaining_value_message_text = ''
+    fully_redeemed_message_html = ''
+    fully_redeemed_message_text = ''
+
+    if voucher.remaining_value.positive?
+      # Simplified example - actual content depends on template placeholders
+      remaining_value_message_html = "<p>Your remaining balance is #{remaining_balance_formatted}. Minimum redemption amount is #{minimum_redemption_amount_formatted}.</p>"
+      remaining_value_message_text = "Your remaining balance is #{remaining_balance_formatted}. Minimum redemption amount is #{minimum_redemption_amount_formatted}."
+    else
+      fully_redeemed_message_html = '<p>This voucher has been fully redeemed.</p>'
+      fully_redeemed_message_text = 'This voucher has been fully redeemed.'
+    end
+
+    variables = {
+      user_first_name: user.first_name,
+      transaction_date_formatted: transaction.created_at.strftime('%B %d, %Y'),
+      transaction_amount_formatted: number_to_currency(transaction.amount),
+      vendor_business_name: vendor.business_name,
+      transaction_reference_number: transaction.reference_number || 'N/A',
+      voucher_code: voucher.code,
+      remaining_balance_formatted: remaining_balance_formatted,
+      expiration_date_formatted: expiration_date_formatted,
+      # Optional variables
+      remaining_value_message_html: remaining_value_message_html,
+      remaining_value_message_text: remaining_value_message_text,
+      fully_redeemed_message_html: fully_redeemed_message_html,
+      fully_redeemed_message_text: fully_redeemed_message_text,
+      minimum_redemption_amount_formatted: minimum_redemption_amount_formatted # Often used within optional blocks
+    }.compact
+
+    # Render subject and bodies
+    rendered_subject, rendered_html_body = html_template.render(**variables)
+    _, rendered_text_body = text_template.render(**variables)
+
+    # Send email
+    mail(
+      to: user.email,
+      subject: rendered_subject,
+      message_stream: 'notifications'
+    ) do |format|
+      format.html { render html: rendered_html_body.html_safe }
+      format.text { render plain: rendered_text_body }
+    end
+  rescue StandardError => e
+    # Log error with more details
+    Event.create!(
+      user: user,
+      action: 'email_delivery_error',
+      user_agent: Current.user_agent,
+      ip_address: Current.ip_address,
+      metadata: {
+        error_message: e.message,
+        error_class: e.class.name,
+        template_name: template_name,
+        variables: variables,
+        backtrace: e.backtrace&.first(5)
+      }
+    )
     raise e
   end
 end

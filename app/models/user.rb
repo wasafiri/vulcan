@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'bcrypt'
+
 # User model that serves as the base class for all user types in the system
 class User < ApplicationRecord
   # Token generation for email verification and password reset
@@ -18,6 +20,11 @@ class User < ApplicationRecord
       end
       user.admin? ? user : user.tap { |u| u.update!(type: 'Users::Administrator') }
     end
+  end
+
+  def self.digest(string)
+    cost = ActiveModel::SecurePassword.min_cost ? BCrypt::Engine::MIN_COST : BCrypt::Engine.cost
+    BCrypt::Password.create(string, cost: cost)
   end
 
   has_secure_password
@@ -66,7 +73,7 @@ class User < ApplicationRecord
   validates :reset_password_token, uniqueness: true, allow_nil: true
   validate :phone_number_must_be_valid
   validate :validate_address_for_letter_preference
-  # validate :constituent_must_have_disability # Added validation
+  validate :constituent_must_have_disability # Uncommented validation
 
   # Status enum
   enum :status, { inactive: 0, active: 1, suspended: 2 }, default: :active
@@ -119,9 +126,15 @@ class User < ApplicationRecord
     end
   end
 
-  def self.digest(string)
-    cost = ActiveModel::SecurePassword.min_cost ? BCrypt::Engine::MIN_COST : BCrypt::Engine.cost
-    BCrypt::Password.create(string, cost: cost)
+  # Method to return a list of disabilities
+  def disabilities
+    disability_list = []
+    disability_list << 'Hearing Disability' if hearing_disability
+    disability_list << 'Vision Disability' if vision_disability
+    disability_list << 'Speech Disability' if speech_disability
+    disability_list << 'Mobility Disability' if mobility_disability
+    disability_list << 'Cognition Disability' if cognition_disability
+    disability_list
   end
 
   def role_type
@@ -315,10 +328,10 @@ class User < ApplicationRecord
 
   # Custom validation for constituent disability
   def constituent_must_have_disability
-    # Only apply to existing Users::Constituent type (skip during initial registration)
-    # because we want them to select a disability on constituent_portal/applications#new instead
-    return unless type == 'Users::Constituent' && !new_record?
+    # Only apply to Users::Constituent type
+    return unless type == 'Users::Constituent'
 
+    # Add error if no disability is selected
     errors.add(:base, 'At least one disability must be selected.') unless disability_selected?
   end
 end

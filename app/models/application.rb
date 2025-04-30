@@ -181,6 +181,16 @@ class Application < ApplicationRecord
     latest_audit.present? && latest_review.present? && latest_audit.created_at > latest_review.created_at
   end
 
+  # Retrieves the latest review and audit for a given proof type
+  # @param proof_type [String] The type of proof ("income" or "residency")
+  # @return [Array] A two-element array containing the latest review and audit
+  def latest_review_and_audit(proof_type)
+    latest_review = proof_reviews.where(proof_type: proof_type).order(created_at: :desc).first
+    latest_audit = proof_submission_audits.where(proof_type: proof_type).order(created_at: :desc).first
+
+    [latest_review, latest_audit]
+  end
+
   # Application status change tracking
   def update_status(new_status, user: nil, notes: nil)
     old_status = status

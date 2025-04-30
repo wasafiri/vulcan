@@ -7,6 +7,28 @@ class RegistrationsControllerTest < ActionDispatch::IntegrationTest
   setup do
     # Clear emails before each test
     ActionMailer::Base.deliveries.clear
+
+    # NOTE: This is a class variable to prevent multiple setup/teardown cycles
+    # from causing template creation issues across parallel test runs
+    @@templates_created ||= false
+
+    unless @@templates_created
+      # Ensure all email templates are cleared properly
+      EmailTemplate.delete_all
+
+      # Create required email templates for tests properly
+      admin = create(:admin)
+
+      # Create the required template using the factory - include both variables to satisfy validation
+      create(:email_template, :text,
+             name: 'application_notifications_registration_confirmation',
+             subject: 'Welcome to the Maryland Accessible Telecommunications Program',
+             body: 'This is a test text body for registration confirmation. %<user_first_name>s, %<user_full_name>s, %<dashboard_url>s, %<new_application_url>s, %<header_text>s, %<footer_text>s, %<active_vendors_text_list>s',
+             description: 'Sent to a user upon successful account registration confirmation.',
+             updated_by: admin)
+
+      @@templates_created = true
+    end
   end
 
   teardown do
@@ -143,6 +165,15 @@ class RegistrationsControllerTest < ActionDispatch::IntegrationTest
   end
 
   def test_should_send_registration_confirmation_email
+    # Create template directly in this test to ensure it exists when needed
+    admin = create(:admin)
+    create(:email_template, :text,
+           name: 'application_notifications_registration_confirmation',
+           subject: 'Welcome to the Maryland Accessible Telecommunications Program',
+           body: 'This is a test text body for registration confirmation. %<user_first_name>s, %<user_full_name>s, %<dashboard_url>s, %<new_application_url>s, %<header_text>s, %<footer_text>s, %<active_vendors_text_list>s',
+           description: 'Sent to a user upon successful account registration confirmation.',
+           updated_by: admin)
+
     # Clear deliveries to ensure clean state
     ActionMailer::Base.deliveries.clear
 
@@ -197,35 +228,15 @@ class RegistrationsControllerTest < ActionDispatch::IntegrationTest
     assert_equal ['no_reply@mdmat.org'], email.from, 'Email should be from no_reply@mdmat.org'
     assert_equal ['testuser@example.com'], email.to, 'Email should be sent to the registered user'
     assert_equal 'Welcome to the Maryland Accessible Telecommunications Program', email.subject
+    assert_not email.multipart?, 'Email should not be multipart'
 
-    # Verify email is multipart (HTML and text)
-    assert email.multipart?, 'Email should be multipart'
-    assert_equal 2, email.parts.size, 'Email should have HTML and text parts'
+    # Get the email content
+    content = email.body.to_s
 
-    # Verify HTML part exists and has correct content
-    html_part = email.parts.find { |part| part.content_type.include?('text/html') }
-    assert_not_nil html_part, 'HTML part should exist'
-    html_content = html_part.body.to_s
-
-    # Check for key elements in HTML content
-    assert_match(/Dear Test,/, html_content, 'Should include personalized greeting')
-    assert_match(/Program Overview/, html_content, 'Should include program overview heading')
-    assert_match(/Next Steps/, html_content, 'Should include next steps heading')
-    assert_match(/Available Products/, html_content, 'Should include available products section')
-
-    # Verify links are included
-    assert_match(/dashboard/, html_content, 'Should include dashboard link')
-    assert_match(/new application/, html_content, 'Should include application link')
-
-    # Verify text part exists and has correct content
-    text_part = email.parts.find { |part| part.content_type.include?('text/plain') }
-    assert_not_nil text_part, 'Text part should exist'
-    text_content = text_part.body.to_s
-
-    # Check for key elements in text content
-    assert_match(/Dear Test,/, text_content, 'Should include personalized greeting')
-    assert_match(/PROGRAM OVERVIEW/, text_content, 'Should include program overview section')
-    assert_match(/NEXT STEPS/, text_content, 'Should include next steps section')
-    assert_match(/AVAILABLE PRODUCTS/, text_content, 'Should include available products section')
+    # Test that variables were substituted with values
+    assert_match(/Test/, content, 'First name should be substituted')
+    assert_match(/Test User/, content, 'Full name should be substituted')
+    assert_match(%r{constituent_portal/dashboard}, content, 'Should include dashboard link')
+    assert_match(%r{constituent_portal/applications/new}, content, 'Should include new application link')
   end
 end

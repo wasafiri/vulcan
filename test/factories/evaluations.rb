@@ -42,6 +42,7 @@ FactoryBot.define do
       status { :completed }
       notes { 'Evaluation completed successfully.' }
       report_submitted { true }
+      submitted_at { Time.current }
     end
 
     trait :pending do
