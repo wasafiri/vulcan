@@ -171,7 +171,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
       rejection_reason: rejection_reason,
       header_text: header_text(title: header_title, logo_url: header_logo_url),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
-                               show_automated_message: footer_show_automated_message),
+                               organization_name: organization_name, show_automated_message: footer_show_automated_message),
       additional_instructions: additional_instructions, # Optional (now correctly sourced from notes)
       remaining_attempts_message_text: remaining_attempts_message_text, # Optional
       archived_message_text: archived_message_text, # Optional
@@ -252,6 +252,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
       reapply_date_formatted: reapply_date.strftime('%B %d, %Y'),
       header_text: header_text(title: header_title, logo_url: header_logo_url),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
+                               organization_name: Policy.get('organization_name') || 'Maryland Accessible Telecommunications',
                                show_automated_message: footer_show_automated_message),
       header_logo_url: header_logo_url, # Optional
       header_subtitle: nil # Optional
@@ -327,6 +328,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
       admin_dashboard_url: admin_dashboard_url,
       header_text: header_text(title: header_title, logo_url: header_logo_url),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
+                               organization_name: Policy.get('organization_name') || 'Maryland Accessible Telecommunications',
                                show_automated_message: footer_show_automated_message),
       header_logo_url: header_logo_url, # Optional
       header_subtitle: nil # Optional
@@ -403,6 +405,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
       footer_show_automated_message: footer_show_automated_message,
       header_text: header_text(title: header_title, logo_url: header_logo_url),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
+                               organization_name: Policy.get('organization_name') || 'Maryland Accessible Telecommunications',
                                show_automated_message: footer_show_automated_message),
       header_logo_url: header_logo_url, # Pass optional var if available
       header_subtitle: nil # Pass optional var if available (none for this template)
@@ -498,6 +501,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
       header_text: header_text(title: header_title, logo_url: header_logo_url),
       status_box_text: status_box_text(status: 'error', title: status_box_title, message: status_box_message),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
+                               organization_name: Policy.get('organization_name') || 'Maryland Accessible Telecommunications',
                                show_automated_message: footer_show_automated_message),
       additional_notes: additional_notes, # Optional
       header_logo_url: header_logo_url, # Optional
@@ -574,6 +578,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
       error_message: message,
       header_text: header_text(title: header_title, logo_url: header_logo_url),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
+                               organization_name: Policy.get('organization_name') || 'Maryland Accessible Telecommunications',
                                show_automated_message: footer_show_automated_message),
       header_logo_url: header_logo_url, # Optional
       header_subtitle: nil # Optional
