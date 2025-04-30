@@ -58,36 +58,32 @@ gem 'solid_cable'
 gem 'solid_cache'
 gem 'solid_queue'
 
-# Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
-# gem 'image_processing', '~> 1.2'
 # bundle and transpile JavaScript [https://github.com/rails/jsbundling-rails]
 gem 'jsbundling-rails'
 
 group :development, :test do
-  # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
-  gem 'debug', require: 'debug/prelude'
-  # Static analysis for security vulnerabilities [https://brakemanscanner.org/]
   gem 'brakeman', '~> 7.0', require: false
+  gem 'debug', require: 'debug/prelude'
 end
 
 group :development do
   # Use console on exceptions pages [https://github.com/rails/web-console]
   gem 'better_html', '~> 2.1', '>= 2.1.1'
   gem 'bullet'
+  gem 'debride'
   gem 'erb_lint'
   gem 'letter_opener'
   gem 'rubocop'
   gem 'rubocop-capybara'
   gem 'rubocop-factory_bot'
   gem 'rubocop-rails'
-  gem 'solargraph'
   gem 'web-console'
 end
 
 group :test do
   # Use system testing [https://guides.rubyonrails.org/testing.html#system-testing]
   gem 'capybara'
-  gem 'cuprite' # Added Cuprite gem
+  gem 'cuprite'
   gem 'database_cleaner-active_record'
   gem 'factory_bot_rails'
   gem 'minitest-rails', '~> 8.0.0'
