@@ -92,19 +92,7 @@ module Applications
 
     # Helper method to create a test constituent directly
     def create_test_constituent(email)
-      Constituent.create!(
-        first_name: 'Test',
-        last_name: 'User',
-        email: email,
-        phone: '2025551234',
-        physical_address_1: '123 Test St',
-        city: 'Baltimore',
-        state: 'MD',
-        zip_code: '21201',
-        hearing_disability: true,
-        password: 'password123',
-        password_confirmation: 'password123'
-      )
+      create(:constituent, email: email)
     end
 
     test 'creates application with accepted income proof' do
