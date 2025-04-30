@@ -1,10 +1,5 @@
 {
-    "cline.modelSettings.o3Mini.reasoningEffort": "high",
-    "solargraph.commandPath": "bin/solargraph",
-    "solargraph.useBundler": true,
-    "solargraph.bundlerPath": "bundle",
-    "solargraph.diagnostics": true,
-    "solargraph.formatting": true,
-    "solargraph.logLevel": "info",
-    "solargraph.transport": "socket"
+  "cline.modelSettings.o3Mini.reasoningEffort": "high",
+  "cline.vsCodeLmModelSelector": {
+  },
 }
