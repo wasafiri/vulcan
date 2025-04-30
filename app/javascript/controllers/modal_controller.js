@@ -64,6 +64,10 @@ export default class extends Controller {
   }
 
   _showModal(element) {
+    // Reset PDF loaded state so that PDFs can be reloaded
+    element.querySelectorAll('iframe[data-original-src]').forEach((iframe) => {
+      iframe.removeAttribute("data-pdf-loaded")
+    })
     // Unhide, lock scroll, load PDFs, focus first input
     element.classList.remove("hidden")
     document.body.classList.add("overflow-hidden")
@@ -74,21 +78,50 @@ export default class extends Controller {
 
   _loadIframes(element) {
     console.log("Loading iframes in element:", element)
+    console.log("Modal ID:", element.id)
     const iframes = element.querySelectorAll('iframe[data-original-src]')
-    iframes.forEach(iframe => {
+    console.log("Found iframes:", iframes.length)
+    
+    iframes.forEach((iframe, index) => {
+      console.log(`Processing iframe ${index} in ${element.id}`)
+      
       const already = iframe.getAttribute("data-pdf-loaded") === "true"
-      if (already) return
-
-      const originalSrc = iframe.getAttribute("data-original-src")
-      if (!originalSrc) {
-        console.error("Empty data-original-src on iframe")
+      if (already) {
+        console.log(`Iframe ${index} already loaded, skipping`)
         return
       }
 
+      const originalSrc = iframe.getAttribute("data-original-src")
+      if (!originalSrc) {
+        console.error(`Iframe ${index}: Empty data-original-src on iframe`)
+        return
+      }
+      
+      console.log(`Iframe ${index} original src:`, originalSrc)
+
       try {
-        iframe.removeAttribute("src")
-        void iframe.offsetWidth
-        iframe.src = originalSrc
+        // Check current src
+        const currentSrc = iframe.getAttribute("src") 
+        console.log(`Iframe ${index} current src:`, currentSrc)
+        
+        // Force set iframe src, even if it's the same
+        console.log(`Setting src for iframe ${index} in ${element.id} to:`, originalSrc)
+        
+        // DEBUG: Log the proof type based on modal ID
+        if (element.id === 'incomeProofReviewModal') {
+          console.log('INCOME PROOF PDF LOADING')
+        } else if (element.id === 'residencyProofReviewModal') {
+          console.log('RESIDENCY PROOF PDF LOADING')
+        } else if (element.id === 'medicalCertificationReviewModal') {
+          console.log('MEDICAL CERTIFICATION PDF LOADING')
+        }
+        
+        // Force refresh by replacing iframe with a new one
+        const parent = iframe.parentNode
+        const newIframe = iframe.cloneNode(true)
+        newIframe.src = originalSrc + '&t=' + new Date().getTime() // Add timestamp to bust cache
+        parent.replaceChild(newIframe, iframe)
+        
         iframe.setAttribute("data-pdf-loading", "true")
 
         iframe.addEventListener("load", () => {
@@ -123,6 +156,9 @@ export default class extends Controller {
       this.containerTarget
 
     modalElement?.classList.add("hidden")
+    modalElement?.querySelectorAll('iframe[data-original-src]').forEach((iframe) => {
+      iframe.removeAttribute("data-pdf-loaded")
+    })
 
     // Only remove overflow-hidden if no other modals are visible
     const anyVisible = this.element.querySelectorAll(
