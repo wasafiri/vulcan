@@ -126,8 +126,7 @@
           <% else %>
             <!-- Show review button for pending submissions or non-approved proofs -->
                   <button type="button"
-                          data-action="click->modal#open"
-                          data-modal-id="incomeProofReviewModal"
+                          data-action="click->proof-review#openModal"
                           data-proof-type="income"
                           class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white <%= proof_review_button_class(@application, 'income') %> focus:outline-none">
                     <%= proof_review_button_text(@application, "income") %>
@@ -267,8 +266,7 @@
           <% else %>
             <!-- Show review button for pending submissions or non-approved proofs -->
                   <button type="button"
-                          data-action="click->modal#open"
-                          data-modal-id="residencyProofReviewModal"
+                          data-action="click->proof-review#openModal"
                           data-proof-type="residency"
                           class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white <%= proof_review_button_class(@application, 'residency') %> focus:outline-none">
                     <%= proof_review_button_text(@application, "residency") %>
