@@ -72,14 +72,22 @@ module ApplicationStatusManagement
 
   private
 
+  # Handles transitions to specific statuses that trigger automated actions.
+  # Currently triggers the auto-request for medical certification when transitioning to 'awaiting_documents'.
   def handle_status_change
     return unless status_previously_changed?(to: 'awaiting_documents')
 
     handle_awaiting_documents_transition
   end
 
+  # --- Auto Request Medical Certification Process ---
+  # Triggered when the application status transitions to 'awaiting_documents'.
+  # Checks if income and residency proofs are approved.
+  # If so, updates the medical certification status to 'requested' and sends an email to the medical provider.
   def handle_awaiting_documents_transition
+    # Ensure income and residency proofs are approved
     return unless all_proofs_approved?
+    # Avoid re-requesting if already requested
     return if medical_certification_status_requested?
 
     # Update certification status and send email
@@ -89,6 +97,10 @@ module ApplicationStatusManagement
     end
   end
 
+  # --- Auto Approve Application Process ---
+  # Checks if the application itself is eligible for auto-approval.
+  # Eligibility requires income proof, residency proof, AND medical certification to be approved.
+  # This method is triggered after save if any of the relevant proof statuses change.
   def requirements_met_for_approval?
     # Only run this when relevant fields have changed
     return false unless saved_change_to_income_proof_status? ||
@@ -98,7 +110,7 @@ module ApplicationStatusManagement
     # Only auto-approve applications that aren't already approved
     return false if status_approved?
 
-    # Check if all requirements are met
+    # Check if all requirements are met (income, residency, and medical certification approved)
     all_requirements_met?
   end
 
