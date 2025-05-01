@@ -94,7 +94,7 @@ class User < ApplicationRecord
 
   # Scopes
   scope :admins, -> { where(type: 'Users::Administrator') }
-  scope :vendors, -> { where(type: 'Vendor') }
+  scope :vendors, -> { where(type: 'Users::Vendor') }
   scope :ordered_by_name, -> { order(:first_name) }
 
   # Basic user information
@@ -215,8 +215,6 @@ class User < ApplicationRecord
   private
 
   def reset_all_caches
-    @cached_capabilities = nil
-    @preloaded_capabilities = nil
     @available_capabilities = nil
     @inherent_capabilities = nil
     @loaded_capabilities = nil

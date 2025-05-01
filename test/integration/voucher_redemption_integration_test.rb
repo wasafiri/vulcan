@@ -29,7 +29,7 @@ class VoucherRedemptionIntegrationTest < ActionDispatch::IntegrationTest
     @constituent = User.create!(
       first_name: 'Integration',
       last_name: 'Tester',
-      type: 'Constituent',
+      type: 'Users::Constituent',
       email: "integration_test.#{SecureRandom.hex(4)}@example.com",
       password: 'password',
       password_confirmation: 'password'
@@ -46,14 +46,13 @@ class VoucherRedemptionIntegrationTest < ActionDispatch::IntegrationTest
 
     # Create application
     @application = create(:application,
-      user: @constituent,
-      status: 'draft',
-      household_size: 2,
-      annual_income: 35_000,
-      medical_provider_name: 'Dr. Integration Test',
-      medical_provider_email: 'doctor.integration@example.com',
-      medical_provider_phone: '555-123-4567'
-    )
+                          user: @constituent,
+                          status: 'draft',
+                          household_size: 2,
+                          annual_income: 35_000,
+                          medical_provider_name: 'Dr. Integration Test',
+                          medical_provider_email: 'doctor.integration@example.com',
+                          medical_provider_phone: '555-123-4567')
 
     # Create voucher
     @voucher = Voucher.create!(

@@ -6,11 +6,11 @@ require_relative '../../support/notification_delivery_stub'
 module ConstituentPortal
   class TrainingRequestsSystemTest < ApplicationSystemTestCase
     setup do
-      @constituent = users(:constituent_john)
+      @constituent = create(:constituent)
       @application = applications(:one)
 
       # Set Current.user to avoid validation errors in callbacks
-      Current.user = users(:admin_david)
+      Current.user = create(:admin)
       @application.update!(status: :approved)
       Current.reset
 

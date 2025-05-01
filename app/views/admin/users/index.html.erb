@@ -84,8 +84,8 @@
                       </label>
                       <%= select_tag "role_#{user.id}",
                           options_for_select(
-                            %w[Admin Evaluator Constituent Vendor Trainer],
-                            selected: user.role_type
+                            %w[Users::Administrator Users::Evaluator Users::Constituent Users::Vendor Users::Trainer],
+                            selected: user.type # Use user.type which is the STI column value
                           ),
                           data: { 
                             role_select_target: "select",

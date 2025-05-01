@@ -36,24 +36,12 @@ module Admin
         return
       end
 
-      Rails.logger.debug "W9Review before save: #{@w9_review.inspect}"
-      # Debug info
-      Rails.logger.debug "ADMIN TYPE: #{current_user.class.name}, admin_id: #{current_user.id}, type: #{current_user.type.inspect}"
-      Rails.logger.debug "VENDOR TYPE: #{@vendor.class.name}, vendor_id: #{@vendor.id}, type: #{@vendor.type.inspect}"
-      Rails.logger.debug "W9REVIEW BEFORE SAVE: #{@w9_review.inspect}"
-      Rails.logger.debug "W9REVIEW VALID: #{@w9_review.valid?}"
-
-      if !@w9_review.valid?
-        Rails.logger.debug "VALIDATION ERRORS: #{@w9_review.errors.full_messages.join(', ')}"
-      end
-
       if @w9_review.save
         Rails.logger.debug 'W9Review saved successfully'
         # Update vendor's w9_status based on the review
         @vendor.update(w9_status: @w9_review.status)
         redirect_to admin_vendor_path(@vendor), notice: 'W9 review completed successfully'
       else
-        Rails.logger.debug "W9Review save failed: #{@w9_review.errors.full_messages.join(', ')}"
         # If validation fails, render the form with error messages
         flash.now[:alert] = 'W9 review failed to save'
         render :new, status: :unprocessable_entity
@@ -70,10 +58,11 @@ module Admin
     end
 
     def set_vendor
-      @vendor = Vendor.find(params[:vendor_id])
+      # Use Users::Vendor to match the STI type column
+      @vendor = Users::Vendor.find(params[:vendor_id])
     rescue ActiveRecord::RecordNotFound
       # Special handling for the review_not_found test only
-      if Rails.env.test? && params[:id].present? && params[:id].to_i == 999999
+      if Rails.env.test? && params[:id].present? && params[:id].to_i == 999_999
         redirect_to admin_vendor_path(params[:vendor_id]), alert: 'Review not found'
       else
         # Default behavior for any other vendor not found scenarios
@@ -89,7 +78,7 @@ module Admin
     end
 
     def w9_review_params
-      params.require(:w9_review).permit(:status, :rejection_reason_code, :rejection_reason)
+      params.expect(w9_review: %i[status rejection_reason_code rejection_reason])
     end
 
     def require_admin!

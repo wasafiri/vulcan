@@ -8,8 +8,5 @@ require_dependency 'users/vendor'
 
 # Define a proper Vendor class for STI that maintains compatibility with existing tests
 class Vendor < Users::Vendor
-  # Don't override the database type column - keep it as 'Vendor' to maintain compatibility
-  def self.sti_name
-    'Vendor'
-  end
+  # Don't override the database type column - keep it as is to maintain compatibility
 end

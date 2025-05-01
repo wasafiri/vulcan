@@ -21,7 +21,7 @@ module Admin
         'Can perform evaluations and manage assessment data'
       when 'Constituent'
         'Standard user access to system features'
-      when 'Vendor'
+      when 'Users::Vendor'
         'Vendor-specific access and management features'
       else
         'Standard system access'

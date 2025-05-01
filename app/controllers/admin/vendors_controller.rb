@@ -7,7 +7,8 @@ module Admin
     before_action :set_vendor, only: %i[show edit update]
 
     def index
-      @vendors = Vendor.all.order(:business_name)
+      # Use Users::Vendor to match the STI type column
+      @vendors = Users::Vendor.order(:business_name)
 
       # Filter by W9 status if provided
       return unless params[:w9_status].present?
@@ -32,7 +33,8 @@ module Admin
     private
 
     def set_vendor
-      @vendor = Vendor.find(params[:id])
+      # Use Users::Vendor to match the STI type column
+      @vendor = Users::Vendor.find(params[:id])
     end
 
     def vendor_params
