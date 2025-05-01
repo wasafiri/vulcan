@@ -8,30 +8,25 @@ class RegistrationsControllerTest < ActionDispatch::IntegrationTest
     # Clear emails before each test
     ActionMailer::Base.deliveries.clear
 
-    # NOTE: This is a class variable to prevent multiple setup/teardown cycles
-    # from causing template creation issues across parallel test runs
-    @@templates_created ||= false
+    # Ensure the required email template exists for tests, creating it only if necessary.
+    # Using find_or_create_by! ensures idempotency across test runs.
+    EmailTemplate.find_or_create_by!(name: 'application_notifications_registration_confirmation') do |template|
+      admin = User.find_by(email: 'david.bahar@maryland.gov') || create(:admin, email: 'david.bahar@maryland.gov') # Ensure admin exists
 
-    unless @@templates_created
-      # Ensure all email templates are cleared properly
-      EmailTemplate.delete_all
-
-      # Create required email templates for tests properly
-      admin = create(:admin)
-
-      # Create the required template using the factory - include both variables to satisfy validation
-      create(:email_template, :text,
-             name: 'application_notifications_registration_confirmation',
-             subject: 'Welcome to the Maryland Accessible Telecommunications Program',
-             body: 'This is a test text body for registration confirmation. %<user_first_name>s, %<user_full_name>s, %<dashboard_url>s, %<new_application_url>s, %<header_text>s, %<footer_text>s, %<active_vendors_text_list>s',
-             description: 'Sent to a user upon successful account registration confirmation.',
-             updated_by: admin)
-
-      @@templates_created = true
+      template.assign_attributes(
+        format: :text,
+        subject: 'Welcome to the Maryland Accessible Telecommunications Program',
+        body: 'This is a test text body for registration confirmation. %<user_first_name>s, %<user_full_name>s, %<dashboard_url>s, %<new_application_url>s, %<header_text>s, %<footer_text>s, %<active_vendors_text_list>s',
+        description: 'Sent to a user upon successful account registration confirmation.',
+        updated_by: admin
+        # NOTE: `create!` behavior is implicit within find_or_create_by! block assignment + save
+      )
+      # No need to explicitly call save!, find_or_create_by! handles it.
     end
   end
 
   teardown do
+    # Clear emails after each test
     # Clean up after tests
     ActionMailer::Base.deliveries.clear
   end
@@ -72,10 +67,12 @@ class RegistrationsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 'newuser@example.com', user.email
   end
 
-  def test_should_not_create_constituent_without_disabilities
-    assert_no_difference('User.count') do
+  # Renamed test to reflect correct behavior: disability is NOT required at registration
+  def test_should_create_constituent_without_disabilities
+    # User should be created successfully even without disability flags
+    assert_difference('User.count', 1) do
       post sign_up_path, params: { user: {
-        email: 'newuser@example.com',
+        email: 'nodisability@example.com', # Use a unique email for this test
         password: 'password123',
         password_confirmation: 'password123',
         first_name: 'New',
@@ -84,7 +81,7 @@ class RegistrationsControllerTest < ActionDispatch::IntegrationTest
         phone: '555-555-5555',
         timezone: 'Eastern Time (US & Canada)',
         locale: 'en',
-        hearing_disability: false,
+        hearing_disability: false, # No disability selected
         vision_disability: false,
         speech_disability: false,
         mobility_disability: false,
@@ -92,10 +89,14 @@ class RegistrationsControllerTest < ActionDispatch::IntegrationTest
       } }
     end
 
-    assert_response :unprocessable_entity
-    # Validation should prevent save, check errors on instance variable
-    assert_includes assigns(:user).errors[:base], 'At least one disability must be selected.'
-    # Removed assert_select as view structure might change or not include base errors easily
+    # Should succeed and redirect
+    assert_redirected_to welcome_path
+    assert_equal 'Account created successfully. Welcome!', flash[:notice]
+
+    # Verify user was created correctly without disability flags set
+    user = User.find_by(email: 'nodisability@example.com')
+    assert_not_nil user
+    assert_not user.disability_selected?, 'User should not have any disability flags set at registration'
   end
 
   def test_should_not_create_user_with_invalid_phone
@@ -143,6 +144,60 @@ class RegistrationsControllerTest < ActionDispatch::IntegrationTest
     assert_includes assigns(:user).errors[:email], 'has already been taken'
   end
 
+  def test_should_not_create_user_with_existing_phone
+    # Use FactoryBot to create an existing user with a specific phone
+    create(:constituent, phone: '555-999-8888')
+
+    assert_no_difference('User.count') do
+      post sign_up_path, params: { user: {
+        email: 'anothernew@example.com',
+        password: 'password123',
+        password_confirmation: 'password123',
+        first_name: 'New',
+        last_name: 'User',
+        date_of_birth: '1990-01-01',
+        phone: '555-999-8888', # Already exists
+        timezone: 'Eastern Time (US & Canada)',
+        locale: 'en',
+        hearing_disability: true
+      } }
+    end
+
+    assert_response :unprocessable_entity
+    # Check errors directly on the instance variable assigned by the controller
+    assert_includes assigns(:user).errors[:phone], 'has already been taken'
+  end
+
+  def test_should_create_user_but_flag_for_review_on_name_dob_match
+    # Create an existing user with specific details
+    create(:constituent, first_name: 'Duplicate', last_name: 'User', date_of_birth: '1985-05-15')
+
+    # Attempt to create a new user with the same name and DOB, but different email/phone
+    assert_difference('User.count', 1) do
+      post sign_up_path, params: { user: {
+        email: 'duplicate_name_dob@example.com', # Unique email
+        password: 'password123',
+        password_confirmation: 'password123',
+        first_name: 'Duplicate', # Same first name (case difference handled by controller)
+        last_name: 'USER',       # Same last name (case difference handled by controller)
+        date_of_birth: '1985-05-15', # Same DOB
+        phone: '555-123-4567', # Unique phone
+        timezone: 'Eastern Time (US & Canada)',
+        locale: 'en',
+        hearing_disability: true
+      } }
+    end
+
+    # Should still redirect successfully
+    assert_redirected_to welcome_path
+    assert_equal 'Account created successfully. Welcome!', flash[:notice]
+
+    # Verify the new user was created AND flagged
+    new_user = User.find_by(email: 'duplicate_name_dob@example.com')
+    assert_not_nil new_user, 'New user should have been created despite name/DOB match'
+    assert new_user.needs_duplicate_review, 'User should be flagged for duplicate review'
+  end
+
   def test_should_not_create_user_with_mismatched_passwords
     assert_no_difference('User.count') do
       post sign_up_path, params: { user: {
@@ -165,15 +220,7 @@ class RegistrationsControllerTest < ActionDispatch::IntegrationTest
   end
 
   def test_should_send_registration_confirmation_email
-    # Create template directly in this test to ensure it exists when needed
-    admin = create(:admin)
-    create(:email_template, :text,
-           name: 'application_notifications_registration_confirmation',
-           subject: 'Welcome to the Maryland Accessible Telecommunications Program',
-           body: 'This is a test text body for registration confirmation. %<user_first_name>s, %<user_full_name>s, %<dashboard_url>s, %<new_application_url>s, %<header_text>s, %<footer_text>s, %<active_vendors_text_list>s',
-           description: 'Sent to a user upon successful account registration confirmation.',
-           updated_by: admin)
-
+    # Template should be created by the setup block, no need to create it here again.
     # Clear deliveries to ensure clean state
     ActionMailer::Base.deliveries.clear
 

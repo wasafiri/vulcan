@@ -7,7 +7,7 @@ FactoryBot.define do
       password { 'password123' }
       first_name { 'Test' }
       last_name { 'User' }
-      phone { '555-555-5555' }
+      phone # Use the sequence defined in sequences.rb
       date_of_birth { 30.years.ago }
       timezone { 'Eastern Time (US & Canada)' }
       locale { 'en' }

@@ -35,10 +35,9 @@ class User < ApplicationRecord
   LOCK_DURATION = 1.hour
   VALID_ROLES = %w[admin constituent evaluator vendor trainer].freeze
 
-  # Format phone numbers to include dashes
-  before_save :format_phone_number
-
   # Callbacks
+  # Format phone numbers before validation to ensure uniqueness check uses the correct format
+  before_validation :format_phone_number
   after_save :reset_all_caches
 
   # Associations
@@ -68,9 +67,11 @@ class User < ApplicationRecord
   validates :email, presence: true,
                     uniqueness: true,
                     format: { with: URI::MailTo::EMAIL_REGEXP }
+  # Add uniqueness validation for phone, allowing blank values
+  validates :phone, uniqueness: { case_sensitive: false }, allow_blank: true
   validates :first_name, :last_name, presence: true
   validates :reset_password_token, uniqueness: true, allow_nil: true
-  validate :phone_number_must_be_valid
+  validate :phone_number_must_be_valid # This still checks the 10-digit format
   validate :validate_address_for_letter_preference
   validate :constituent_must_have_disability, if: :validate_constituent_disability? # Only validate when appropriate
 

@@ -21,6 +21,9 @@ class RegistrationsController < ApplicationController
   def create
     build_user
 
+    # Check for potential duplicates based on Name + DOB and flag for admin review
+    @user.needs_duplicate_review = true if potential_duplicate_found?(@user)
+
     if @user.save
       create_session_and_cookie
       track_sign_in
@@ -122,7 +125,26 @@ class RegistrationsController < ApplicationController
       :communication_preference,
       # Address fields for letter notifications
       :physical_address_1, :physical_address_2,
-      :city, :state, :zip_code
+      :city, :state, :zip_code,
+      :needs_duplicate_review
     )
+  end
+
+  # Helper method for the soft duplicate check
+  def potential_duplicate_found?(user)
+    # Normalize inputs for comparison
+    normalized_first_name = user.first_name&.strip&.downcase
+    normalized_last_name = user.last_name&.strip&.downcase
+
+    # Check only if all parts are present
+    return false unless normalized_first_name.present? && normalized_last_name.present? && user.date_of_birth.present?
+
+    # Correctly use where(...).exists? for multiple conditions
+    User.where(
+      'lower(first_name) = ? AND lower(last_name) = ? AND date_of_birth = ?',
+      normalized_first_name,
+      normalized_last_name,
+      user.date_of_birth
+    ).exists?
   end
 end
