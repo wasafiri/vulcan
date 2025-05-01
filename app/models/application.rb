@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-# Represents a constituent's application in the system
 # Manages the application lifecycle including proof submission, review,
 # medical certification, training sessions, evaluations, and voucher issuance
 class Application < ApplicationRecord
@@ -100,11 +99,7 @@ class Application < ApplicationRecord
       .references(:users)
   }
 
-  # Base scope for approved applications
-  scope :approved, -> { where(status: :approved) }
-
   # Alias scopes for approved applications
-  # Alias scope for approved applications
   scope :complete, lambda {
     where.not(status: :draft) # Application submitted
          .where(residency_proof_status: :approved)      # Residency approved
@@ -117,16 +112,10 @@ class Application < ApplicationRecord
          .distinct # Avoid duplicates due to the join
   }
 
-  scope :needs_income_review, -> { where(income_proof_status: :not_reviewed) }
-  scope :needs_residency_review, -> { where(residency_proof_status: :not_reviewed) }
-  scope :rejected_income_proofs, -> { where(income_proof_status: :rejected) }
-  scope :rejected_residency_proofs, -> { where(residency_proof_status: :rejected) }
   scope :with_pending_training, lambda {
     joins(:training_sessions).merge(TrainingSession.where(status: %i[requested scheduled confirmed])).distinct
   }
-  scope :assigned_to_trainer, lambda { |trainer_id|
-    joins(:training_sessions).where(training_sessions: { trainer_id: trainer_id }).distinct
-  }
+
   scope :with_active_training_for_trainer, lambda { |trainer_id|
     joins(:training_sessions).where(
       training_sessions: {
@@ -136,25 +125,17 @@ class Application < ApplicationRecord
     ).distinct
   }
 
-  # Status methods - using the robust implementation from the class (with events and voucher creation)
-  # (Note: these override the simpler implementations from ApplicationStatusManagement)
-  # Delegates approval logic to the Applications::Approver service object
-  # @param user [User] The user performing the action (defaults to Current.user)
-  # @return [Boolean] Result from the service call
+  # Status methods- Delegate approval logic to the Applications::Approver service object
   def approve!(user: Current.user)
     Applications::Approver.new(self, by: user).call
   end
 
-  # Delegates rejection logic to the Applications::Rejecter service object
-  # @param user [User] The user performing the action (defaults to Current.user)
-  # @return [Boolean] Result from the service call
+  # Delegate rejection logic to the Applications::Rejecter service object
   def reject!(user: Current.user)
     Applications::Rejecter.new(self, by: user).call
   end
 
-  # Delegates document request logic to the Applications::DocumentRequester service object
-  # @param user [User] The user performing the action (defaults to Current.user)
-  # @return [Boolean] Result from the service call
+  # Delegate document request logic to the Applications::DocumentRequester service object
   def request_documents!(user: Current.user)
     Applications::DocumentRequester.new(self, by: user).call
   end
@@ -208,7 +189,6 @@ class Application < ApplicationRecord
     self[:medical_provider_name]
   end
 
-  # === Struct definitions ===
   # Definition for Medical Provider Info struct
   MedicalProviderInfo = Struct.new(:name, :phone, :fax, :email, keyword_init: true) do
     def present?
@@ -233,43 +213,6 @@ class Application < ApplicationRecord
     def error_message
       error&.message || message
     end
-  end
-
-  # Definition for ProofMetadata struct
-  ProofMetadata = Struct.new(:blob_id, :content_type, :byte_size, :filename, keyword_init: true) do
-    def to_h
-      { blob_id: blob_id, content_type: content_type, byte_size: byte_size, filename: filename }
-    end
-  end
-
-  # === Compatibility Methods ===
-  # These methods ensure backward compatibility with code that expects
-  # the previous enum method naming pattern with suffix
-
-  # Income proof status compatibility methods
-  def income_proof_status_approved_status?
-    income_proof_status_approved?
-  end
-
-  def income_proof_status_rejected_status?
-    income_proof_status_rejected?
-  end
-
-  def income_proof_status_not_reviewed_status?
-    income_proof_status_not_reviewed?
-  end
-
-  # Residency proof status compatibility methods
-  def residency_proof_status_approved_status?
-    residency_proof_status_approved?
-  end
-
-  def residency_proof_status_rejected_status?
-    residency_proof_status_rejected?
-  end
-
-  def residency_proof_status_not_reviewed_status?
-    residency_proof_status_not_reviewed?
   end
 
   private
@@ -300,13 +243,6 @@ class Application < ApplicationRecord
     ensure
       @logging_status_change = false
     end
-  end
-
-  def schedule_admin_notifications
-    return if Rails.env.test?
-    return unless needs_review_since_changed? && needs_review_since.present?
-
-    NotifyAdminsJob.perform_later(self)
   end
 
   def waiting_period_completed
@@ -371,7 +307,7 @@ class Application < ApplicationRecord
   end
 
   def constituent_must_have_disability
-    return if user&.has_disability_selected?
+    return if user&.disability_selected?
 
     errors.add(:base, 'At least one disability must be selected before submitting an application.')
   end

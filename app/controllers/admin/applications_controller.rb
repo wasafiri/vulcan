@@ -533,35 +533,6 @@ module Admin
       handle_certification_result(result)
     end
 
-    # Load comprehensive medical certification events from all relevant sources
-    def load_certification_events
-      # Get certification events from multiple sources for comprehensive history
-      notifications = Notification
-                      .where(notifiable: @application)
-                      # Include all certification-related actions
-                      .where('action LIKE ?', '%certification%')
-                      .select(:id, :actor_id, :action, :created_at, :metadata, :notifiable_id)
-
-      # Get status changes related to medical certification
-      status_changes = ApplicationStatusChange.where(application_id: @application.id)
-                                              .where("metadata->>'change_type' = ? OR from_status LIKE ? OR to_status LIKE ?",
-                                                     'medical_certification', '%certification%', '%certification%')
-                                              .select(:id, :user_id, :from_status, :to_status, :created_at, :metadata)
-
-      # Get events related to medical certification - broader match
-      events = Event.where("(metadata->>'application_id' = ? AND (action LIKE ? OR metadata::text LIKE ?))",
-                           @application.id.to_s,
-                           '%certification%',
-                           '%certification%')
-                    .select(:id, :user_id, :action, :created_at, :metadata)
-
-      # Combine all events and sort by creation date
-      (notifications.to_a + status_changes.to_a + events.to_a)
-        .sort_by(&:created_at)
-        .reverse
-        .first(10) # Limit to most recent events for performance
-    end
-
     private
 
     # --- Turbo Stream Success Helpers ---
@@ -764,22 +735,6 @@ module Admin
 
     def sort_direction
       %w[asc desc].include?(params[:direction]) ? params[:direction] : 'desc'
-    end
-
-    def filter_conditions
-      # Define your filter conditions based on params[:filter]
-      case params[:filter]
-      when 'in_progress'
-        { status: :in_progress }
-      when 'approved'
-        { status: :approved }
-      when 'proofs_needing_review'
-        { status: :proofs_needing_review }
-      when 'awaiting_medical_response'
-        { status: :awaiting_medical_response }
-      else
-        {}
-      end
     end
 
     # Loads an application with only the essential attachments

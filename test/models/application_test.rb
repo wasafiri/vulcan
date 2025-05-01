@@ -165,4 +165,36 @@ class ApplicationTest < ActiveSupport::TestCase
       Thread.current[:force_notifications] = nil
     end
   end
+
+  test 'status_draft? predicate method works correctly' do
+    application = create(:application, status: :draft)
+    approved_app = create(:application, status: :approved)
+
+    assert application.status_draft?
+    assert_not approved_app.status_draft?
+  end
+
+  test 'status_approved scope returns only approved applications' do
+    approved_app = create(:application, status: :approved)
+    rejected_app = create(:application, status: :rejected)
+    draft_app = create(:application, status: :draft)
+
+    approved_applications = Application.status_approved
+
+    assert_includes approved_applications, approved_app
+    assert_not_includes approved_applications, rejected_app
+    assert_not_includes approved_applications, draft_app
+  end
+
+  test 'status_rejected scope returns only rejected applications' do
+    approved_app = create(:application, status: :approved)
+    rejected_app = create(:application, status: :rejected)
+    draft_app = create(:application, status: :draft)
+
+    rejected_applications = Application.status_rejected
+
+    assert_includes rejected_applications, rejected_app
+    assert_not_includes rejected_applications, approved_app
+    assert_not_includes rejected_applications, draft_app
+  end
 end

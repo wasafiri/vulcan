@@ -93,15 +93,9 @@ class User < ApplicationRecord
   end
 
   # Scopes
-  scope :with_capability, lambda { |capability|
-    joins(:role_capabilities)
-      .where(role_capabilities: { capability: capability })
-      .or(where(type: capable_types_for(capability)))
-  }
   scope :admins, -> { where(type: 'Users::Administrator') }
   scope :vendors, -> { where(type: 'Vendor') }
   scope :ordered_by_name, -> { order(:first_name) }
-  scope :locked, -> { where.not(locked_at: nil) }
 
   # Basic user information
   def full_name
@@ -159,17 +153,8 @@ class User < ApplicationRecord
     )
   end
 
-  def track_failed_attempt!
-    increment!(:failed_attempts)
-    lock_account! if failed_attempts >= MAX_LOGIN_ATTEMPTS
-  end
-
   def lock_account!
     update!(locked_at: Time.current)
-  end
-
-  def locked?
-    locked_at? && locked_at > LOCK_DURATION.ago
   end
 
   # Password reset methods
@@ -178,21 +163,6 @@ class User < ApplicationRecord
       reset_password_token: SecureRandom.urlsafe_base64,
       reset_password_sent_at: Time.current
     )
-  end
-
-  def clear_reset_password_token!
-    update(
-      reset_password_token: nil,
-      reset_password_sent_at: nil
-    )
-  end
-
-  def password_reset_expired?
-    reset_password_sent_at.nil? || reset_password_sent_at < PASSWORD_RESET_EXPIRY.ago
-  end
-
-  def preloaded_capabilities
-    role_capabilities.loaded? ? role_capabilities : []
   end
 
   def available_capabilities
@@ -218,14 +188,6 @@ class User < ApplicationRecord
       Rails.logger.error "Failed to add capability #{capability} to user #{id}: #{new_capability.errors.full_messages}"
     end
     new_capability
-  end
-
-  def cached_capabilities
-    @cached_capabilities ||= {
-      available: available_capabilities_list,
-      inherent: inherent_capabilities_list,
-      preloaded: role_capabilities.to_a
-    }
   end
 
   def remove_capability(capability)
