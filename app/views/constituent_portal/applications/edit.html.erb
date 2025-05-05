@@ -3,7 +3,18 @@
    <h1 class="text-3xl font-bold text-gray-900">Edit Application</h1>
  </header>
 
- <%= form_with(model: [:constituent_portal, @application], local: true, class: "space-y-8") do |f| %>
+ <%= form_with(model: [:constituent_portal, @application], 
+              local: true, 
+              class: "space-y-8", 
+              data: { 
+                controller: "autosave", 
+                autosave_target: "form",
+                autosave_url_value: autosave_field_constituent_portal_application_path(@application),
+                autosave_debounce_wait_value: 1000
+              }) do |f| %>
+   
+   <!-- Autosave status indicator -->
+   <div data-autosave-target="autosaveStatus" class="text-sm text-gray-500 mt-2 hidden"></div>
    <div class="bg-white shadow sm:rounded-lg" aria-labelledby="application_form_heading">
      <h2 id="application_form_heading" class="sr-only">Application Details Form</h2>
 

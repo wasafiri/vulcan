@@ -154,6 +154,9 @@ Rails.application.routes.draw do
       resources :scanned_proofs, only: %i[new create] # Added missing routes
     end
 
+    # Application Analytics
+    get 'application_analytics/pain_points', to: 'application_analytics#pain_points'
+
     resources :email_templates, only: %i[index show edit update] do
       member do
         get :new_test_email
@@ -332,9 +335,11 @@ Rails.application.routes.draw do
     resources :applications, path: 'applications' do
       collection do
         get :fpl_thresholds
+        patch :autosave_field
       end
 
       member do
+        patch :autosave_field
         patch :upload_documents
         post :request_review
         get :verify

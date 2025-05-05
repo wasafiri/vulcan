@@ -93,6 +93,7 @@ class Application < ApplicationRecord
   after_update :log_status_change, if: :saved_change_to_status?
 
   # Scopes
+  scope :draft, -> { where(status: :draft) }
   scope :search_by_last_name, lambda { |query|
     includes(:user, :proof_reviews, :training_sessions, :evaluations)
       .where('users.last_name ILIKE ?', "%#{query}%")
@@ -124,6 +125,15 @@ class Application < ApplicationRecord
       }
     ).distinct
   }
+
+  # Class Methods for Analysis
+  def self.pain_point_analysis
+    draft
+      .where.not(last_visited_step: [nil, ''])
+      .group(:last_visited_step)
+      .order('count_all DESC')
+      .count
+  end
 
   # Status methods- Delegate approval logic to the Applications::Approver service object
   def approve!(user: Current.user)

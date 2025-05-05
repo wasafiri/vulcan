@@ -197,4 +197,43 @@ class ApplicationTest < ActiveSupport::TestCase
     assert_not_includes rejected_applications, approved_app
     assert_not_includes rejected_applications, draft_app
   end
+
+  # Tests for Pain Point Analysis
+  test 'draft scope returns only draft applications' do
+    draft_app = create(:application, status: :draft)
+    in_progress_app = create(:application, status: :in_progress)
+
+    draft_applications = Application.draft
+
+    assert_includes draft_applications, draft_app
+    assert_not_includes draft_applications, in_progress_app
+  end
+
+  test 'pain_point_analysis returns correct counts grouped by last_visited_step' do
+    # Create draft applications with different last visited steps
+    create(:application, status: :draft, last_visited_step: 'step_1')
+    create(:application, status: :draft, last_visited_step: 'step_1')
+    create(:application, status: :draft, last_visited_step: 'step_2')
+    create(:application, status: :draft, last_visited_step: nil) # Should be ignored
+    create(:application, status: :draft, last_visited_step: '') # Should be ignored
+    create(:application, status: :in_progress, last_visited_step: 'step_1') # Should be ignored (not draft)
+
+    analysis = Application.pain_point_analysis
+
+    expected_analysis = {
+      'step_1' => 2,
+      'step_2' => 1
+    }
+
+    assert_equal expected_analysis, analysis
+  end
+
+  test 'pain_point_analysis returns empty hash when no relevant drafts exist' do
+    create(:application, status: :in_progress, last_visited_step: 'step_1')
+    create(:application, status: :draft, last_visited_step: nil)
+
+    analysis = Application.pain_point_analysis
+
+    assert_equal({}, analysis)
+  end
 end

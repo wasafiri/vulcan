@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_05_01_182033) do
+ActiveRecord::Schema[8.0].define(version: 2025_05_05_192536) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -122,6 +122,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_01_182033) do
     t.text "medical_certification_rejection_reason"
     t.datetime "medical_certification_requested_at"
     t.integer "medical_certification_request_count", default: 0
+    t.string "last_visited_step"
     t.index ["income_proof_status"], name: "idx_applications_on_income_proof_status"
     t.index ["income_verified_by_id"], name: "index_applications_on_income_verified_by_id"
     t.index ["last_proof_submitted_at"], name: "index_applications_on_last_proof_submitted_at"
@@ -618,7 +619,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_01_182033) do
     t.boolean "force_password_change", default: false, null: false
     t.string "website_url"
     t.string "webauthn_id"
-    t.boolean "needs_duplicate_review", default: false, null: false
     t.index ["business_name"], name: "index_users_on_business_name"
     t.index ["business_tax_id"], name: "index_users_on_business_tax_id"
     t.index ["email"], name: "index_users_on_email", unique: true

@@ -730,6 +730,198 @@ module ConstituentPortal
       )
     end
 
+    # Autosave a single field for an application
+    # This action handles AJAX requests to save individual fields as users navigate the form
+    # @return [JSON] JSON response with success status, errors, and application ID if new
+    def autosave_field
+      # Parse field_name and field_value from the request
+      field_name = params[:field_name]
+      field_value = params[:field_value]
+
+      # Verify required parameters
+      if field_name.blank?
+        return render json: { success: false, errors: { base: ['Field name is required'] } }, status: :unprocessable_entity
+      end
+
+      # Find or initialize the application draft
+      @application = if params[:id].present?
+                       current_user.applications.find_or_initialize_by(id: params[:id]) do |app|
+                         app.status = :draft
+                         app.application_date = Time.current
+                         app.submission_method = :online
+                         app.application_type ||= :new
+                       end
+                     else
+                       # For new applications
+                       current_user.applications.new(
+                         status: :draft,
+                         application_date: Time.current,
+                         submission_method: :online,
+                         application_type: :new
+                       )
+                     end
+
+      # Skip file inputs
+      if field_name.ends_with?('proof]') || field_name.include?('file')
+        return render json: { success: false, errors: { field_name => ['File uploads are not supported for autosave'] } },
+                      status: :unprocessable_entity
+      end
+
+      # Extract the actual field name from the params key (e.g., "application[field_name]" -> "field_name")
+      attribute_name = extract_attribute_name(field_name)
+      log_debug("Extracted attribute name: #{attribute_name}")
+
+      # Determine which model this field belongs to (Application vs User)
+      target_model, actual_attribute = determine_target_model_and_attribute(attribute_name)
+      log_debug("Target model: #{target_model}, actual attribute: #{actual_attribute}")
+
+      # Process and save the field
+      result = if target_model == :user
+                 autosave_user_field(actual_attribute, field_value)
+               else
+                 autosave_application_field(actual_attribute, field_value)
+               end
+
+      # Return JSON response
+      render json: if result[:success]
+                     { success: true, applicationId: @application.id, message: 'Field saved successfully' }
+                   else
+                     { success: false, errors: result[:errors] }
+                   end,
+             status: result[:success] ? :ok : :unprocessable_entity
+    rescue ActiveRecord::RecordNotFound
+      render json: { success: false, errors: { base: ['Application not found'] } }, status: :not_found
+    rescue StandardError => e
+      log_error("Autosave error: #{e.message}", e)
+      render json: { success: false, errors: { base: ['An error occurred during autosave'] } }, status: :internal_server_error
+    end
+
+    # Extract the attribute name from the form field name
+    # @param field_name [String] The form field name (e.g., "application[household_size]")
+    # @return [String] The attribute name (e.g., "household_size")
+    def extract_attribute_name(field_name)
+      # Handle nested medical provider attributes in application params
+      if field_name.start_with?('application[') && field_name.include?('medical_provider_attributes') &&
+         field_name =~ /application\[medical_provider_attributes\]\[([^\]]+)\]/
+        return "medical_provider_#{::Regexp.last_match(1)}"
+      end
+
+      # Strip off the "application[" prefix and the "]" suffix for standard fields
+      return field_name[12..-2] if field_name.start_with?('application[') && field_name.end_with?(']')
+
+      # Handle standalone medical provider attributes
+      return "medical_provider_#{::Regexp.last_match(1)}" if field_name =~ /medical_provider_attributes\[([^\]]+)\]/
+
+      # Default case
+      field_name
+    end
+
+    # Determine which model a field belongs to and its actual attribute name
+    # @param attribute_name [String] The extracted attribute name
+    # @return [Array<Symbol, String>] The target model (:user or :application) and the actual attribute name
+    def determine_target_model_and_attribute(attribute_name)
+      user_fields = %w[is_guardian guardian_relationship
+                       hearing_disability vision_disability speech_disability
+                       mobility_disability cognition_disability]
+
+      # Fields that should be ignored for autosave
+      ignored_fields = %w[physical_address_1 physical_address_2 city state zip_code
+                          residency_proof income_proof]
+
+      if user_fields.include?(attribute_name)
+        [:user, attribute_name]
+      elsif ignored_fields.include?(attribute_name)
+        [:ignored, attribute_name]
+      else
+        [:application, attribute_name]
+      end
+    end
+
+    # Save a user field with appropriate validation
+    # @param attribute [String] The attribute name
+    # @param value [String, Boolean] The value to save
+    # @return [Hash] Result with success flag and any errors
+    def autosave_user_field(attribute, value)
+      # Cast value if it's a boolean field
+      if %w[is_guardian hearing_disability vision_disability speech_disability mobility_disability
+            cognition_disability].include?(attribute)
+        value = safe_boolean_cast(value)
+      end
+
+      # Special validation for guardian_relationship
+      # First check for an empty guardian relationship when the user is already a guardian
+      if attribute == 'guardian_relationship' && value.blank?
+        # Reload to ensure we have the latest data
+        current_user.reload
+        if current_user.is_guardian?
+          return { success: false,
+                   errors: { 'application[guardian_relationship]' => ["can't be blank when you select that you are a guardian"] } }
+        end
+      end
+
+      # Update the attribute directly to bypass validations
+      current_user.update_column(attribute, value)
+
+      # Update last visited step if application exists
+      @application.update_column(:last_visited_step, attribute) if @application.persisted?
+
+      { success: true }
+    rescue StandardError => e
+      log_error("Error autosaving user field #{attribute}: #{e.message}", e)
+      { success: false, errors: { "application[#{attribute}]" => [e.message] } }
+    end
+
+    # Save an application field with appropriate validation
+    # @param attribute [String] The attribute name
+    # @param value [String, Boolean] The value to save
+    # @return [Hash] Result with success flag and any errors
+    def autosave_application_field(attribute, value)
+      # Skip ignored attributes
+      return { success: false, errors: { "application[#{attribute}]" => ['This field cannot be autosaved'] } } if attribute == :ignored
+
+      # Perform additional type validation for numeric fields
+      if attribute == 'annual_income' && !value.to_s.match?(/\A\d+(\.\d+)?\z/)
+        return { success: false,
+                 errors: { 'application[annual_income]' => ['Must be a valid number'] } }
+      end
+
+      if attribute == 'household_size' && !value.to_s.match?(/\A\d+\z/)
+        return { success: false,
+                 errors: { 'application[household_size]' => ['Must be a valid integer'] } }
+      end
+
+      # Cast value if it's a boolean field
+      value = safe_boolean_cast(value) if %w[maryland_resident self_certify_disability].include?(attribute)
+
+      begin
+        # Assign the value for validation
+        @application.assign_attributes(attribute => value)
+      rescue ActiveRecord::UnknownAttributeError => e
+        # Handle unknown attributes (like physical_address_1)
+        return { success: false, errors: { "application[#{attribute}]" => ['This field cannot be autosaved'] } }
+      end
+
+      # Validate only this attribute
+      @application.valid?
+
+      # Check for errors on just this attribute
+      if @application.errors[attribute].any?
+        return { success: false,
+                 errors: { "application[#{attribute}]" => @application.errors[attribute] } }
+      end
+
+      # If valid, save without validations (since we're just saving one field at a time)
+      @application.save(validate: false)
+
+      # Update last visited step after successful save
+      @application.update_column(:last_visited_step, attribute)
+
+      { success: true }
+    rescue StandardError => e
+      log_error("Error autosaving application field #{attribute}: #{e.message}", e)
+      { success: false, errors: { "application[#{attribute}]" => [e.message] } }
+    end
+
     def fpl_thresholds
       thresholds = {}
       (1..8).each do |size|

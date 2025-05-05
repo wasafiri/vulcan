@@ -1,0 +1,47 @@
+<% content_for :title, "Application Pain Point Analysis" %>
+
+<div class="container mx-auto px-4 py-8">
+  <h1 class="text-2xl font-semibold mb-6">Application Pain Point Analysis</h1>
+
+  <p class="mb-4">
+    This report shows the last step visited by users who started an application but did not submit it (status: draft).
+    The steps are ordered by the number of users who last visited them, indicating potential "pain points" where users abandon the process.
+  </p>
+
+  <% if @analysis_results.blank? %>
+    <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative" role="alert">
+      <strong class="font-bold">No Data:</strong> No draft applications with a recorded last visited step were found.
+    </div>
+  <% else %>
+    <div class="overflow-x-auto bg-white shadow rounded-lg">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Last Visited Step (Field Name)
+            </th>
+            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Number of Draft Applications
+            </th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          <% @analysis_results.each do |step, count| %>
+            <tr>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                <%= step.humanize.titleize %> (<%= step %>)
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <%= count %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+
+  <div class="mt-6">
+    <%= link_to 'Back to Applications', admin_applications_path, class: "text-blue-600 hover:text-blue-800" %>
+  </div>
+</div>

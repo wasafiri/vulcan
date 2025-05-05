@@ -18,7 +18,15 @@
           local: true,
           class: "space-y-6",
           "aria-labelledby": "form-title",
-          data: { controller: "application-form" }) do |form| %>
+          data: { 
+            controller: "application-form autosave", 
+            autosave_target: "form",
+            autosave_url_value: autosave_field_constituent_portal_applications_path,
+            autosave_debounce_wait_value: 1000
+          }) do |form| %>
+          
+        <!-- Autosave status indicator -->
+        <div data-autosave-target="autosaveStatus" class="text-sm text-gray-500 mt-2 hidden"></div>
 
         <% if @application.errors.any? %>
           <div class="bg-red-50 p-4 rounded mb-6" role="alert" aria-atomic="true">
