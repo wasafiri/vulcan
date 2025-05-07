@@ -2,7 +2,22 @@
 
 ENV['RAILS_ENV'] ||= 'test'
 require_relative '../config/environment'
+Rails.application.eager_load! # Ensure all models are loaded
 require 'rails/test_help'
+
+# --- Database Cleaner Initial Suite Clean ---
+# Clean the database completely before the suite starts and before seeds are loaded.
+# Note: Ensure DatabaseCleaner gem is in the :test group of your Gemfile
+begin
+  require 'database_cleaner/active_record'
+  DatabaseCleaner.clean_with(:truncation)
+rescue LoadError
+  puts "DatabaseCleaner not found. Add `gem 'database_cleaner-active_record'` to Gemfile's test group."
+rescue NameError # Handles if DatabaseCleaner is not defined (e.g. gem not loaded properly)
+  puts "DatabaseCleaner not defined. Ensure it's correctly installed and loaded."
+end
+# --- End Database Cleaner Initial Suite Clean ---
+
 Rails.application.load_seed if Rails.env.test?
 require 'minitest/mock'
 require 'ostruct'
@@ -74,29 +89,28 @@ module ActiveSupport
     # Provide shorthand for @product in controller tests
     attr_reader :product
 
-    # --- Database Cleaner Configuration ---
-    # Clean the database completely before the suite starts
-    # Note: Ensure DatabaseCleaner gem is in the :test group of your Gemfile
+    # --- Database Cleaner Per-Test Configuration ---
+    # Use truncation strategy for all tests (as previously configured)
     begin
-      DatabaseCleaner.clean_with(:truncation)
+      # Ensure DatabaseCleaner is available before trying to set strategy
+      if defined?(DatabaseCleaner)
+        DatabaseCleaner.strategy = :truncation
+      else
+        # This case should ideally be caught by the initial load attempt,
+        # but as a safeguard:
+        puts 'DatabaseCleaner not available for strategy setting.'
+      end
     rescue NameError
-      puts "DatabaseCleaner not found. Add `gem 'database_cleaner-active_record'` to Gemfile's test group."
-    end
-
-    # Use truncation strategy for all tests
-    begin
-      DatabaseCleaner.strategy = :truncation
-    rescue NameError
+      # This rescue might be redundant if the above check is robust,
+      # but kept for safety from original code.
       # Ignore if DatabaseCleaner not loaded
     end
 
-    # Wrap tests in DatabaseCleaner start/clean calls
-    # Use Minitest's setup/teardown hooks
-    # Clean AFTER each test
+    # Clean AFTER each test using the chosen strategy
     teardown do
       DatabaseCleaner.clean if defined?(DatabaseCleaner)
     end
-    # --- End Database Cleaner Configuration ---
+    # --- End Database Cleaner Per-Test Configuration ---
 
     def assert_enqueued_email_with(_mailer_class, _method_name, _args: nil)
       block_result = nil

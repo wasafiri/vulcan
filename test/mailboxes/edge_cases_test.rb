@@ -7,13 +7,17 @@ class EdgeCasesTest < ActionMailbox::TestCase
   include ActionMailboxTestHelper
 
   setup do
-    # Create a constituent and application using factories
-    @constituent = create(:constituent)
+    # Create a constituent and application using factories with unique emails
+    # to avoid potential clashes during test runs.
+    constituent_email = "constituent_#{SecureRandom.hex(4)}@example.com"
+    medical_provider_email = "doctor_#{SecureRandom.hex(4)}@example.com"
+
+    @constituent = create(:constituent, email: constituent_email)
     @application = create(:application, user: @constituent, total_rejections: 0)
-    @constituent.update(email: 'constituent@example.com')
+    # The email is now set during creation, so no separate update is needed for @constituent.
 
     # Create a medical provider using factory
-    @medical_provider = create(:medical_provider, email: 'doctor@example.com')
+    @medical_provider = create(:medical_provider, email: medical_provider_email)
 
     # Create policy records for rate limiting, using find_or_create_by to avoid uniqueness constraint errors
     %i[proof_submission_rate_limit_web proof_submission_rate_limit_email
@@ -72,7 +76,7 @@ class EdgeCasesTest < ActionMailbox::TestCase
     end
 
     # Clean up
-    File.delete(file_path) if File.exist?(file_path)
+    FileUtils.rm_f(file_path)
   end
 
   test 'handles emails with very large attachments' do
@@ -103,7 +107,7 @@ class EdgeCasesTest < ActionMailbox::TestCase
     end
 
     # Clean up
-    File.delete(file_path) if File.exist?(file_path)
+    FileUtils.rm_f(file_path)
   end
 
   test 'handles emails with ambiguous proof type' do
@@ -133,7 +137,7 @@ class EdgeCasesTest < ActionMailbox::TestCase
     end
 
     # Clean up
-    File.delete(file_path) if File.exist?(file_path)
+    FileUtils.rm_f(file_path)
   end
 
   test 'handles emails with multiple recipients' do
@@ -147,8 +151,12 @@ class EdgeCasesTest < ActionMailbox::TestCase
     # Stub the attach_proof method to prevent actual attachment but still track calls
     ProofSubmissionMailbox.any_instance.expects(:attach_proof).at_least_once.returns(true)
 
+    # Capture the constituent's email in a local variable before the Mail.new block
+    # to ensure it's resolved in the correct scope.
+    current_constituent_email = @constituent.email
+
     mail = Mail.new do
-      from 'constituent@example.com'
+      from current_constituent_email # Use the local variable
       to ['proof@example.com', 'support@example.com', 'admin@example.com']
       subject 'Income Proof Submission'
 
@@ -168,7 +176,7 @@ class EdgeCasesTest < ActionMailbox::TestCase
     end
 
     # Clean up
-    File.delete(file_path) if File.exist?(file_path)
+    FileUtils.rm_f(file_path)
   end
 
   test 'handles emails with special characters in subject and body' do
@@ -197,6 +205,6 @@ class EdgeCasesTest < ActionMailbox::TestCase
     end
 
     # Clean up
-    File.delete(file_path) if File.exist?(file_path)
+    FileUtils.rm_f(file_path)
   end
 end

@@ -101,7 +101,11 @@ class ProofSubmissionMailbox < ApplicationMailbox
   end
 
   def ensure_active_application
-    return if application&.active?
+    # An application is considered active for proof submission if its status
+    # is one of: in_progress, needs_information, reminder_sent, or awaiting_documents.
+    # This aligns with the :active scope defined in ApplicationStatusManagement.
+    active_statuses = %i[in_progress needs_information reminder_sent awaiting_documents]
+    return if application && active_statuses.include?(application.status&.to_sym)
 
     bounce_with_notification(
       :inactive_application,

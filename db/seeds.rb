@@ -109,34 +109,6 @@ else
       load Rails.root.join('db/seeds/email_templates.rb')
 
       # ------------------------------
-      # Create Admin Users
-      # ------------------------------
-      puts 'Creating admin users...'
-      admin_users = [
-        {
-          type: 'Users::Administrator',
-          email: 'david.bahar@maryland.gov',
-          first_name: 'David',
-          last_name: 'Bahar',
-          password: 'password123',
-          password_confirmation: 'password123',
-          phone: '555-555-0001',
-          date_of_birth: 44.years.ago.to_date,
-          timezone: 'Eastern Time (US & Canada)',
-          locale: 'en',
-          hearing_disability: true,
-          email_verified: true
-        }
-        # ... rest of admin users ...
-      ]
-      admin_users.each do |attributes|
-        user = User.find_or_create_by(email: attributes[:email]) do |u|
-          u.assign_attributes(attributes)
-        end
-        puts "  Admin user #{user.email} created or found."
-      end
-
-      # ------------------------------
       # Ensure storage directory exists
       # ------------------------------
       puts 'Ensuring storage directory exists...'

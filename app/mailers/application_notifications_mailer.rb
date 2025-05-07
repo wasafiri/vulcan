@@ -575,7 +575,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
 
     variables = {
       constituent_full_name: constituent_full_name,
-      error_message: message,
+      message: message,
       header_text: header_text(title: header_title, logo_url: header_logo_url),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
                                organization_name: Policy.get('organization_name') || 'Maryland Accessible Telecommunications',
