@@ -42,3 +42,12 @@
 .aider*
 aider.chat.history.md
 chrome/
+
+# Ignore .DS_Store files in specified directories
+/.DS_Store
+/app/.DS_Store
+/test/.DS_Store
+/test/controllers/.DS_Store
+.DS_Store
+test/controllers/.DS_Store
+test/.DS_Store
