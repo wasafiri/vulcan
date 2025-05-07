@@ -5,6 +5,18 @@ module Admin
     before_action :authenticate_user!
     before_action :require_admin!
 
+    # Define the mapping from expected demodulized names to full namespaced names.
+    # These should match the actual class names under the Users module.
+    VALID_USER_TYPES = {
+      'Administrator' => 'Users::Administrator',
+      'Evaluator' => 'Users::Evaluator',
+      'Constituent' => 'Users::Constituent',
+      'Vendor' => 'Users::Vendor',
+      'Trainer' => 'Users::Trainer'
+      # Consider adding "Admin" => "Users::Administrator" if "Admin" is a possible input
+      # that needs to be mapped from legacy data or other potential (but unexpected) inputs.
+    }.freeze
+
     def index
       @users = User.includes(:role_capabilities)
                    .order(:type, :last_name, :first_name)
@@ -12,27 +24,50 @@ module Admin
     end
 
     def update_role
-      Rails.logger.info "Admin::UsersController#update_role - Received params[:role]: #{params[:role].inspect}" # DEBUG LINE
+      # This logger is crucial to see what Rails gives us *before* any of our logic.
+      Rails.logger.info "Admin::UsersController#update_role - Received raw params[:role]: #{params[:role].inspect} for user_id: #{params[:id]}"
       user = User.find(params[:id])
-      new_role = params[:role]
+      raw_role_param = params[:role]
 
-      # Prevent Admin from changing their own role
-      if user.prevent_self_role_update(current_user, new_role)
-        if user.update(type: new_role)
-          # Also update capabilities if they were sent
+      namespaced_role = nil
+      if raw_role_param.present? && raw_role_param.include?('::')
+        # If it already looks namespaced, check if it's a valid known namespaced type
+        namespaced_role = VALID_USER_TYPES.values.find { |v| v == raw_role_param }
+      elsif raw_role_param.present?
+        # If it's (presumably) demodulized, try to map it from its classified form
+        namespaced_role = VALID_USER_TYPES[raw_role_param.classify]
+      end
+
+      if namespaced_role.blank?
+        Rails.logger.warn "Admin::UsersController#update_role - Invalid or unmappable role received: #{raw_role_param.inspect} for user_id: #{user.id}. Valid types are: #{VALID_USER_TYPES.keys.join(', ')} (demodulized) or #{VALID_USER_TYPES.values.join(', ')} (namespaced)."
+        render json: {
+          success: false,
+          message: "Invalid role specified: '#{raw_role_param}'. Please select a valid role."
+        }, status: :unprocessable_entity
+        return
+      end
+
+      Rails.logger.info "Admin::UsersController#update_role - Determined namespaced_role: #{namespaced_role.inspect} for user_id: #{user.id}"
+
+      # Prevent Admin from changing their own role.
+      # This method should ideally work with namespaced role strings.
+      if user.prevent_self_role_update(current_user, namespaced_role)
+        if user.update(type: namespaced_role) # CRITICAL: Use the fully namespaced role
           update_user_capabilities(user, params[:capabilities]) if params[:capabilities].present?
-
+          Rails.logger.info "Admin::UsersController#update_role - Successfully updated user_id: #{user.id} to type: #{user.type}"
           render json: {
             success: true,
-            message: "#{user.full_name}'s role updated to #{new_role.sub('Users::', '').titleize}." # Adjusted for potentially namespaced role
+            message: "#{user.full_name}'s role updated to #{namespaced_role.demodulize.titleize}."
           }
         else
+          Rails.logger.error "Admin::UsersController#update_role - Failed to update user_id: #{user.id} to type #{namespaced_role}: #{user.errors.full_messages.join(', ')}"
           render json: {
             success: false,
             message: user.errors.full_messages.join(', ')
           }, status: :unprocessable_entity
         end
       else
+        Rails.logger.warn "Admin::UsersController#update_role - Denied attempt by user_id: #{current_user.id} to change own role for user_id: #{user.id} to #{namespaced_role}"
         render json: {
           success: false,
           message: 'You cannot change your own role.'
