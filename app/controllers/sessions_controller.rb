@@ -19,14 +19,14 @@ class SessionsController < ApplicationController
         TwoFactorAuth.clear_challenge(session) # Clear any stale challenge
         TwoFactorAuth.store_temp_user_id(session, user.id)
         TwoFactorAuth.store_return_path(session, session[:return_to])
-        redirect_to verify_method_two_factor_authentication_path(type: 'webauthn')
+        redirect_to verify_method_two_factor_authentication_path(type: 'webauthn') and return
       else
         # User doesn't have 2FA, sign them in directly using the ApplicationController helper
-        sign_in(user) # This now calls the refactored method in ApplicationController
+        sign_in(user) and return # This now calls the refactored method in ApplicationController
         # The sign_in method handles the redirect
       end
     else
-      handle_invalid_credentials # Keep existing invalid credential handling
+      handle_invalid_credentials and return # Keep existing invalid credential handling
     end
   end
 
