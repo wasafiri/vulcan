@@ -100,4 +100,12 @@ FactoryBot.define do
       end
     end
   end
+
+  factory :vendor_user, parent: :user, class: 'Users::Vendor' do
+    type { 'Users::Vendor' }
+    business_name { "Vendor Business #{rand(1000)}" }
+    phone { "555-#{rand(100..999)}-#{rand(1000..9999)}" }
+    business_tax_id { "ABC-#{rand(1000..9999)}" } # Add a default business_tax_id
+    # other vendor-specific attributes
+  end
 end
