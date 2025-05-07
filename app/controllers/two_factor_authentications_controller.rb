@@ -586,7 +586,7 @@ class TwoFactorAuthenticationsController < ApplicationController
     )
 
     # Send SMS
-    SMSService.send_message(
+    ::SmsService.send_message(
       credential.phone_number,
       "Your verification code is: #{code}"
     )
