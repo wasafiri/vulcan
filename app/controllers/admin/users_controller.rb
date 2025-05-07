@@ -8,13 +8,12 @@ module Admin
     # Define the mapping from expected demodulized names to full namespaced names.
     # These should match the actual class names under the Users module.
     VALID_USER_TYPES = {
+      'Admin' => 'Users::Administrator',
       'Administrator' => 'Users::Administrator',
       'Evaluator' => 'Users::Evaluator',
       'Constituent' => 'Users::Constituent',
       'Vendor' => 'Users::Vendor',
       'Trainer' => 'Users::Trainer'
-      # Consider adding "Admin" => "Users::Administrator" if "Admin" is a possible input
-      # that needs to be mapped from legacy data or other potential (but unexpected) inputs.
     }.freeze
 
     def index
@@ -52,7 +51,18 @@ module Admin
       # Prevent Admin from changing their own role.
       # This method should ideally work with namespaced role strings.
       if user.prevent_self_role_update(current_user, namespaced_role)
-        if user.update(type: namespaced_role) # CRITICAL: Use the fully namespaced role
+        # Manually assign type and clear errors to handle STI validation crossover
+        user.type
+        user.type = namespaced_role
+
+        # If the type actually changed, clear existing errors from the old type's context.
+        # This is an attempt to prevent validations from the *previous* type from interfering.
+        if user.type_changed? && user.type_was != user.type
+          Rails.logger.info "Admin::UsersController#update_role - Type changed from #{user.type_was} to #{user.type}. Clearing errors."
+          user.errors.clear
+        end
+
+        if user.save # This will use the new type (namespaced_role) for validation context
           update_user_capabilities(user, params[:capabilities]) if params[:capabilities].present?
           Rails.logger.info "Admin::UsersController#update_role - Successfully updated user_id: #{user.id} to type: #{user.type}"
           render json: {
