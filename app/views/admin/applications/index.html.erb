@@ -18,113 +18,140 @@
         - Now organized in a responsive grid layout for better space usage on desktop
         - Maintains vertical stacking on mobile for touch-friendly access
         - All buttons use consistent sizing and accessibility attributes
+        - Reorganized into task-oriented groups for better workflow
+        - Uses a responsive grid to reduce vertical space
       %>
       <div class="mb-4">
-        <!-- Container grid for responsive layout -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- System Configuration Group - col 1 on desktop -->
-          <div>
-            <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">System Configuration</h3>
-            <div class="flex flex-wrap gap-4">
-              <%= link_to admin_policies_path,
-                  class: "inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                  aria: { label: "Edit system policies and settings" } do %>
-                <span>Edit Policies</span>
-              <% end %>
-              
-              <%= link_to admin_users_path,
-                  class: "inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                  aria: { label: "Manage system users" } do %>
-                <span>Edit Users</span>
-              <% end %>
-              
-              <%= link_to admin_products_path,
-                  class: "inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                  aria: { label: "Manage products catalog" } do %>
-                <span>Manage Products</span>
-              <% end %>
-
-              <%= link_to admin_email_templates_path,
-                  class: "inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                  aria: { label: "Manage email templates" } do %>
-                <span>Manage Emails</span>
-              <% end %>
-            </div>
-          </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6"> 
           
-          <!-- Resource Management Group - col 2 on desktop -->
-          <div>
-            <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Resource Management</h3>
-            <div class="flex flex-wrap gap-4">
-              <%= link_to admin_vendors_path,
-                  class: "inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                  aria: { label: "Manage system vendors" } do %>
-                <span>Manage Vendors</span>
-              <% end %>
-              
-              <%= link_to admin_vouchers_path,
-                  class: "inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                  aria: { label: "Manage system vouchers" },
-                  data: { turbo: false } do %>
-                <span>Manage Vouchers</span>
-              <% end %>
-              
-              <%= link_to admin_invoices_path,
-                  class: "inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                  aria: { label: "Manage system invoices" } do %>
-                <span>Manage Invoices</span>
-              <% end %>
-            </div>
-          </div>
-          
-          <!-- Operations Group - spans full width on desktop -->
-          <div class="md:col-span-2">
-            <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Operations</h3>
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
-              <%= link_to new_admin_paper_application_path,
-                  class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                  aria: { label: "Upload a paper application" } do %>
-                <span>Upload Paper Application</span>
-              <% end %>
-              
-              <%= link_to admin_print_queue_index_path, class: "relative inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
-                <span class="inline-block pr-2">Print Queue</span>
-                <% pending_count = PrintQueueItem.pending.count rescue 0 %>
-                <% if pending_count > 0 %>
-                  <span class="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white">
-                    <%= pending_count %>
-                  </span>
+          <!-- Row 1, Col 1: Groups 1 & 2 -->
+          <div class="space-y-6"> 
+            <!-- Group 1: Direct Application Input & Queues -->
+            <div>
+              <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Direct Application Input & Queues</h3>
+              <div class="flex flex-wrap gap-4">
+                <%= link_to new_admin_paper_application_path,
+                    class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500", # Primary button style
+                    aria: { label: "Upload a paper application" } do %>
+                  <span>Upload Paper Application</span>
                 <% end %>
-              <% end %>
-              
-              <%= link_to trainers_dashboard_path,
-                  class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                  aria: { label: "View trainings dashboard" } do %>
-                <span>View Trainings</span>
-              <% end %>
-              
-              <%= link_to evaluators_dashboard_path,
-                  class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                  aria: { label: "View evaluations dashboard" } do %>
-                <span>View Evaluations</span>
-              <% end %>
-              
-              <%= link_to admin_reports_path,
-                  class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                  aria: { label: "View detailed system reports" } do %>
-                <span>View Reports</span>
-              <% end %>
+                
+                <%= link_to admin_print_queue_index_path, class: "relative inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
+                  <span class="inline-block pr-2">Print Queue</span>
+                  <% pending_count = PrintQueueItem.pending.count rescue 0 %>
+                  <% if pending_count > 0 %>
+                    <span class="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white">
+                      <%= pending_count %>
+                    </span>
+                  <% end %>
+                <% end %>
+              </div>
+            </div>
 
-              <%= link_to admin_application_analytics_pain_points_path,
-                  class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                  aria: { label: "View application pain point analysis" } do %>
+            <!-- Group 2: Review & Processing Workflows -->
+            <div>
+              <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Review & Processing Workflows</h3>
+              <div class="flex flex-wrap gap-4">
+                <%= link_to trainers_dashboard_path,
+                    class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                    aria: { label: "View trainings dashboard" } do %>
+                  <span>View Trainings</span>
+                <% end %>
+                
+                <%= link_to evaluators_dashboard_path,
+                    class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                    aria: { label: "View evaluations dashboard" } do %>
+                  <span>View Evaluations</span>
+                <% end %>
+                <%# Consider adding links from 'Common Tasks' here if needed %>
+              </div>
+            </div>
+          </div>
+
+          <!-- Row 1, Col 2: Group 3 -->
+          <div> 
+            <!-- Group 3: Data Management -->
+            <div>
+              <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Data Management</h3>
+              <div class="flex flex-wrap gap-4">
+                <%= link_to admin_users_path,
+                    class: "inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                    aria: { label: "Manage system users" } do %>
+                  <span>Manage Users</span>
+                <% end %>
+                
+                <%= link_to admin_vendors_path,
+                    class: "inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                    aria: { label: "Manage system vendors" } do %>
+                  <span>Manage Vendors</span>
+                <% end %>
+
+                <%= link_to admin_products_path,
+                    class: "inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                    aria: { label: "Manage products catalog" } do %>
+                  <span>Manage Products</span>
+                <% end %>
+
+                <%= link_to admin_vouchers_path,
+                    class: "inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                    aria: { label: "Manage system vouchers" },
+                    data: { turbo: false } do %>
+                  <span>Manage Vouchers</span>
+                <% end %>
+                
+                <%= link_to admin_invoices_path,
+                    class: "inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                    aria: { label: "Manage system invoices" } do %>
+                  <span>Manage Invoices</span>
+                <% end %>
+              </div>
+            </div>
+          </div>
+
+          <!-- Row 2, Col 1: Group 4 -->
+          <div>
+            <!-- Group 4: System Configuration -->
+            <div>
+              <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">System Configuration</h3>
+              <div class="flex flex-wrap gap-4">
+                <%= link_to admin_policies_path,
+                    class: "inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                  aria: { label: "Edit system policies and settings" } do %>
+                  <span>Edit Policies</span>
+                <% end %>
+
+                <%= link_to admin_email_templates_path,
+                    class: "inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                    aria: { label: "Manage email templates" } do %>
+                  <span>Manage Emails</span>
+                <% end %>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Row 2, Col 2: Group 5 -->
+          <div>
+            <!-- Group 5: Analytics & Reporting -->
+            <div>
+              <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Analytics & Reporting</h3>
+              <div class="flex flex-wrap gap-4">
+                <%= link_to admin_reports_path,
+                    class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                    aria: { label: "View detailed system reports" } do %>
+                  <span>View Reports</span>
+                <% end %>
+
+                <%= link_to admin_application_analytics_pain_points_path,
+                    class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                    aria: { label: "View application pain point analysis" } do %>
                 <span>Pain Point Analysis</span>
               <% end %>
             </div>
           </div>
         </div>
+        
       </div>
-    </div>
+      </div>
 
     <%# Status Cards Section %>
     <section aria-labelledby="status-cards-heading" class="mb-6">

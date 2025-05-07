@@ -23,7 +23,7 @@
     <div class="mt-4 flex md:mt-0 md:ml-4 space-x-4">
       <% if @invoice.status_invoice_pending? %>
         <%= form_with model: [ :admin, @invoice ], class: "inline" do |f| %>
-          <%= f.hidden_field :status, value: "approved" %>
+          <%= f.hidden_field :status, value: "invoice_approved" %>
           <%= f.submit "Approve Invoice",
               class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" %>
         <% end %>
@@ -51,7 +51,7 @@
                 class: "mt-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" %>
           </div>
 
-          <%= f.hidden_field :status, value: "paid" %>
+          <%= f.hidden_field :status, value: "invoice_paid" %>
           
           <div class="flex justify-end">
             <%= f.submit "Record Payment",

@@ -22,89 +22,133 @@
             (<%= number_to_human_size(safe_attachment_byte_size(@application.income_proof)) %>)
           </p>
         </div>
-      <% elsif @application.income_proof_status.in?(['approved', 'rejected']) %>
-        <div class="mb-3">
-          <div class="rounded-md bg-amber-50 p-3 border border-amber-300">
-            <div class="flex">
-              <div class="flex-shrink-0">
-                <svg class="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M8.485 3.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 3.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
-                </svg>
-              </div>
-              <div class="ml-3">
-                <p class="text-sm text-amber-800">
-                  <strong>Data inconsistency detected:</strong> Income proof is marked as <%= @application.income_proof_status.titleize %> but the file is not currently attached.
-                </p>
+      <% elsif @application.income_proof_status == 'rejected' %>
+        <% latest_rejection = get_chronological_proof_history(@application, "income").find { |activity| activity.activity_type == :rejection } %>
+        <% if latest_rejection %>
+          <div class="mb-3">
+            <p class="text-sm text-gray-600 mb-1">
+              <span class="<%= latest_rejection.icon_class %>"><%= latest_rejection.icon_symbol %></span>
+              Rejected on <%= latest_rejection.created_at.strftime("%B %d, %Y at %I:%M %p") %> by <%= latest_rejection.source.admin&.full_name || "Unknown Admin" %>
+            </p>
+            <% if latest_rejection.details.present? %>
+              <p class="text-sm text-gray-600 ml-4 mb-1">
+                <span class="text-gray-500">Reason:</span> "<%= sanitize latest_rejection.details %>"
+              </p>
+            <% end %>
+            <% if latest_rejection.source.respond_to?(:notes) && latest_rejection.source.notes.present? %>
+              <p class="text-sm text-gray-600 ml-4">
+                <%= sanitize latest_rejection.source.notes %>
+              </p>
+            <% end %>
+          </div>
+        <% else %>
+           <div class="mb-3">
+            <div class="rounded-md bg-amber-50 p-3 border border-amber-300">
+              <div class="flex">
+                <div class="flex-shrink-0">
+                  <svg class="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.485 3.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 3.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+                <div class="ml-3">
+                  <p class="text-sm text-amber-800">
+                    <strong>Data inconsistency detected:</strong> Income proof is marked as <%= @application.income_proof_status.titleize %> but the file is not currently attached.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        <% end %>
+      <% elsif @application.income_proof_status == 'approved' %>
+         <div class="mb-3">
+            <div class="rounded-md bg-amber-50 p-3 border border-amber-300">
+              <div class="flex">
+                <div class="flex-shrink-0">
+                  <svg class="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.485 3.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 3.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+                <div class="ml-3">
+                  <p class="text-sm text-amber-800">
+                    <strong>Data inconsistency detected:</strong> Income proof is marked as <%= @application.income_proof_status.titleize %> but the file is not currently attached.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
       <% end %>
 
       <!-- History Section -->
-      <% if @application.income_proof.attached? %>
+      <% chronological_activities = get_chronological_proof_history(@application, "income") %>
+      <% if chronological_activities.any? %>
         <div class="mt-4">
           <h3 class="text-sm font-medium text-gray-700 mb-2">Proof History</h3>
           <div class="proof-history pl-4 border-l-2 border-gray-200">
-            <% chronological_activities = get_chronological_proof_history(@application, "income") %>
-            
-            <% if chronological_activities.any? %>
-              <% chronological_activities.each do |activity| %>
-                <div class="history-item mb-2">
-                  <p class="text-sm text-gray-600 mb-1">
-                    <span class="<%= activity.icon_class %>"><%= activity.icon_symbol %></span>
-                    
-                    <% case activity.activity_type %>
-                    <% when :submission %>
-                      Submitted on
-                    <% when :resubmission %>
-                      Resubmitted on
-                    <% when :approval %>
-                      Approved on
-                    <% when :rejection %>
-                      Rejected on
-                    <% end %>
-                    
-                    <%= activity.created_at.strftime("%B %d, %Y at %I:%M %p") %>
-                    
-                    <% if [:submission, :resubmission].include?(activity.activity_type) && activity.source.respond_to?(:submission_method) && activity.source.submission_method.present? %>
-                      <span class="text-xs text-gray-500">(via <%= activity.source.submission_method %>)</span>
-                    <% elsif [:approval, :rejection].include?(activity.activity_type) %>
-                      by <%= activity.source.admin&.full_name || "Unknown Admin" %>
-                    <% end %>
-                  </p>
+            <% chronological_activities.each do |activity| %>
+              <div class="history-item mb-2">
+                <p class="text-sm text-gray-600 mb-1">
+                  <span class="<%= activity.icon_class %>"><%= activity.icon_symbol %></span>
                   
-                  <% if activity.activity_type == :rejection && activity.details.present? %>
-                    <p class="text-sm text-gray-600 ml-4 mb-1">
-                      <span class="text-gray-500">Reason:</span> "<%= sanitize activity.details %>"
-                    </p>
-                  <% elsif activity.activity_type == :approval && activity.details.present? %>
-                    <p class="text-sm text-gray-600 ml-4 mb-1">
-                      <span class="text-gray-500">Note:</span> "<%= sanitize activity.details %>"
-                    </p>
-                  <% elsif activity.source.respond_to?(:notes) && activity.source.notes.present? %>
-                    <p class="text-sm text-gray-600 ml-4">
-                      <%= sanitize activity.source.notes %>
-                    </p>
+                  <% case activity.activity_type %>
+                  <% when :submission %>
+                    Submitted on
+                  <% when :resubmission %>
+                    Resubmitted on
+                  <% when :approval %>
+                    Approved on
+                  <% when :rejection %>
+                    Rejected on
                   <% end %>
-                </div>
-              <% end %>
-            <% elsif @application.created_at.present? %>
-              <!-- Fallback when no audit records exist -->
-              <div class="history-item mb-2">
-                <p class="text-sm text-gray-600 mb-1">
-                  <span class="text-blue-600">→</span> Submitted on
-                  <%= @application.created_at.strftime("%B %d, %Y at %I:%M %p") %>
-                  <span class="text-xs text-gray-500">(via application submission)</span>
+                  
+                  <%= activity.created_at.strftime("%B %d, %Y at %I:%M %p") %>
+                  
+                  <% if [:submission, :resubmission].include?(activity.activity_type) && activity.source.respond_to?(:submission_method) && activity.source.submission_method.present? %>
+                    <span class="text-xs text-gray-500">(via <%= activity.source.submission_method %>)</span>
+                  <% elsif [:approval, :rejection].include?(activity.activity_type) %>
+                    by <%= activity.source.admin&.full_name || "Unknown Admin" %>
+                  <% end %>
                 </p>
-              </div>
-            <% else %>
-              <div class="history-item mb-2">
-                <p class="text-sm text-gray-600 mb-1">
-                  <span class="text-yellow-500">Note:</span> No detailed history available.
-                </p>
+                
+                <% if activity.activity_type == :rejection && activity.details.present? %>
+                  <p class="text-sm text-gray-600 ml-4 mb-1">
+                    <span class="text-gray-500">Reason:</span> "<%= sanitize activity.details %>"
+                  </p>
+                <% elsif activity.activity_type == :approval && activity.details.present? %>
+                  <p class="text-sm text-gray-600 ml-4 mb-1">
+                    <span class="text-gray-500">Note:</span> "<%= sanitize activity.details %>"
+                  </p>
+                <% elsif activity.source.respond_to?(:notes) && activity.source.notes.present? %>
+                  <p class="text-sm text-gray-600 ml-4">
+                    <%= sanitize activity.source.notes %>
+                  </p>
+                <% end %>
               </div>
             <% end %>
+          </div>
+        </div>
+      <% elsif @application.created_at.present? %>
+        <!-- Fallback when no audit records exist -->
+        <div class="mt-4">
+          <h3 class="text-sm font-medium text-gray-700 mb-2">Proof History</h3>
+          <div class="proof-history pl-4 border-l-2 border-gray-200">
+            <div class="history-item mb-2">
+              <p class="text-sm text-gray-600 mb-1">
+                <span class="text-blue-600">→</span> Submitted on
+                <%= @application.created_at.strftime("%B %d, %Y at %I:%M %p") %>
+                <span class="text-xs text-gray-500">(via application submission)</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      <% else %>
+        <div class="mt-4">
+          <h3 class="text-sm font-medium text-gray-700 mb-2">Proof History</h3>
+          <div class="proof-history pl-4 border-l-2 border-gray-200">
+            <div class="history-item mb-2">
+              <p class="text-sm text-gray-600 mb-1">
+                <span class="text-yellow-500">Note:</span> No detailed history available.
+              </p>
+            </div>
           </div>
         </div>
       <% end %>
@@ -163,89 +207,133 @@
             (<%= number_to_human_size(safe_attachment_byte_size(@application.residency_proof)) %>)
           </p>
         </div>
-      <% elsif @application.residency_proof_status.in?(['approved', 'rejected']) %>
-        <div class="mb-3">
-          <div class="rounded-md bg-amber-50 p-3 border border-amber-300">
-            <div class="flex">
-              <div class="flex-shrink-0">
-                <svg class="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M8.485 3.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 3.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
-                </svg>
-              </div>
-              <div class="ml-3">
-                <p class="text-sm text-amber-800">
-                  <strong>Data inconsistency detected:</strong> Residency proof is marked as <%= @application.residency_proof_status.titleize %> but the file is not currently attached.
-                </p>
+      <% elsif @application.residency_proof_status == 'rejected' %>
+         <% latest_rejection = get_chronological_proof_history(@application, "residency").find { |activity| activity.activity_type == :rejection } %>
+        <% if latest_rejection %>
+          <div class="mb-3">
+            <p class="text-sm text-gray-600 mb-1">
+              <span class="<%= latest_rejection.icon_class %>"><%= latest_rejection.icon_symbol %></span>
+              Rejected on <%= latest_rejection.created_at.strftime("%B %d, %Y at %I:%M %p") %> by <%= latest_rejection.source.admin&.full_name || "Unknown Admin" %>
+            </p>
+            <% if latest_rejection.details.present? %>
+              <p class="text-sm text-gray-600 ml-4 mb-1">
+                <span class="text-gray-500">Reason:</span> "<%= sanitize latest_rejection.details %>"
+              </p>
+            <% end %>
+            <% if latest_rejection.source.respond_to?(:notes) && latest_rejection.source.notes.present? %>
+              <p class="text-sm text-gray-600 ml-4">
+                <%= sanitize latest_rejection.source.notes %>
+              </p>
+            <% end %>
+          </div>
+        <% else %>
+           <div class="mb-3">
+            <div class="rounded-md bg-amber-50 p-3 border border-amber-300">
+              <div class="flex">
+                <div class="flex-shrink-0">
+                  <svg class="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.485 3.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 3.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+                <div class="ml-3">
+                  <p class="text-sm text-amber-800">
+                    <strong>Data inconsistency detected:</strong> Residency proof is marked as <%= @application.residency_proof_status.titleize %> but the file is not currently attached.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        <% end %>
+      <% elsif @application.residency_proof_status == 'approved' %>
+         <div class="mb-3">
+            <div class="rounded-md bg-amber-50 p-3 border border-amber-300">
+              <div class="flex">
+                <div class="flex-shrink-0">
+                  <svg class="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.485 3.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 3.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+                <div class="ml-3">
+                  <p class="text-sm text-amber-800">
+                    <strong>Data inconsistency detected:</strong> Residency proof is marked as <%= @application.residency_proof_status.titleize %> but the file is not currently attached.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
       <% end %>
 
       <!-- History Section -->
-      <% if @application.residency_proof.attached? %>
+      <% chronological_activities = get_chronological_proof_history(@application, "residency") %>
+      <% if chronological_activities.any? %>
         <div class="mt-4">
           <h3 class="text-sm font-medium text-gray-700 mb-2">Proof History</h3>
           <div class="proof-history pl-4 border-l-2 border-gray-200">
-            <% chronological_activities = get_chronological_proof_history(@application, "residency") %>
-            
-            <% if chronological_activities.any? %>
-              <% chronological_activities.each do |activity| %>
-                <div class="history-item mb-2">
-                  <p class="text-sm text-gray-600 mb-1">
-                    <span class="<%= activity.icon_class %>"><%= activity.icon_symbol %></span>
-                    
-                    <% case activity.activity_type %>
-                    <% when :submission %>
-                      Submitted on
-                    <% when :resubmission %>
-                      Resubmitted on
-                    <% when :approval %>
-                      Approved on
-                    <% when :rejection %>
-                      Rejected on
-                    <% end %>
-                    
-                    <%= activity.created_at.strftime("%B %d, %Y at %I:%M %p") %>
-                    
-                    <% if [:submission, :resubmission].include?(activity.activity_type) && activity.source.respond_to?(:submission_method) && activity.source.submission_method.present? %>
-                      <span class="text-xs text-gray-500">(via <%= activity.source.submission_method %>)</span>
-                    <% elsif [:approval, :rejection].include?(activity.activity_type) %>
-                      by <%= activity.source.admin&.full_name || "Unknown Admin" %>
-                    <% end %>
-                  </p>
+            <% chronological_activities.each do |activity| %>
+              <div class="history-item mb-2">
+                <p class="text-sm text-gray-600 mb-1">
+                  <span class="<%= activity.icon_class %>"><%= activity.icon_symbol %></span>
                   
-                  <% if activity.activity_type == :rejection && activity.details.present? %>
-                    <p class="text-sm text-gray-600 ml-4 mb-1">
-                      <span class="text-gray-500">Reason:</span> "<%= sanitize activity.details %>"
-                    </p>
-                  <% elsif activity.activity_type == :approval && activity.details.present? %>
-                    <p class="text-sm text-gray-600 ml-4 mb-1">
-                      <span class="text-gray-500">Note:</span> "<%= sanitize activity.details %>"
-                    </p>
-                  <% elsif activity.source.respond_to?(:notes) && activity.source.notes.present? %>
-                    <p class="text-sm text-gray-600 ml-4">
-                      <%= sanitize activity.source.notes %>
-                    </p>
+                  <% case activity.activity_type %>
+                  <% when :submission %>
+                    Submitted on
+                  <% when :resubmission %>
+                    Resubmitted on
+                  <% when :approval %>
+                    Approved on
+                  <% when :rejection %>
+                    Rejected on
                   <% end %>
-                </div>
-              <% end %>
-            <% elsif @application.created_at.present? %>
-              <!-- Fallback when no audit records exist -->
-              <div class="history-item mb-2">
-                <p class="text-sm text-gray-600 mb-1">
-                  <span class="text-blue-600">→</span> Submitted on
-                  <%= @application.created_at.strftime("%B %d, %Y at %I:%M %p") %>
-                  <span class="text-xs text-gray-500">(via application submission)</span>
+                  
+                  <%= activity.created_at.strftime("%B %d, %Y at %I:%M %p") %>
+                  
+                  <% if [:submission, :resubmission].include?(activity.activity_type) && activity.source.respond_to?(:submission_method) && activity.source.submission_method.present? %>
+                    <span class="text-xs text-gray-500">(via <%= activity.source.submission_method %>)</span>
+                  <% elsif [:approval, :rejection].include?(activity.activity_type) %>
+                    by <%= activity.source.admin&.full_name || "Unknown Admin" %>
+                  <% end %>
                 </p>
-              </div>
-            <% else %>
-              <div class="history-item mb-2">
-                <p class="text-sm text-gray-600 mb-1">
-                  <span class="text-yellow-500">Note:</span> No detailed history available.
-                </p>
+                
+                <% if activity.activity_type == :rejection && activity.details.present? %>
+                  <p class="text-sm text-gray-600 ml-4 mb-1">
+                    <span class="text-gray-500">Reason:</span> "<%= sanitize activity.details %>"
+                  </p>
+                <% elsif activity.activity_type == :approval && activity.details.present? %>
+                  <p class="text-sm text-gray-600 ml-4 mb-1">
+                    <span class="text-gray-500">Note:</span> "<%= sanitize activity.details %>"
+                  </p>
+                <% elsif activity.source.respond_to?(:notes) && activity.source.notes.present? %>
+                  <p class="text-sm text-gray-600 ml-4">
+                    <%= sanitize activity.source.notes %>
+                  </p>
+                <% end %>
               </div>
             <% end %>
+          </div>
+        </div>
+      <% elsif @application.created_at.present? %>
+        <!-- Fallback when no audit records exist -->
+        <div class="mt-4">
+          <h3 class="text-sm font-medium text-gray-700 mb-2">Proof History</h3>
+          <div class="proof-history pl-4 border-l-2 border-gray-200">
+            <div class="history-item mb-2">
+              <p class="text-sm text-gray-600 mb-1">
+                <span class="text-blue-600">→</span> Submitted on
+                <%= @application.created_at.strftime("%B %d, %Y at %I:%M %p") %>
+                <span class="text-xs text-gray-500">(via application submission)</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      <% else %>
+        <div class="mt-4">
+          <h3 class="text-sm font-medium text-gray-700 mb-2">Proof History</h3>
+          <div class="proof-history pl-4 border-l-2 border-gray-200">
+            <div class="history-item mb-2">
+              <p class="text-sm text-gray-600 mb-1">
+                <span class="text-yellow-500">Note:</span> No detailed history available.
+              </p>
+            </div>
           </div>
         </div>
       <% end %>

@@ -896,7 +896,7 @@ module ConstituentPortal
       begin
         # Assign the value for validation
         @application.assign_attributes(attribute => value)
-      rescue ActiveRecord::UnknownAttributeError => e
+      rescue ActiveRecord::UnknownAttributeError
         # Handle unknown attributes (like physical_address_1)
         return { success: false, errors: { "application[#{attribute}]" => ['This field cannot be autosaved'] } }
       end

@@ -40,7 +40,7 @@ module Admin
 
     def update
       if @invoice.update(invoice_params)
-        notice = if @invoice.saved_change_to_status? && @invoice.invoice_approved?
+        notice = if @invoice.saved_change_to_status? && @invoice.status_invoice_approved?
                    'Invoice approved successfully'
                  elsif @invoice.saved_change_to_status? && @invoice.status_invoice_paid?
                    'Payment details recorded successfully'
@@ -61,8 +61,8 @@ module Admin
     end
 
     def approve
-      if @invoice.pending?
-        @invoice.update!(status: :approved)
+      if @invoice.status_invoice_pending?
+        @invoice.update!(status: :invoice_approved)
         log_event!('Approved invoice')
         redirect_to [:admin, @invoice], notice: 'Invoice approved successfully'
       else
@@ -91,7 +91,7 @@ module Admin
       if params[:date_range].present?
         case params[:date_range]
         when 'today'
-          scope = scope.where(created_at: Time.current.beginning_of_day..Time.current.end_of_day)
+          scope = scope.where(created_at: Time.current.all_day)
         when 'week'
           scope = scope.where(created_at: 1.week.ago.beginning_of_day..Time.current.end_of_day)
         when 'month'
