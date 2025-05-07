@@ -63,12 +63,12 @@ gem 'jsbundling-rails'
 
 group :development, :test do
   gem 'brakeman', '~> 7.0', require: false
+  gem 'byebug'
   gem 'debug', require: 'debug/prelude'
 end
 
 group :development do
   # Use console on exceptions pages [https://github.com/rails/web-console]
-  gem 'better_html', '~> 2.1', '>= 2.1.1'
   gem 'bullet'
   gem 'debride'
   gem 'erb_lint'

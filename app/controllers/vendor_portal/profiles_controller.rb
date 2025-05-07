@@ -22,19 +22,33 @@ module VendorPortal
     private
 
     def vendor_params
-      params.require(:user).permit(
-        :name,
-        :company_name,
-        :address_line1,
-        :address_line2,
+      permitted = params.require(:users_vendor).permit(
+        :business_name,
+        :business_tax_id,
+        :website_url,
+        :address_line1,      # legacy key that may be submitted
+        :address_line2,      # legacy key that may be submitted
+        :physical_address_1,
+        :physical_address_2,
         :city,
         :state,
         :zip_code,
         :phone,
-        :fax,
         :email,
-        :website_url
+        :w9_form,
+        :terms_accepted
       )
+
+      # Map legacy keys to new column names if new ones are blank.
+      if permitted[:physical_address_1].blank? && permitted[:address_line1].present?
+        permitted[:physical_address_1] = permitted.delete(:address_line1)
+      end
+
+      if permitted[:physical_address_2].blank? && permitted[:address_line2].present?
+        permitted[:physical_address_2] = permitted.delete(:address_line2)
+      end
+
+      permitted
     end
   end
 end

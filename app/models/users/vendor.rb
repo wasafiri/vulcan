@@ -4,11 +4,11 @@ module Users
   class Vendor < User
     # Products represent equipment
     has_many :products, foreign_key: :user_id
-    has_many :vouchers, foreign_key: :vendor_id
+    has_many :vouchers
     has_many :processed_vouchers, -> { where.not(status: :pending) }, class_name: 'Voucher', foreign_key: :vendor_id
-    has_many :voucher_transactions, foreign_key: :vendor_id
-    has_many :invoices, foreign_key: :vendor_id
-    has_many :w9_reviews, foreign_key: :vendor_id
+    has_many :voucher_transactions
+    has_many :invoices
+    has_many :w9_reviews
 
     has_one_attached :w9_form
 
@@ -89,6 +89,24 @@ module Users
         .completed
         .where(invoice_id: nil)
         .order(processed_at: :desc)
+    end
+
+    # Virtual attribute for handling terms acceptance.
+    # When the form sends a "terms_accepted" value (e.g., "1" for checked),
+    # this getter returns true if "terms_accepted_at" is present.
+    def terms_accepted
+      !!terms_accepted_at
+    end
+
+    # The setter converts the submitted value into a timestamp.
+    # If the value is truthy (checked), it sets terms_accepted_at to the current time;
+    # otherwise, it clears the timestamp.
+    def terms_accepted=(value)
+      if ActiveModel::Type::Boolean.new.cast(value)
+        self.terms_accepted_at ||= Time.current
+      else
+        self.terms_accepted_at = nil
+      end
     end
   end
 end

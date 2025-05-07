@@ -150,7 +150,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
     rescue StandardError
       nil
     end
-    sign_in_url = new_user_session_url(host: default_url_options[:host])
+    sign_in_url = sign_in_url(host: default_url_options[:host])
 
     # Conditional messages (Optional Variables)
     remaining_attempts_message_text = nil
@@ -395,10 +395,10 @@ class ApplicationNotificationsMailer < ApplicationMailer
     end # Placeholder
 
     variables = {
-      user_first_name: constituent.first_name,
+      constituent_first_name: constituent.first_name,
       constituent_email: constituent.email,
       temp_password: temp_password,
-      sign_in_url: new_user_session_url(host: default_url_options[:host]),
+      sign_in_url: sign_in_url(host: default_url_options[:host]),
       header_title: header_title,
       footer_contact_email: footer_contact_email,
       footer_website_url: footer_website_url,

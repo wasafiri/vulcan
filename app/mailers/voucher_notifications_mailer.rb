@@ -16,11 +16,11 @@ class VoucherNotificationsMailer < ApplicationMailer
     template_name = 'voucher_notifications_voucher_assigned'
 
     begin
-      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      # Only find the text template as per project strategy
       text_template = EmailTemplate.find_by!(name: template_name, format: :text)
     rescue ActiveRecord::RecordNotFound => e
       Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
-      raise "Email templates not found for #{template_name}"
+      raise "Email template (text format) not found for #{template_name}"
     end
 
     # Prepare variables
@@ -34,19 +34,20 @@ class VoucherNotificationsMailer < ApplicationMailer
       minimum_redemption_amount_formatted: number_to_currency(Policy.get('minimum_voucher_redemption_amount') || 0)
     }.compact
 
-    # Render subject and bodies
-    rendered_subject, rendered_html_body = html_template.render(**variables)
-    _, rendered_text_body = text_template.render(**variables)
+    # Render subject and body from the text template
+    rendered_subject, rendered_text_body = text_template.render(**variables)
 
-    # Send email
+    # Send email as non-multipart text-only
+    text_body = rendered_text_body.to_s
+    Rails.logger.debug { "DEBUG: Preparing to send voucher_assigned email with content: #{text_body.inspect}" }
+
     mail(
       to: user.email,
       subject: rendered_subject,
-      message_stream: 'notifications'
-    ) do |format|
-      format.html { render html: rendered_html_body.html_safe }
-      format.text { render plain: rendered_text_body }
-    end
+      message_stream: 'notifications',
+      body: text_body,
+      content_type: 'text/plain'
+    )
   rescue StandardError => e
     # Log error with more details
     Event.create!(
@@ -71,11 +72,11 @@ class VoucherNotificationsMailer < ApplicationMailer
     template_name = 'voucher_notifications_voucher_expiring_soon'
 
     begin
-      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      # Find the text template
       text_template = EmailTemplate.find_by!(name: template_name, format: :text)
     rescue ActiveRecord::RecordNotFound => e
       Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
-      raise "Email templates not found for #{template_name}"
+      raise "Email template (text format) not found for #{template_name}"
     end
 
     # Prepare variables
@@ -91,19 +92,20 @@ class VoucherNotificationsMailer < ApplicationMailer
       # Add other required variables from AVAILABLE_TEMPLATES if needed
     }.compact
 
-    # Render subject and bodies
-    rendered_subject, rendered_html_body = html_template.render(**variables)
-    _, rendered_text_body = text_template.render(**variables)
+    # Render subject and body from the text template
+    rendered_subject, rendered_text_body = text_template.render(**variables)
 
-    # Send email
+    # Send email as non-multipart text-only
+    text_body = rendered_text_body.to_s
+    Rails.logger.debug { "DEBUG: Preparing to send voucher_expiring_soon email with content: #{text_body.inspect}" }
+
     mail(
       to: user.email,
       subject: rendered_subject,
-      message_stream: 'notifications'
-    ) do |format|
-      format.html { render html: rendered_html_body.html_safe }
-      format.text { render plain: rendered_text_body }
-    end
+      message_stream: 'notifications',
+      body: text_body,
+      content_type: 'text/plain'
+    )
   rescue StandardError => e
     # Log error with more details
     Event.create!(
@@ -128,21 +130,17 @@ class VoucherNotificationsMailer < ApplicationMailer
     template_name = 'voucher_notifications_voucher_expired'
 
     begin
-      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      # Find the text template
       text_template = EmailTemplate.find_by!(name: template_name, format: :text)
     rescue ActiveRecord::RecordNotFound => e
       Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
-      raise "Email templates not found for #{template_name}"
+      raise "Email template (text format) not found for #{template_name}"
     end
 
     # Prepare variables
-    # Optional: Render transaction history if needed for the template
-    transaction_history_html = ''
+    # Optional: Render transaction history if needed for the template (text only)
     transaction_history_text = ''
     if voucher.transactions.any?
-      transaction_history_html = '<ul>' + voucher.transactions.order(created_at: :desc).map do |t|
-        "<li>#{t.created_at.strftime('%m/%d/%Y')}: #{number_to_currency(t.amount)} at #{t.vendor.business_name}</li>"
-      end.join + '</ul>'
       transaction_history_text = voucher.transactions.order(created_at: :desc).map do |t|
         "- #{t.created_at.strftime('%m/%d/%Y')}: #{number_to_currency(t.amount)} at #{t.vendor.business_name}"
       end.join("\n")
@@ -158,23 +156,23 @@ class VoucherNotificationsMailer < ApplicationMailer
       validity_period_months: Policy.get('voucher_validity_period_months') || 6,
       minimum_redemption_amount_formatted: number_to_currency(Policy.get('minimum_voucher_redemption_amount') || 0),
       # Optional variables
-      transaction_history_html: transaction_history_html,
       transaction_history_text: transaction_history_text
     }.compact
 
-    # Render subject and bodies
-    rendered_subject, rendered_html_body = html_template.render(**variables)
-    _, rendered_text_body = text_template.render(**variables)
+    # Render subject and body from the text template
+    rendered_subject, rendered_text_body = text_template.render(**variables)
 
-    # Send email
+    # Send email as non-multipart text-only
+    text_body = rendered_text_body.to_s
+    Rails.logger.debug { "DEBUG: Preparing to send voucher_expired email with content: #{text_body.inspect}" }
+
     mail(
       to: user.email,
       subject: rendered_subject,
-      message_stream: 'notifications'
-    ) do |format|
-      format.html { render html: rendered_html_body.html_safe }
-      format.text { render plain: rendered_text_body }
-    end
+      message_stream: 'notifications',
+      body: text_body,
+      content_type: 'text/plain'
+    )
   rescue StandardError => e
     # Log error with more details
     Event.create!(
@@ -201,11 +199,11 @@ class VoucherNotificationsMailer < ApplicationMailer
     template_name = 'voucher_notifications_voucher_redeemed'
 
     begin
-      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      # Find the text template
       text_template = EmailTemplate.find_by!(name: template_name, format: :text)
     rescue ActiveRecord::RecordNotFound => e
       Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
-      raise "Email templates not found for #{template_name}"
+      raise "Email template (text format) not found for #{template_name}"
     end
 
     # Prepare variables
@@ -214,18 +212,14 @@ class VoucherNotificationsMailer < ApplicationMailer
     expiration_date_formatted = (voucher.issued_at + (Policy.get('voucher_validity_period_months') || 6).months).strftime('%B %d, %Y')
     minimum_redemption_amount_formatted = number_to_currency(Policy.get('minimum_voucher_redemption_amount') || 0)
 
-    # Optional message blocks (logic might need refinement based on template content)
-    remaining_value_message_html = ''
+    # Optional message blocks (text only)
     remaining_value_message_text = ''
-    fully_redeemed_message_html = ''
     fully_redeemed_message_text = ''
 
     if voucher.remaining_value.positive?
       # Simplified example - actual content depends on template placeholders
-      remaining_value_message_html = "<p>Your remaining balance is #{remaining_balance_formatted}. Minimum redemption amount is #{minimum_redemption_amount_formatted}.</p>"
       remaining_value_message_text = "Your remaining balance is #{remaining_balance_formatted}. Minimum redemption amount is #{minimum_redemption_amount_formatted}."
     else
-      fully_redeemed_message_html = '<p>This voucher has been fully redeemed.</p>'
       fully_redeemed_message_text = 'This voucher has been fully redeemed.'
     end
 
@@ -239,26 +233,25 @@ class VoucherNotificationsMailer < ApplicationMailer
       remaining_balance_formatted: remaining_balance_formatted,
       expiration_date_formatted: expiration_date_formatted,
       # Optional variables
-      remaining_value_message_html: remaining_value_message_html,
       remaining_value_message_text: remaining_value_message_text,
-      fully_redeemed_message_html: fully_redeemed_message_html,
       fully_redeemed_message_text: fully_redeemed_message_text,
       minimum_redemption_amount_formatted: minimum_redemption_amount_formatted # Often used within optional blocks
     }.compact
 
-    # Render subject and bodies
-    rendered_subject, rendered_html_body = html_template.render(**variables)
-    _, rendered_text_body = text_template.render(**variables)
+    # Render subject and body from the text template
+    rendered_subject, rendered_text_body = text_template.render(**variables)
 
-    # Send email
+    # Send email as non-multipart text-only
+    text_body = rendered_text_body.to_s
+    Rails.logger.debug { "DEBUG: Preparing to send voucher_redeemed email with content: #{text_body.inspect}" }
+
     mail(
       to: user.email,
       subject: rendered_subject,
-      message_stream: 'notifications'
-    ) do |format|
-      format.html { render html: rendered_html_body.html_safe }
-      format.text { render plain: rendered_text_body }
-    end
+      message_stream: 'notifications',
+      body: text_body,
+      content_type: 'text/plain'
+    )
   rescue StandardError => e
     # Log error with more details
     Event.create!(

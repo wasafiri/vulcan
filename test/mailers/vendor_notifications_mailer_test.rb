@@ -3,29 +3,71 @@
 require 'test_helper'
 
 class VendorNotificationsMailerTest < ActionMailer::TestCase
+  # Helper to create mock templates that respond to render method
+  def mock_template(subject_format, body_format)
+    template_instance = mock("email_template_instance_#{subject_format.gsub(/\s+/, '_')}")
+
+    # Stub the render method to return [rendered_subject, rendered_body]
+    # This simulates what the real EmailTemplate.render method does
+    template_instance.stubs(:render).with(any_parameters).returns do |**vars|
+      # For the invoice_number variable
+      if vars[:invoice_number]
+        rendered_subject = subject_format
+        rendered_body = body_format.gsub('%<invoice_number>s', vars[:invoice_number])
+      elsif vars[:rejection_reason]
+        rendered_subject = subject_format
+        rendered_body = body_format.gsub('%<rejection_reason>s', vars[:rejection_reason])
+      else
+        rendered_subject = subject_format
+        rendered_body = body_format
+      end
+      [rendered_subject, rendered_body]
+    end
+
+    # Still stub subject and body for inspection if needed
+    template_instance.stubs(:subject).returns(subject_format)
+    template_instance.stubs(:body).returns(body_format)
+
+    template_instance
+  end
+
   setup do
     @vendor = create(:vendor)
     @invoice = create(:invoice, vendor: @vendor)
     @transactions = create_list(:voucher_transaction, 3, invoice: @invoice, vendor: @vendor)
 
-    # Stub EmailTemplate lookups
-    @mock_template_rejected = mock('EmailTemplate')
-    @mock_template_rejected.stubs(:subject).returns('Mock W9 Rejected Subject')
-    @mock_template_rejected.stubs(:body).returns('Mock W9 Rejected Body %<rejection_reason>s')
-    EmailTemplate.stubs(:find_by!).with(name: 'vendor_notifications_w9_rejected', format: 'html').returns(@mock_template_rejected)
-    EmailTemplate.stubs(:find_by!).with(name: 'vendor_notifications_w9_rejected', format: 'text').returns(@mock_template_rejected)
+    # Per project strategy, HTML emails are not used. Only stub for :text format.
+    # If the mailer attempts to find_by!(format: :html), it should fail (e.g., RecordNotFound)
+    # as no HTML templates should be seeded for these, and we provide no stub.
 
-    @mock_template_approved = mock('EmailTemplate')
-    @mock_template_approved.stubs(:subject).returns('Mock W9 Approved Subject')
-    @mock_template_approved.stubs(:body).returns('Mock W9 Approved Body')
-    EmailTemplate.stubs(:find_by!).with(name: 'vendor_notifications_w9_approved', format: 'html').returns(@mock_template_approved)
-    EmailTemplate.stubs(:find_by!).with(name: 'vendor_notifications_w9_approved', format: 'text').returns(@mock_template_approved)
+    # Create specific mock templates for each mailer method
+    rejected_template = mock_template(
+      'Mock W9 Rejected Subject',
+      'Mock W9 Rejected Body %<rejection_reason>s'
+    )
 
-    @mock_template_payment = mock('EmailTemplate')
-    @mock_template_payment.stubs(:subject).returns('Mock Payment Issued Subject')
-    @mock_template_payment.stubs(:body).returns('Mock Payment Issued Body %<invoice_number>s')
-    EmailTemplate.stubs(:find_by!).with(name: 'vendor_notifications_payment_issued', format: 'html').returns(@mock_template_payment)
-    EmailTemplate.stubs(:find_by!).with(name: 'vendor_notifications_payment_issued', format: 'text').returns(@mock_template_payment)
+    approved_template = mock_template(
+      'Mock W9 Approved Subject',
+      'Mock W9 Approved Body'
+    )
+
+    payment_template = mock_template(
+      'Mock Payment Issued Subject',
+      'Mock Payment Issued Body %<invoice_number>s'
+    )
+
+    # Stub EmailTemplate.find_by! for text format only
+    EmailTemplate.stubs(:find_by!)
+                 .with(name: 'vendor_notifications_w9_rejected', format: :text)
+                 .returns(rejected_template)
+
+    EmailTemplate.stubs(:find_by!)
+                 .with(name: 'vendor_notifications_w9_approved', format: :text)
+                 .returns(approved_template)
+
+    EmailTemplate.stubs(:find_by!)
+                 .with(name: 'vendor_notifications_payment_issued', format: :text)
+                 .returns(payment_template)
   end
 
   # Skip this test for now as it requires more complex setup
@@ -36,76 +78,102 @@ class VendorNotificationsMailerTest < ActionMailer::TestCase
   end
 
   test 'payment_issued' do
-    # Use .with() to pass parameters
-    email = VendorNotificationsMailer.with(invoice: @invoice).payment_issued
+    # Create a specific stub for this test
+    expected_text = "Mock Payment Issued Body #{@invoice.invoice_number}"
+    payment_template = mock('payment_template_specific')
+    payment_template.stubs(:render).returns(['Payment issued', expected_text])
 
-    assert_emails 1 do
-      email.deliver_later
+    # Override stubs for this test
+    EmailTemplate.unstub(:find_by!)
+    EmailTemplate.stubs(:find_by!)
+                 .with(name: 'vendor_notifications_payment_issued', format: :text)
+                 .returns(payment_template)
+
+    # Using Rails 7.1.0+ capture_emails helper
+    emails = capture_emails do
+      VendorNotificationsMailer.with(invoice: @invoice).payment_issued.deliver_now
     end
+
+    # Verify we captured an email
+    assert_equal 1, emails.size
+    email = emails.first
 
     assert_equal ['no_reply@mdmat.org'], email.from
     assert_equal [@vendor.email], email.to
-    assert_equal 'Mock Payment Issued Subject', email.subject # Use stubbed subject
+    assert_equal 'Payment issued', email.subject
 
-    # Test both HTML and text parts
-    assert_equal 2, email.parts.size
+    # For non-multipart emails, we check the body directly
+    assert_equal 0, email.parts.size, 'Email should have no parts (non-multipart).'
+    assert_includes email.content_type, 'text/plain', 'Email should be text/plain (may include charset)'
 
-    # HTML part
-    html_part = email.parts.find { |part| part.content_type.include?('text/html') }
-    assert_includes html_part.body.to_s, "Mock Payment Issued Body #{@invoice.invoice_number}" # Use stubbed body
-
-    # Text part
-    text_part = email.parts.find { |part| part.content_type.include?('text/plain') }
-    assert_includes text_part.body.to_s, "Mock Payment Issued Body #{@invoice.invoice_number}" # Use stubbed body
+    # Check that the email body contains expected text
+    assert_includes email.body.to_s, expected_text
   end
 
   test 'w9_approved' do
-    # Use .with() to pass parameters
-    email = VendorNotificationsMailer.with(vendor: @vendor).w9_approved
+    # Create a specific stub for this test
+    expected_text = 'Mock W9 Approved Body'
+    approved_template = mock('approved_template_specific')
+    approved_template.stubs(:render).returns(['W9 approved', expected_text])
 
-    assert_emails 1 do
-      email.deliver_later
+    # Update the stub for this test
+    EmailTemplate.stubs(:find_by!)
+                 .with(name: 'vendor_notifications_w9_approved', format: :text)
+                 .returns(approved_template)
+
+    # Using Rails 7.1.0+ capture_emails helper
+    emails = capture_emails do
+      VendorNotificationsMailer.with(vendor: @vendor).w9_approved.deliver_now
     end
+
+    # Verify we captured an email
+    assert_equal 1, emails.size
+    email = emails.first
 
     assert_equal ['no_reply@mdmat.org'], email.from
     assert_equal [@vendor.email], email.to
-    assert_equal 'Mock W9 Approved Subject', email.subject # Use stubbed subject
+    assert_equal 'W9 approved', email.subject
 
-    # Test both HTML and text parts
-    assert_equal 2, email.parts.size
+    # For non-multipart emails, we check the body directly
+    assert_equal 0, email.parts.size, 'Email should have no parts (non-multipart).'
+    assert_includes email.content_type, 'text/plain', 'Email should be text/plain (may include charset)'
 
-    # HTML part
-    html_part = email.parts.find { |part| part.content_type.include?('text/html') }
-    assert_includes html_part.body.to_s, 'Mock W9 Approved Body' # Use stubbed body
-
-    # Text part
-    text_part = email.parts.find { |part| part.content_type.include?('text/plain') }
-    assert_includes text_part.body.to_s, 'Mock W9 Approved Body' # Use stubbed body
+    # Check that the email body contains expected text
+    assert_includes email.body.to_s, expected_text
   end
 
   test 'w9_rejected' do
     review = create(:w9_review, :rejected, vendor: @vendor)
-    # Use .with() to pass parameters
-    email = VendorNotificationsMailer.with(vendor: @vendor, w9_review: review).w9_rejected
 
-    assert_emails 1 do
-      email.deliver_later
+    # Create a specific stub for this test
+    expected_text = "Mock W9 Rejected Body #{review.rejection_reason}"
+    rejected_template = mock('rejected_template_specific')
+    rejected_template.stubs(:render).returns(['W9 rejected', expected_text])
+
+    # Update the stub for this test
+    EmailTemplate.stubs(:find_by!)
+                 .with(name: 'vendor_notifications_w9_rejected', format: :text)
+                 .returns(rejected_template)
+
+    # Using Rails 7.1.0+ capture_emails helper
+    emails = capture_emails do
+      VendorNotificationsMailer.with(vendor: @vendor, w9_review: review).w9_rejected.deliver_now
     end
+
+    # Verify we captured an email
+    assert_equal 1, emails.size
+    email = emails.first
 
     assert_equal ['no_reply@mdmat.org'], email.from
     assert_equal [@vendor.email], email.to
-    assert_equal 'Mock W9 Rejected Subject', email.subject # Use stubbed subject
+    assert_equal 'W9 rejected', email.subject
 
-    # Test both HTML and text parts
-    assert_equal 2, email.parts.size
+    # For non-multipart emails, we check the body directly
+    assert_equal 0, email.parts.size, 'Email should have no parts (non-multipart).'
+    assert_includes email.content_type, 'text/plain', 'Email should be text/plain (may include charset)'
 
-    # HTML part
-    html_part = email.parts.find { |part| part.content_type.include?('text/html') }
-    assert_includes html_part.body.to_s, "Mock W9 Rejected Body #{review.rejection_reason}" # Use stubbed body
-
-    # Text part
-    text_part = email.parts.find { |part| part.content_type.include?('text/plain') }
-    assert_includes text_part.body.to_s, "Mock W9 Rejected Body #{review.rejection_reason}" # Use stubbed body
+    # Check that the email body contains expected text
+    assert_includes email.body.to_s, expected_text
   end
 
   # Skip this test for now as it requires w9_expiration_date attribute

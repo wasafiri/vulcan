@@ -116,6 +116,7 @@ GEM
     bullet (8.0.5)
       activesupport (>= 3.0.0)
       uniform_notifier (~> 1.11)
+    byebug (12.0.0)
     capybara (3.40.0)
       addressable
       matrix
@@ -504,10 +505,10 @@ PLATFORMS
 DEPENDENCIES
   aws-sdk-s3
   bcrypt (~> 3.1.20)
-  better_html (~> 2.1, >= 2.1.1)
   bootsnap
   brakeman (~> 7.0)
   bullet
+  byebug
   capybara
   cssbundling-rails
   cuprite

@@ -10,11 +10,11 @@ class UserMailer < ApplicationMailer
 
     template_name = 'user_mailer_password_reset'
     begin
-      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      # Only find the text template as per project strategy
       text_template = EmailTemplate.find_by!(name: template_name, format: :text)
     rescue ActiveRecord::RecordNotFound => e
-      Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
-      raise "Email templates not found for #{template_name}"
+      Rails.logger.error "Missing EmailTemplate (text format) for #{template_name}: #{e.message}"
+      raise "Email template (text format) not found for #{template_name}"
     end
 
     # Prepare variables
@@ -23,19 +23,21 @@ class UserMailer < ApplicationMailer
       reset_url: reset_url
     }.compact
 
-    # Render subject and bodies
-    rendered_subject, rendered_html_body = html_template.render(**variables)
-    _, rendered_text_body = text_template.render(**variables)
+    puts "DEBUG: About to call render on text_template: #{text_template.inspect}" # Debug line
+    # Render subject and body from the text template
+    rendered_subject, rendered_text_body = text_template.render(**variables)
 
     # Send email
+    text_body = rendered_text_body.to_s
+    Rails.logger.debug { "DEBUG: Preparing to send password_reset email with content: #{text_body.inspect}" }
+
     mail(
       to: user.email,
       subject: rendered_subject,
-      message_stream: 'user-email'
-    ) do |format|
-      format.html { render html: rendered_html_body.presence || '' }
-      format.text { render plain: rendered_text_body.to_s }
-    end
+      message_stream: 'user-email',
+      body: text_body,
+      content_type: 'text/plain'
+    )
   rescue StandardError => e
     # Log error with more details
     Event.create!(
@@ -63,11 +65,11 @@ class UserMailer < ApplicationMailer
 
     template_name = 'user_mailer_email_verification'
     begin
-      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      # Only find the text template as per project strategy
       text_template = EmailTemplate.find_by!(name: template_name, format: :text)
     rescue ActiveRecord::RecordNotFound => e
-      Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
-      raise "Email templates not found for #{template_name}"
+      Rails.logger.error "Missing EmailTemplate (text format) for #{template_name}: #{e.message}"
+      raise "Email template (text format) not found for #{template_name}"
     end
 
     # Prepare variables
@@ -76,19 +78,21 @@ class UserMailer < ApplicationMailer
       verification_url: verification_url
     }.compact
 
-    # Render subject and bodies
-    rendered_subject, rendered_html_body = html_template.render(**variables)
-    _, rendered_text_body = text_template.render(**variables)
+    puts "DEBUG: About to call render on text_template: #{text_template.inspect}" # Debug line
+    # Render subject and body from the text template
+    rendered_subject, rendered_text_body = text_template.render(**variables)
 
     # Send email
+    text_body = rendered_text_body.to_s
+    Rails.logger.debug { "DEBUG: Preparing to send email_verification email with content: #{text_body.inspect}" }
+
     mail(
       to: user.email,
       subject: rendered_subject,
-      message_stream: 'outbound' # Keep existing stream or adjust if needed
-    ) do |format|
-      format.html { render html: rendered_html_body.presence || '' }
-      format.text { render plain: rendered_text_body.to_s }
-    end
+      message_stream: 'outbound', # Keep existing stream or adjust if needed
+      body: text_body,
+      content_type: 'text/plain'
+    )
   rescue StandardError => e
     # Log error with more details
     Event.create!(

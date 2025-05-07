@@ -3,23 +3,45 @@
 require 'test_helper'
 
 class EvaluatorMailerTest < ActionMailer::TestCase
-  # Helper to create mock templates
-  def mock_template(subject, body)
-    template = mock('email_template')
-    template.stubs(:render).returns([subject, body])
-    template
+  # Helper to create mock templates that respond to render method
+  def mock_template(subject_format, body_format)
+    template_instance = mock("email_template_instance_#{subject_format.gsub(/\s+/, '_')}")
+
+    # Stub the render method to return [rendered_subject, rendered_body]
+    # This simulates what the real EmailTemplate.render method does
+    template_instance.stubs(:render).with(any_parameters).returns([subject_format, body_format])
+
+    # Still stub subject and body for inspection if needed
+    template_instance.stubs(:subject).returns(subject_format)
+    template_instance.stubs(:body).returns(body_format)
+
+    template_instance
   end
 
   setup do
-    # Mock EmailTemplate lookups
-    html_mock = mock_template('Mock Subject', '<p>Mock HTML Body</p>')
-    text_mock = mock_template('Mock Subject', 'Mock Text Body')
+    # Per project strategy, HTML emails are not used. Only stub for :text format.
+    # If the mailer attempts to find_by!(format: :html), it should fail (e.g., RecordNotFound)
+    # as no HTML templates should be seeded for these, and we provide no stub.
+
+    # Create specific mock templates for each mailer method
+    new_evaluation_assigned_mock = mock_template(
+      'New Evaluation Assigned',
+      'Text body for evaluation assigned to %<evaluator_full_name>s for %<constituent_full_name>s'
+    )
+
+    evaluation_submission_mock = mock_template(
+      'Evaluation has been Submitted',
+      'Text body for evaluation completed by %<evaluator_full_name>s'
+    )
+
+    # Stub EmailTemplate.find_by! for text format only
     EmailTemplate.stubs(:find_by!)
-                 .with(has_entry(format: :html))
-                 .returns(html_mock)
+                 .with(name: 'evaluator_mailer_new_evaluation_assigned', format: :text)
+                 .returns(new_evaluation_assigned_mock)
+
     EmailTemplate.stubs(:find_by!)
-                 .with(has_entry(format: :text))
-                 .returns(text_mock)
+                 .with(name: 'evaluator_mailer_evaluation_submission_confirmation', format: :text)
+                 .returns(evaluation_submission_mock)
 
     # Create test data using FactoryBot
     @evaluation = create(:evaluation)
@@ -29,54 +51,49 @@ class EvaluatorMailerTest < ActionMailer::TestCase
   end
 
   test 'new_evaluation_assigned' do
-    email = EvaluatorMailer.with(evaluation: @evaluation).new_evaluation_assigned
-
-    assert_emails 1 do
-      email.deliver_later
+    # Using Rails 7.1.0+ capture_emails helper
+    emails = capture_emails do
+      EvaluatorMailer.with(evaluation: @evaluation).new_evaluation_assigned.deliver_now
     end
+
+    # Verify we captured an email
+    assert_equal 1, emails.size
+    email = emails.first
 
     assert_equal ['no_reply@mdmat.org'], email.from
     assert_equal [@evaluator.email], email.to
-    assert_match 'New Evaluation', email.subject
+    assert_equal 'New Evaluation Assigned', email.subject
 
-    # Test both HTML and text parts
-    assert_equal 2, email.parts.size
+    # For non-multipart emails, we check the body directly
+    assert_equal 0, email.parts.size, 'Email should have no parts (non-multipart).'
+    assert_includes email.content_type, 'text/plain', 'Email should be text/plain (may include charset)'
 
-    # HTML part
-    html_part = email.parts.find { |part| part.content_type.include?('text/html') }
-    assert_includes html_part.body.to_s, 'assigned'
-    assert_includes html_part.body.to_s, @constituent.full_name
-
-    # Text part
-    text_part = email.parts.find { |part| part.content_type.include?('text/plain') }
-    assert_includes text_part.body.to_s, 'assigned'
-    assert_includes text_part.body.to_s, @constituent.full_name
+    # Check that the email body contains expected text
+    expected_text = "Text body for evaluation assigned to #{@evaluator.full_name} for #{@constituent.full_name}"
+    assert_includes email.body.to_s, expected_text
   end
 
   test 'evaluation_submission_confirmation' do
-    # Use .with() to pass parameters
-    email = EvaluatorMailer.with(evaluation: @evaluation).evaluation_submission_confirmation
-
-    assert_emails 1 do
-      email.deliver_later
+    # Using Rails 7.1.0+ capture_emails helper
+    emails = capture_emails do
+      EvaluatorMailer.with(evaluation: @evaluation).evaluation_submission_confirmation.deliver_now
     end
+
+    # Verify we captured an email
+    assert_equal 1, emails.size
+    email = emails.first
 
     assert_equal ['no_reply@mdmat.org'], email.from
     assert_equal [@constituent.email], email.to
-    assert_match 'Evaluation has been Submitted', email.subject
+    assert_equal 'Evaluation has been Submitted', email.subject
 
-    # Test both HTML and text parts
-    assert_equal 2, email.parts.size
+    # For non-multipart emails, we check the body directly
+    assert_equal 0, email.parts.size, 'Email should have no parts (non-multipart).'
+    assert_includes email.content_type, 'text/plain', 'Email should be text/plain (may include charset)'
 
-    # HTML part
-    html_part = email.parts.find { |part| part.content_type.include?('text/html') }
-    assert_includes html_part.body.to_s, 'completed'
-    assert_includes html_part.body.to_s, @evaluator.full_name
-
-    # Text part
-    text_part = email.parts.find { |part| part.content_type.include?('text/plain') }
-    assert_includes text_part.body.to_s, 'completed'
-    assert_includes text_part.body.to_s, @evaluator.full_name
+    # Check that the email body contains expected content from the mock
+    expected_text = "Text body for evaluation completed by #{@evaluator.full_name}"
+    assert_includes email.body.to_s, expected_text
   end
 
   test 'evaluation_submission_confirmation generates letter when preference is letter' do

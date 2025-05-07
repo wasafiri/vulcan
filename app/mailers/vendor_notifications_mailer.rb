@@ -201,16 +201,21 @@ class VendorNotificationsMailer < ApplicationMailer
     variables = {} # Initialize variables
 
     begin
-      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      # Only find the text template as per project strategy
       text_template = EmailTemplate.find_by!(name: template_name, format: :text)
     rescue ActiveRecord::RecordNotFound => e
       Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
-      raise "Email templates not found for #{template_name}"
+      raise "Email template (text format) not found for #{template_name}"
     end
 
     # Prepare variables
     rejection_reason = w9_review&.rejection_reason || 'No reason provided.'
-    vendor_portal_url = vendor_portal_root_url(host: default_url_options[:host]) # Assuming this helper exists
+    # Use root_url instead of vendor_portal_root_url if the helper isn't defined
+    vendor_portal_url = if defined?(vendor_portal_root_url)
+                          vendor_portal_root_url(host: default_url_options[:host])
+                        else
+                          root_url(host: default_url_options[:host])
+                        end
 
     # Common elements for shared partials
     header_title = 'W9 Form Requires Attention'
@@ -230,32 +235,29 @@ class VendorNotificationsMailer < ApplicationMailer
       rejection_reason: rejection_reason,
       vendor_portal_url: vendor_portal_url,
       header_title: header_title,
-      # Shared partials
-      status_box_html: status_box_html(status: :error, title: status_box_title, message: status_box_message),
+      # Shared partials (text only for non-multipart emails)
       status_box_text: status_box_text(status: :error, title: status_box_title, message: status_box_message),
-      header_html: header_html(title: header_title, logo_url: header_logo_url),
       header_text: header_text(title: header_title, logo_url: header_logo_url),
-      footer_html: footer_html(contact_email: footer_contact_email, website_url: footer_website_url,
-                               show_automated_message: footer_show_automated_message),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
                                show_automated_message: footer_show_automated_message),
       header_logo_url: header_logo_url, # Optional
       header_subtitle: nil # Optional
     }.compact
 
-    # Render subject and bodies
-    rendered_subject, rendered_html_body = html_template.render(**variables)
-    _, rendered_text_body = text_template.render(**variables)
+    # Render subject and body from the text template
+    rendered_subject, rendered_text_body = text_template.render(**variables)
 
-    # Send email
+    # Send email as non-multipart text-only
+    text_body = rendered_text_body.to_s
+    Rails.logger.debug { "DEBUG: Preparing to send w9_rejected email with content: #{text_body.inspect}" }
+
     mail(
       to: vendor.email,
       subject: rendered_subject,
-      message_stream: 'outbound' # Keep existing stream
-    ) do |format|
-      format.html { render html: rendered_html_body.html_safe }
-      format.text { render plain: rendered_text_body }
-    end
+      message_stream: 'outbound', # Keep existing stream
+      body: text_body,
+      content_type: 'text/plain'
+    )
   rescue StandardError => e
     # Log error with more details
     Event.create!(
@@ -279,17 +281,21 @@ class VendorNotificationsMailer < ApplicationMailer
     template_name = 'vendor_notifications_w9_expiring_soon'
 
     begin
-      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      # Only find the text template as per project strategy
       text_template = EmailTemplate.find_by!(name: template_name, format: :text)
     rescue ActiveRecord::RecordNotFound => e
       Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
-      raise "Email templates not found for #{template_name}"
+      raise "Email template (text format) not found for #{template_name}"
     end
 
     # Prepare variables
     days_until_expiry = (vendor.w9_expiration_date - Date.current).to_i
     expiration_date_formatted = vendor.w9_expiration_date.strftime('%B %d, %Y')
-    vendor_portal_url = vendor_portal_root_url(host: default_url_options[:host]) # Assuming this helper exists
+    vendor_portal_url = if defined?(vendor_portal_root_url)
+                          vendor_portal_root_url(host: default_url_options[:host])
+                        else
+                          root_url(host: default_url_options[:host])
+                        end
     vendor_association_message = vendor.associated? ? 'Your association requires a valid W9.' : '' # Example optional message
 
     # Common elements for shared partials
@@ -313,15 +319,10 @@ class VendorNotificationsMailer < ApplicationMailer
       expiration_date_formatted: expiration_date_formatted,
       vendor_portal_url: vendor_portal_url,
       header_title: header_title,
-      # Shared partials
-      status_box_warning_html: status_box_html(status: :warning, title: status_box_warning_title, message: status_box_warning_message),
+      # Shared partials (text only for non-multipart emails)
       status_box_warning_text: status_box_text(status: :warning, title: status_box_warning_title, message: status_box_warning_message),
-      status_box_info_html: status_box_html(status: :info, title: status_box_info_title, message: status_box_info_message),
       status_box_info_text: status_box_text(status: :info, title: status_box_info_title, message: status_box_info_message),
-      header_html: header_html(title: header_title, logo_url: header_logo_url),
       header_text: header_text(title: header_title, logo_url: header_logo_url),
-      footer_html: footer_html(contact_email: footer_contact_email, website_url: footer_website_url,
-                               show_automated_message: footer_show_automated_message),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
                                show_automated_message: footer_show_automated_message),
       # Optional
@@ -330,19 +331,20 @@ class VendorNotificationsMailer < ApplicationMailer
       header_subtitle: nil
     }.compact
 
-    # Render subject and bodies
-    rendered_subject, rendered_html_body = html_template.render(**variables)
-    _, rendered_text_body = text_template.render(**variables)
+    # Render subject and body from the text template
+    rendered_subject, rendered_text_body = text_template.render(**variables)
 
-    # Send email
+    # Send email as non-multipart text-only
+    text_body = rendered_text_body.to_s
+    Rails.logger.debug { "DEBUG: Preparing to send w9_expiring_soon email with content: #{text_body.inspect}" }
+
     mail(
       to: vendor.email,
       subject: rendered_subject,
-      message_stream: 'outbound' # Keep existing stream
-    ) do |format|
-      format.html { render html: rendered_html_body.html_safe }
-      format.text { render plain: rendered_text_body }
-    end
+      message_stream: 'outbound', # Keep existing stream
+      body: text_body,
+      content_type: 'text/plain'
+    )
   rescue StandardError => e
     # Log error with more details
     Event.create!(
@@ -366,16 +368,20 @@ class VendorNotificationsMailer < ApplicationMailer
     template_name = 'vendor_notifications_w9_expired'
 
     begin
-      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      # Only find the text template as per project strategy
       text_template = EmailTemplate.find_by!(name: template_name, format: :text)
     rescue ActiveRecord::RecordNotFound => e
       Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
-      raise "Email templates not found for #{template_name}"
+      raise "Email template (text format) not found for #{template_name}"
     end
 
     # Prepare variables
     expiration_date_formatted = vendor.w9_expiration_date.strftime('%B %d, %Y')
-    vendor_portal_url = vendor_portal_root_url(host: default_url_options[:host]) # Assuming this helper exists
+    vendor_portal_url = if defined?(vendor_portal_root_url)
+                          vendor_portal_root_url(host: default_url_options[:host])
+                        else
+                          root_url(host: default_url_options[:host])
+                        end
     vendor_association_message = vendor.associated? ? 'Your association requires a valid W9.' : '' # Example optional message
 
     # Common elements for shared partials
@@ -398,15 +404,10 @@ class VendorNotificationsMailer < ApplicationMailer
       expiration_date_formatted: expiration_date_formatted,
       vendor_portal_url: vendor_portal_url,
       header_title: header_title,
-      # Shared partials
-      status_box_warning_html: status_box_html(status: :warning, title: status_box_warning_title, message: status_box_warning_message),
+      # Shared partials (text only for non-multipart emails)
       status_box_warning_text: status_box_text(status: :warning, title: status_box_warning_title, message: status_box_warning_message),
-      status_box_info_html: status_box_html(status: :info, title: status_box_info_title, message: status_box_info_message),
       status_box_info_text: status_box_text(status: :info, title: status_box_info_title, message: status_box_info_message),
-      header_html: header_html(title: header_title, logo_url: header_logo_url),
       header_text: header_text(title: header_title, logo_url: header_logo_url),
-      footer_html: footer_html(contact_email: footer_contact_email, website_url: footer_website_url,
-                               show_automated_message: footer_show_automated_message),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
                                show_automated_message: footer_show_automated_message),
       # Optional
@@ -415,19 +416,20 @@ class VendorNotificationsMailer < ApplicationMailer
       header_subtitle: nil
     }.compact
 
-    # Render subject and bodies
-    rendered_subject, rendered_html_body = html_template.render(**variables)
-    _, rendered_text_body = text_template.render(**variables)
+    # Render subject and body from the text template
+    rendered_subject, rendered_text_body = text_template.render(**variables)
 
-    # Send email
+    # Send email as non-multipart text-only
+    text_body = rendered_text_body.to_s
+    Rails.logger.debug { "DEBUG: Preparing to send w9_expired email with content: #{text_body.inspect}" }
+
     mail(
       to: vendor.email,
       subject: rendered_subject,
-      message_stream: 'outbound' # Keep existing stream
-    ) do |format|
-      format.html { render html: rendered_html_body.html_safe }
-      format.text { render plain: rendered_text_body }
-    end
+      message_stream: 'outbound', # Keep existing stream
+      body: text_body,
+      content_type: 'text/plain'
+    )
   rescue StandardError => e
     # Log error with more details
     Event.create!(

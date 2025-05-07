@@ -15,7 +15,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     training_session = params[:training_session] # Use params
     template_name = 'training_session_notifications_trainer_assigned'
     begin
-      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      # Only find the text template as per project strategy
       text_template = EmailTemplate.find_by!(name: template_name, format: :text)
     rescue ActiveRecord::RecordNotFound => e
       Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
@@ -42,30 +42,28 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
       trainer_full_name: trainer.full_name,
       constituent_full_name: constituent.full_name,
       application_id: application.id,
-      # Shared partial variables (rendered content)
-      header_html: header_html(title: header_title, logo_url: header_logo_url),
+      # Shared partial variables (rendered content - text only for non-multipart emails)
       header_text: header_text(title: header_title, logo_url: header_logo_url),
-      footer_html: footer_html(contact_email: footer_contact_email, website_url: footer_website_url,
-                               show_automated_message: footer_show_automated_message),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
                                show_automated_message: footer_show_automated_message),
       header_logo_url: header_logo_url, # Optional, passed for potential use in template body
       header_subtitle: nil # Optional
     }.compact
 
-    # Render subject and bodies
-    rendered_subject, rendered_html_body = html_template.render(**variables)
-    _, rendered_text_body = text_template.render(**variables)
+    # Render subject and body from the text template
+    rendered_subject, rendered_text_body = text_template.render(**variables)
 
-    # Send email to trainer
+    # Send email as non-multipart text-only
+    text_body = rendered_text_body.to_s
+    Rails.logger.debug { "DEBUG: Preparing to send trainer_assigned email with content: #{text_body.inspect}" }
+
     mail(
       to: trainer.email,
       subject: rendered_subject,
-      message_stream: 'notifications'
-    ) do |format|
-      format.html { render html: rendered_html_body.presence || '' }
-      format.text { render plain: rendered_text_body.to_s }
-    end
+      message_stream: 'notifications',
+      body: text_body,
+      content_type: 'text/plain'
+    )
   rescue StandardError => e
     # Update error logging to include template name and variables
     Event.create!(
@@ -90,7 +88,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     training_session = params[:training_session] # Use params
     template_name = 'training_session_notifications_training_scheduled'
     begin
-      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      # Only find the text template as per project strategy
       text_template = EmailTemplate.find_by!(name: template_name, format: :text)
     rescue ActiveRecord::RecordNotFound => e
       Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
@@ -119,30 +117,28 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
       scheduled_date: training_session.scheduled_for.strftime('%B %d, %Y'),
       scheduled_time: training_session.scheduled_for.strftime('%I:%M %p'),
       application_id: application.id,
-      # Shared partial variables
-      header_html: header_html(title: header_title, logo_url: header_logo_url),
+      # Shared partial variables (text only for non-multipart emails)
       header_text: header_text(title: header_title, logo_url: header_logo_url),
-      footer_html: footer_html(contact_email: footer_contact_email, website_url: footer_website_url,
-                               show_automated_message: footer_show_automated_message),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
                                show_automated_message: footer_show_automated_message),
       header_logo_url: header_logo_url, # Optional
       header_subtitle: nil # Optional
     }.compact
 
-    # Render subject and bodies
-    rendered_subject, rendered_html_body = html_template.render(**variables)
-    _, rendered_text_body = text_template.render(**variables)
+    # Render subject and body from the text template
+    rendered_subject, rendered_text_body = text_template.render(**variables)
 
-    # Send email
+    # Send email as non-multipart text-only
+    text_body = rendered_text_body.to_s
+    Rails.logger.debug { "DEBUG: Preparing to send training_scheduled email with content: #{text_body.inspect}" }
+
     mail(
-      to: trainer.email,
+      to: constituent.email, # Fixed: should send to constituent, not trainer
       subject: rendered_subject,
-      message_stream: 'notifications'
-    ) do |format|
-      format.html { render html: rendered_html_body.presence || '' }
-      format.text { render plain: rendered_text_body.to_s }
-    end
+      message_stream: 'notifications',
+      body: text_body,
+      content_type: 'text/plain'
+    )
   rescue StandardError => e
     # Log error with more details
     Event.create!(
@@ -167,7 +163,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     training_session = params[:training_session] # Use params
     template_name = 'training_session_notifications_training_completed'
     begin
-      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      # Only find the text template as per project strategy
       text_template = EmailTemplate.find_by!(name: template_name, format: :text)
     rescue ActiveRecord::RecordNotFound => e
       Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
@@ -195,30 +191,28 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
       trainer_name: trainer.full_name || 'Your Trainer',
       completion_date: training_session.completed_at.strftime('%B %d, %Y'),
       application_id: application.id,
-      # Shared partial variables
-      header_html: header_html(title: header_title, logo_url: header_logo_url),
+      # Shared partial variables (text only for non-multipart emails)
       header_text: header_text(title: header_title, logo_url: header_logo_url),
-      footer_html: footer_html(contact_email: footer_contact_email, website_url: footer_website_url,
-                               show_automated_message: footer_show_automated_message),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
                                show_automated_message: footer_show_automated_message),
       header_logo_url: header_logo_url, # Optional
       header_subtitle: nil # Optional
     }.compact
 
-    # Render subject and bodies
-    rendered_subject, rendered_html_body = html_template.render(**variables)
-    _, rendered_text_body = text_template.render(**variables)
+    # Render subject and body from the text template
+    rendered_subject, rendered_text_body = text_template.render(**variables)
 
-    # Send email
+    # Send email as non-multipart text-only
+    text_body = rendered_text_body.to_s
+    Rails.logger.debug { "DEBUG: Preparing to send training_completed email with content: #{text_body.inspect}" }
+
     mail(
       to: constituent.email,
       subject: rendered_subject,
-      message_stream: 'notifications'
-    ) do |format|
-      format.html { render html: rendered_html_body.presence || '' }
-      format.text { render plain: rendered_text_body.to_s }
-    end
+      message_stream: 'notifications',
+      body: text_body,
+      content_type: 'text/plain'
+    )
   rescue StandardError => e
     # Log error with more details
     Event.create!(
@@ -241,7 +235,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
   def training_cancelled(training_session)
     template_name = 'training_session_notifications_training_cancelled'
     begin
-      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      # Only find the text template as per project strategy
       text_template = EmailTemplate.find_by!(name: template_name, format: :text)
     rescue ActiveRecord::RecordNotFound => e
       Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
@@ -270,30 +264,28 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
       scheduled_date: training_session.scheduled_for.strftime('%B %d, %Y'),
       scheduled_time: training_session.scheduled_for.strftime('%I:%M %p'),
       application_id: application.id,
-      # Shared partial variables
-      header_html: header_html(title: header_title, logo_url: header_logo_url),
+      # Shared partial variables (text only for non-multipart emails)
       header_text: header_text(title: header_title, logo_url: header_logo_url),
-      footer_html: footer_html(contact_email: footer_contact_email, website_url: footer_website_url,
-                               show_automated_message: footer_show_automated_message),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
                                show_automated_message: footer_show_automated_message),
       header_logo_url: header_logo_url, # Optional
       header_subtitle: nil # Optional
     }.compact
 
-    # Render subject and bodies
-    rendered_subject, rendered_html_body = html_template.render(**variables)
-    _, rendered_text_body = text_template.render(**variables)
+    # Render subject and body from the text template
+    rendered_subject, rendered_text_body = text_template.render(**variables)
 
-    # Send email
+    # Send email as non-multipart text-only
+    text_body = rendered_text_body.to_s
+    Rails.logger.debug { "DEBUG: Preparing to send training_cancelled email with content: #{text_body.inspect}" }
+
     mail(
       to: constituent.email,
       subject: rendered_subject,
-      message_stream: 'notifications'
-    ) do |format|
-      format.html { render html: rendered_html_body.presence || '' }
-      format.text { render plain: rendered_text_body.to_s }
-    end
+      message_stream: 'notifications',
+      body: text_body,
+      content_type: 'text/plain'
+    )
   rescue StandardError => e
     # Log error with more details
     Event.create!(
@@ -317,7 +309,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     # Use full template name as defined in the constant
     template_name = 'training_session_notifications_training_no_show'
     begin
-      html_template = EmailTemplate.find_by!(name: template_name, format: :html)
+      # Only find the text template as per project strategy
       text_template = EmailTemplate.find_by!(name: template_name, format: :text)
     rescue ActiveRecord::RecordNotFound => e
       Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
@@ -346,30 +338,28 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
       missed_date: training_session.scheduled_for.strftime('%B %d, %Y'),
       missed_time: training_session.scheduled_for.strftime('%I:%M %p'),
       application_id: application.id,
-      # Shared partial variables
-      header_html: header_html(title: header_title, logo_url: header_logo_url),
+      # Shared partial variables (text only for non-multipart emails)
       header_text: header_text(title: header_title, logo_url: header_logo_url),
-      footer_html: footer_html(contact_email: footer_contact_email, website_url: footer_website_url,
-                               show_automated_message: footer_show_automated_message),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
                                show_automated_message: footer_show_automated_message),
       header_logo_url: header_logo_url, # Optional
       header_subtitle: nil # Optional
     }.compact
 
-    # Render subject and bodies
-    rendered_subject, rendered_html_body = html_template.render(**variables)
-    _, rendered_text_body = text_template.render(**variables)
+    # Render subject and body from the text template
+    rendered_subject, rendered_text_body = text_template.render(**variables)
 
-    # Send email
+    # Send email as non-multipart text-only
+    text_body = rendered_text_body.to_s
+    Rails.logger.debug { "DEBUG: Preparing to send no_show_notification email with content: #{text_body.inspect}" }
+
     mail(
       to: constituent.email,
       subject: rendered_subject,
-      message_stream: 'notifications'
-    ) do |format|
-      format.html { render html: rendered_html_body.presence || '' }
-      format.text { render plain: rendered_text_body.to_s }
-    end
+      message_stream: 'notifications',
+      body: text_body,
+      content_type: 'text/plain'
+    )
   rescue StandardError => e
     # Log error with more details
     Event.create!(

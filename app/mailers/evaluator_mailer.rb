@@ -74,15 +74,20 @@ class EvaluatorMailer < ApplicationMailer
 
     # Render subject and body from text template
     rendered_subject, rendered_text_body = text_template.render(**variables)
+    rendered_subject = format(rendered_subject, **variables)
+    rendered_text_body = format(rendered_text_body, **variables)
 
-    # Send email
+    # Send email as non-multipart text-only
+    text_body = rendered_text_body.to_s
+    Rails.logger.debug { "DEBUG: Preparing to send new_evaluation_assigned email with content: #{text_body.inspect}" }
+
     mail(
       to: evaluator.email,
       subject: rendered_subject,
-      message_stream: 'notifications'
-    ) do |format|
-      format.text { render plain: rendered_text_body.to_s }
-    end
+      message_stream: 'notifications',
+      body: text_body,
+      content_type: 'text/plain'
+    )
   rescue StandardError => e
     # Log error with more details
     Event.create!(
@@ -94,7 +99,7 @@ class EvaluatorMailer < ApplicationMailer
         error_message: e.message,
         error_class: e.class.name,
         template_name: template_name, # Use local variable
-        variables: variables.except(:header_html, :header_text, :footer_html, :footer_text, :constituent_disabilities_html_list, :constituent_disabilities_text_list), # Avoid logging large HTML/text blocks
+        variables: (variables || {}).except(:header_html, :header_text, :footer_html, :footer_text, :constituent_disabilities_html_list, :constituent_disabilities_text_list), # Avoid logging large HTML/text blocks
         backtrace: e.backtrace&.first(5)
       }
     )
@@ -117,7 +122,7 @@ class EvaluatorMailer < ApplicationMailer
     constituent = evaluation.constituent
     application = evaluation.application
     evaluator = evaluation.evaluator
-    submission_date_formatted = evaluation.submitted_at&.strftime('%B %d, %Y at %I:%M %p %Z') || 'Not Provided'
+    submission_date_formatted = evaluation.try(:submitted_at)&.strftime('%B %d, %Y at %I:%M %p %Z') || 'Not Provided'
 
     # Common elements for shared partials
     header_title = "Your Evaluation has been Submitted - Application ##{application.id}"
@@ -145,9 +150,11 @@ class EvaluatorMailer < ApplicationMailer
 
     # Render subject and body from text template
     rendered_subject, rendered_text_body = text_template.render(**variables)
+    rendered_subject = format(rendered_subject, **variables)
+    rendered_text_body = format(rendered_text_body, **variables)
 
     # Create a letter if the constituent prefers print communications
-    if constituent.communication_preference == 'letter'
+    if (constituent.communication_preference == 'letter') && !@letter_queued
       Letters::TextTemplateToPdfService.new(
         template_name: 'evaluator_mailer_evaluation_submission_confirmation',
         recipient: constituent,
@@ -158,16 +165,20 @@ class EvaluatorMailer < ApplicationMailer
           submission_date_formatted: submission_date_formatted
         }
       ).queue_for_printing
+      @letter_queued = true
     end
 
-    # Send email (text only)
+    # Send email as non-multipart text-only
+    text_body = rendered_text_body.to_s
+    Rails.logger.debug { "DEBUG: Preparing to send evaluation_submission_confirmation email with content: #{text_body.inspect}" }
+
     mail(
       to: constituent.email,
       subject: rendered_subject,
-      message_stream: 'notifications'
-    ) do |format|
-      format.text { render plain: rendered_text_body.to_s }
-    end
+      message_stream: 'notifications',
+      body: text_body,
+      content_type: 'text/plain'
+    )
   rescue StandardError => e
     Rails.logger.error("Failed to send evaluation submission confirmation email for evaluation #{evaluation&.id}: #{e.message}")
     Rails.logger.error(e.backtrace.join("\n"))

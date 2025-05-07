@@ -5,6 +5,7 @@ require_relative '../config/environment'
 require 'rails/test_help'
 Rails.application.load_seed if Rails.env.test?
 require 'minitest/mock'
+require 'ostruct'
 require 'mocha/minitest'
 require 'capybara/rails'
 require 'support/voucher_test_helper'
