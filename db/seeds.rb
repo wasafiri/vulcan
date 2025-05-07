@@ -103,6 +103,12 @@ else
       ActiveRecord::FixtureSet.create_fixtures(fixtures_path, 'invoices')
 
       # ------------------------------
+      # Seed Email Templates
+      # ------------------------------
+      puts 'Seeding email templates...'
+      load Rails.root.join('db/seeds/email_templates.rb')
+
+      # ------------------------------
       # Create Admin Users
       # ------------------------------
       puts 'Creating admin users...'
@@ -332,9 +338,7 @@ else
         end
 
         # Report fixed files
-        if fixed_files.any?
-          puts "  ✓ Fixed #{fixed_files.size} missing files for Application ##{app.id}: #{fixed_files.join(', ')}"
-        end
+        puts "  ✓ Fixed #{fixed_files.size} missing files for Application ##{app.id}: #{fixed_files.join(', ')}" if fixed_files.any?
       end
     end
   rescue StandardError => e
