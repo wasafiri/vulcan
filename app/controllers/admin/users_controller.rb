@@ -12,6 +12,7 @@ module Admin
     end
 
     def update_role
+      Rails.logger.info "Admin::UsersController#update_role - Received params[:role]: #{params[:role].inspect}" # DEBUG LINE
       user = User.find(params[:id])
       new_role = params[:role]
 
@@ -23,7 +24,7 @@ module Admin
 
           render json: {
             success: true,
-            message: "#{user.full_name}'s role updated to #{new_role.titleize}."
+            message: "#{user.full_name}'s role updated to #{new_role.sub('Users::', '').titleize}." # Adjusted for potentially namespaced role
           }
         else
           render json: {
