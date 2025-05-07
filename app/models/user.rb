@@ -8,6 +8,9 @@ class User < ApplicationRecord
   generates_token_for :password_reset, expires_in: 20.minutes
   generates_token_for :email_verification, expires_in: 1.day
 
+  # Ensure duplicate review flag is accessible
+  attr_accessor :needs_duplicate_review unless column_names.include?('needs_duplicate_review')
+
   # Class methods
   def self.system_user
     @system_user ||= begin

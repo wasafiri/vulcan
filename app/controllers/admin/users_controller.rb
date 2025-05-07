@@ -71,6 +71,18 @@ module Admin
           # Convert the user to the new type. `becomes` returns a new object of the target class.
           converted_user = user.becomes(new_klass)
 
+          # Explicitly null out type-specific fields when changing from one type to another
+          # to avoid validation crossover issues
+          if user.type_was == 'Users::Vendor' && !converted_user.is_a?(Users::Vendor)
+            Rails.logger.info "Admin::UsersController#update_role - Nullifying vendor-specific fields for user_id: #{user.id}"
+            converted_user.business_name = nil
+            converted_user.business_tax_id = nil
+            converted_user.terms_accepted_at = nil
+            converted_user.w9_status = nil # Reset enum to default if it exists
+            # Don't purge attachments in the controller - that should be a separate, deliberate action
+          end
+          # Add similar blocks for other types if they have type-specific fields
+
           # Attributes are copied. Now, when we save converted_user,
           # only validations for the new_klass (and User base) should run.
 

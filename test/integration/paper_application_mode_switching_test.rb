@@ -28,8 +28,10 @@ class PaperApplicationModeSwitchingTest < ActionDispatch::IntegrationTest
   end
 
   test 'paper application service properly handles mode switching between accept and reject' do
-    # Create a test constituent using factory
-    @constituent = create(:constituent)
+    # Create a test constituent using factory with unique email to avoid uniqueness constraint errors
+    @constituent = create(:constituent,
+                          email: "paper-app-test-#{SecureRandom.hex(4)}@example.com",
+                          phone: "555-#{rand(100..999)}-#{rand(1000..9999)}")
 
     # Step 1: First create application with income proof attached but residency proof rejected
     # For testing, directly use the file rather than creating a blob
@@ -153,8 +155,10 @@ class PaperApplicationModeSwitchingTest < ActionDispatch::IntegrationTest
   test 'paper application service properly handles invalid signed_ids' do
     # This test verifies the service doesn't crash when given invalid signed_ids
 
-    # Create a test constituent using factory
-    @constituent = create(:constituent)
+    # Create a test constituent using factory with unique email to avoid uniqueness constraint errors
+    @constituent = create(:constituent,
+                          email: "paper-app-invalid-#{SecureRandom.hex(4)}@example.com",
+                          phone: "555-#{rand(100..999)}-#{rand(1000..9999)}")
 
     # Attempt to create application with invalid signed_id
     post admin_paper_applications_path, params: {

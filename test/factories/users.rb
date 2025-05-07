@@ -105,7 +105,32 @@ FactoryBot.define do
     type { 'Users::Vendor' }
     business_name { "Vendor Business #{rand(1000)}" }
     phone { "555-#{rand(100..999)}-#{rand(1000..9999)}" }
-    business_tax_id { "ABC-#{rand(1000..9999)}" } # Add a default business_tax_id
-    # other vendor-specific attributes
+    business_tax_id { "ABCDEF#{rand(100_000..999_999)}" }
+    terms_accepted_at { Time.current }
+    status { :approved } # Default to an approved vendor
+    w9_status { :approved } # Default to W9 approved
+
+    after(:build) do |vendor|
+      unless vendor.w9_form.attached?
+        vendor.w9_form.attach(
+          io: File.open(Rails.root.join('test/fixtures/files/sample_w9.pdf')),
+          filename: 'sample_w9.pdf',
+          content_type: 'application/pdf'
+        )
+      end
+    end
+
+    trait :pending_approval do
+      status { :pending }
+      w9_status { :pending_review }
+    end
+
+    trait :not_yet_submitted_w9 do
+      status { :pending }
+      w9_status { :not_submitted }
+      after(:build) do |vendor|
+        vendor.w9_form.detach if vendor.w9_form.attached?
+      end
+    end
   end
 end

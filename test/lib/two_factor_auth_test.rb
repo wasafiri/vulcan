@@ -4,8 +4,11 @@ require 'test_helper'
 
 class TwoFactorAuthTest < ActiveSupport::TestCase
   setup do
-    # Replace fixture accessor with FactoryBot
-    @user = create(:user, email_verified: true, verified: true)
+    # Replace fixture accessor with FactoryBot, using unique email to avoid uniqueness constraint errors
+    @user = create(:user,
+                   email: "2fa-test-#{SecureRandom.hex(4)}@example.com",
+                   email_verified: true,
+                   verified: true)
     @session = {}
 
     # Set up minimal test credentials
@@ -31,9 +34,9 @@ class TwoFactorAuthTest < ActiveSupport::TestCase
   end
 
   test 'stores an sms challenge' do
-    # Create credential for this test
+    # Create credential for this test with unique phone number to avoid uniqueness constraint errors
     sms_credential = @user.sms_credentials.create!(
-      phone_number: '555-123-4567',
+      phone_number: "555-#{rand(100..999)}-#{rand(1000..9999)}",
       last_sent_at: Time.current
     )
 
@@ -143,7 +146,7 @@ class TwoFactorAuthTest < ActiveSupport::TestCase
 
   def setup_sms_credential
     @sms_credential = @user.sms_credentials.create!(
-      phone_number: '555-123-4567',
+      phone_number: "555-#{rand(100..999)}-#{rand(1000..9999)}",
       last_sent_at: Time.current
     )
 
