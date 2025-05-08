@@ -144,172 +144,116 @@ This document provides a structured guide for improvements needed in the MAT Vul
 
 ## Testing Fixes
 
-### Priority Test Files to Fix
+This section outlines the current state of test failures based on the **May 8, 2025 test log analysis**. 
+The "Priority Test Files to Fix" section below is now superseded by "Remaining Test Issues (Based on May 8 Log Analysis)".
 
-1. [x] **Test Failures: admin/products_controller_test.rb**
-   - Fixed: Tests now pass without errors
-   - Previous issue: 9 errors related to "Validation failed: Email has already been taken"
-   - Root cause: This appears to have been fixed by the email sequence implementation which properly creates unique emails
+*(Previous "Priority Test Files to Fix" section can be removed or archived if this new list is comprehensive)*
 
-2. [x] **Test Failures: inbound_email_processing_test.rb**
-   - Current status: Fixed - all tests now pass (5 runs, 27 assertions, 0 failures, 0 errors, 1 skip)
-   - Root cause: Multiple issues in the test:
-     1. Attachment verification failures - application attachments weren't being properly created
-     2. Mailbox routing issues where mail from unknown sender caused an uncaught throw `:bounce`
-     3. `ProofSubmissionMailbox.constituent` method received nil where `mail.from.first` was expected
-     4. Medical provider emails weren't being properly matched to applications
-   - Fix implemented: 
-     1. Updated `proof_submission_mailbox.rb` to properly handle both constituent and medical provider emails
-     2. Fixed `app_from_provider_email` method to use `medical_provider_email` field instead of nonexistent metadata
-     3. Improved email routing for medical certification emails
-     4. Enhanced test setup to properly attach medical certification files
-     5. Fixed uncaught throw in unknown sender test using proper mocking
+### Remaining Test Issues (Based on May 8 Log Analysis)
 
-3. [x] **Test Failures: edge_cases_test.rb and mailbox tests**
-   - Fixed: All tests now pass
-   - Previous errors: "Email templates not found for application_notifications_proof_submission_error"
-   - Root cause: The test was using a generic template stub that didn't properly handle specific template lookups
-   - Fix implemented: Updated the test's setup method to create a specific mock for the proof_submission_error template
+**Attack Order (Derived from Log):**
 
-4. [x] **Test Failures: rate_limit_test.rb**
-   - Fixed: All tests now pass by properly mocking the cache interactions
-   - Previous issues: 5 failures including nil counters, unexpected invocations, and missing exceptions 
-   - Root cause: The test was using a complex stubbing approach that didn't match how RateLimit was accessing the cache
-   - Fix implemented:
-     1. Used `expects` instead of `stubs` for the first test to verify correct method calls
-     2. Directly mocked internal `current_usage_count` method for exception tests
-     3. Simplified test approach to focus on behavior verification rather than implementation details
-     4. Ensured unique test approach for time travel test with proper expiration simulation
+1.  **[✓] NameError in Admin Controllers (`Admin::ApplicationsControllerTest`, `Admin::DashboardsControllerTest`, `AuthenticationTest`)**
+    *   **Affected Tests:**
+        *   `Admin::ApplicationsControllerTest#test_should_get_index`
+        *   `Admin::DashboardsControllerTest#test_should_get_index` (and other filter tests)
+        *   `AuthenticationTest#test_should_enforce_role-based_access_control`
+    *   **Error:** `NameError: '@{data: {current_fiscal_year: 2024, …}}' is not allowed as an instance variable name`
+    *   **Location:** `app/controllers/admin/applications_controller.rb:28` (or near, in `index` action's `instance_variable_set` loop).
+    *   **Cause:** A key from `report_data` (from `Applications::ReportingService`) like `"data: {current_fiscal_year: 2024, …}"` is being used to create an instance variable name.
+    *   **Fix Implemented:**
+        *   Created a `SafeInstanceVariables` concern in `app/controllers/concerns/safe_instance_variables.rb` that provides:
+            *   `safe_assign(key, value)` - Safely assigns a value to an instance variable after sanitizing the key
+            *   `safe_assign_all(hash)` - Safely assigns multiple instance variables from a hash
+        *   Included the concern in `Admin::BaseController` so it's available to all admin controllers
+        *   Added key sanitization in `Admin::ApplicationsController`, `Admin::DashboardController`, `Admin::ReportsController`, and `Admin::ApplicationAnalyticsController` to strip leading '@' symbols and replace special characters with underscores
+        *   This fix ensures all instance variable names are valid Ruby identifiers
 
-5. [x] **Test Failures: letters/text_template_to_pdf_service_test.rb**
-   - Fixed: Service now handles both `%<key>s` (printf style) and `%{key}` (string interpolation style) placeholders
-   - Root cause: Mismatch between the formats used in templates (%<key>s) and the code that replaces variables (which looked for %{key})
-   - Fix approach: Updated `render_template_with_variables` method to handle both placeholder formats, ensuring backward compatibility
-   - Implementation details: Now checks for both formats for each variable and replaces them if found
+2.  **[ ] Factory/Fixture Email Collisions (`TrainingSessionNotificationsMailerTest`)**
+    *   **Affected Tests:** `TrainingSessionNotificationsMailerTest` (3 errors)
+    *   **Error:** `ActiveRecord::RecordInvalid: Validation failed: Email has already been taken`
+    *   **Location:** `test/mailers/training_session_notifications_mailer_test.rb:48`
+    *   **Cause:** `:trainer` factory email collisions, possibly due to sequence reset issues or conflict with `users.yml` fixtures.
+    *   **Fix Sketch:** Make email sequence more robust (e.g., add `SecureRandom.hex(4)`). Review test setup for unique email usage.
 
-6. [x] **Test Failures: application_notifications_mailer_test.rb**
-   - Fixed: Most tests now pass with only 1 remaining error
-   - Previous issues: "Validation failed: Email has already been taken, Phone has already been taken"
-   - Root cause: Test was using shared data instances which caused uniqueness validation failures
-   - Fix approach: Updated most tests to use FactoryBot.generate(:email) and FactoryBot.generate(:phone) to ensure unique values
-   - Progress: Fixed the account_created, income_threshold_exceeded, and registration_confirmation tests by using unique email/phone values
-   - Remaining issue: One test still has a conflict (proof_rejected_generates_letter) that requires further work
+3.  **[ ] Missing Email Templates / ActiveRecord::RecordInvalid (EmailTemplate related)**
+    *   **Affected Tests:**
+        *   `Applications::PaperApplicationTypeConsistencyTest`: `RuntimeError: Email templates not found for application_notifications_account_created` (at `app/mailers/application_notifications_mailer.rb:381`)
+        *   `RegistrationsMailerTest` (2 errors): `ActiveRecord::RecordInvalid: Validation failed: Description can't be blank...` (at `test/unit/registrations_mailer_test.rb:73`, likely due to `EmailTemplate.find_by!` returning nil).
+    *   **Cause:** `EmailTemplate.find_by!` failing. Potential issues: test stubs, `DatabaseCleaner` interaction, or incorrect template name in `db/seeds/email_templates.rb`.
+    *   **Fix Sketch:** Verify template names in seed file. Review test stubs. Consider explicit `EmailTemplate` creation in test `setup` if global seeding is problematic.
 
-7. [x] **Test Failures: application_mailbox_test.rb (in test/mailboxes)**
-   - Fixed: All 4 tests now pass successfully
-   - Previous issues: "undefined method 'mailbox_name'" and "undefined method 'default_mailbox_name'"
-   - Root cause: The test was looking for methods that aren't part of the standard Rails ActionMailbox API
-   - Fix implemented: A custom `assert_mailbox_routed` helper method was implemented in `test/test_helper.rb` that doesn't rely on these missing methods. This method verifies that the inbound email was processed successfully rather than trying to access specific mailbox name attributes directly.
-   - Note: This same fix needs to be applied to the similar test file in `test/unit/application_mailbox_test.rb`
+4.  **[ ] `assert_enqueued_email_with` / `assert_enqueued_with` Issues**
+    *   **Affected Tests:**
+        *   `VoucherTest` (3 failures): `No enqueued job found with {job: ActionMailer::MailDeliveryJob, args: …}`
+        *   `InvoiceTest` (1 error): `ArgumentError: unknown keyword: :args` (at `test/test_helper.rb:115` in `assert_enqueued_email_with`).
+    *   **Cause:**
+        *   `VoucherTest`: Mismatch between expected and actual enqueued job arguments.
+        *   `InvoiceTest`: The helper `assert_enqueued_email_with` in `test_helper.rb` is not fully Rails 7 compatible regarding argument passing to underlying assertions.
+    *   **Fix Sketch:**
+        *   Update `assert_enqueued_email_with` in `test_helper.rb` to correctly pass arguments to Rails 7's `assert_enqueued_with` (avoid keyword `args:` if it's not for the job's payload).
+        *   For `VoucherTest`, inspect "Potential matches" and adjust test expectations for job arguments.
 
-8. [x] **Test Failures: admin/paper_applications_controller_test.rb**
-   - Fixed: All tests now pass successfully
-   - Previous issues: 5 issues (3 errors, 2 failures) including phone uniqueness validation errors and response code mismatches
-   - Root cause: Test was using hardcoded phone numbers and emails across tests, causing uniqueness validation failures with new phone uniqueness constraints
-   - Fix implemented:
-     1. Generated unique phone numbers and emails for each test using timestamps and random numbers
-     2. Updated mocking of the PaperApplicationService to properly handle success/failure scenarios
-     3. Fixed test assertions to match expected controller behavior
-     4. Properly stubbed service layer to ensure consistent test behavior
+5.  **[ ] Service Test Failures (`Applications::FilterServiceTest`, `Applications::ReportingServiceTest`)**
+    *   **Affected Tests & Errors:**
+        *   `Applications::FilterServiceTest`: `ActiveRecord::RecordInvalid` (Income proof validation at line 92), `NoMethodError: undefined method 'count' for nil` (line 25), multiple `NilClass#include?` or expectation failures (lines 29-198).
+        *   `Applications::ReportingServiceTest`: `NoMethodError: undefined method '[]' for nil` (line 62 and others), `Expected nil to respond to #empty?` (line 527).
+    *   **Cause:** Tests not correctly handling the `BaseService::Result` object (i.e., not checking `result.success?` and accessing `result.data`). `result.data` might be `nil` if the service call failed. Factory setup issues for `RecordInvalid`.
+    *   **Fix Sketch:**
+        *   Ensure all tests check `service_result.success?` before `service_result.data`.
+        *   For `FilterServiceTest` `RecordInvalid`: Review factory setup at line 92 to include income proof.
+        *   Investigate why `service_result.data` is `nil` in failing cases for both service tests.
 
-9. [x] **Test Failures: voucher_redemption_integration_test.rb**
-   - Fixed: All tests now pass successfully
-   - Previous issues: 3 errors with "RuntimeError: not a redirect! 204 No Content", plus floating point precision issues with voucher values
-   - Root cause: 
-     1. Setup method expected redirects but received 204 responses
-     2. VoucherTransaction required a reference number but controller didn't set one
-     3. Floating point comparison issues when checking voucher remaining values
-   - Fix implemented:
-     1. Added reference number auto-generation to VoucherTransaction model with before_validation callback
-     2. Updated test to use more flexible approach when checking for existing transactions
-     3. Used assert_in_delta for floating point comparisons to account for minor precision differences
-     4. Made transaction product creation in tests more robust by checking for existing associations
+6.  **[✓] Missing Factory Traits (`EdgeCasesTest`)**
+    *   **Affected Tests:** `EdgeCasesTest` (6 errors for various test methods)
+    *   **Error:** `KeyError: Trait not registered: "proof_submission_rate_limit_web"`
+    *   **Location:** `test/mailboxes/edge_cases_test.rb:25`
+    *   **Fix Implemented:** Added the missing traits to the `Policy` factory in `test/factories/policies.rb`:
+        ```ruby
+        # Rate limiting traits
+        trait :proof_submission_rate_limit_web do
+          key { 'proof_submission_rate_limit_web' }
+          value { 10 } # Allow 10 submissions via web
+        end
 
-10. [x] **Test Failures: unit/application_mailbox_test.rb**
-    - Fixed: All 4 tests now pass successfully
-    - Previous issues: "Could not find or build blob: expected attachable, got #<Mock:0x5860>" and "uncaught throw :bounce"
-    - Root cause: Improper mocking of attachment processing and blob creation
-    - Fix implemented:
-     1. Used simpler approach focusing on routing rather than attachment handling
-     2. Applied same solution as was used in test/mailboxes/application_mailbox_test.rb
-     3. Used targeted stubbing of key callbacks (validate_attachments, bounce_with_notification, etc.)
-     4. Ensured bounce notifications don't cause test failures
-     5. Properly setup test user and application data for mailbox testing
+        trait :proof_submission_rate_limit_email do
+          key { 'proof_submission_rate_limit_email' }
+          value { 5 } # Allow 5 submissions via email
+        end
 
-10. [x] **Test Failures: mailer_helper_test.rb**
-    - Fixed: All tests now pass with the date format without commas
-    - Previous issue: 4 failures with "Expected: 'March 10 2025', Actual: 'March 10, 2025'"
-    - Root cause: The format_date_str method used '%B %d, %Y' format (with comma) but tests expected '%B %d %Y' (no comma)
-    - Fix approach: Modified the format_date_str method in mailer_helper.rb to remove the comma in the :long format
+        trait :proof_submission_rate_period do
+          key { 'proof_submission_rate_period' }
+          value { 24 } # Period of 24 hours
+        end
 
-11. [x] **Added Test Coverage: admin_test_mailer_test.rb**
-    - Created a new test file for the previously untested AdminTestMailer class
-    - Test coverage includes verification of:
-      - Text email format generation
-      - Custom recipient email handling
-      - Fallback to user email when recipient is nil
-      - Format conversion from string to symbol
-    - Implementation notes: Used assert_includes for content type checks to handle charset information that may be included in the content type (e.g., 'text/plain; charset=UTF-8')
+        trait :max_proof_rejections do
+          key { 'max_proof_rejections' }
+          value { 3 } # Maximum of 3 rejections allowed
+        end
+        ```
 
-12. [ ] **Remaining Mailer Test Fixes**
-    - Current status: 1 failure and 6 errors in mailer tests
-    - Primary issues to fix:
-      - Email uniqueness validation failures in UserMailerTest and TrainingSessionNotificationsMailerTest
-        - Fix approach: Use FactoryBot.generate(:email) to create unique emails for each test
-      - Missing required variables in UrlHelpersInMailersTest
-        - Fix approach: Provide the missing variables (status_box_text in EvaluatorMailer, constituent_full_name and rejection_reason in ApplicationNotificationsMailer)
-      - Mock expectation failure in EvaluatorMailerTest
-        - Fix approach: Update the expectations for Letters::TextTemplateToPdfService.queue_for_printing to match the actual number of calls
-    - Implementation notes: Follow the pattern used in application_notifications_mailer_test.rb to ensure proper test isolation
+7.  **[ ] Controller Authentication/Authorization & Session Issues**
+    *   **Affected Tests & Errors:**
+        *   `VendorPortal::DashboardControllerTest`: Expected redirect, got 200 (line 13).
+        *   `Evaluators::DashboardsControllerTest`: Expected redirect, got 204 (line 15).
+        *   `PasswordVisibilityIntegrationTest`: Expected 2XX, got 302 to `/password/new` (line 38).
+        *   `DebugAuthenticationTest`: Expected 200, got 302 after manual cookie injection (line 157).
+    *   **Cause:** Auth filters bypassed or not triggering as expected; incorrect manual cookie setting; expired/missing password reset token.
+    *   **Fix Sketch:**
+        *   `VendorPortal`/`Evaluators`: Ensure no user is signed in during `setup` for tests checking unauthenticated access.
+        *   `PasswordVisibilityIntegrationTest`: Create a fresh `PasswordResetToken` in test setup.
+        *   `DebugAuthenticationTest`: Verify correct cookie name and signing for manual injection, or use `sign_in` helper.
 
-13. [X] **Test Failures: applications/reporting_service_test.rb**
-    - Fixed: All tests now pass successfully 
-    - Previous issues: 1 failure with "Test setup issue: Expected to add 1 draft application to database" 
-    - Root cause: The reporting service was not properly retrieving application status counts from the database 
-    - Fix implemented: 
-      1. Modified test to verify application creation success without relying on specific status count calculation methods 
-      2. Added a robust status_count lambda function in ReportingService to handle multiple possible status storage formats 
-      3. Ensured the service can handle database entries where status is stored as string, integer, or symbol 
-      4. Improved status count retrieval to check all possible forms of the status in the database (as string, symbol, or integer)
+8.  **[ ] Miscellaneous Test Logic/Setup Issues**
+    *   **`ConstituentPortal::GuardianApplicationsTest`:** `Event.count` didn't change by 1 (line 81). Investigate event creation logic in the controller action.
+    *   **`MatVulcan::InboundEmailConfigTest`:** `LoadError: cannot load such file -- …/config/initializers/inbound_email_config.rb` (line 64). Check file path or if file is missing.
+    *   **`ProofSubmissionFlowTest` (3 errors):** `ActiveRecord::RecordNotFound: Couldn't find Application` (line 12). Fix test setup to ensure `Application` record exists.
+    *   **`Applications::EventDeduplicationServiceTest`:** `NameError: undefined local variable or method 'assertion_count'` (line 13). Replace with `assert_equal` or other standard Minitest assertion.
+    *   **`ProofAttachmentMetricsJobTest`:** `Should have created 1 notification. Actual: 0` (line 74). Ensure test setup meets job's conditions for creating notification (e.g., application has attachments).
+    *   **`ProofAttachmentFallbackTest` (2 errors):** `NoMethodError: undefined method 'applications'` (line 10). Likely a typo, should be `application` or fixture accessor.
+    *   **`EvaluatorMailerTest`:** `unexpected invocation: ...queue_for_printing(). expected exactly once, invoked twice` (line 99). Adjust mock expectation (`times: 2`) or investigate mailer logic.
+    *   **Web-authn / 2-FA integration tests:** Multiple failures (unexpected redirects, missing cookies). Needs deeper investigation into session/cookie handling in these flows.
 
-
-14. [x] **Test Failures: proof_submission_mailbox_test.rb**
-    - Fixed: All tests now pass successfully 
-    - Previous issues: 3 failures with "Expected 1 email, got 0" in various bounce scenarios
-    - Root cause: Test implementation issue - `assert_emails 1` blocks were incorrectly combined with `assert_throws(:bounce)` blocks, causing timing/sequencing issues
-    - Fix implemented: 
-      1. Separated assertions for email delivery and bounce behavior
-      2. Used proper mocks with `expects(:deliver_now)` to verify email delivery attempts
-      3. Fixed test structure to properly handle control flow interruptions from bounce throws
-      4. Ensured notification emails were properly tracked before bounce handling
-    - Note: This was purely a test implementation issue, not an application code issue. The underlying ProofSubmissionMailbox code was working correctly.
-
-15. [x] **Test Failures: inbound_email_processing_test.rb**
-    - Fixed: All tests now pass (5 runs, 27 assertions, 0 failures, 0 errors, 1 skip)
-    - Previous issue: NoMethodError: undefined method 'hours' for nil in Policy.rate_limit_for
-    - Root cause: The Policy.rate_limit_for method didn't handle the case where policy records for rate limiting were missing
-    - Fix implemented: Updated Policy.rate_limit_for to handle nil values and provide sensible defaults:
-      1. Added logic to detect completely missing rate limit configuration
-      2. Added fallback defaults (10 submissions, 24 hours) when some values are missing
-      3. Maintained backward compatibility with existing code that depends on this method
-
-16. [x] **Test Failures: rails/action_mailbox/postmark/inbound_emails_controller_test.rb**
-    - Fixed: All tests now pass successfully (2 runs, 4 assertions, 0 failures, 0 errors, 0 skips)
-    - Previous issue: NameError: uninitialized constant Rails::ActionMailbox::Postmark::InboundEmailsController
-    - Root cause: 
-        1. Missing controller implementation
-        2. Incorrect route being used in tests (built-in Rails controller instead of our custom one)
-        3. Ineffective mocking approach for authentication
-    - Fix implemented: 
-        1. Created the controller with proper namespacing and authentication
-        2. Updated tests to use the correct route (`rails_action_mailbox_postmark_inbound_emails_url`)
-        3. Improved authentication mocking by using a mock authenticator object instead of directly stubbing methods
-
-17. [ ] **Test Failures: url_helpers_in_mailers_test.rb**
-    - Current status: 2 errors during setup, 0 assertions run 
-    - Error type: One RecordInvalid, one missing template
-    - Severity: High - Both examples crash during setup, hiding more problems underneath
-    - Fix approach: Resolve the record validation errors and ensure templates exist or are properly mocked
 
 ## Email Template Improvements
 

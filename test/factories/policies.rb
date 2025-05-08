@@ -15,6 +15,27 @@ FactoryBot.define do
       sequence(:key) { |n| "voucher_value_hearing_disability_#{n}" }
       value { 500 }
     end
+
+    # Rate limiting traits
+    trait :proof_submission_rate_limit_web do
+      key { 'proof_submission_rate_limit_web' }
+      value { 10 } # Allow 10 submissions via web
+    end
+
+    trait :proof_submission_rate_limit_email do
+      key { 'proof_submission_rate_limit_email' }
+      value { 5 } # Allow 5 submissions via email
+    end
+
+    trait :proof_submission_rate_period do
+      key { 'proof_submission_rate_period' }
+      value { 24 } # Period of 24 hours
+    end
+
+    trait :max_proof_rejections do
+      key { 'max_proof_rejections' }
+      value { 3 } # Maximum of 3 rejections allowed
+    end
   end
 end
 
