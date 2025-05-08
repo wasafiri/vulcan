@@ -74,10 +74,15 @@ module Letters
     def render_template_with_variables
       body = template.body.dup
 
-      # Replace all %{placeholders} with the actual values
+      # Replace all placeholders with the actual values
       variables.each do |key, value|
-        placeholder = "%{#{key}}"
+        # Handle the %<key>s format (printf style)
+        placeholder = "%<#{key}>s"
         body.gsub!(placeholder, value.to_s) if body.include?(placeholder)
+
+        # Also handle the %{key} format for backward compatibility
+        alt_placeholder = "%{#{key}}"
+        body.gsub!(alt_placeholder, value.to_s) if body.include?(alt_placeholder)
       end
 
       body

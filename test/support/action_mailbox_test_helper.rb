@@ -31,4 +31,33 @@ module ActionMailboxTestHelper
 
     ActionMailbox::InboundEmail.create_and_extract_message_id!(mail.to_s)
   end
+
+  # This method is expected by the tests but was missing
+  def receive_inbound_email_from_mail(to:, from:, subject: 'Test Email', body: 'Test Body', attachments: nil)
+    mail = Mail.new do
+      to to
+      from from
+      subject subject
+
+      if attachments.nil?
+        body body
+      else
+        text_part do
+          body body
+        end
+
+        attachments.each do |attachment|
+          add_file(
+            filename: attachment[:filename],
+            content: attachment[:content],
+            content_type: attachment[:content_type]
+          )
+        end
+      end
+    end
+
+    inbound_email = ActionMailbox::InboundEmail.create_and_extract_message_id!(mail.to_s)
+    inbound_email.route
+    inbound_email
+  end
 end

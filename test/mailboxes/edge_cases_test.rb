@@ -34,6 +34,21 @@ class EdgeCasesTest < ActionMailbox::TestCase
       routing(/medical-cert@/i => :medical_certification)
       routing(/.+/ => :default)
     end
+
+    # Stub email template finder to prevent "Email templates not found" errors
+    # This allows tests to run without requiring templates to exist in test DB
+    # Create a specific mock for the proof_submission_error template
+    proof_submission_error_template = mock('EmailTemplate')
+    proof_submission_error_template.stubs(:render).returns(['Error Processing Your Proof Submission', 'Test Email Body'])
+
+    # Create a generic mock for other templates
+    generic_template = mock('EmailTemplate')
+    generic_template.stubs(:render).returns(['Test Email Subject', 'Test Email Body'])
+
+    # Ensure the template lookup uses the correct template based on name
+    EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_proof_submission_error',
+                                        format: :text).returns(proof_submission_error_template)
+    EmailTemplate.stubs(:find_by!).returns(generic_template) # Fallback for any other template
   end
 
   test 'handles emails with no attachments' do

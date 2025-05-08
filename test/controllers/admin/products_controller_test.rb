@@ -5,7 +5,8 @@ require 'test_helper'
 module Admin
   class ProductsControllerTest < ActionDispatch::IntegrationTest
     def setup
-      @admin = create(:admin, email: 'admin@example.com')
+      # Don't use hardcoded email - let the factory sequence generate a unique one
+      @admin = create(:admin)
       @product = create(:product, name: 'iPad Air', device_types: ['Tablet'])
 
       # Use sign_in_as to authenticate the user for the test
