@@ -116,25 +116,29 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
       # We need to stub the Event creation completely to avoid FK violations and focus on the bounce behavior
       Event.stubs(:create!).returns(true)
 
-      # We only want to stub the mail delivery but let the bounce happen
-      mail_double = mock('Mail')
-      mail_double.stubs(:deliver_now).returns(true)
-      ApplicationNotificationsMailer.stubs(:proof_submission_error).returns(mail_double)
+      # In a bounce scenario, we need to verify that:
+      # 1. An email is sent (the proof_submission_error notification)
+      # 2. The bounce event is triggered
 
-      # This should bounce with a constituent_not_found error
+      # First, ensure the mail object is correctly delivered before the bounce
+      mail_double = mock('Mail')
+      mail_double.expects(:deliver_now).returns(true)
+      ApplicationNotificationsMailer.expects(:proof_submission_error).returns(mail_double)
+
+      # Now, we can't combine assert_emails with assert_throws
+      # because the throw interrupts the block - separate the concerns:
+
+      # Verify the bounce happens
       assert_throws(:bounce) do
-        # The email should be delivered before the bounce
-        assert_emails 1 do
-          safe_receive_email(
-            to: MatVulcan::InboundEmailConfig.inbound_email_address,
-            from: 'unknown@example.com',
-            subject: 'Income Proof',
-            body: 'Proof attached.',
-            attachments: {
-              'proof.pdf' => @pdf_content
-            }
-          )
-        end
+        safe_receive_email(
+          to: MatVulcan::InboundEmailConfig.inbound_email_address,
+          from: 'unknown@example.com',
+          subject: 'Income Proof',
+          body: 'Proof attached.',
+          attachments: {
+            'proof.pdf' => @pdf_content
+          }
+        )
       end
     end
   end
@@ -150,18 +154,22 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
       # Create an application and immediately mark it rejected
       create(:application, user: constituent_without_app, status: :rejected)
 
+      # First, ensure the mail object is correctly delivered before the bounce
+      mail_double = mock('Mail')
+      mail_double.expects(:deliver_now).returns(true)
+      ApplicationNotificationsMailer.expects(:proof_submission_error).returns(mail_double)
+
+      # Verify the bounce happens
       assert_throws(:bounce) do
-        assert_emails 1 do
-          safe_receive_email(
-            to: MatVulcan::InboundEmailConfig.inbound_email_address,
-            from: constituent_without_app.email,
-            subject: 'Income Proof',
-            body: 'Proof attached.',
-            attachments: {
-              'proof.pdf' => @pdf_content
-            }
-          )
-        end
+        safe_receive_email(
+          to: MatVulcan::InboundEmailConfig.inbound_email_address,
+          from: constituent_without_app.email,
+          subject: 'Income Proof',
+          body: 'Proof attached.',
+          attachments: {
+            'proof.pdf' => @pdf_content
+          }
+        )
       end
 
       latest_event = get_latest_event
@@ -171,15 +179,19 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
 
   test 'bounces email without attachments' do
     measure_time('Process email without attachments') do
+      # First, ensure the mail object is correctly delivered before the bounce
+      mail_double = mock('Mail')
+      mail_double.expects(:deliver_now).returns(true)
+      ApplicationNotificationsMailer.expects(:proof_submission_error).returns(mail_double)
+
+      # Verify the bounce happens
       assert_throws(:bounce) do
-        assert_emails 1 do
-          safe_receive_email(
-            to: MatVulcan::InboundEmailConfig.inbound_email_address,
-            from: @constituent.email,
-            subject: 'Income Proof',
-            body: 'I forgot to attach the proof!'
-          )
-        end
+        safe_receive_email(
+          to: MatVulcan::InboundEmailConfig.inbound_email_address,
+          from: @constituent.email,
+          subject: 'Income Proof',
+          body: 'I forgot to attach the proof!'
+        )
       end
       latest_event = get_latest_event
       assert_equal 'proof_submission_no_attachments', latest_event&.action
@@ -192,18 +204,22 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
       max_rejections = Policy.get('max_proof_rejections')
       @application.update_column(:total_rejections, max_rejections) # Use update_column to bypass callbacks
 
+      # First, ensure the mail object is correctly delivered before the bounce
+      mail_double = mock('Mail')
+      mail_double.expects(:deliver_now).returns(true)
+      ApplicationNotificationsMailer.expects(:proof_submission_error).returns(mail_double)
+
+      # Verify the bounce happens
       assert_throws(:bounce) do
-        assert_emails 1 do
-          safe_receive_email(
-            to: MatVulcan::InboundEmailConfig.inbound_email_address,
-            from: @constituent.email,
-            subject: 'Income Proof',
-            body: 'Please find my proof attached.',
-            attachments: {
-              'proof.pdf' => @pdf_content
-            }
-          )
-        end
+        safe_receive_email(
+          to: MatVulcan::InboundEmailConfig.inbound_email_address,
+          from: @constituent.email,
+          subject: 'Income Proof',
+          body: 'Please find my proof attached.',
+          attachments: {
+            'proof.pdf' => @pdf_content
+          }
+        )
       end
       latest_event = get_latest_event
       assert_equal 'proof_submission_max_rejections_reached', latest_event&.action

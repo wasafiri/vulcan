@@ -30,9 +30,20 @@ class Policy < ApplicationRecord
   ].freeze
 
   def self.rate_limit_for(action, method)
+    max_value = get("#{action}_rate_limit_#{method}")
+    period_value = get("#{action}_rate_period")
+
+    # Return nil if we don't have any rate limit configuration
+    # This allows callers to handle the case appropriately
+    return nil if max_value.nil? && period_value.nil?
+
+    # Use reasonable defaults if either value is missing
+    max_value ||= 10 # Default to 10 submissions
+    period_value ||= 24 # Default to 24 hours
+
     {
-      max: get("#{action}_rate_limit_#{method}"),
-      period: get("#{action}_rate_period").hours
+      max: max_value,
+      period: period_value.hours
     }
   end
 

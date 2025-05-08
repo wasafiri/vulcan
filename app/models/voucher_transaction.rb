@@ -15,6 +15,7 @@ class VoucherTransaction < ApplicationRecord
   validate :amount_within_voucher_limit, if: :redemption?
 
   before_validation :set_processed_at, on: :create
+  before_validation :generate_reference_number, on: :create
 
   enum :transaction_type, {
     redemption: 0, # Standard redemption of voucher value
@@ -75,5 +76,16 @@ class VoucherTransaction < ApplicationRecord
 
   def set_processed_at
     self.processed_at ||= Time.current
+  end
+
+  def generate_reference_number
+    return if reference_number.present?
+
+    # Format: TX-[voucher-code-part]-[timestamp]-[random]
+    voucher_part = voucher&.code&.first(6)&.upcase || 'NOTX'
+    timestamp = Time.current.strftime('%y%m%d%H%M')
+    random = SecureRandom.hex(3).upcase
+
+    self.reference_number = "TX-#{voucher_part}-#{timestamp}-#{random}"
   end
 end
