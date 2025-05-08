@@ -7,8 +7,11 @@ module ConstituentPortal
     include ActionDispatch::TestProcess::FixtureFile
 
     setup do
-      # Set up test data using factories
-      @user = create(:constituent, :with_disabilities)
+      # Generate a unique email for each test to avoid uniqueness validation errors
+      unique_email = "constituent_#{Time.now.to_i}_#{rand(1000)}@example.com"
+
+      # Set up test data using factories with the unique email
+      @user = create(:constituent, :with_disabilities, email: unique_email)
       @application = create(:application, user: @user)
       @valid_pdf = fixture_file_upload(Rails.root.join('test/fixtures/files/income_proof.pdf'), 'application/pdf')
       @valid_image = fixture_file_upload(Rails.root.join('test/fixtures/files/residency_proof.pdf'), 'application/pdf')
@@ -180,11 +183,18 @@ module ConstituentPortal
       # Set the application to draft status
       @application.update!(status: :draft)
 
-      # Update the application
+      # Update the application with at least one disability selected
+      # The controller requires at least one disability to be selected
       patch constituent_portal_application_path(@application), params: {
         application: {
           household_size: 4,
-          annual_income: 60_000
+          annual_income: 60_000,
+          # Include disability information to pass validation
+          hearing_disability: checkbox_params(true),
+          vision_disability: checkbox_params(false),
+          speech_disability: checkbox_params(false),
+          mobility_disability: checkbox_params(false),
+          cognition_disability: checkbox_params(false)
         }
       }
 
@@ -195,6 +205,11 @@ module ConstituentPortal
       @application.reload
       assert_equal 4, @application.household_size
       assert_equal 60_000, @application.annual_income
+
+      # Verify user disability attributes were updated
+      # These get applied to the user, not the application
+      @user.reload
+      assert_equal true, @user.hearing_disability
     end
 
     # Test submitting a draft application

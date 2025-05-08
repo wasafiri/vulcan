@@ -1,6 +1,7 @@
 # Test Suite Fixing Guide (Post FactoryBot Transition)
 
 **Date:** April 22, 2025
+**Updated:** May 7, 2025
 
 ## Overview
 
@@ -15,11 +16,18 @@ This document tracks the process of fixing the test suite failures encountered a
     *   **Errors:** 186
     *   **Skips:** 19
 
-*   **Current (April 22, 2025):**
+*   **Step 1 (April 22, 2025):**
     *   **Runs:** 598
     *   **Assertions:** 1941
     *   **Failures:** 38
     *   **Errors:** 100
+    *   **Skips:** 21
+
+*   **Step 2 (May 7, 2025):**
+    *   **Runs:** 662
+    *   **Assertions:** 2404
+    *   **Failures:** 23
+    *   **Errors:** 39
     *   **Skips:** 21
     
 *   **Progress:**
@@ -27,6 +35,8 @@ This document tracks the process of fixing the test suite failures encountered a
     * Fixed enum issues in CheckVoucherExpirationJobTest
     * Fixed TrainingSessionNotificationsMailerTest with proper factory usage
     * Successfully resolving the most critical issues has reduced errors by 47% (from 186 to 100)
+    * Fixed paper_applications_controller_test.rb with proper factory setup and mocking
+    * Addressed email delivery test issues in various mailer tests
 
 ## Major Error Categories
 
@@ -347,6 +357,21 @@ This document tracks the process of fixing the test suite failures encountered a
       * The method now safely handles cases where either value might be nil
     * All mailbox tests now pass successfully with both ActionMailbox::TestCase and integration tests
 
+*   [x] **Task:** Fix Postmark InboundEmailsController Test
+*   [x] **Action:** 
+    * Created the missing controller in `app/controllers/rails/action_mailbox/postmark/inbound_emails_controller.rb`
+    * Fixed route conflict between custom controller and Rails built-in controller
+    * Updated the test to use the correct route URL helper
+    * Improved authentication mocking approach for better test reliability
+*   [x] **Details:**
+    * Found a routing conflict in the application:
+      * Custom controller: `rails_action_mailbox_postmark_inbound_emails` 
+      * Rails built-in controller: `rails_postmark_inbound_emails`
+    * Test was using `rails_postmark_inbound_emails_url` which sent the request to Rails' built-in controller, not our custom one
+    * Changed the test to use `rails_action_mailbox_postmark_inbound_emails_url`
+    * Replaced direct stubbing of `ensure_authentic` with mock authenticator objects for more effective testing
+    * This fix resulted in both test cases passing (successful authentication and failed authentication)
+
 **Phase 5: Address Controller/Integration Failures**
 
 *   [x] **Task:** Fix 404s (`PagesControllerTest`).
@@ -398,60 +423,4 @@ This document tracks the process of fixing the test suite failures encountered a
     * The `ProofReviewer` service uses `update_column` to change the status, which bypasses ActiveRecord callbacks.
     * The `purge_proof_if_rejected` callback in `ProofManageable` was never triggered when using `update_column`.
 *   [x] **Fix:** 
-    * Added explicit purging logic in the `ProofReviewer` service that directly calls a new method on the application model.
-    * Added a new `purge_rejected_proof` method to `ProofManageable` that handles the direct purging.
-    * Kept the existing `purge_proof_if_rejected` callback for other cases where status is changed via normal save operations.
-    * Enhanced logging to track when purges happen or are skipped, aiding in debugging.
-*   [x] **Result:**
-    * `PaperApplicationModeSwitchingTest` now passes all assertions.
-    * Both direct column updates (via `update_column`) and standard save operations now properly handle attachment purging.
-
-**Phase 7: Correct Assertion Failures**
-
-*   [ ] **Task:** Fix specific assertion failures.
-*   [ ] **Action:** Debug individual test logic and expected outcomes.
-    *   [ ] `TrainingSessionTest`: Check `scheduled_for` validation and `rescheduling?` logic.
-    *   [ ] `ApplicationProofValidationTest`: Debug `validates_attachment` or custom validation for file types.
-    *   [ ] `AuthenticationTest`, `RegistrationsControllerTest`: Debug authentication/sign-in flow and redirects.
-    *   [ ] `Admin::DashboardControllerTest`: Debug filtering logic.
-    *   [ ] `Admin::PrintQueueControllerTest`: Debug response codes/redirects.
-    *   [ ] `ProofSubmissionMailboxTest`: Debug email sending assertions.
-    *   [ ] `W9ReviewTest`: Check validation logic for vendor type.
-    *   [ ] `UserTest`: Check `User.admins` scope SQL generation vs. assertion.
-    *   [ ] `MailerHelperTest`: Check `format_date` helper logic and date/time handling.
-*   [ ] **Progress:** (To be updated)
-
-**Phase 7: Resolve Miscellaneous Errors**
-
-*   [ ] **Task:** Fix remaining errors (`URI::InvalidURIError`, `NameError`, `LoadError`, `MockExpectationError`, etc.).
-*   [ ] **Action:** Address each based on the specific error message and context.
-*   [ ] **Progress:** (To be updated)
-
-## Application Workflow Verification (Medical Certification)
-
-*   **Goal:** Ensure tests correctly reflect the application approval workflow, especially regarding medical certifications.
-*   **Correct Flow:**
-    1.  Income & Residency Proofs Approved.
-    2.  `medical_certification_status` -> `:requested`.
-    3.  Medical Cert Received -> `medical_certification_status` -> `:received`.
-    4.  Admin Approves Cert -> `medical_certification_status` -> `:approved`.
-    5.  Application `status` -> `:approved` (auto-triggered).
-    6.  Voucher Issuable.
-*   **Action:** Review tests in `test/system/admin/applications_test.rb`, `test/models/application_test.rb`, `test/controllers/admin/applications_controller_test.rb`, and service tests. Flag and correct any tests deviating from this flow.
-*   **Status:** [ ] To Do
-
-## Existing Documentation Review
-
-*   **Goal:** Check existing files in `doc/` for relevance and accuracy after recent changes.
-*   **Files to Review:**
-    *   [ ] `doc/attachment_mocking_guide.md` (Relevant to factory/test setup)
-    *   [ ] `doc/system_testing_guide.md` (Relevant to test setup)
-    *   [ ] `doc/service_objects.md` (Relevant if service logic changed)
-    *   [ ] `doc/medical_certification_guide.md` (Relevant to workflow verification)
-    *   [ ] `doc/proof_attachment_guide.md` (Relevant to proof handling tests)
-*   **Action:** Update or note required changes in these documents based on the fixes implemented.
-*   **Status:** [ ] To Do
-
----
-
-This guide will be updated as fixes are implemented and new issues arise.
+    * Added explicit purging logic in the `ProofReviewer` service that directly calls a new method on

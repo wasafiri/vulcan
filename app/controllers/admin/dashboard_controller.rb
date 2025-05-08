@@ -21,13 +21,13 @@ module Admin
       @open_applications_count   = Application.active.count
       @pending_services_count    = Application.where(status: :approved).count
 
-      # Calculate training requests count properly, counting distinct applications 
+      # Calculate training requests count properly, counting distinct applications
       # to avoid duplicate counting if there are multiple notifications for the same application
       @training_requests_count = Notification.where(action: 'training_requested')
-                                 .where(notifiable_type: 'Application')
-                                 .select(:notifiable_id)
-                                 .distinct
-                                 .count
+                                             .where(notifiable_type: 'Application')
+                                             .select(:notifiable_id)
+                                             .distinct
+                                             .count
 
       @proofs_needing_review_count = Application.where(income_proof_status: :not_reviewed)
                                                 .or(Application.where(residency_proof_status: :not_reviewed))
@@ -57,8 +57,18 @@ module Admin
         application_ids = Notification.where(action: 'training_requested')
                                       .where(notifiable_type: 'Application')
                                       .pluck(:notifiable_id)
-        # Ensure we pass all IDs as an array, not as individual arguments
-        scope.where(id: application_ids.presence || [0])
+        # Debug output to help diagnose the issue
+        Rails.logger.debug { "Training requests filter found IDs: #{application_ids.inspect}" }
+
+        # The issue might be that the application is filtered out by the base scope
+        # Use unscoped to avoid default scopes for just this specific filter
+        if application_ids.present?
+          # Ensure we include applications regardless of their status
+          Application.where(id: application_ids)
+        else
+          # Empty result set if no training requests found
+          scope.none
+        end
       else
         scope
       end
