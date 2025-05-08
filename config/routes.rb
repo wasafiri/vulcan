@@ -318,17 +318,6 @@ Rails.application.routes.draw do
     resources :invoices, only: %i[index show]
   end
 
-  # Redirects from old constituent namespace to new constituent_portal namespace
-  get '/constituent/applications/:id/proofs/resubmit',
-      to: redirect('/constituent_portal/applications/%<id>s/proofs/new/income')
-  post '/constituent/applications/:id/proofs/resubmit',
-       to: redirect('/constituent_portal/applications/%<id>s/proofs/resubmit')
-  get '/constituent/applications/:id', to: redirect('/constituent_portal/applications/%<id>s')
-  get '/constituent/dashboard', to: redirect('/constituent_portal/dashboard')
-  get '/constituent/applications', to: redirect('/constituent_portal/applications')
-  get '/constituent/evaluations', to: redirect('/constituent_portal/evaluations')
-  get '/constituent/devices', to: redirect('/constituent_portal/products')
-
   # New constituent_portal namespace (replacing constituent)
   namespace :constituent_portal do
     resource :dashboard, only: [:show]

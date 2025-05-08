@@ -22,6 +22,12 @@ module Evaluators
 
       # Load display data (always needed)
       load_display_data
+
+      # Handle different format requests appropriately
+      respond_to do |format|
+        format.html # renders show.html.erb as usual
+        format.turbo_stream # renders show.turbo_stream.erb if it exists
+      end
     end
 
     private
@@ -70,7 +76,7 @@ module Evaluators
       @requested_evaluations_display = []
       @upcoming_evaluations = []
       @recent_evaluations = []
-      
+
       # If we're filtering, don't load all the display data
       return if @current_filter.present?
 

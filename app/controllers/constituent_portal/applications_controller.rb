@@ -455,18 +455,13 @@ module ConstituentPortal
       end
     end
 
-    # Create guardian update event
+    # Create guardian update event using the event service
     # @return [void]
     def create_guardian_update_event
-      Event.create!(
-        user: current_user,
-        action: 'guardian_application_updated',
-        metadata: {
-          application_id: @application.id,
-          guardian_relationship: current_user.guardian_relationship,
-          timestamp: Time.current.iso8601
-        }
-      )
+      # Use the new event service to ensure events are always created
+      # even when only nested attributes change
+      service = Applications::EventService.new(@application, user: current_user)
+      service.log_guardian_update(current_user.guardian_relationship)
     end
 
     # Determine the appropriate notice for an update
@@ -1017,15 +1012,9 @@ module ConstituentPortal
     end
 
     def log_guardian_event
-      Event.create!(
-        user: current_user,
-        action: 'guardian_application_submitted',
-        metadata: {
-          application_id: @application.id,
-          guardian_relationship: current_user.guardian_relationship,
-          timestamp: Time.current.iso8601
-        }
-      )
+      # Use the event service to log the guardian application submission
+      service = Applications::EventService.new(@application, user: current_user)
+      service.log_guardian_submission(current_user.guardian_relationship)
     end
 
     def redirect_to_app(app)

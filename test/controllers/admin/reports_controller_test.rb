@@ -5,7 +5,8 @@ require 'test_helper'
 module Admin
   class ReportsControllerTest < ActionDispatch::IntegrationTest
     def setup
-      @admin = users(:admin_david)
+      # Create an admin user with FactoryBot
+      @admin = create(:admin)
 
       # Set standard test headers
       @headers = {
@@ -13,12 +14,8 @@ module Admin
         'REMOTE_ADDR' => '127.0.0.1'
       }
 
-      post sign_in_path,
-           params: { email: @admin.email, password: 'password123' },
-           headers: @headers
-
-      assert_response :redirect
-      follow_redirect!
+      # Use the sign_in helper from test_helper.rb
+      sign_in(@admin)
     end
 
     def test_should_get_index

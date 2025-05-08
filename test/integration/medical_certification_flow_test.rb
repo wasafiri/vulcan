@@ -6,12 +6,14 @@ class MedicalCertificationFlowTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
 
   def setup
-    @admin = create(:admin)
-    @constituent = create(:constituent)
+    # Use unique emails with a timestamp to avoid email duplication errors
+    timestamp = Time.current.to_i
+    @admin = create(:admin, email: "mcf_admin_#{timestamp}@example.com")
+    @constituent = create(:constituent, email: "mcf_constituent_#{timestamp}@example.com")
     @application = create(:application,
                           user: @constituent,
                           medical_provider_name: 'Dr. Smith',
-                          medical_provider_email: 'drsmith@example.com',
+                          medical_provider_email: "drsmith_#{timestamp}@example.com",
                           medical_provider_phone: '555-555-5555')
 
     # Sign in as admin

@@ -1,23 +1,30 @@
 # frozen_string_literal: true
 
+# Base class for all service objects in the application
+# Provides common functionality and structure
 class BaseService
-  attr_reader :errors
+  # Default result object returned by services
+  Result = Struct.new(:success, :message, :data, keyword_init: true) do
+    def success?
+      success == true
+    end
 
-  def initialize
-    @errors = []
+    def failure?
+      !success?
+    end
   end
 
-  protected
-
-  def add_error(message)
-    @errors << message
-    false
+  def initialize(*_args)
+    # Base initialization - may be overridden by subclasses
   end
 
-  def log_error(error, context = nil)
-    message = "#{self.class.name} error: #{error.message}"
-    message += " | Context: #{context}" if context
-    Rails.logger.error(message)
-    add_error(error.message)
+  # Returns a success result with optional message and data
+  def success(message = nil, data = nil)
+    Result.new(success: true, message: message, data: data)
+  end
+
+  # Returns a failure result with optional message and data
+  def failure(message = nil, data = nil)
+    Result.new(success: false, message: message, data: data)
   end
 end

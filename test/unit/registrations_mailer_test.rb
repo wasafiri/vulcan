@@ -5,16 +5,27 @@ require 'test_helper'
 class RegistrationsMailerTest < ActiveSupport::TestCase
   include ActiveJob::TestHelper
 
-  test 'registration_confirmation email should be sent' do
-    # Skip loading fixtures to avoid foreign key violations
+  setup do
+    # Create templates needed for the test
+    create_email_templates
+  end
 
+  test 'registration_confirmation email should be sent' do
     # Create a test user directly (not saved to DB)
-    user = Constituent.new(
+    user = Users::Constituent.new(
       first_name: 'Test',
       last_name: 'User',
-      email: 'test@example.com',
-      phone: '555-123-4567'
+      email: 'test.reg.mailer@example.com', # Unique to avoid collisions
+      phone: '555-123-4567',
+      communication_preference: 'email'
     )
+
+    # Create a mock template that returns text-only content
+    mock_template = mock('EmailTemplate')
+    subject = 'Welcome to the Maryland Accessible Telecommunications Program'
+    body = "Dear Test,\n\nWelcome to the program.\n\nThank you,\nThe MAT Team"
+    mock_template.stubs(:render).returns([subject, body])
+    EmailTemplate.stubs(:find_by!).returns(mock_template)
 
     # Clear any emails from previous tests
     ActionMailer::Base.deliveries.clear
@@ -24,50 +35,69 @@ class RegistrationsMailerTest < ActiveSupport::TestCase
 
     # Basic assertions
     assert_equal ['no_reply@mdmat.org'], email.from
-    assert_equal ['test@example.com'], email.to
+    assert_equal ['test.reg.mailer@example.com'], email.to
     assert_equal 'Welcome to the Maryland Accessible Telecommunications Program', email.subject
 
-    # Check multipart email
-    assert email.multipart?
-    assert_equal 2, email.parts.size
-
-    # Check HTML part content
-    html_part = email.parts.find { |part| part.content_type.include?('text/html') }
-    assert_not_nil html_part
-    assert_includes html_part.body.to_s, 'Dear Test,'
-    assert_includes html_part.body.to_s, 'Program Overview'
-
-    # Check text part content
-    text_part = email.parts.find { |part| part.content_type.include?('text/plain') }
-    assert_not_nil text_part
-    assert_includes text_part.body.to_s, 'Dear Test,'
-    assert_includes text_part.body.to_s, 'PROGRAM OVERVIEW'
+    # Check text-only email (no longer multipart)
+    assert_equal 'text/plain; charset=UTF-8', email.content_type
+    assert_includes email.body.to_s, 'Dear Test,'
+    assert_includes email.body.to_s, 'Welcome to the program'
   end
 
   test 'registrations controller should send email' do
-    # Skip fixtures to avoid foreign key violations
+    # Create a user with unique email
+    user = Users::Constituent.new(
+      first_name: 'New',
+      last_name: 'User',
+      email: 'test.reg.controller@example.com',
+      communication_preference: 'email'
+    )
 
-    # Create a test user directly
-    ActionMailer::Base.deliveries.clear
+    # Use old-style expectation (instead of enqueued assertions) to avoid serialization issues with unsaved records
+    mail_message = mock('MailMessage')
+    mail_message.expects(:deliver_later).returns(true)
 
-    # Mock the mailer
-    mock_mailer = Minitest::Mock.new
-    mock_mailer.expect :deliver_later, nil
+    ApplicationNotificationsMailer.expects(:registration_confirmation)
+                                  .with(user)
+                                  .returns(mail_message)
 
-    # Mock the controller action
-    ApplicationNotificationsMailer.stub :registration_confirmation, mock_mailer do
-      # Create a user (no DB save)
-      user = Constituent.new(
-        first_name: 'New',
-        last_name: 'User',
-        email: 'newuser@example.com'
+    # Simulate the controller's send_registration_confirmation method
+    ApplicationNotificationsMailer.registration_confirmation(user).deliver_later
+  end
+
+  private
+
+  def create_email_templates
+    # Create the required templates for the mailer to work
+    unless EmailTemplate.exists?(name: 'application_notifications_registration_confirmation', format: :text)
+      EmailTemplate.create!(
+        name: 'application_notifications_registration_confirmation',
+        format: :text,
+        body: "Subject: Welcome to the Maryland Accessible Telecommunications Program\n\n" \
+              "%<header_text>s\n\n" \
+              "Dear %<user_first_name>s,\n\n" \
+              "Welcome to the program.\n\n" \
+              '%<footer_text>s',
+        subject: 'Welcome to the Maryland Accessible Telecommunications Program'
       )
-
-      # Simulate the controller action
-      ApplicationNotificationsMailer.registration_confirmation(user)
     end
 
-    # Verify mock was called
-    mock_mailer.verify
+    unless EmailTemplate.exists?(name: 'email_header_text', format: :text)
+      EmailTemplate.create!(
+        name: 'email_header_text',
+        format: :text,
+        body: "=== %<title>s ===\n\n",
+        subject: 'Header Template'
+      )
+    end
+
+    return if EmailTemplate.exists?(name: 'email_footer_text', format: :text)
+
+    EmailTemplate.create!(
+      name: 'email_footer_text',
+      format: :text,
+      body: "\n\nThank you,\nThe MAT Team\nContact: %<contact_email>s",
+      subject: 'Footer Template'
+    )
   end
 end

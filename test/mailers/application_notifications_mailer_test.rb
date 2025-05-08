@@ -420,8 +420,8 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     constituent = Constituent.create!(
       first_name: 'John',
       last_name: 'Doe',
-      email: 'john.doe@example.com',
-      phone: '555-123-4567',
+      email: FactoryBot.generate(:email),
+      phone: FactoryBot.generate(:phone),
       password: 'password',
       password_confirmation: 'password',
       hearing_disability: true
@@ -468,8 +468,8 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     constituent = Constituent.create!(
       first_name: 'John',
       last_name: 'Doe',
-      email: 'john.doe@example.com',
-      phone: '555-123-4567',
+      email: FactoryBot.generate(:email),
+      phone: FactoryBot.generate(:phone),
       password: 'password',
       password_confirmation: 'password',
       hearing_disability: true,
@@ -523,8 +523,8 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     constituent_params = {
       first_name: 'John',
       last_name: 'Doe',
-      email: 'john.doe@example.com',
-      phone: '555-123-4567',
+      email: FactoryBot.generate(:email),
+      phone: FactoryBot.generate(:phone),
       communication_preference: 'letter' # Set preference to letter
     }
 
@@ -587,8 +587,8 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     constituent_params = {
       first_name: 'John',
       last_name: 'Doe',
-      email: 'john.doe@example.com',
-      phone: '555-123-4567'
+      email: FactoryBot.generate(:email),
+      phone: FactoryBot.generate(:phone)
     }
 
     notification_params = {
@@ -623,7 +623,7 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
 
     # Assert email properties
     assert_equal ['no_reply@mdmat.org'], email.from
-    assert_equal ['john.doe@example.com'], email.to
+    assert_equal [constituent_params[:email]], email.to
 
     # We're working with the mock data from setup
     expected_subject = "Mock Income Threshold Exceeded for #{constituent_params[:first_name]}"
@@ -691,8 +691,8 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     user = Constituent.create!(
       first_name: 'Jane',
       last_name: 'Smith',
-      email: 'jane.smith@example.com',
-      phone: '555-123-4567',
+      email: FactoryBot.generate(:email),
+      phone: FactoryBot.generate(:phone),
       password: 'password',
       password_confirmation: 'password',
       hearing_disability: true
@@ -738,8 +738,8 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     user = Constituent.create!(
       first_name: 'Jane',
       last_name: 'Smith',
-      email: 'jane.smith@example.com',
-      phone: '555-123-4567',
+      email: FactoryBot.generate(:email),
+      phone: FactoryBot.generate(:phone),
       password: 'password',
       password_confirmation: 'password',
       hearing_disability: true,
