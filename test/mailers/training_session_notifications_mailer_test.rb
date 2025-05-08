@@ -44,9 +44,15 @@ class TrainingSessionNotificationsMailerTest < ActionMailer::TestCase
   end
 
   setup do
-    # Use factories instead of fixtures
-    @constituent = create(:constituent, first_name: 'John', last_name: 'Doe', email: 'john.doe@example.com')
-    @trainer = create(:trainer, first_name: 'Jane', last_name: 'Smith', email: 'jane.smith@example.com')
+    # Use factories instead of fixtures with unique emails for each test run
+    @constituent = create(:constituent,
+                          first_name: 'John',
+                          last_name: 'Doe',
+                          email: "john.doe.#{SecureRandom.hex(6)}@example.com")
+    @trainer = create(:trainer,
+                      first_name: 'Jane',
+                      last_name: 'Smith',
+                      email: "jane.smith.#{SecureRandom.hex(6)}@example.com")
     @application = create(:application, :in_progress, user: @constituent)
 
     # Create a mock training session with the necessary attributes
