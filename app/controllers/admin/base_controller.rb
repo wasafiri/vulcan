@@ -3,6 +3,7 @@
 module Admin
   class BaseController < ApplicationController
     include Pagy::Backend
+    include SafeInstanceVariables
 
     before_action :authenticate_user!
     before_action :require_admin!
