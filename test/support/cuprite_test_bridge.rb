@@ -7,12 +7,13 @@ module CupriteTestBridge
   # Safe browser interaction that recovers from common Cuprite/Ferrum errors
   def safe_interaction
     yield
-  rescue Ferrum::DeadBrowserError, Ferrum::NoSuchWindowError, Ferrum::NodeNotFoundError => e
-    puts "Recovering from Cuprite error: #{e.class} - #{e.message}"
-    Capybara.reset_sessions! # Force a clean browser state
-    false
   rescue StandardError => e
-    puts "Error during browser interaction: #{e.class} - #{e.message}"
+    if e.class.to_s =~ /Ferrum::(DeadBrowserError|NoSuchWindowError|NodeNotFoundError)/
+      puts "Recovering from Cuprite error: #{e.class} - #{e.message}"
+      Capybara.reset_sessions! # Force a clean browser state
+    else
+      puts "Error during browser interaction: #{e.class} - #{e.message}"
+    end
     false
   end
 
@@ -65,6 +66,9 @@ module CupriteTestBridge
 
     # Refresh to apply cookie
     safe_interaction { visit current_path }
+
+    # Navigate to root to verify greeting
+    safe_visit root_path
 
     # Return the session
     test_session

@@ -12,7 +12,7 @@ module Applications
 
     def request_certification
       # Validate medical provider email
-      return add_error('Medical provider email is required') unless application.medical_provider_email.present?
+      return failure(message: 'Medical provider email is required') unless application.medical_provider_email.present?
 
       # Get current time once to ensure consistency
       current_time = Time.current
@@ -30,10 +30,10 @@ module Applications
         # Send email with notification for tracking
         send_email(notification)
 
-        true
+        success(message: 'Medical certification requested successfully.')
       rescue StandardError => e
         log_error(e, "Application ID: #{application.id}")
-        false
+        failure(message: "Failed to request medical certification: #{e.message}")
       end
     end
 
@@ -41,14 +41,14 @@ module Applications
 
     def update_certification_status(timestamp)
       previous_status = application.medical_certification_status
-      
+
       # Update the application columns directly to bypass callbacks
       application.update_columns(
         medical_certification_requested_at: timestamp,
         medical_certification_status: Application.medical_certification_statuses[:requested],
         updated_at: timestamp # Ensure timestamp is updated for audit purposes
       )
-      
+
       # Create ApplicationStatusChange record for activity history
       ApplicationStatusChange.create!(
         application: application,
@@ -63,7 +63,7 @@ module Applications
           provider_email: application.medical_provider_email
         }
       )
-      
+
       # Create event for audit trail with clear context
       Event.create!(
         user: actor,

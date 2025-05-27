@@ -1,2 +1,158 @@
-<h1>Admin::Users#show</h1>
-<p>Find me in app/views/admin/users/show.html.erb</p>
+<main class="container mx-auto px-4 py-8" role="main" aria-labelledby="user-title">
+  <div class="max-w-7xl mx-auto">
+    <!-- Header Section -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+      <h1 id="user-title" class="text-3xl font-bold text-gray-900 mb-4 md:mb-0">
+        User Details: <%= @user.full_name %>
+      </h1>
+      <div class="flex space-x-4">
+        <%= link_to admin_users_path,
+            class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+            aria: { label: "Return to users list" } do %>
+          <span>Back to List</span>
+        <% end %>
+        <%# Add Edit/Delete buttons here if needed %>
+    </div>
+  </div>
+
+    <div class="mb-4">
+      <%= link_to 'Back to Application Dashboard', admin_applications_path,
+          class: 'inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500' %>
+    </div>
+
+    <!-- Basic User Information Section -->
+    <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="basic-info-title">
+      <h2 id="basic-info-title" class="text-xl font-semibold text-gray-900 mb-4">Basic Information</h2>
+      <dl class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Full Name</dt>
+          <dd class="mt-1 text-sm text-gray-900"><%= @user.full_name %></dd>
+        </div>
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Email</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <% if @user.email.present? %>
+              <%= mail_to @user.email, class: "text-indigo-600 hover:text-indigo-500" %>
+            <% else %>
+              No email provided
+            <% end %>
+          </dd>
+        </div>
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Phone</dt>
+          <dd class="mt-1 text-sm text-gray-900"><%= @user.phone || "Not provided" %></dd>
+        </div>
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Date of Birth</dt>
+          <dd class="mt-1 text-sm text-gray-900"><%= @user.date_of_birth&.strftime("%B %d, %Y") || "Not provided" %></dd>
+        </div>
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Address</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <% if @user.physical_address_1.present? %>
+              <%= @user.physical_address_1 %><br>
+              <% if @user.physical_address_2.present? %>
+                <%= @user.physical_address_2 %><br>
+              <% end %>
+              <%= "#{@user.city}, #{@user.state} #{@user.zip_code}" %>
+            <% else %>
+              No address provided
+            <% end %>
+          </dd>
+        </div>
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Communication Preference</dt>
+          <dd class="mt-1 text-sm text-gray-900"><%= @user.communication_preference&.titleize || "Not specified" %></dd>
+        </div>
+      </dl>
+    </section>
+
+    <!-- Guardian/Dependent Info Section -->
+    <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="guardian-dependent-info-title">
+      <h2 id="guardian-dependent-info-title" class="text-xl font-semibold text-gray-900 mb-4">Guardian/Dependent Information</h2>
+
+      <% if @user.is_guardian? %>
+        <div class="mb-6">
+          <h3 class="text-lg font-medium text-gray-900 mb-2">Dependents Managed by <%= @user.full_name %></h3>
+          <% if @user.dependents.any? %>
+      <div class="mb-4 space-x-4">
+        <%= link_to 'Add Dependent to this Guardian',
+                    new_admin_guardian_relationship_path(guardian_id: @user.id), # Assuming this route exists or will be created
+                    class: 'inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500',
+                    data: { test_id: 'add-dependent-link' } %>
+      </div>
+      <ul role="list" class="space-y-4" id="dependents_managed_list">
+        <% @user.guardian_relationships_as_guardian.each do |gr| %>
+          <% dependent = gr.dependent_user %>
+          <li class="p-4 border border-gray-200 rounded-lg shadow-sm" id="dependent_<%= dependent.id %>">
+            <div class="flex items-center justify-between">
+              <div class="flex-1">
+                <p class="text-md font-semibold text-gray-900">
+                  <%= link_to dependent.full_name, admin_user_path(dependent), class: "text-indigo-600 hover:text-indigo-800" %>
+                </p>
+                <p class="text-sm text-gray-600">Relationship: <span class="font-medium"><%= gr.relationship_type %></span></p>
+                <p class="text-sm text-gray-500">Established: <%= gr.created_at.strftime("%B %d, %Y") %></p>
+              </div>
+              <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                <%= link_to "Start Paper Application", new_admin_paper_application_path(guardian_id: @user.id, dependent_id: dependent.id),
+                    class: "inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-full shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" %>
+              </div>
+            </div>
+          </li>
+        <% end %>
+      </ul>
+    <% else %>
+      <p class="text-gray-500 text-sm">This user does not manage any dependents yet.</p>
+      <div class="mt-4">
+        <%= link_to 'Add Dependent to this Guardian',
+                    new_admin_guardian_relationship_path(guardian_id: @user.id), # Assuming this route exists or will be created
+                    class: 'inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500' %>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+      <% if @user.is_dependent? %>
+        <div class="mb-4">
+          <%= link_to 'Back to Application Dashboard', admin_applications_path,
+              class: 'inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500',
+              aria: { label: 'Back to Application Dashboard' } %>
+        </div>
+        <div class="mb-6">
+          <h3 class="text-lg font-medium text-gray-900 mb-2">Guardians for <%= @user.full_name %></h3>
+           <% if @user.guardians.any? %>
+            <ul role="list" class="space-y-4" id="guardians_list">
+              <% @user.guardian_relationships_as_dependent.each do |gr| %>
+                <% guardian = gr.guardian_user %>
+                <li class="p-4 border border-gray-200 rounded-lg shadow-sm" id="guardian_<%= guardian.id %>">
+                  <div class="flex-1">
+                    <p class="text-md font-semibold text-gray-900">
+                      <%= link_to guardian.full_name, admin_user_path(guardian), class: "text-indigo-600 hover:text-indigo-800" %>
+                    </p>
+                    <p class="text-sm text-gray-600">Relationship: <span class="font-medium"><%= gr.relationship_type %></span></p>
+                    <p class="text-sm text-gray-500">Established: <%= gr.created_at.strftime("%B %d, %Y") %></p>
+                    <div class="mt-2">
+                      <p class="text-xs text-gray-500">Contact:</p>
+                      <p class="text-sm text-gray-700">Email: <%= mail_to guardian.email, guardian.email, class: "text-indigo-600 hover:text-indigo-500" %></p>
+                      <p class="text-sm text-gray-700">Phone: <%= guardian.phone || "Not provided" %></p>
+                    </div>
+                  </div>
+                </li>
+              <% end %>
+            </ul>
+          <% else %>
+            <p class="text-gray-500 text-sm">This user does not have any guardians listed yet.</p>
+          <% end %>
+          <%# Removed message about unimplemented add/remove functionality %>
+        </div>
+      <% end %>
+
+      <% if !@user.is_guardian? && !@user.is_dependent? %>
+        <p class="text-gray-500 text-sm">This user is neither a guardian nor a dependent in a recorded relationship.</p>
+        <%# Removed message about unimplemented add/remove functionality %>
+      <% end %>
+    </section>
+
+    <%# Add sections for Applications, Notes, etc. here if needed %>
+
+  </div>
+</main>

@@ -3,6 +3,9 @@
 require_relative 'boot'
 require 'rails/all'
 
+# Fix for Rails 8.0.2 + Ruby 3.4.2 compatibility issue
+require 'action_dispatch/routing/url_for'
+
 # Require the gems listed in Gemfile
 Bundler.require(*Rails.groups)
 

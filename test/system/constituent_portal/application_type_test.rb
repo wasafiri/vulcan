@@ -1,25 +1,33 @@
 # frozen_string_literal: true
 
 require 'application_system_test_case'
+require_relative '../../support/cuprite_test_bridge'
 
 module ConstituentPortal
   class ApplicationTypeTest < ApplicationSystemTestCase
+    include CupriteTestBridge
+
     setup do
-      @constituent = users(:constituent_alex)
-      sign_in(@constituent)
+      @constituent = create(:constituent)
+      enhanced_sign_in(@constituent) # Use enhanced sign-in for more reliable authentication
+
+      # Make sure we're starting on the dashboard
+      visit constituent_portal_dashboard_path
+      assert_current_path constituent_portal_dashboard_path
     end
 
     test 'application type is displayed correctly on show page' do
       # Visit the new application page
       visit new_constituent_portal_application_path
+      wait_for_page_load # Ensure the page is fully loaded before proceeding
 
       # Fill in required fields
       check 'I certify that I am a resident of Maryland'
       fill_in 'Household Size', with: 3
       fill_in 'Annual Income', with: 45_999
 
-      # Fill in medical provider info
-      within "section[aria-labelledby='medical-info-heading']" do
+      # Fill in medical provider info - use the actual fieldset identifier
+      within 'section', text: 'Medical Provider Information' do
         fill_in 'Name', with: 'Dr. Test Provider'
         fill_in 'Phone', with: '2025551234'
         fill_in 'Email', with: 'test@example.com'
@@ -63,38 +71,52 @@ module ConstituentPortal
     end
 
     test 'self_certify_disability is set correctly' do
-      skip 'This test is currently failing due to checkbox handling issues'
       # Visit the new application page
       visit new_constituent_portal_application_path
+      wait_for_page_load # Ensure the page is fully loaded
 
       # Fill in required fields
       check 'I certify that I am a resident of Maryland'
       fill_in 'Household Size', with: 3
       fill_in 'Annual Income', with: 45_999
 
-      # Check the self-certify disability checkbox
-      check 'I certify that I have a disability that affects my ability to access telecommunications services'
+      # Use a more reliable method to check the self-certify checkbox
+      # Use find + check to ensure we're finding the right element
+      within 'section', text: 'Disability Information' do
+        # Find the checkbox by its associated label text
+        check_box = find('label', text: /I certify that I have a disability/).find(:xpath, '..//input[@type="checkbox"]')
+        check_box.check
 
-      # Fill in medical provider info
-      within "section[aria-labelledby='medical-info-heading']" do
+        # Also check one of the specific disability checkboxes
+        find('label', text: 'Hearing').find(:xpath, '..//input[@type="checkbox"]').check
+      end
+
+      # Fill in medical provider info - use the actual section identifier
+      within 'section', text: 'Medical Provider Information' do
         fill_in 'Name', with: 'Dr. Test Provider'
         fill_in 'Phone', with: '2025551234'
         fill_in 'Email', with: 'test@example.com'
       end
 
-      # Save the application
-      click_button 'Save Application'
+      # Take a screenshot to debug if needed
+
+      # Save the application with explicit button identification
+      find('input[type="submit"][name="save_draft"]').click
 
       # Verify we're redirected to the show page
-      assert_text 'Application saved as draft.'
+      assert_text 'Application saved as draft.', wait: 5
 
       # Get the application ID from the URL
       current_url =~ %r{/applications/(\d+)}
       application_id = ::Regexp.last_match(1)
+      # Make sure we have a valid application ID
+      assert application_id.present?, "Failed to extract application ID from URL: #{current_url}"
+
       application = Application.find(application_id)
 
       # Debug the self_certify_disability field
       puts "DEBUG: self_certify_disability: #{application.self_certify_disability.inspect}"
+      puts "DEBUG: hearing_disability: #{application.user.hearing_disability.inspect}"
 
       # Verify the self_certify_disability field is set correctly
       assert application.self_certify_disability, 'self_certify_disability should be true'

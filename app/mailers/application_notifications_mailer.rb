@@ -10,6 +10,23 @@ class ApplicationNotificationsMailer < ApplicationMailer
     Rails.application.config.action_mailer.default_url_options
   end
 
+  def application_submitted(application)
+    @application = application
+    @user = application.user
+
+    # Set up mail options with CC for alternate contact if provided
+    mail_options = {
+      to: @user.email,
+      subject: 'Your Application Has Been Submitted',
+      message_stream: 'notifications'
+    }
+
+    # Add CC for alternate contact if email is provided
+    mail_options[:cc] = @application.alternate_contact_email if @application.alternate_contact_email.present?
+
+    mail(mail_options)
+  end
+
   # A helper method that handles common logging, instance variable setup,
   # subject formatting, and mail object creation.
 

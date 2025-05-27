@@ -6,12 +6,16 @@ export default class extends Controller {
   connect() {
     console.log("TOTP Form controller connected")
     this.enableSubmitButton()
+    
+    // Store bound method reference for proper cleanup
+    this._boundHandleStreamRender = this.handleStreamRender.bind(this)
+    
     // Listen for stream renders targeting our container
-    document.addEventListener("turbo:before-stream-render", this.handleStreamRender.bind(this))
+    document.addEventListener("turbo:before-stream-render", this._boundHandleStreamRender)
   }
 
   disconnect() {
-    document.removeEventListener("turbo:before-stream-render", this.handleStreamRender.bind(this))
+    document.removeEventListener("turbo:before-stream-render", this._boundHandleStreamRender)
     console.log("TOTP Form controller disconnected")
   }
 

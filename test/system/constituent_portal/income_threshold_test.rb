@@ -5,7 +5,7 @@ require 'application_system_test_case'
 module ConstituentPortal
   class IncomeThresholdTest < ApplicationSystemTestCase
     setup do
-      @constituent = users(:constituent_john)
+      @constituent = create(:constituent, email: 'john.doe@example.com', first_name: 'John', last_name: 'Doe')
       sign_in(@constituent)
 
       # Set up FPL policies for testing

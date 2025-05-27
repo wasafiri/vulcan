@@ -1,268 +1,139 @@
-import { Controller } from "@hotwired/stimulus"
+import { Controller } from "@hotwired/stimulus";
+import { setVisible } from "../utils/visibility";
 
-// Controls the Paper Application form behavior
 export default class extends Controller {
   static targets = [
-    "householdSize", 
-    "annualIncome", 
-    "submitButton", 
+    "householdSize", // Assuming these are still relevant for income validation
+    "annualIncome",  // Assuming these are still relevant for income validation
+    "submitButton",
     "rejectionModal",
-    "incomeProofRejectionReason",
-    "incomeProofRejectionNotes",
-    "residencyProofRejectionReason",
-    "residencyProofRejectionNotes"
-  ]
+    "incomeThresholdWarning",
+    "incomeThresholdBadge" // This was to be removed from view, but target kept for now if logic remains
+  ];
 
   connect() {
-    this.setupRadioListeners()
-    this.validateIncomeThreshold()
-    this.initializeFormValidation()
-    
-    // Enable file inputs for the pre-selected "accept" options
-    this.enableFileInput('income_proof')
-    this.enableFileInput('residency_proof')
-    
-    // Make sure rejection fields are hidden
-    document.getElementById('income_proof_rejection').classList.add('hidden')
-    document.getElementById('residency_proof_rejection').classList.add('hidden')
-    
-    // Notification method toggling is now handled by communication-preference controller
-    
-    // Add debug info
-    console.log('Paper application controller connected')
-    console.log('Income proof radio checked:', document.getElementById('accept_income_proof').checked)
-    console.log('Residency proof radio checked:', document.getElementById('accept_residency_proof').checked)
+    console.log("PaperApplicationController connected");
+    // Store bound method references for proper cleanup
+    this._boundValidateIncomeThreshold = this.validateIncomeThreshold.bind(this)
+    this.initializeIncomeValidation();
   }
 
-  // Notification method is now handled by communication-preference controller
-
-  setupRadioListeners() {
-    // Income proof radio buttons
-    document.getElementById('accept_income_proof').addEventListener('change', () => {
-      document.getElementById('income_proof_upload').classList.remove('hidden')
-      document.getElementById('income_proof_rejection').classList.add('hidden')
-      this.enableFileInput('income_proof')
-    })
-
-    document.getElementById('reject_income_proof').addEventListener('change', () => {
-      document.getElementById('income_proof_upload').classList.add('hidden')
-      document.getElementById('income_proof_rejection').classList.remove('hidden')
-      this.clearFileUpload('income_proof')
-      this.disableFileInput('income_proof')
-    })
-
-    // Residency proof radio buttons
-    document.getElementById('accept_residency_proof').addEventListener('change', () => {
-      document.getElementById('residency_proof_upload').classList.remove('hidden')
-      document.getElementById('residency_proof_rejection').classList.add('hidden')
-      this.enableFileInput('residency_proof')
-    })
-
-    document.getElementById('reject_residency_proof').addEventListener('change', () => {
-      document.getElementById('residency_proof_upload').classList.add('hidden')
-      document.getElementById('residency_proof_rejection').classList.remove('hidden')
-      this.clearFileUpload('residency_proof')
-      this.disableFileInput('residency_proof')
-    })
-  }
-
-  // Enable file input when Accept is selected
-  enableFileInput(inputName) {
-    const fileInput = document.querySelector(`input[name="${inputName}"]`)
-    if (fileInput) {
-      fileInput.disabled = false
+  disconnect() {
+    // Clean up event listeners
+    if (this.hasHouseholdSizeTarget) {
+      this.householdSizeTarget.removeEventListener('change', this._boundValidateIncomeThreshold);
+    }
+    if (this.hasAnnualIncomeTarget) {
+      this.annualIncomeTarget.removeEventListener('change', this._boundValidateIncomeThreshold);
     }
   }
 
-  // Disable file input when Reject is selected
-  disableFileInput(inputName) {
-    const fileInput = document.querySelector(`input[name="${inputName}"]`)
-    if (fileInput) {
-      fileInput.disabled = true
+  /**
+ * Set up income threshold validation
+ */
+  initializeIncomeValidation() {
+    // Find the income and household size fields
+    if (this.hasHouseholdSizeTarget && this.hasAnnualIncomeTarget) {
+      this.householdSizeTarget.addEventListener('change', this._boundValidateIncomeThreshold);
+      this.annualIncomeTarget.addEventListener('change', this._boundValidateIncomeThreshold);
+      // Initial validation on connect if values are present
+      this.validateIncomeThreshold();
     }
   }
 
-  // Clear file input when switching to Reject
-  clearFileUpload(inputName) {
-    // Clear file input
-    const fileInput = document.querySelector(`input[name="${inputName}"]`)
-    if (fileInput) {
-      fileInput.value = ''
-    }
-  }
+  /**
+ * Validate the income threshold based on household size and income
+ */
+  validateIncomeThreshold() {
+    if (!this.hasHouseholdSizeTarget || !this.hasAnnualIncomeTarget) return;
 
-  // Set up form validation before submission
-  initializeFormValidation() {
-    const form = this.element
-    form.addEventListener('submit', (event) => {
-      if (!this.validateForm()) {
-        event.preventDefault()
-      }
-    })
-  }
+    const householdSize = parseInt(this.householdSizeTarget.value, 10) || 0;
+    const annualIncome = parseFloat(this.annualIncomeTarget.value) || 0;
 
-  // Validate the form before submission
-  validateForm() {
-    let isValid = true
-    
-    // Validate email is present if notification method is email
-    const emailRadio = document.getElementById('communication_preference_email')
-    const letterRadio = document.getElementById('communication_preference_letter')
-    const emailField = document.querySelector('input[name="constituent[email]"]')
-    
-    if (emailRadio && emailRadio.checked && (!emailField || !emailField.value.trim())) {
-      this.showError('Email is required when Email notification method is selected')
-      isValid = false
+    // Don't validate if either is not set or invalid
+    if (householdSize <= 0 || annualIncome <= 0) {
+      // Reset UI if inputs are cleared or invalid
+      this.updateIncomeThresholdUI(false, 0);
+      return;
     }
-    
-    // If letter notification is selected, check that physical address fields are filled
-    if (letterRadio && letterRadio.checked) {
-      const addressField = document.querySelector('input[name="constituent[physical_address_1]"]')
-      const cityField = document.querySelector('input[name="constituent[city]"]')
-      const zipField = document.querySelector('input[name="constituent[zip_code]"]')
-      
-      if (!addressField || !addressField.value.trim()) {
-        this.showError('Physical address is required for mailed letter notifications')
-        isValid = false
-      }
-      
-      if (!cityField || !cityField.value.trim()) {
-        this.showError('City is required for mailed letter notifications')
-        isValid = false
-      }
-      
-      if (!zipField || !zipField.value.trim()) {
-        this.showError('ZIP code is required for mailed letter notifications')
-        isValid = false
-      }
-    }
-    
-    // Validate income proof
-    if (document.getElementById('accept_income_proof').checked) {
-      const fileInput = document.querySelector('input[name="income_proof"]')
-      if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-        this.showError('Please upload an income proof document')
-        isValid = false
-      }
-    } else if (document.getElementById('reject_income_proof').checked) {
-      const reasonSelect = document.querySelector('select[name="income_proof_rejection_reason"]')
-      if (!reasonSelect || !reasonSelect.value) {
-        this.showError('Please select a reason for rejecting income proof')
-        isValid = false
-      }
-    } else {
-      this.showError('Please select an option for income proof')
-      isValid = false
-    }
-    
-    // Validate residency proof
-    if (document.getElementById('accept_residency_proof').checked) {
-      const fileInput = document.querySelector('input[name="residency_proof"]')
-      if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-        this.showError('Please upload a residency proof document')
-        isValid = false
-      }
-    } else if (document.getElementById('reject_residency_proof').checked) {
-      const reasonSelect = document.querySelector('select[name="residency_proof_rejection_reason"]')
-      if (!reasonSelect || !reasonSelect.value) {
-        this.showError('Please select a reason for rejecting residency proof')
-        isValid = false
-      }
-    } else {
-      this.showError('Please select an option for residency proof')
-      isValid = false
-    }
-    
-    return isValid
-  }
-  
-  // Notification method is now handled by communication-preference controller
 
-  // Show an error message at the top of the form
-  showError(message) {
-    // Check if error container already exists
-    let errorContainer = document.querySelector('.form-error-container')
-    if (!errorContainer) {
-      // Create new error container if not found
-      errorContainer = document.createElement('div')
-      errorContainer.className = 'form-error-container bg-red-100 border border-red-400 text-red-700 p-4 rounded mb-4'
-      this.element.insertBefore(errorContainer, this.element.firstChild)
-    }
-    
-    const errorMessage = document.createElement('p')
-    errorMessage.textContent = message
-    errorContainer.appendChild(errorMessage)
-  }
+    // Fetch FPL data - In a real app, this might come from an API endpoint or data attributes
+    // For now, using the placeholder from the original controller.
+    // Consider fetching /admin/paper_applications/fpl_thresholds if this needs to be dynamic
+    fetch('/admin/paper_applications/fpl_thresholds')
+      .then(response => {
+        if (!response.ok) throw new Error('Network response was not ok');
+        return response.json();
+      })
+      .then(data => {
+        const baseThreshold = data.thresholds[householdSize] || data.thresholds[Object.keys(data.thresholds).pop()]; // Fallback
+        const modifierPercentage = data.modifier;
 
-  async validateIncomeThreshold() {
-    if (!this.hasHouseholdSizeTarget || !this.hasAnnualIncomeTarget) return
-
-    const householdSize = parseInt(this.householdSizeTarget.value) || 0
-    const annualIncome = parseFloat(this.annualIncomeTarget.value) || 0
-    
-    if (householdSize <= 0 || annualIncome <= 0) return
-    
-    try {
-      // Fetch FPL thresholds from the server
-      const response = await fetch('/admin/paper_applications/fpl_thresholds')
-      const data = await response.json()
-      
-      // Calculate the threshold for the household size
-      let size = Math.min(householdSize, 8) // Max 8 person household in our thresholds
-      let baseFpl = data.thresholds[size] || data.thresholds[8] // Default to 8 if size not found
-      let threshold = baseFpl * (data.modifier / 100.0)
-      
-      const exceedsThreshold = annualIncome > threshold
-      
-      // Show warning if income exceeds threshold
-      const warningElement = document.getElementById('income-threshold-warning')
-      const rejectionButton = document.getElementById('rejection-button')
-      
-      if (exceedsThreshold) {
-        warningElement.classList.remove('hidden')
-        rejectionButton.classList.remove('hidden')
-        this.submitButtonTarget.disabled = true
-      } else {
-        warningElement.classList.add('hidden')
-        rejectionButton.classList.add('hidden')
-        this.submitButtonTarget.disabled = false
-      }
-      
-      // Update badge
-      const badgeElement = document.getElementById('income-threshold-badge')
-      if (badgeElement) {
-        if (exceedsThreshold) {
-          badgeElement.classList.remove('hidden')
-        } else {
-          badgeElement.classList.add('hidden')
+        if (baseThreshold === undefined || modifierPercentage === undefined) {
+          console.error("FPL data missing for household size or modifier.");
+          this.updateIncomeThresholdUI(false, 0); // Reset UI on error
+          return;
         }
+
+        const maxIncomeThreshold = baseThreshold * (modifierPercentage / 100);
+        const exceedsThreshold = annualIncome > maxIncomeThreshold;
+        this.updateIncomeThresholdUI(exceedsThreshold, maxIncomeThreshold);
+      })
+      .catch(error => {
+        console.error('Error fetching FPL thresholds:', error);
+        this.updateIncomeThresholdUI(false, 0); // Reset UI on error
+        // Optionally show an error message to the user
+        if (this.hasIncomeThresholdWarningTarget) {
+            this.incomeThresholdWarningTarget.innerHTML = '<p class="text-red-700">Could not verify income threshold. Please try again.</p>';
+            setVisible(this.incomeThresholdWarningTarget, true);
+        }
+      });
+  }
+
+  /**
+ * Update the UI for income threshold validation
+ * @param {boolean} exceedsThreshold Whether income exceeds threshold
+ * @param {number} maxThreshold The maximum threshold amount (currently unused in UI update)
+ */
+  updateIncomeThresholdUI(exceedsThreshold, _maxThreshold) {
+    if (this.hasIncomeThresholdWarningTarget) {
+      setVisible(this.incomeThresholdWarningTarget, exceedsThreshold);
+    }
+    // The incomeThresholdBadgeTarget was removed from the view in the proposal.
+    // If it's truly gone, this line can be removed. Keeping for now.
+    if (this.hasIncomeThresholdBadgeTarget) {
+      setVisible(this.incomeThresholdBadgeTarget, exceedsThreshold);
+    }
+
+    if (this.hasSubmitButtonTarget) {
+      // Setting the property AND the attribute for the selector to match
+      this.submitButtonTarget.disabled = exceedsThreshold;
+      
+      // This is critical: For the CSS selector input[type=submit][disabled] to match,
+      // we need to set the HTML attribute, not just the JS property
+      if (exceedsThreshold) {
+        this.submitButtonTarget.setAttribute('disabled', 'disabled');
+      } else {
+        this.submitButtonTarget.removeAttribute('disabled');
       }
-    } catch (error) {
-      console.error('Error validating income threshold:', error)
+    }
+
+    const rejectionButton = document.getElementById('rejection-button'); // Still using getElementById as per original
+    if (rejectionButton) {
+      setVisible(rejectionButton, exceedsThreshold);
     }
   }
-  
+
+  /* Modal helpers */
   openRejectionModal() {
-    if (!this.hasRejectionModalTarget) return
-    
-    // Copy constituent information to the modal form
-    const firstNameField = document.querySelector('input[name="constituent[first_name]"]')
-    const lastNameField = document.querySelector('input[name="constituent[last_name]"]')
-    const emailField = document.querySelector('input[name="constituent[email]"]')
-    const phoneField = document.querySelector('input[name="constituent[phone]"]')
-    
-    document.querySelector('input[name="first_name"]').value = firstNameField?.value || ''
-    document.querySelector('input[name="last_name"]').value = lastNameField?.value || ''
-    document.querySelector('input[name="email"]').value = emailField?.value || ''
-    document.querySelector('input[name="phone"]').value = phoneField?.value || ''
-    document.querySelector('input[name="household_size"]').value = this.householdSizeTarget?.value || ''
-    document.querySelector('input[name="annual_income"]').value = this.annualIncomeTarget?.value || ''
-    
-    this.rejectionModalTarget.classList.remove('hidden')
+    if (this.hasRejectionModalTarget) {
+      setVisible(this.rejectionModalTarget, true);
+    }
   }
-  
+
   closeRejectionModal() {
-    if (!this.hasRejectionModalTarget) return
-    this.rejectionModalTarget.classList.add('hidden')
+    if (this.hasRejectionModalTarget) {
+      setVisible(this.rejectionModalTarget, false);
+    }
   }
 }

@@ -8,10 +8,10 @@ module Admin
     include ActionDispatch::TestProcess::FixtureFile
 
     setup do
-      @admin = users(:admin_david)
-      @evaluator = users(:evaluator_betsy)
-      @medical_provider = users(:medical_provider)
-      @application = applications(:draft_application)
+      @admin = create(:admin)
+      @evaluator = create(:user, :evaluator)
+      @medical_provider = create(:user, :medical_provider)
+      @application = create(:application, :draft)
 
       setup_active_storage_test
       sign_in(@admin)

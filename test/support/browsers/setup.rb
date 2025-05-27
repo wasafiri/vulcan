@@ -4,66 +4,35 @@ require 'capybara'
 require 'selenium-webdriver'
 require_relative 'version'
 require_relative 'paths'
-require_relative 'downloader'
 
 module TestBrowsers
-  # Main configuration method to set up Chrome for Testing
+  # Main configuration method to set up Chrome
   def self.configure!
-    # Download Chrome for Testing and ChromeDriver if not already present
-    Downloader.ensure_binaries!
+    # Use webdrivers gem for Chrome/ChromeDriver management
+    fallback_to_webdrivers
 
-    # Register the custom Chrome for Testing driver
-    register_chrome_for_testing_driver
+    # Register the custom Chrome driver
+    register_chrome_driver
 
     # Set default driver to our custom driver
-    Capybara.javascript_driver = :chrome_for_testing
+    Capybara.javascript_driver = :chrome_headless
 
-    puts "Chrome for Testing configuration complete! Using version: #{Version::CHROME_VERSION}"
-    puts "Chrome binary: #{Paths.chrome_binary}"
-    puts "ChromeDriver binary: #{Paths.chromedriver_binary}"
-
-    # Verify the binaries are executable
-    if File.executable?(Paths.chrome_binary)
-      puts 'Chrome binary is executable ✓'
-    else
-      puts 'WARNING: Chrome binary is not executable!'
-      begin
-        File.chmod(0o755, Paths.chrome_binary)
-      rescue StandardError
-        nil
-      end
-    end
-
-    if File.executable?(Paths.chromedriver_binary)
-      puts 'ChromeDriver binary is executable ✓'
-    else
-      puts 'WARNING: ChromeDriver binary is not executable!'
-      begin
-        File.chmod(0o755, Paths.chromedriver_binary)
-      rescue StandardError
-        nil
-      end
-    end
+    puts "Chrome configuration complete!" if ENV['VERBOSE_TESTS']
   end
 
-  # Register a custom Capybara driver that uses Chrome for Testing
-  def self.register_chrome_for_testing_driver
-    Capybara.register_driver :chrome_for_testing do |app|
+  # Register a custom Capybara driver that uses standard Chrome
+  def self.register_chrome_driver
+    Capybara.register_driver :chrome_headless do |app|
       # Create Chrome options
       options = chrome_options
 
-      # Configure the Chrome service to use our ChromeDriver
-      service = chrome_service
-
-      puts "Registering Chrome for Testing driver with options: #{options.args.join(', ')}"
-      puts "ChromeDriver service path: #{service.path}"
+      puts "Registering Chrome driver with options: #{options.args.join(', ')}" if ENV['VERBOSE_TESTS']
 
       # Create and return the Selenium driver
       Capybara::Selenium::Driver.new(
         app,
         browser: :chrome,
         options: options,
-        service: service,
         # Add timeout options to help with connection issues
         http_client: Selenium::WebDriver::Remote::Http::Default.new(
           read_timeout: 120,
@@ -77,20 +46,22 @@ module TestBrowsers
   def self.chrome_options
     options = Selenium::WebDriver::Chrome::Options.new
 
-    # Set the Chrome binary path to our downloaded version
-    options.binary = Paths.chrome_binary.to_s
-
     # Common options for testing
     options.add_argument('--headless=new')
     options.add_argument('--disable-gpu')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--window-size=1400,1000')
-    options.add_argument('--verbose')
-
-    # Add this to give more details on session issues
-    options.add_argument('--enable-logging')
-    options.add_argument('--log-level=0')
+    # Only add verbose logging when explicitly requested
+    if ENV['VERBOSE_TESTS']
+      options.add_argument('--verbose')
+      options.add_argument('--enable-logging')
+      options.add_argument('--log-level=0')
+    else
+      # Quiet mode - suppress most logging
+      options.add_argument('--log-level=3') # Only fatal errors
+      options.add_argument('--silent')
+    end
 
     # Performance optimizations
     options.add_argument('--disable-site-isolation-trials')
@@ -118,12 +89,11 @@ module TestBrowsers
     # Disable automation flags that might cause detection
     options.add_argument('--disable-blink-features=AutomationControlled')
 
-    # Debug logging when needed
-    options.add_argument('--enable-logging')
-    options.add_argument('--v=1')
-
-    # Set Chrome for Testing user data directory
-    options.add_argument("--user-data-dir=#{Paths.root.join('user_data')}")
+    # Debug logging when needed (only in verbose mode)
+    if ENV['VERBOSE_TESTS']
+      options.add_argument('--enable-logging')
+      options.add_argument('--v=1')
+    end
 
     # Add option to maintain connection
     options.add_argument('--disable-session-crashed-bubble')
@@ -132,31 +102,9 @@ module TestBrowsers
     options
   end
 
-  # Configure the Chrome service to use our ChromeDriver
-  def self.chrome_service
-    service = Selenium::WebDriver::Chrome::Service.new(
-      path: Paths.chromedriver_binary.to_s,
-      port: random_free_port,
-      args: ['--verbose', '--log-path=chromedriver.log']
-    )
-
-    # Ensure ChromeDriver is executable
-    File.chmod(0o755, service.path) if File.exist?(service.path)
-
-    service
-  end
-
-  # Find a random free port for ChromeDriver
-  def self.random_free_port
-    server = TCPServer.new('127.0.0.1', 0)
-    port = server.addr[1]
-    server.close
-    port
-  end
-
-  # Fallback to using webdrivers if our Chrome for Testing setup fails
+  # Use webdrivers gem for Chrome/ChromeDriver management
   def self.fallback_to_webdrivers
-    puts 'Falling back to webdrivers gem for browser automation'
+    puts 'Using webdrivers gem for browser automation' if ENV['VERBOSE_TESTS']
 
     require 'webdrivers'
 
@@ -168,7 +116,7 @@ module TestBrowsers
       Webdrivers::Chromedriver.update
       true
     rescue StandardError => e
-      puts "Warning: ChromeDriver update failed: #{e.message}"
+      puts "Warning: ChromeDriver update failed: #{e.message}" if ENV['VERBOSE_TESTS']
       false
     end
   end

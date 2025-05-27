@@ -5,6 +5,230 @@ module Admin
     before_action :authenticate_user!
     before_action :require_admin!
 
+    def index
+      @q = params[:q]
+      @role_filter = params[:role] # e.g., "guardian" or "dependent" from paper app form
+      @frame_id = params[:turbo_frame_id] # e.g., "guardian_search_results"
+
+      # Base query with ordering
+      base_query = User.order(:type, :last_name, :first_name)
+
+      if @q.present?
+        query_term = "%#{@q.downcase}%"
+        base_query = base_query.where(
+          'LOWER(first_name) ILIKE :q OR LOWER(last_name) ILIKE :q OR LOWER(email) ILIKE :q', q: query_term
+        )
+      elsif turbo_frame_request_id&.end_with?('_search_results')
+        # If no query, and it's a turbo frame request for search, return empty results
+        base_query = base_query.none
+      end
+
+      # Fetch limited results for dropdown
+      @users = base_query.limit(10).to_a
+
+      respond_to do |format|
+        format.html do
+          if turbo_frame_request_id == "#{@role_filter}_search_results" || @frame_id == "#{@role_filter}_search_results"
+            render partial: 'admin/users/user_search_results_list', locals: { users: @users, role: @role_filter }
+          elsif @q.blank?
+            # For full page load without query, re-query without limit
+            @users = User.order(:type, :last_name, :first_name).to_a
+
+            # Only get the counts that the index view needs to avoid N+1 queries
+            constituent_ids = @users.select { |user| user.is_a?(Users::Constituent) }.map(&:id)
+            if constituent_ids.any?
+              constituent_records = {}
+
+              # Get counts directly rather than loading associations
+              dependents_counts = GuardianRelationship.where(guardian_id: constituent_ids)
+                                                      .group(:guardian_id)
+                                                      .count
+
+              has_guardian = GuardianRelationship.where(dependent_id: constituent_ids)
+                                                 .distinct
+                                                 .pluck(:dependent_id)
+
+              # Get the actual users
+              Users::Constituent.where(id: constituent_ids).find_each do |user|
+                # Store the counts as attributes on the user
+                user.instance_variable_set(:@dependents_count, dependents_counts[user.id] || 0)
+                user.instance_variable_set(:@has_guardian, has_guardian.include?(user.id))
+
+                # Add helper methods to access this data
+                class << user
+                  def dependents_count
+                    @dependents_count || 0
+                  end
+
+                  def has_guardian?
+                    @has_guardian || false
+                  end
+                end
+
+                constituent_records[user.id] = user
+              end
+
+              # Replace the users in the array with our enhanced users
+              @users.each_with_index do |user, index|
+                @users[index] = constituent_records[user.id] if user.is_a?(Users::Constituent) && constituent_records[user.id]
+              end
+            end
+          end
+        end
+        format.json { render json: @users.as_json(only: %i[id first_name last_name email]) }
+      end
+    end
+
+    def show
+      # Fetch the user without eager loading problematic associations
+      @user = User.find(params[:id])
+
+      # Only enhance the data if this is a Constituent user
+      return unless @user.is_a?(Users::Constituent)
+
+      # Get relationship info directly without using eager loading
+      dependent_rels = GuardianRelationship.where(guardian_id: @user.id)
+                                           .select(:id, :guardian_id, :dependent_id, :relationship_type)
+                                           .to_a
+
+      guardian_rels = GuardianRelationship.where(dependent_id: @user.id)
+                                          .select(:id, :guardian_id, :dependent_id, :relationship_type)
+                                          .to_a
+
+      # Manually fetch the related users to avoid eager loading warnings
+      all_user_ids = dependent_rels.map(&:dependent_id) + guardian_rels.map(&:guardian_id)
+
+      if all_user_ids.any?
+        related_users = User.where(id: all_user_ids).index_by(&:id)
+
+        # Attach the dependent users to dependent relationships
+        dependent_rels.each do |rel|
+          # Define a method to get the dependent user
+          rel.define_singleton_method(:dependent_user) do
+            related_users[rel.dependent_id]
+          end
+        end
+
+        # Attach the guardian users to guardian relationships
+        guardian_rels.each do |rel|
+          # Define a method to get the guardian user
+          rel.define_singleton_method(:guardian_user) do
+            related_users[rel.guardian_id]
+          end
+        end
+      end
+
+      # Set instance variables for the view
+      @dependents_count = dependent_rels.size
+      @has_guardian = guardian_rels.any?
+      @guardian_relationships = guardian_rels
+      @dependent_relationships = dependent_rels
+
+      # Add helper methods to this specific user object
+      @user.instance_variable_set(:@dependents_count, @dependents_count)
+      @user.instance_variable_set(:@has_guardian, @has_guardian)
+
+      # Define the helper methods on the instance
+      class << @user
+        def dependents_count
+          @dependents_count || 0
+        end
+
+        def has_guardian?
+          @has_guardian || false
+        end
+      end
+    end
+
+    def edit; end
+
+    # Create action for creating a new guardian from the paper application form
+    def create
+      @user = Users::Constituent.new(user_create_params)
+      @user.password = @user.password_confirmation = SecureRandom.hex(8)
+      @user.force_password_change = true
+      @user.verified = true
+
+      # Check for potential duplicates based on Name + DOB
+      @user.needs_duplicate_review = true if potential_duplicate_found?(@user)
+
+      if @user.save
+        render json: {
+          success: true,
+          user: @user.as_json(only: %i[id first_name last_name email phone
+                                       physical_address_1 physical_address_2 city state zip_code])
+        }
+      else
+        render json: {
+          success: false,
+          errors: @user.errors.full_messages
+        }, status: :unprocessable_entity
+      end
+    end
+
+    # New dedicated search endpoint for user search
+    def search
+      @q = params[:q]
+      @role_filter = params[:role] # e.g., "guardian" or "dependent" from paper app form
+      @frame_id = "#{@role_filter}_search_results"
+
+      base_query = User.order(:last_name, :first_name)
+
+      if @q.present?
+        query_term = "%#{@q.downcase}%"
+        base_query = base_query.where(
+          'LOWER(first_name) ILIKE :q OR LOWER(last_name) ILIKE :q OR LOWER(email) ILIKE :q', q: query_term
+        )
+      else
+        # If no query, return empty results
+        base_query = base_query.none
+      end
+
+      # Get basic users without eager loading
+      @users = base_query.limit(10).to_a # Limit results for search dropdown
+
+      # Selectively optimize for Users::Constituent models
+      constituent_ids = @users.select { |user| user.is_a?(Users::Constituent) }.map(&:id)
+      if constituent_ids.any?
+        constituent_records = {}
+
+        # Get counts directly rather than loading associations
+        dependents_counts = GuardianRelationship.where(guardian_id: constituent_ids)
+                                                .group(:guardian_id)
+                                                .count
+
+        has_guardian = GuardianRelationship.where(dependent_id: constituent_ids)
+                                           .distinct
+                                           .pluck(:dependent_id)
+
+        # Get the actual users and enhance them
+        Users::Constituent.where(id: constituent_ids).find_each do |user|
+          user.instance_variable_set(:@dependents_count, dependents_counts[user.id] || 0)
+          user.instance_variable_set(:@has_guardian, has_guardian.include?(user.id))
+
+          # Add helper methods to access the data
+          class << user
+            def dependents_count
+              @dependents_count || 0
+            end
+
+            def has_guardian?
+              @has_guardian || false
+            end
+          end
+
+          constituent_records[user.id] = user
+        end
+
+        # Replace the users in the array with our enhanced users
+        @users.each_with_index do |user, index|
+          @users[index] = constituent_records[user.id] if user.is_a?(Users::Constituent) && constituent_records[user.id]
+        end
+      end
+
+      render partial: 'admin/users/user_search_results_list', locals: { users: @users, role: @role_filter }
+    end
+
     # Define the mapping from expected demodulized names to full namespaced names.
     # These should match the actual class names under the Users module.
     VALID_USER_TYPES = {
@@ -15,12 +239,6 @@ module Admin
       'Vendor' => 'Users::Vendor',
       'Trainer' => 'Users::Trainer'
     }.freeze
-
-    def index
-      @users = User.includes(:role_capabilities)
-                   .order(:type, :last_name, :first_name)
-                   .to_a
-    end
 
     def update_role
       # This logger is crucial to see what Rails gives us *before* any of our logic.
@@ -147,10 +365,6 @@ module Admin
       }, status: :unprocessable_entity
     end
 
-    def show; end
-
-    def edit; end
-
     def update; end
 
     def constituents
@@ -180,7 +394,55 @@ module Admin
     end
 
     def user_params
-      params.require(:user).permit(:type, capabilities: [])
+      params.expect(user: [:type, { capabilities: [] }])
+    end
+
+    # Handles updating capabilities for a user
+    # Used by update_role to ensure capabilities are maintained when changing user types
+    def update_user_capabilities(user, capabilities)
+      return if capabilities.blank?
+
+      # Clear existing capabilities first
+      user.role_capabilities.destroy_all
+
+      # Add each new capability
+      capabilities.each do |capability|
+        user.add_capability(capability)
+      end
+    end
+
+    # Permits parameters for creating a constituent user
+    # Called in the create action
+    def user_create_params
+      # When called from the admin UI (normal user create form), parameters come wrapped in :user
+      # When called from the paper application form, parameters come directly (unwrapped)
+      if params.key?(:user)
+        params.expect(
+          user: %i[first_name last_name email phone
+                   physical_address_1 physical_address_2
+                   city state zip_code date_of_birth
+                   communication_preference locale]
+        )
+      else
+        # Handle direct params from paper application form's guardian_attributes
+        params.permit(
+          :first_name, :last_name, :email, :phone,
+          :physical_address_1, :physical_address_2,
+          :city, :state, :zip_code, :date_of_birth,
+          :communication_preference, :locale
+        )
+      end
+    end
+
+    # Checks for possible duplicate users based on name and date of birth
+    # Called in the create action to flag potential duplicates for review
+    def potential_duplicate_found?(user)
+      return false unless user.first_name.present? && user.last_name.present? && user.date_of_birth.present?
+
+      User.exists?(['LOWER(first_name) = ? AND LOWER(last_name) = ? AND date_of_birth = ?',
+                    user.first_name.downcase,
+                    user.last_name.downcase,
+                    user.date_of_birth])
     end
   end
 end

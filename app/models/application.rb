@@ -3,10 +3,13 @@
 # Manages the application lifecycle including proof submission, review,
 # medical certification, training sessions, evaluations, and voucher issuance
 class Application < ApplicationRecord
+  # Alternate contact validations
+  validates :alternate_contact_phone,
+            format: { with: /\A\+?[\d\-\(\)\s]+\z/, allow_blank: true }
+  validates :alternate_contact_email,
+            format: { with: URI::MailTo::EMAIL_REGEXP, allow_blank: true }
   # Virtual attribute to hold nested medical provider params for the form
   attr_accessor :medical_provider_attributes
-
-  delegate :guardian_relationship, :guardian_relationship=, to: :user, allow_nil: true
 
   # Concerns
   include ApplicationStatusManagement
@@ -27,6 +30,12 @@ class Application < ApplicationRecord
              class_name: 'User',
              optional: true,
              inverse_of: :income_verified_applications
+
+  belongs_to :managing_guardian, # NEW ASSOCIATION
+             class_name: 'User',
+             optional: true,
+             inverse_of: :managed_applications # User model will need has_many :managed_applications
+
   has_many :training_sessions, class_name: 'TrainingSession'
   has_many :trainers, through: :training_sessions
   has_many :evaluations, dependent: :destroy
@@ -76,7 +85,7 @@ class Application < ApplicationRecord
   }, prefix: :medical_certification_status
 
   # Validations
-  validates :user, :application_date, :status, presence: true
+  validates :application_date, :status, presence: true
   validates :maryland_resident, inclusion: { in: [true], message: 'You must be a Maryland resident to apply' }, unless: :status_draft?
   validates :terms_accepted, :information_verified, :medical_release_authorized,
             acceptance: { accept: true }, if: :submitted?
@@ -84,13 +93,17 @@ class Application < ApplicationRecord
             presence: true, unless: :status_draft?
   validates :household_size, :annual_income, presence: true, unless: :status_draft?
   validates :self_certify_disability, inclusion: { in: [true, false] }, unless: :status_draft?
-  validates :guardian_relationship, presence: true, if: :is_guardian?
+  # REMOVED VALIDATION: validates :guardian_relationship, presence: true, if: :is_guardian?
+  # The old :is_guardian? method on Application is also being replaced/repurposed.
 
   validate :waiting_period_completed, on: :create
   validate :constituent_must_have_disability, if: :validate_disability?
 
+  after_create :ensure_managing_guardian_set
   # Callbacks
   after_update :log_status_change, if: :saved_change_to_status?
+  after_save :ensure_managing_guardian_set, if: :user_id_previously_changed?
+  after_save :log_alternate_contact_changes, if: :saved_change_to_alternate_contact?
 
   # Scopes
   scope :draft, -> { where(status: :draft) }
@@ -98,6 +111,27 @@ class Application < ApplicationRecord
     includes(:user, :proof_reviews, :training_sessions, :evaluations)
       .where('users.last_name ILIKE ?', "%#{query}%")
       .references(:users)
+  }
+
+  # Guardian/Dependent relationship scopes
+  scope :managed_by, lambda { |guardian_user|
+    where(managing_guardian_id: guardian_user.id)
+  }
+
+  scope :for_dependents_of, lambda { |guardian_user|
+    if guardian_user
+      joins('INNER JOIN guardian_relationships ON applications.user_id = guardian_relationships.dependent_id')
+        .where(guardian_relationships: { guardian_id: guardian_user.id })
+    else
+      none
+    end
+  }
+
+  # Returns all applications related to a guardian, either managed by them
+  # or for one of their dependents (even if not managed by this guardian)
+  scope :related_to_guardian, lambda { |guardian_user|
+    managed_by(guardian_user)
+      .or(for_dependents_of(guardian_user))
   }
 
   # Alias scopes for approved applications
@@ -225,6 +259,58 @@ class Application < ApplicationRecord
     end
   end
 
+  # New method to check if the application is for a dependent (managed by a guardian)
+  def for_dependent?
+    managing_guardian_id.present?
+  end
+
+  # Returns the guardian relationship type for this application
+  def guardian_relationship_type
+    return nil unless for_dependent?
+
+    # Look up the relationship type from the GuardianRelationship table
+    GuardianRelationship.find_by(
+      guardian_id: managing_guardian_id,
+      dependent_id: user_id
+    )&.relationship_type
+  end
+
+  # Add a condition method to check if any alternate contact field changed
+  def saved_change_to_alternate_contact?
+    saved_change_to_alternate_contact_name? ||
+      saved_change_to_alternate_contact_phone? ||
+      saved_change_to_alternate_contact_email?
+  end
+
+  # Log changes to alternate contact fields
+  def log_alternate_contact_changes
+    changed_attributes = {}
+    %w[name phone email].each do |field|
+      attribute = "alternate_contact_#{field}"
+      if saved_change_to_attribute?(attribute)
+        old_value, new_value = saved_change_to_attribute(attribute)
+        changed_attributes[attribute] = { old: old_value, new: new_value }
+      end
+    end
+
+    # Only log if there were actual changes to alternate contact fields
+    return unless changed_attributes.present?
+
+    # Use Event model to log the changes
+    Event.create!(
+      user: Current.user || user, # Use Current.user if available, otherwise fall back to the application's user
+      action: 'alternate_contact_updated',
+      metadata: {
+        application_id: id,
+        changes: changed_attributes,
+        changed_by: Current.user&.id,
+        timestamp: Time.current.iso8601
+      }
+    )
+  rescue StandardError => e
+    Rails.logger.error "Failed to log alternate contact changes for application #{id}: #{e.message}"
+  end
+
   private
 
   def log_status_change
@@ -302,19 +388,7 @@ class Application < ApplicationRecord
     types
   end
 
-  def is_guardian?
-    # Get the value from the form submission if it's being processed
-    if @attributes && @attributes['is_guardian'].present?
-      # Use the form-submitted value
-      ActiveModel::Type::Boolean.new.cast(@attributes['is_guardian'].value)
-    elsif user&.changed? && user.changes.include?('is_guardian')
-      # User has pending changes that aren't saved yet
-      user.is_guardian_will_change
-    else
-      # Fall back to the current database value
-      user&.is_guardian == true
-    end
-  end
+  # Method replaced by for_dependent?
 
   def constituent_must_have_disability
     return if user&.disability_selected?
@@ -328,5 +402,26 @@ class Application < ApplicationRecord
     return true if submitted?
 
     false
+  end
+
+  # Ensures the managing_guardian_id is set when the application is for a dependent
+  # This is called after create and when user_id changes
+  def ensure_managing_guardian_set
+    # Skip if the application already has a managing guardian
+    return if managing_guardian_id.present?
+
+    # Skip if there's no user set yet
+    return if user_id.blank?
+
+    # Find if there's any guardian relationship for this user (dependent)
+    guardian_relationship = GuardianRelationship.where(dependent_id: user_id).first
+
+    # If there is a guardian relationship, set the managing_guardian_id to the guardian_id
+    return unless guardian_relationship.present?
+
+    Rails.logger.info "Setting managing_guardian_id to #{guardian_relationship.guardian_id} for application #{id}"
+
+    # Use update_column to avoid callbacks and validations
+    update_column(:managing_guardian_id, guardian_relationship.guardian_id)
   end
 end

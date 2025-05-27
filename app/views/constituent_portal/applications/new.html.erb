@@ -6,7 +6,13 @@
     </a>
     <!-- Wrap the form container with an id for the skip link -->
     <div id="main-content" tabindex="-1" class="bg-white p-4 sm:p-8 rounded shadow-md">
-      <h1 class="text-2xl font-semibold mb-6 text-center" id="form-title">New Application</h1>
+      <h1 class="text-2xl font-semibold mb-6 text-center" id="form-title" data-dependent-selector-target="formTitle">
+        <% if @application.for_dependent? && @application.user.present? %>
+          New Application for <%= @application.user.full_name %>
+        <% else %>
+          New Application
+        <% end %>
+      </h1>
 
       <% if flash[:alert] %>
         <div class="bg-red-100 border border-red-400 text-red-700 p-4 rounded mb-4" role="alert" aria-live="polite">
@@ -19,10 +25,11 @@
           class: "space-y-6",
           "aria-labelledby": "form-title",
           data: { 
-            controller: "application-form autosave", 
+            controller: "income-validation currency-formatter accessibility-announcer autosave", 
             autosave_target: "form",
             autosave_url_value: autosave_field_constituent_portal_applications_path,
-            autosave_debounce_wait_value: 1000
+            autosave_debounce_wait_value: 1000,
+            income_validation_fpl_url_value: fpl_thresholds_constituent_portal_applications_path
           }) do |form| %>
           
         <!-- Autosave status indicator -->
@@ -78,11 +85,10 @@
               <%= form.number_field :household_size,
                   min: 1,
                   required: true,
-                  class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md",
+                  class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-500 rounded-md",
                   "aria-describedby": "household_size_help",
                   data: { 
-                    application_form_target: "householdSize",
-                    action: "change->application-form#validateIncomeThreshold blur->application-form#validateIncomeThreshold"
+                    income_validation_target: "householdSize"
                   } %>
             </div>
             <p class="mt-2 text-sm text-gray-700" id="household_size_help">
@@ -90,27 +96,34 @@
             </p>
           </div>
 
-          <div>
-            <%= form.label :annual_income, "Annual Income", class: "block text-sm font-medium text-gray-700" %>
-            <div class="mt-1 relative rounded-md shadow-sm">
+          <div class="p-4 border-2 border-indigo-200 rounded-md bg-indigo-50">
+            <%= form.label :annual_income, "Annual Income", id: "annual_income_label", class: "block text-base font-semibold text-indigo-800" %>
+            <div class="mt-2 relative rounded-md shadow-sm">
               <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span class="text-gray-700 sm:text-sm">$</span>
+                <span class="text-gray-700 sm:text-sm font-medium">$</span>
               </div>
               <%= form.number_field :annual_income,
                   step: "0.01",
                   required: true,
-                  class: "pl-7 focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md",
+                  class: "pl-7 focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-md border-gray-500 rounded-md py-3",
                   "aria-describedby": "annual_income_help",
+                  "aria-labelledby": "annual_income_label annual_income_help",
+                  inputmode: "decimal",
                   data: { 
-                    application_form_target: "annualIncome",
-                    action: "change->application-form#validateIncomeThreshold blur->application-form#validateIncomeThreshold"
+                    income_validation_target: "annualIncome",
+                    currency_formatter_target: "input"
                   } %>
             </div>
-            <p class="mt-2 text-sm text-gray-700" id="annual_income_help">
-              Total yearly household income before taxes
-            </p>
+            <div class="mt-2">
+              <p class="text-sm font-medium text-indigo-700" id="annual_income_help">
+                Total yearly household income before taxes
+              </p>
+            </div>
           </div>
         </fieldset>
+
+        <!-- Income Threshold Warning Container -->
+        <div id="income-threshold-warning" class="hidden" data-income-validation-target="warningContainer"></div>
 
         <!-- Address Information Section -->
         <section aria-labelledby="address-section-title" class="space-y-4 p-4 bg-gray-50 rounded">
@@ -120,7 +133,7 @@
               <%= form.label :physical_address_1, "Street Address", class: "block text-sm font-medium text-gray-700" %>
               <%= form.text_field :physical_address_1, 
                   value: @address[:physical_address_1],
-                  class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+                  class: "mt-1 block w-full h-10 py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
                   required: true %>
             </div>
             
@@ -128,7 +141,7 @@
               <%= form.label :physical_address_2, "Apartment/Suite", class: "block text-sm font-medium text-gray-700" %>
               <%= form.text_field :physical_address_2, 
                   value: @address[:physical_address_2],
-                  class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" %>
+                  class: "mt-1 block w-full h-10 py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" %>
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -136,7 +149,7 @@
                 <%= form.label :city, "City", class: "block text-sm font-medium text-gray-700" %>
                 <%= form.text_field :city, 
                     value: @address[:city],
-                    class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+                    class: "mt-1 block w-full h-10 py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
                     required: true %>
               </div>
               
@@ -157,9 +170,9 @@
                       ["South Dakota", "SD"], ["Tennessee", "TN"], ["Texas", "TX"], ["Utah", "UT"], 
                       ["Vermont", "VT"], ["Virginia", "VA"], ["Washington", "WA"], ["West Virginia", "WV"], 
                       ["Wisconsin", "WI"], ["Wyoming", "WY"], ["District of Columbia", "DC"]
-                    ], (@address && @address.respond_to?(:[]) ? @address[:state] : nil) || params.dig(:application, :state) || current_user&.state),
+                    ], (@address && @address.respond_to?(:[]) ? @address[:state] : nil) || params.dig(:application, :state) || current_user&.state || "MD"),
                     { include_blank: "Select State" },
-                    { class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+                    { class: "mt-1 block w-full h-10 py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
                       required: true } %>
               </div>
               
@@ -167,7 +180,7 @@
                 <%= form.label :zip_code, "Zip Code", class: "block text-sm font-medium text-gray-700" %>
                 <%= form.text_field :zip_code, 
                     value: @address[:zip_code],
-                    class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+                    class: "mt-1 block w-full h-10 py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
                     required: true,
                     pattern: "\\d{5}(-\\d{4})?",
                     title: "5-digit zip code (12345) or 9-digit zip code (12345-6789)" %>
@@ -176,42 +189,45 @@
           </div>
         </section>
 
-        <!-- Guardian Information Section -->
-        <section aria-labelledby="guardian-section-title" class="space-y-4 p-4 bg-gray-50 rounded" data-controller="guardian-controller">
-          <h2 id="guardian-section-title" class="text-lg font-medium text-gray-900">Guardian Information</h2>
-          <div class="flex items-start">
-            <%= form.check_box :is_guardian,
-                class: "mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
-                "aria-describedby": "guardian-description",
-                data: { 
-                  guardian_controller_target: "checkbox",
-                  action: "change->guardian-controller#toggleVisibility"
-                } %>
-            <%= form.label :is_guardian, "I am applying on behalf of someone under 18",
-                class: "ml-2 block text-sm text-gray-700" %>
-          </div>
-          <p id="guardian-description" class="text-sm text-gray-700">
-            Check this box if you are a parent or legal guardian applying on behalf of a minor
-          </p>
-          <div class="guardian-fields <%= current_user&.is_guardian? ? '' : 'hidden' %>" data-guardian-controller-target="relationshipField">
-            <%= form.label :guardian_relationship, "Relationship to Applicant",
-                class: "block text-sm font-medium text-gray-700" %>
-            <%= form.select :guardian_relationship,
-                options_for_select(["Parent", "Legal Guardian"], current_user&.guardian_relationship),
-                { include_blank: "Select Relationship" },
-                { class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500",
-                  "aria-describedby": "relationship-hint",
-                  required: current_user&.is_guardian?,
-                  data: { guardian_controller_target: "select" } } %>
-            <% if @application&.errors&.include?(:guardian_relationship) || current_user&.errors&.include?(:guardian_relationship) %>
-              <p class="mt-1 text-sm text-red-600" role="alert">
-                Guardian relationship can't be blank when you select that you are a guardian
-              </p>
+        <!-- Applicant Selection Section -->
+        <section aria-labelledby="applicant-selection-title" class="space-y-4 p-4 bg-gray-50 rounded" data-controller="dependent-selector">
+          <h2 id="applicant-selection-title" class="text-lg font-medium text-gray-900">Who is this application for?</h2>
+          <div class="space-y-2">
+            <div class="flex items-center">
+              <%= form.radio_button :for_self, "true", id: "apply_for_self", checked: !@application.for_dependent?,
+                     class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
+                     data: { action: "change->dependent-selector#toggleAction" } %>
+              <%= form.label :for_self_true, "Myself", for: "apply_for_self", class: "ml-3 text-sm text-gray-700" %>
+            </div>
+            <% if current_user&.dependents&.any? %>
+              <div class="flex items-center">
+                <%= form.radio_button :for_self, "false", id: "apply_for_dependent", checked: @application.for_dependent?,
+                       class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
+                       data: { action: "change->dependent-selector#toggleAction" } %>
+                <%= form.label :for_self_false, "A dependent I manage", for: "apply_for_dependent", class: "ml-3 text-sm text-gray-700" %>
+              </div>
             <% end %>
-            <p id="relationship-hint" class="mt-1 text-sm text-gray-700">
-              Select your relationship to the applicant if you are applying on behalf of a minor
-            </p>
           </div>
+
+          <% if current_user&.dependents&.any? %>
+            <div id="dependent-selection-fields" class="space-y-4" data-dependent-selector-target="dependentSection" style="<%= @application.for_dependent? ? 'display: block;' : 'display: none;' %>">
+              <div>
+                <%= form.label :user_id, "Select Dependent", class: "block text-sm font-medium text-gray-700" %>
+                <%= form.select :user_id,
+                    options_for_select(current_user.dependents.map { |d| [d.full_name, d.id] }, @application.user_id),
+                    { include_blank: "Select a Dependent" },
+                    { class: "mt-1 block w-full h-10 py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+                      required: @application.for_dependent?,
+                      data: { 
+                        "dependent-selector-target": "dependentSelect",
+                        action: "change->dependent-selector#selectDependentAction"
+                      } } %>
+              </div>
+              <p class="mt-2 text-sm text-gray-700">
+                If you don't see the dependent you want to select in the dropdown box, create one first by going to your <%= link_to "dashboard", constituent_portal_dashboard_path, class: "text-indigo-600 hover:text-indigo-500" %> and click on "Add New Dependent".
+              </p>
+            </div>
+          <% end %>
         </section>
 
         <!-- Disability Section -->
@@ -244,7 +260,7 @@
                       class: "ml-2 text-sm text-gray-700" %>
                 </div>
                 <div id="<%= disability %>-description" class="sr-only">
-                  Check if you have a <%= disability %> disability
+                  Check if your dependent has a <%= disability %> disability
                 </div>
               <% end %>
             </div>
@@ -256,6 +272,30 @@
           <%= render "medical_provider_form", form: mp %>
         <% end %>
 
+        <!-- Alternate Contact Section (optional) -->
+        <section aria-labelledby="alternate-contact-section-title" class="space-y-4 p-4 bg-gray-50 rounded">
+          <h2 id="alternate-contact-section-title" class="text-lg font-medium text-gray-900">Alternate Contact (Optional)</h2>
+          <p class="text-sm text-gray-700">You may provide an alternate contact person who can be contacted regarding your application.</p>
+          
+          <div class="space-y-4">
+            <div>
+              <%= form.label :alternate_contact_name, "Name", class: "block text-sm font-medium text-gray-700" %>
+              <%= form.text_field :alternate_contact_name, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" %>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <%= form.label :alternate_contact_phone, "Phone", class: "block text-sm font-medium text-gray-700" %>
+                <%= form.telephone_field :alternate_contact_phone, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" %>
+              </div>
+              <div>
+                <%= form.label :alternate_contact_email, "Email", class: "block text-sm font-medium text-gray-700" %>
+                <%= form.email_field :alternate_contact_email, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" %>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- Document Upload Section -->
         <section aria-labelledby="documents-section-title" class="space-y-4 p-4 bg-gray-50 rounded">
           <h2 id="documents-section-title" class="text-lg font-medium text-gray-900">Required Documentation</h2>
@@ -264,7 +304,9 @@
               <%= form.label :residency_proof, "Proof of Residency (Required)",
                   class: "block text-sm font-medium text-gray-700" %>
               <p id="residency-hint" class="text-xs text-gray-700 mb-2">
-                Upload driver's license, state ID, or identification card. <span class="font-semibold text-red-600">This proof is required to submit your application.</span>
+                Upload one of the following acceptable documents: <strong>driver's license</strong>, <strong>state ID</strong>, 
+                <strong>identification card</strong>, <strong>utility bill</strong>, or <strong>patient photo ID</strong>. 
+                <span class="font-semibold text-red-600">This proof is required to submit your application.</span>
               </p>
               <%= form.file_field :residency_proof,
                   class: "block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500",
@@ -279,7 +321,11 @@
               <%= form.label :income_proof, "Income Verification (Required)",
                   class: "block text-sm font-medium text-gray-700" %>
               <p id="income-hint" class="text-xs text-gray-700 mb-2">
-                We need proof of your household income. Please provide your most recent tax return (preferred), current year SSA award letter (less than 2 months old), or a recent bank statement showing your SSA deposit. <span class="font-semibold text-red-600">This proof is required to submit your application.</span>
+                We need proof of your household income. Please provide one of the following acceptable documents: 
+                <strong>Tax return</strong> (preferred), <strong>current year SSA award letter</strong> (less than 2 months old), 
+                <strong>recent bank statement</strong> showing your SSA deposit, <strong>current, unexpired SSA/SSI/SSDI documentation</strong>, 
+                <strong>current, unexpired Medicaid and/or SNAP award letter</strong>, or <strong>current, unexpired VA Benefits letter</strong>. 
+                <span class="font-semibold text-red-600">This proof is required to submit your application.</span>
               </p>
               <%= form.file_field :income_proof,
                   class: "block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500",
@@ -309,7 +355,7 @@
               name: "submit_application",
               class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500",
               "aria-label": "Submit final application",
-              data: { application_form_target: "submitButton" } %>
+              data: { income_validation_target: "submitButton" } %>
         </div>
       <% end %>
     </div>

@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
-import Auth, { registerWebAuthn } from "../auth.js";
+import Auth, { registerWebAuthn } from "../auth.js"
+import { setVisible } from "../utils/visibility"
 
 export default class extends Controller {
   // Define the expected value for the callback URL
@@ -15,6 +16,11 @@ export default class extends Controller {
     
     // Get the form element but don't attach a submit handler (using button click instead)
     this.form = this.element;
+  }
+
+  disconnect() {
+    // Stub disconnect method for future cleanup if DOM listeners are added
+    // Currently no cleanup needed as we don't attach document-level event listeners
   }
 
   // Handle button click instead of form submission
@@ -111,8 +117,8 @@ export default class extends Controller {
     if (this.hasStatusMessageTarget) {
       this.statusMessageTarget.textContent = message;
       
-      // Remove previous status classes
-      this.statusMessageTarget.classList.remove("text-green-600", "text-red-600", "text-blue-600");
+      // Reset classes
+      this.statusMessageTarget.className = "text-sm mt-2";
       
       // Add class based on type
       if (type === "error") {
@@ -123,8 +129,8 @@ export default class extends Controller {
         this.statusMessageTarget.classList.add("text-blue-600");
       }
       
-      // Show the status message
-      this.statusMessageTarget.classList.remove("hidden");
+      // Use setVisible utility for consistent visibility management
+      setVisible(this.statusMessageTarget, !!message);
     }
   }
 }

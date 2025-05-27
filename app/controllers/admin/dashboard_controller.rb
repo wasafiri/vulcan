@@ -12,27 +12,64 @@ module Admin
       @pagy, @applications = pagy(scope, items: 20)
     end
 
+    def load_dashboard_counts
+      # Ensure all instance variable keys are sanitized to prevent errors with special characters
+      safe_assign(:current_fiscal_year, fiscal_year)
+      safe_assign(:total_users_count, User.count)
+      safe_assign(:ytd_constituents_count, Application.where(created_at: fiscal_year_start..).count)
+
+      # Add debug logging for application counts
+      active_count = Application.active.count
+      approved_count = Application.where(status: :approved).count
+      Rails.logger.info "Dashboard counts - Active: #{active_count}, Approved: #{approved_count}"
+
+      # Calculate medical certs and proofs needing review counts
+      proofs_needing_review_count = Application.where(income_proof_status: :not_reviewed)
+                                               .or(Application.where(residency_proof_status: :not_reviewed))
+                                               .distinct
+                                               .count
+      medical_certs_to_review_count = Application.where(medical_certification_status: 'received').count
+
+      # Add detailed logging for troubleshooting
+      Rails.logger.info "Medical certifications needing review: #{medical_certs_to_review_count}"
+      Rails.logger.info "Proofs needing review: #{proofs_needing_review_count}"
+
+      safe_assign(:open_applications_count, active_count)
+      safe_assign(:pending_services_count, approved_count)
+      safe_assign(:proofs_needing_review_count, proofs_needing_review_count)
+      safe_assign(:medical_certs_to_review_count, medical_certs_to_review_count)
+
+      # Calculate training requests count - first try notifications, then fallback to joined training sessions
+      training_count = Notification.where(action: 'training_requested')
+                                   .where(notifiable_type: 'Application')
+                                   .select(:notifiable_id)
+                                   .distinct
+                                   .count
+
+      # If no training requests found via notifications, check actual training sessions
+      if training_count.zero?
+        training_count = Application.joins(:training_sessions)
+                                    .where(training_sessions: { status: %i[requested scheduled confirmed] })
+                                    .distinct
+                                    .count
+      end
+
+      safe_assign(:training_requests_count, training_count)
+      Rails.logger.info "Training requests: #{training_count}"
+
+      # Log the final instance variable values
+      Rails.logger.info "Dashboard instance variables - @open_applications_count: #{@open_applications_count}, @pending_services_count: #{@pending_services_count}"
+    end
+
     private
 
-    def load_dashboard_counts
-      @current_fiscal_year       = fiscal_year
-      @total_users_count         = User.count
-      @ytd_constituents_count    = Application.where(created_at: fiscal_year_start..).count
-      @open_applications_count   = Application.active.count
-      @pending_services_count    = Application.where(status: :approved).count
-
-      # Calculate training requests count properly, counting distinct applications
-      # to avoid duplicate counting if there are multiple notifications for the same application
-      @training_requests_count = Notification.where(action: 'training_requested')
-                                             .where(notifiable_type: 'Application')
-                                             .select(:notifiable_id)
-                                             .distinct
-                                             .count
-
-      @proofs_needing_review_count = Application.where(income_proof_status: :not_reviewed)
-                                                .or(Application.where(residency_proof_status: :not_reviewed))
-                                                .count
-      @medical_certs_to_review_count = Application.where(medical_certification_status: 'received').count
+    # Safely assigns a value to an instance variable after sanitizing the key
+    # @param key [String, Symbol] The variable name, without the '@' prefix
+    # @param value [Object] The value to assign
+    def safe_assign(key, value)
+      # Strip leading @ if present and sanitize key to ensure valid Ruby variable name
+      sanitized_key = key.to_s.sub(/\A@/, '').gsub(/[^0-9a-zA-Z_]/, '_')
+      instance_variable_set("@#{sanitized_key}", value)
     end
 
     def build_application_scope

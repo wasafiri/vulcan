@@ -75,6 +75,10 @@ class Voucher < ApplicationRecord
     end
   end
 
+  # Determines if a voucher can be redeemed based on its internal state and amount.
+  # NOTE: This method does NOT perform identity verification (e.g., Date of Birth).
+  # Identity verification is handled externally by the VoucherVerificationService
+  # as a prerequisite to calling the redemption process.
   def can_redeem?(amount)
     return false unless voucher_active?
     return false if expired?
@@ -84,7 +88,14 @@ class Voucher < ApplicationRecord
     true
   end
 
+  # Processes the redemption of a voucher.
+  # This method handles the financial transaction and updates the voucher's state.
+  # It assumes that any necessary identity verification (e.g., DOB) has already
+  # been performed by an external service (e.g., VoucherVerificationService)
+  # prior to this method being called.
   def redeem!(amount, vendor, product_data = nil)
+    # VoucherVerificationService is responsible for identify verification, like checking DOB
+    # Ensure the voucher meets basic redemption criteria (active, not expired, sufficient funds)
     return false unless can_redeem?(amount)
 
     transaction do

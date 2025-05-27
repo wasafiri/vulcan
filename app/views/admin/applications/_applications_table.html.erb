@@ -22,6 +22,9 @@
             </svg>
           <% end %>
         </th>
+        <th scope="col" class="w-2/12 px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Applicant</th>
+        <th scope="col" class="w-2/12 px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Managing Guardian</th>
+        <th scope="col" class="w-1/12 px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Applicant Type</th>
         <th scope="col" class="w-1/12 px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Phone</th>
         <th scope="col" class="w-2/12 px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
         <th scope="col" class="w-1/12 px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -41,7 +44,7 @@
     </thead>
     <tbody class="bg-white divide-y divide-gray-200">
       <% applications.each do |application| %>
-        <tr class="application-row h-20 focus:outline-none focus:ring-2 focus:ring-indigo-500" tabindex="0"> <!-- Added application-row class here -->
+        <tr class="application-row h-20 focus:outline-none focus:ring-2 focus:ring-indigo-500 <%= 'bg-blue-50' if application.for_dependent? %>" tabindex="0"> <!-- Added application-row class here -->
           <td class="px-4 py-2 text-sm text-gray-900">
             <%= application.application_date.strftime("%m/%d/%Y") %>
           </td>
@@ -50,6 +53,35 @@
               <%= application.user.full_name %>
             <% else %>
               Unknown User
+            <% end %>
+          </td>
+          <td class="px-4 py-2 text-sm text-gray-900">
+            <% if application.user.present? %>
+              <%= application.user.full_name %>
+            <% else %>
+              Unknown Applicant
+            <% end %>
+          </td>
+          <td class="px-4 py-2 text-sm text-gray-900">
+            <% if application.managing_guardian.present? %>
+              <span class="font-semibold"><%= application.managing_guardian.full_name %></span>
+              <%# Corrected query to use guardian_id and dependent_id %>
+              <% guardian_relationship = GuardianRelationship.find_by(guardian_id: application.managing_guardian_id, dependent_id: application.user_id) %>
+              <% if guardian_relationship %>
+                <span class="text-gray-600 text-sm ml-1">(<%= guardian_relationship.relationship_type %>)</span>
+              <% end %>
+            <% else %>
+              N/A
+            <% end %>
+          </td>
+          <td class="px-4 py-2 text-sm text-gray-900">
+            <%= application.for_dependent? ? 'Minor (via Guardian)' : 'Individual' %>
+            <% if application.for_dependent? %>
+              <%# Heroicon "users" outline %>
+              <svg class="inline-block h-5 w-5 text-indigo-600 ml-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372m-10.75-.372a9.369 9.369 0 01-2.625-.372M12 20.75c1.243 0 2.423-.309 3.528-.886M12 20.75c-1.243 0-2.423-.309-3.528-.886m11.028-9.128c-.093-.093-.19-.183-.293-.27M12 12.75c-1.243 0-2.423.309-3.528.886m7.056 0c1.105-.577 2.285-.886 3.528-.886M12 12.75a9.37 9.37 0 01-6.128-2.128M12 12.75a9.37 9.37 0 006.128-2.128m-6.128 2.128L12 12.75m-6.128-2.128a9.371 9.371 0 01-2.625-.372m10.75.372c.093.093.19.183.293.27M12 3.25a2.25 2.25 0 100 4.5 2.25 2.25 0 000-4.5z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 12.75c2.67 0 5.193.903 7.126 2.472M12 12.75c-2.67 0-5.193.903-7.126 2.472" />
+              </svg>
             <% end %>
           </td>
           <td class="px-4 py-2 text-sm text-gray-900 hidden sm:table-cell">

@@ -1,0 +1,23 @@
+<%# app/views/constituent_portal/dependents/new.html.erb %>
+<div class="min-h-screen bg-gray-100 py-12">
+  <div class="form-container max-w-2xl mx-auto">
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:p-2 focus:bg-indigo-600 focus:text-white focus:z-10">
+      Skip to main content
+    </a>
+    <div id="main-content" tabindex="-1" class="bg-white p-4 sm:p-8 rounded shadow-md">
+      <h1 class="text-2xl font-semibold mb-6 text-center" id="form-title">Add New Dependent</h1>
+
+      <% if flash[:alert] %>
+        <div class="bg-red-100 border border-red-400 text-red-700 p-4 rounded mb-4" role="alert" aria-live="polite">
+          <span><%= flash[:alert] %></span>
+        </div>
+      <% end %>
+      
+      <p class="text-sm text-gray-600 mb-6 text-center">
+        Provide the information for the dependent you are adding. This will establish you (<%= current_user.email %>) as their guardian.
+      </p>
+
+      <%= render 'form', dependent_user: @dependent_user, guardian_relationship: @guardian_relationship %>
+    </div>
+  </div>
+</div>

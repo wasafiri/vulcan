@@ -104,7 +104,7 @@ end
           <h3 id="<%= cfg[:id] %>-heading" class="text-lg font-medium text-gray-900 mb-4"><%= cfg[:title] %></h3>
 
           <%# Guardian Alert (only for income/residency) %>
-          <% if cfg[:key] != :medical && @application.user&.is_guardian? %>
+          <% if cfg[:key] != :medical && @application.for_dependent? %>
             <div class="mb-4 rounded-md bg-amber-50 p-4 border border-amber-300">
               <div class="flex">
                 <div class="flex-shrink-0">
@@ -116,7 +116,53 @@ end
                 <div class="ml-3">
                   <h3 class="text-sm font-medium text-amber-800">Guardian Application</h3>
                   <div class="mt-1 text-sm text-amber-700">
-                    <p>This application was submitted by a <strong><%= @application.user&.guardian_relationship&.downcase || "guardian" %></strong> on behalf of a minor. Please verify this relationship when reviewing these proof documents.</p>
+                    <p>This application was submitted by a <strong><%= @application.managing_guardian.full_name %></strong> (<%= @application.guardian_relationship_type&.downcase || "guardian" %>) on behalf of a dependent. Please verify this relationship when reviewing these proof documents.</p>
+                    
+                    <% if cfg[:key] == :residency %>
+                      <%# Show address information for residency proof review %>
+                      <% if @application.user.present? %>
+                        <% 
+                          address_parts = []
+                          address_parts << @application.user.physical_address_1 if @application.user.physical_address_1.present?
+                          address_parts << @application.user.physical_address_2 if @application.user.physical_address_2.present?
+                          full_address = address_parts.join(", ")
+                          full_address += ", #{@application.user.city}, #{@application.user.state} #{@application.user.zip_code}" if @application.user.city.present?
+                        %>
+                        
+                        <% if full_address.present? %>
+                          <p class="mt-2"><strong>The address entered for the application was:</strong> <%= full_address %></p>
+                        <% else %>
+                          <%# Check if guardian has address information %>
+                          <% if @application.managing_guardian.present? %>
+                            <% 
+                              guardian_address_parts = []
+                              guardian_address_parts << @application.managing_guardian.physical_address_1 if @application.managing_guardian.physical_address_1.present?
+                              guardian_address_parts << @application.managing_guardian.physical_address_2 if @application.managing_guardian.physical_address_2.present?
+                              guardian_full_address = guardian_address_parts.join(", ")
+                              guardian_full_address += ", #{@application.managing_guardian.city}, #{@application.managing_guardian.state} #{@application.managing_guardian.zip_code}" if @application.managing_guardian.city.present?
+                            %>
+                            <% if guardian_full_address.present? %>
+                              <p class="mt-2"><strong>The guardian's address on file is:</strong> <%= guardian_full_address %></p>
+                            <% end %>
+                          <% end %>
+                        <% end %>
+                      <% end %>
+                    <% elsif cfg[:key] == :income %>
+                      <%# Show income and household size information for income proof review %>
+                      <% if @application.annual_income.present? || @application.household_size.present? %>
+                        <p class="mt-2">
+                          <strong>
+                            <% if @application.annual_income.present? && @application.household_size.present? %>
+                              The income entered during the application was <%= number_to_currency(@application.annual_income) %> and the family size was <%= @application.household_size %>.
+                            <% elsif @application.annual_income.present? %>
+                              The income entered during the application was <%= number_to_currency(@application.annual_income) %>.
+                            <% elsif @application.household_size.present? %>
+                              The family size entered during the application was <%= @application.household_size %>.
+                            <% end %>
+                          </strong>
+                        </p>
+                      <% end %>
+                    <% end %>
                   </div>
                 </div>
               </div>

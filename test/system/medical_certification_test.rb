@@ -10,7 +10,7 @@ class MedicalCertificationTest < ApplicationSystemTestCase
     super
 
     # Create admin, constituent and application
-    @admin = users(:admin_david)
+    @admin = create(:admin)
     @constituent = create(:constituent)
     @application = create(:application,
                           user: @constituent,

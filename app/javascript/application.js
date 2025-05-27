@@ -1,14 +1,14 @@
 // Entry point for the build script in your package.json
 import "@hotwired/turbo-rails"
 import * as ActiveStorage from "@rails/activestorage"
-import Chart from "chart.js/auto"
+// Temporarily commenting out Chart.js global import to debug getComputedStyle recursion
+// import Chart from "chart.js/auto"
 import * as WebAuthnJSON from "@github/webauthn-json"
 import Auth from "./auth"
 import "./controllers"
-import "./controllers/debug_helper"
 
-// Make Chart.js available globally
-window.Chart = Chart
+// Make Chart.js available globally - temporarily disabled
+// window.Chart = Chart
 // Make WebAuthnJSON and Auth available globally if needed for debugging, or remove if not
 window.WebAuthnJSON = WebAuthnJSON
 window.Auth = Auth
@@ -80,6 +80,8 @@ window.togglePasswordVisibility = function(button, timeout = 5000) {
   }
 };
 
+// Import Stimulus controllers
+import "./controllers"
 // Log when application.js is loaded
 console.log("Application.js loaded - password visibility is handled by global function");
 

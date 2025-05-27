@@ -11,6 +11,12 @@ class User < ApplicationRecord
   # Ensure duplicate review flag is accessible
   attr_accessor :needs_duplicate_review unless column_names.include?('needs_duplicate_review')
 
+  # DEPRECATED: These attributes will be removed in a future version.
+  # Use GuardianRelationship model instead.
+  # - is_guardian (boolean)
+  # - guardian_relationship (string)
+  # - guardian_id (bigint)
+
   # Class methods
   def self.system_user
     @system_user ||= begin
@@ -42,6 +48,7 @@ class User < ApplicationRecord
   # Format phone numbers before validation to ensure uniqueness check uses the correct format
   before_validation :format_phone_number
   after_save :reset_all_caches
+  after_update :log_profile_changes, if: :saved_changes_to_profile_fields?
 
   # Associations
   has_many :sessions, dependent: :destroy
@@ -57,6 +64,27 @@ class User < ApplicationRecord
            dependent: :nullify
   has_many :role_capabilities, dependent: :destroy
 
+  # Guardian/Dependent Associations
+  has_many :guardian_relationships_as_guardian,
+           class_name: 'GuardianRelationship',
+           foreign_key: 'guardian_id',
+           dependent: :destroy,
+           inverse_of: :guardian_user
+  has_many :dependents, through: :guardian_relationships_as_guardian, source: :dependent_user
+
+  has_many :guardian_relationships_as_dependent,
+           class_name: 'GuardianRelationship',
+           foreign_key: 'dependent_id',
+           dependent: :destroy,
+           inverse_of: :dependent_user
+  has_many :guardians, through: :guardian_relationships_as_dependent, source: :guardian_user
+
+  has_many :managed_applications, # Applications where this user is the managing_guardian
+           class_name: 'Application',
+           foreign_key: 'managing_guardian_id',
+           inverse_of: :managing_guardian,
+           dependent: :nullify # Or :restrict_with_error if a guardian shouldn't be deleted if they manage apps
+
   has_and_belongs_to_many :products,
                           join_table: 'products_users'
 
@@ -67,11 +95,16 @@ class User < ApplicationRecord
 
   # Validations
   validates :password, length: { minimum: 8 }, if: -> { password.present? }
+  # Accessor for skipping contact uniqueness validation (used for dependent sharing guardian email/phone)
+  attr_accessor :skip_contact_uniqueness_validation
+
   validates :email, presence: true,
-                    uniqueness: true,
+                    uniqueness: { unless: :skip_contact_uniqueness_for_dependent? },
                     format: { with: URI::MailTo::EMAIL_REGEXP }
-  # Add uniqueness validation for phone, allowing blank values
-  validates :phone, uniqueness: { case_sensitive: false }, allow_blank: true
+  # Add uniqueness validation for phone only when phone is present and non-blank
+  # and not a dependent using guardian's contact
+  validates :phone, uniqueness: { case_sensitive: false, allow_blank: true,
+                                  unless: :skip_contact_uniqueness_for_dependent? }
   validates :first_name, :last_name, presence: true
   validates :reset_password_token, uniqueness: true, allow_nil: true
   validate :phone_number_must_be_valid # This still checks the 10-digit format
@@ -100,6 +133,15 @@ class User < ApplicationRecord
   scope :admins, -> { where(type: 'Users::Administrator') }
   scope :vendors, -> { where(type: 'Users::Vendor') }
   scope :ordered_by_name, -> { order(:first_name) }
+
+  # Guardian relationship scopes
+  scope :with_dependents, lambda {
+    joins(:guardian_relationships_as_guardian).distinct
+  }
+
+  scope :with_guardians, lambda {
+    joins(:guardian_relationships_as_dependent).distinct
+  }
 
   # Basic user information
   def full_name
@@ -216,6 +258,35 @@ class User < ApplicationRecord
     disability_flags.any? { |flag| flag == true }
   end
 
+  # New guardian/dependent helper methods
+  def is_guardian?
+    guardian_relationships_as_guardian.exists?
+  end
+
+  def is_dependent?
+    guardian_relationships_as_dependent.exists?
+  end
+
+  # Returns all applications for dependents of this guardian user
+  def dependent_applications
+    return Application.none unless is_guardian?
+
+    Application.where(user_id: dependents.pluck(:id))
+  end
+
+  # Returns relationship types for a specific dependent
+  def relationship_types_for_dependent(dependent_user)
+    guardian_relationships_as_guardian
+      .where(dependent_id: dependent_user.id)
+      .pluck(:relationship_type)
+  end
+
+  # Method to check if this user is dependent sharing guardian's contact info
+  def skip_contact_uniqueness_for_dependent?
+    # Handle both boolean and string values (form params may come as strings)
+    [true, 'true', '1'].include?(skip_contact_uniqueness_validation)
+  end
+
   private
 
   def reset_all_caches
@@ -307,5 +378,41 @@ class User < ApplicationRecord
     # Only validate when updating existing users with applications
     # or when explicitly requested via an application submission
     applications.exists? || @validate_disability_required
+  end
+
+  # Check if any profile fields changed
+  def saved_changes_to_profile_fields?
+    profile_fields = %w[first_name last_name email phone physical_address_1 physical_address_2 city state zip_code date_of_birth]
+    profile_fields.any? { |field| saved_change_to_attribute?(field) }
+  end
+
+  # Log profile changes to Event model
+  def log_profile_changes
+    changed_attributes = {}
+    profile_fields = %w[first_name last_name email phone physical_address_1 physical_address_2 city state zip_code date_of_birth]
+    
+    profile_fields.each do |field|
+      if saved_change_to_attribute?(field)
+        old_value, new_value = saved_change_to_attribute(field)
+        changed_attributes[field] = { old: old_value, new: new_value }
+      end
+    end
+
+    return unless changed_attributes.present?
+
+    # Determine who made the change
+    actor = Current.user || self
+    action = actor == self ? 'profile_updated' : 'profile_updated_by_guardian'
+
+    Event.create!(
+      user: actor,
+      action: action,
+      metadata: {
+        user_id: id,
+        changes: changed_attributes,
+        updated_by: actor.id,
+        timestamp: Time.current.iso8601
+      }
+    )
   end
 end

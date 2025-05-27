@@ -1,167 +1,364 @@
 # frozen_string_literal: true
 
-# Helper module for paper application system tests
-# This adds additional support methods to improve test stability with Cuprite
+#
+# Paper-application system-test helpers
+# – Stable selectors first, labels last
+# – Scoped visibility handling (no global Capybara flag changes)
+# – Minimal DOM-mutation fallbacks
+# – Lightweight PageObjects for clearer responsibilities
+#
 module PaperApplicationsTestHelper
-  # Safe method to handle browser errors during tests
-  def safe_browser_operation
-    yield
-  rescue StandardError => e
-    # Log error but don't let it fail the test - just a helper method
-    puts "Browser operation failed: #{e.message}"
-    false
-  end
+  # ------------------------------------------------------------------------
+  # Configuration hashes (single sources of truth)
+  # ------------------------------------------------------------------------
 
-  # Check if element exists without raising errors
-  def element_exists?(selector)
-    safe_browser_operation { page.has_selector?(selector) }
-  end
+  FIELD_DEFINITIONS = {
+    # Applicant / constituent
+    'First Name' => {
+      ids: %w[constituent_first_name applicant_attributes_first_name first_name],
+      name_attr: 'constituent[first_name]',
+      container: :get_applicant_info_fieldset
+    },
+    'Last Name' => {
+      ids: %w[constituent_last_name applicant_attributes_last_name last_name],
+      name_attr: 'constituent[last_name]',
+      container: :get_applicant_info_fieldset
+    },
+    'Email' => {
+      ids: %w[constituent_email applicant_attributes_email email],
+      name_attr: 'constituent[email]',
+      container: :get_applicant_info_fieldset
+    },
+    'Phone' => {
+      ids: %w[constituent_phone applicant_attributes_phone phone],
+      name_attr: 'constituent[phone]',
+      container: :get_applicant_info_fieldset
+    },
 
-  # Specialized fill_in that properly handles Cuprite and ambiguous fields
-  def paper_fill_in(field, value)
-    # Handle the ambiguous email field by trying different strategies
-    if field == 'Email'
-      handle_email_field(value)
-    else
-      # For non-ambiguous fields, try standard approach first
-      standard_fill_in(field, value)
-    end
-  rescue Capybara::Ambiguous => e
-    # Handle ambiguous fields by finding a better selector
-    puts "Ambiguous field '#{field}', trying alternative approach: #{e.message}"
-    alternative_fill_in(field, value)
-  end
+    # Application details
+    'Household Size' => {
+      ids: %w[application_household_size household_size],
+      name_attr: 'application[household_size]'
+    },
+    'Annual Income' => {
+      ids: %w[application_annual_income annual_income],
+      name_attr: 'application[annual_income]'
+    },
 
-  # Handle ambiguous email fields with special logic
-  def handle_email_field(value)
-    context = within_fieldset_text
-    if context
-      # If we're inside a fieldset with specific text, use CSS ID selectors
-      if context == 'Constituent Information'
-        fill_in_by_id('#constituent_email', value)
-      else
-        fill_in_by_id('#medical_provider_email', value)
-      end
-    else
-      # If we can't determine context, try with exact CSS ID
-      handle_unknown_email_field(value)
-    end
-  end
+    # Medical-provider section
+    'Name' => {
+      ids: %w[application_medical_provider_name medical_provider_name],
+      name_attr: 'application[medical_provider_name]',
+      container: :get_medical_provider_fieldset
+    },
+    'Medical Provider Email' => {
+      ids: %w[application_medical_provider_email medical_provider_email],
+      name_attr: 'application[medical_provider_email]',
+      container: :get_medical_provider_fieldset
+    },
+    'Medical Provider Phone' => {
+      ids: %w[application_medical_provider_phone medical_provider_phone],
+      name_attr: 'application[medical_provider_phone]',
+      container: :get_medical_provider_fieldset
+    }
+  }.freeze
 
-  # Try to determine which email field to use when context is unknown
-  def handle_unknown_email_field(value)
-    if has_css?('#constituent_email')
-      fill_in_by_id('#constituent_email', value)
-    elsif has_css?('#medical_provider_email')
-      fill_in_by_id('#medical_provider_email', value)
-    else
-      # Last fallback - try to find by placeholder
-      input = first("input[placeholder*='Email'], input[name*='email']")
-      fill_field_with_js(input, value)
-    end
-  end
+  APPLICANT_TYPES = {
+    adult: {
+      radio_selector: 'input[name="application[applicant_type]"][value="adult"]',
+      label_text: 'An Adult (applying for themselves)',
+      expected_sections: %w[
+        [data-applicant-type-target="adultSection"]
+        [data-applicant-type-target="commonSections"]
+      ]
+    },
+    dependent: {
+      radio_selector: 'input[name="application[applicant_type]"][value="dependent"]',
+      label_text: 'A Dependent (must select existing guardian in system or enter guardian\'s information)',
+      expected_sections: %w[
+        [data-applicant-type-target="guardianSection"]
+        [data-applicant-type-target="commonSections"]
+      ]
+    }
+  }.freeze
 
-  # Standard fill_in attempt
-  def standard_fill_in(field, value)
-    input = find_field(field)
-    fill_field_with_js(input, value)
-  end
+  # ------------------------------------------------------------------------
+  # Public helpers (called from tests)
+  # ------------------------------------------------------------------------
 
-  def alternative_fill_in(field, value)
-    # Compute a CSS-friendly field identifier.
-    field_id = field.downcase.gsub(/\s+/, '_')
-    id_candidates = [
-      "#constituent_#{field_id}",
-      "#application_#{field_id}",
-      "#medical_provider_#{field_id}"
-    ]
+  # Smarter fill-in
+  def paper_fill_in(field_label, value)
+    return if field_label.nil? || field_label.strip.empty?
 
-    # Find the first candidate ID that exists.
-    if (candidate = id_candidates.find { |id| has_css?(id) })
-      fill_in_by_id(candidate, value)
+    meta = FIELD_DEFINITIONS[field_label]
+    unless meta
+      fill_in(field_label, with: value)
       return
     end
 
-    # Last resort: find by placeholder or name containing the field.
-    input = first("input[placeholder*='#{field}'], input[name*='#{field.downcase}']")
-    fill_field_with_js(input, value)
+    container = meta[:container] && send(meta[:container])
+
+    fill_field(
+      value,
+      ids: meta[:ids],
+      label: field_label,
+      name_attr: meta[:name_attr],
+      container: container
+    )
   end
 
-  # Fill a field using a CSS ID selector
-  def fill_in_by_id(css_id, value)
-    input = find(css_id)
-    fill_field_with_js(input, value)
-  end
-
-  # Use JavaScript to set field value
-  def fill_field_with_js(input, value)
-    # Use JavaScript to set the value directly
-    page.execute_script('arguments[0].value = arguments[1]', input.native, value)
-    # Trigger the change event
-    page.execute_script("arguments[0].dispatchEvent(new Event('change'))", input.native)
-    # Trigger a blur event to fire validations
-    page.execute_script("arguments[0].dispatchEvent(new Event('blur'))", input.native)
-  end
-
-  # Helper to determine the current fieldset context
-  def within_fieldset_text
-    return nil unless has_css?('fieldset')
-
-    fieldset = first('fieldset')
-    return nil unless fieldset.has_css?('legend')
-
-    legend = fieldset.first('legend')
-    legend.text
+  # Robust checkbox helper – no JS mutation; falls back to setting the element
+  def paper_check_box(id_or_label)
+    check(id_or_label, allow_label_click: true)
   rescue Capybara::ElementNotFound
-    nil
+    selector =
+      if id_or_label.start_with?('#')
+        id_or_label
+      else
+        %(input[name="#{id_or_label}"],input[id="#{id_or_label}"])
+      end
+
+    el = find(:css, selector, visible: :all, wait: 0)
+    el.set(true) unless el.checked?
   end
 
-  # Specialized check method that handles Cuprite
-  def paper_check_box(label_or_id)
-    # Try to find by ID first, then by label
-    input = if label_or_id.start_with?('#')
-              find(label_or_id)
-            else
-              find_field(label_or_id)
-            end
-
-    # Use JavaScript to check the box
-    page.execute_script('arguments[0].checked = true', input.native)
-    # Trigger change event
-    page.execute_script("arguments[0].dispatchEvent(new Event('change'))", input.native)
+  # Applicant-type radio selector + section wait
+  def choose_applicant_type(type)
+    ApplicantTypeSwitcher.new(page).choose(type)
+    wait_for_page_load if respond_to?(:wait_for_page_load)
   end
 
-  # Safely upload a file without relying on normal Capybara methods
-  def safe_attach_file(field, _file_path)
-    # Use JavaScript to create a mock file object
-    page.execute_script(<<~JS, find_field(field, visible: false).native)
-      const fileInput = arguments[0];
-      // Create a mock change event
-      const event = new Event('change', { bubbles: true });
-      // Override the target.files property
-      Object.defineProperty(event, 'target', { value: fileInput });
-      fileInput.dispatchEvent(event);
-    JS
+  # Add within_fieldset_tagged method that's used in tests
+  def within_fieldset_tagged(text, &)
+    fieldset = locate_fieldset(text)
+    within(fieldset, &)
   end
 
-  # Safely click submit button
-  def safe_submit_form
-    # Find the submit button using a variety of selectors to be robust
-    submit_button = find("input[type='submit'], button[type='submit'], button:contains('Submit')")
+  # ------------------------------------------------------------------------
+  # Fieldset shortcuts
+  # ------------------------------------------------------------------------
 
-    # Scroll the button into view
-    page.execute_script('arguments[0].scrollIntoView(true)', submit_button.native)
-
-    # Use JavaScript click for reliability
-    page.execute_script('arguments[0].click()', submit_button.native)
+  def get_applicant_info_fieldset
+    locate_fieldset("Applicant's Information",
+                    data_selector: '[data-applicant-type-target="adultSection"]',
+                    fallback_text: /Constituent Information/i)
   end
 
-  def wait_for_validation(max_wait = 1)
-    start_time = Time.current
-    while Time.current - start_time < max_wait
-      return if page.has_selector?('.invalid, .error, .validation-message, .badge', wait: 0.1)
+  def get_guardian_info_fieldset
+    locate_fieldset('Guardian Information',
+                    data_selector: '[data-applicant-type-target="guardianSection"]')
+  end
 
-      sleep 0.1
+  def get_dependent_info_fieldset
+    locate_fieldset('Dependent Information',
+                    data_selector: '[data-applicant-type-target="sectionsForDependentWithGuardian"]')
+  end
+
+  def get_medical_provider_fieldset
+    locate_fieldset('Medical Provider Information')
+  end
+
+  # ------------------------------------------------------------------------
+  # Private helpers
+  # ------------------------------------------------------------------------
+  private
+
+  # Unified "fill a field" implementation
+  def fill_field(value, ids:, label:, name_attr:, container: nil)
+    scope = container || page
+
+    # 1) Try by IDs
+    if (matching_id = ids.find { |id| scope.has_css?("##{id}", visible: :all) })
+      scope.find("##{matching_id}", visible: :all).set(value)
+      return
+    end
+
+    # 2) Try by label
+    begin
+      field = scope.find_field(label, visible: :all)
+      field.set(value)
+      return
+    rescue Capybara::ElementNotFound
+      # no match
+    end
+
+    # 3) Final fallback by name attribute
+    raise Capybara::ElementNotFound, "Cannot find field for #{label.inspect}" unless name_attr
+
+    selector = "input[name='#{name_attr}'], textarea[name='#{name_attr}']"
+    field = scope.first(:css, selector, visible: :all)
+    raise Capybara::ElementNotFound, "Unable to locate field `#{name_attr}` for #{label.inspect}" unless field
+
+    field.set(value)
+  end
+
+  # Delegate to enhanced FieldsetFinder PageObject
+  def locate_fieldset(*, **)
+    FieldsetFinder.new(page).locate(*, **)
+  end
+
+  # Safe wrapper for accessing a specific fieldset within a test
+  def within_fieldset_with_legend(legend_text, options = {}, &)
+    fieldset = locate_fieldset(legend_text)
+    within(fieldset, options, &)
+  end
+
+  # ------------------------------------------------------------------------
+  # Internal PageObjects
+  # ------------------------------------------------------------------------
+
+  # Enhanced PageObject for applicant-type switching
+  class ApplicantTypeSwitcher
+    def initialize(page)
+      @page = page
+    end
+
+    def choose(type)
+      meta = PaperApplicationsTestHelper::APPLICANT_TYPES[
+        type.to_s.downcase.to_sym
+      ] || (raise ArgumentError, "Unknown applicant type: \#{type.inspect}")
+
+      if @page.has_css?(meta[:radio_selector], visible: :all)
+        rb = @page.find(meta[:radio_selector], visible: :all)
+        rb.click unless rb.checked?
+      else
+        @page.choose meta[:label_text], allow_label_click: true
+      end
+
+      meta[:expected_sections].each do |css|
+        @page.assert_selector css, visible: true,
+                                   wait: Capybara.default_max_wait_time
+      end
+    end
+  end
+
+  # Fieldset location encapsulated in its own object
+  class FieldsetFinder
+    def initialize(page)
+      @page = page
+    end
+
+    def locate(legend_text, data_selector: nil, fallback_text: nil)
+      # 1. Try data-selector first as it's most reliable
+      if data_selector && (fs = by_data_selector(data_selector))
+        return make_visible(fs)
+      end
+
+      # 2. Try XPath with proper escaping
+      if (fs = find_by_escaped_xpath(legend_text))
+        return make_visible(fs)
+      end
+
+      # 3. Use pure-Ruby enumeration over fieldsets
+      if (fs = find_fieldset_by_enumeration(legend_text))
+        return make_visible(fs)
+      end
+
+      # 4. Try standard Capybara text matching
+      if (fs = first_fieldset_by_legend(legend_text))
+        return make_visible(fs)
+      end
+
+      # 5. Try fallback text if provided
+      if fallback_text && (fs = by_fallback_text(fallback_text))
+        return make_visible(fs)
+      end
+
+      # 6. Last resort - just get any fieldset
+      fieldset = @page.first('fieldset', visible: :all)
+
+      unless fieldset
+        raise Capybara::ElementNotFound,
+              "Unable to locate fieldset for #{legend_text}"
+      end
+
+      make_visible(fieldset)
+      fieldset
+    end
+
+    private
+
+    # Helper to properly escape text for XPath queries
+    def xpath_literal(str)
+      if !str.include?("'")
+        "'#{str}'"
+      elsif !str.include?('"')
+        %("#{str}")
+      else
+        parts = str.scan(/[^'"]+|['"]/)
+        concat_parts = parts.map do |part|
+          if part == "'"
+            %q("'")
+          elsif part == '"'
+            %q("\"")
+          else
+            "'#{part}'"
+          end
+        end
+        "concat(#{concat_parts.join(',')})"
+      end
+    end
+
+    # Use absolute XPath with proper escaping to find fieldset by legend text
+    def find_by_escaped_xpath(text)
+      literal = xpath_literal(text)
+      @page.first(:xpath,
+                  "//fieldset[.//legend[contains(normalize-space(), #{literal})]]",
+                  wait: 1,
+                  visible: :all)
+    rescue Capybara::ElementNotFound, Capybara::Cuprite::InvalidSelector
+      nil
+    end
+
+    # Pure-Ruby search over all fieldsets to find one with matching legend
+    def find_fieldset_by_enumeration(text)
+      @page.all('fieldset', visible: :all).find do |fs|
+        legend = fs.first('legend', visible: :all, wait: 0)
+        legend && legend.text.strip.include?(text)
+      rescue StandardError
+        false
+      end
+    rescue StandardError
+      nil
+    end
+
+    def first_fieldset_by_legend(text)
+      @page.first(:fieldset, text,
+                  match: :prefer_exact,
+                  wait: 1,
+                  visible: :all)
+    rescue Capybara::ElementNotFound
+      nil
+    end
+
+    def by_data_selector(selector)
+      @page.find(selector, visible: :all, wait: 1)
+    rescue Capybara::ElementNotFound
+      nil
+    end
+
+    def by_fallback_text(text)
+      @page.first('fieldset', text: text, visible: :all)
+    rescue Capybara::ElementNotFound
+      nil
+    end
+
+    # Make the fieldset visible for interaction
+    def make_visible(element)
+      @page.execute_script <<~JS, element
+        (function(el){
+          if(!el) return;
+          el.classList.remove('hidden');
+          el.style.display = 'block';
+          var p = el.parentElement, i = 0;
+          while(p && i < 5){
+            p.classList.remove('hidden');
+            p.style.display = 'block';
+            p = p.parentElement;
+            i++;
+          }
+        })(arguments[0]);
+      JS
     end
   end
 end

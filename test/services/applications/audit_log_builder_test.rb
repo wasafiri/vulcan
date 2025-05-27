@@ -104,5 +104,139 @@ module Applications
       # than we can easily test without deeper knowledge of the implementation
       skip 'Deduplication testing requires deeper knowledge of implementation'
     end
+
+    test 'includes user profile changes in audit logs' do
+      # Create profile change events for the application user
+      profile_update_event = Event.create!(
+        user: @application.user,
+        action: 'profile_updated',
+        metadata: {
+          user_id: @application.user.id,
+          changes: {
+            'first_name' => { 'old' => 'Old Name', 'new' => 'New Name' },
+            'email' => { 'old' => 'old@example.com', 'new' => 'new@example.com' }
+          },
+          updated_by: @application.user.id,
+          timestamp: Time.current.iso8601
+        }
+      )
+
+      with_mocked_attachments do
+        builder = AuditLogBuilder.new(@application)
+        logs = builder.build_audit_logs
+
+        # Verify the profile update event is included
+        assert_includes logs, profile_update_event
+      end
+    end
+
+    test 'includes guardian profile changes for dependent applications' do
+      # Create a dependent application with managing guardian
+      guardian = create(:constituent)
+      dependent = create(:constituent)
+      dependent_application = create(:application, user: dependent, managing_guardian: guardian)
+
+      # Create profile change event where guardian updates dependent's profile
+      guardian_update_event = Event.create!(
+        user: guardian,
+        action: 'profile_updated_by_guardian',
+        metadata: {
+          user_id: dependent.id,
+          changes: {
+            'phone' => { 'old' => '555-123-4567', 'new' => '555-987-6543' }
+          },
+          updated_by: guardian.id,
+          timestamp: Time.current.iso8601
+        }
+      )
+
+      with_mocked_attachments do
+        builder = AuditLogBuilder.new(dependent_application)
+        logs = builder.build_audit_logs
+
+        # Verify the guardian update event is included
+        assert_includes logs, guardian_update_event
+      end
+    end
+
+    test 'includes managing guardian profile changes' do
+      # Create a dependent application with managing guardian
+      guardian = create(:constituent)
+      dependent = create(:constituent)
+      dependent_application = create(:application, user: dependent, managing_guardian: guardian)
+
+      # Create profile change event where guardian updates their own profile
+      guardian_self_update_event = Event.create!(
+        user: guardian,
+        action: 'profile_updated',
+        metadata: {
+          user_id: guardian.id,
+          changes: {
+            'physical_address_1' => { 'old' => '123 Old St', 'new' => '456 New Ave' }
+          },
+          updated_by: guardian.id,
+          timestamp: Time.current.iso8601
+        }
+      )
+
+      with_mocked_attachments do
+        builder = AuditLogBuilder.new(dependent_application)
+        logs = builder.build_audit_logs
+
+        # Verify the guardian's self-update event is included
+        assert_includes logs, guardian_self_update_event
+      end
+    end
+
+    test 'does not include unrelated user profile changes' do
+      # Create an unrelated user and their profile change
+      unrelated_user = create(:constituent)
+      unrelated_event = Event.create!(
+        user: unrelated_user,
+        action: 'profile_updated',
+        metadata: {
+          user_id: unrelated_user.id,
+          changes: {
+            'first_name' => { 'old' => 'Unrelated', 'new' => 'User' }
+          },
+          updated_by: unrelated_user.id,
+          timestamp: Time.current.iso8601
+        }
+      )
+
+      with_mocked_attachments do
+        builder = AuditLogBuilder.new(@application)
+        logs = builder.build_audit_logs
+
+        # Verify the unrelated user's event is NOT included
+        assert_not_includes logs, unrelated_event
+      end
+    end
+
+    test 'profile changes are sorted with other audit logs by created_at' do
+      # Create profile change event with specific timestamp
+      profile_event = Event.create!(
+        user: @application.user,
+        action: 'profile_updated',
+        metadata: {
+          user_id: @application.user.id,
+          changes: { 'first_name' => { 'old' => 'Old', 'new' => 'New' } },
+          updated_by: @application.user.id,
+          timestamp: Time.current.iso8601
+        },
+        created_at: 1.hour.ago
+      )
+
+      with_mocked_attachments do
+        builder = AuditLogBuilder.new(@application)
+        logs = builder.build_audit_logs
+
+        # Verify all logs are sorted by created_at in descending order
+        assert_equal logs.map(&:created_at), logs.map(&:created_at).sort.reverse
+        
+        # Verify profile event is included and properly positioned
+        assert_includes logs, profile_event
+      end
+    end
   end
 end

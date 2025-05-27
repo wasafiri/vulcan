@@ -6,6 +6,41 @@ require 'mocha/minitest'
 # ensuring all necessary methods are stubbed to prevent common errors like
 # "unexpected invocation: #<Mock:0x...>.byte_size()".
 module AttachmentTestHelper
+  # Wrap a block in a fully mocked ActiveStorage service.
+  #
+  # This allows service tests to run without actual file operations
+  # while maintaining the expected interface for code using ActiveStorage.
+  #
+  # @yield Block to execute with mocked attachments
+  def with_mocked_attachments(&)
+    mock_service = build_mock_service
+    ActiveStorage::Blob.stub(:service, mock_service, &)
+  end
+
+  # Build a mock ActiveStorage service with all required methods
+  # @return [Object] A mock service object with the ActiveStorage interface
+  def build_mock_service
+    Class.new do
+      def upload(key, _io, _checksum: nil, **)
+        key # return the key so callers get what they expect
+      end
+
+      def download(*) = +'fake-content'
+      def url(key, **) = "http://example.com/#{key}"
+      def delete(*) = true
+      def exist?(*) = true
+
+      # Add other methods that might be called
+      def open(*)
+        StringIO.new('fake-content')
+      end
+
+      def url_for(key, _expires_in: nil, disposition: nil, filename: nil, **)
+        "http://example.com/#{key}?disposition=#{disposition}&filename=#{filename}"
+      end
+    end.new
+  end
+
   # Creates a comprehensive mock for an ActiveStorage::Attached::One object
   # and its associated ActiveStorage::Blob.
   #
@@ -15,7 +50,8 @@ module AttachmentTestHelper
   # @param created_at [Time] The desired creation timestamp for the mock blob.
   # @param attached [Boolean] Whether the mock attachment should report as attached.
   # @return [Mocha::Mock] A mock object simulating an ActiveStorage::Attached::One instance.
-  def mock_attached_file(filename: 'test.pdf', content_type: 'application/pdf', byte_size: 100.kilobytes, created_at: Time.current, attached: true)
+  def mock_attached_file(filename: 'test.pdf', content_type: 'application/pdf', byte_size: 100.kilobytes, created_at: Time.current,
+                         attached: true)
     # Mock the Blob
     blob_mock = mock("ActiveStorage::Blob #{filename}")
     blob_mock.stubs(:filename).returns(ActiveStorage::Filename.new(filename))

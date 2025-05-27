@@ -139,6 +139,53 @@ module ConstituentPortal
       assert_equal 'not_reviewed', application.residency_proof_status
     end
 
+    test 'guardian should create application for a dependent' do
+      # Setup: Create a guardian and a dependent user linked by GuardianRelationship
+      guardian = create(:constituent, email: 'guardian.app.creator@example.com', phone: '5555550020')
+      dependent = create(:constituent, email: 'dependent.app.subject@example.com', phone: '5555550021')
+      GuardianRelationship.create!(guardian_user: guardian, dependent_user: dependent, relationship_type: 'Parent')
+
+      # Sign in as the guardian
+      sign_in guardian
+
+      # Simulate submitting an application where the guardian selects the dependent
+      # The controller logic will need to handle identifying the dependent based on params,
+      # e.g., params[:application][:user_id] = dependent.id
+      # The managing_guardian_id should be set to current_user.id (guardian.id)
+      assert_difference('Application.count') do
+        post constituent_portal_applications_path, params: {
+          application: {
+            user_id: dependent.id, # Explicitly setting the applicant user ID
+            maryland_resident: true,
+            household_size: 2,
+            annual_income: 30_000,
+            self_certify_disability: checkbox_params(true),
+            hearing_disability: true,
+            residency_proof: @valid_image, # Assuming proofs are needed for submission
+            income_proof: @valid_pdf
+          },
+          medical_provider: { # Assuming these are still collected
+            name: 'Dr. Child',
+            phone: '2025551212',
+            email: 'drchild@example.com'
+          },
+          submit_application: 'Submit Application' # Trigger submission logic
+        }
+      end
+
+      application = Application.last
+      assert_redirected_to constituent_portal_application_path(application)
+
+      # Verify the application is linked correctly
+      assert_equal(dependent.id, application.user_id, 'Application user_id should be the dependent')
+      assert_equal(guardian.id, application.managing_guardian_id, 'Application managing_guardian_id should be the guardian')
+      assert_equal('in_progress', application.status) # Assuming submission leads to in_progress
+
+      # Verify proofs were attached (if submitted)
+      assert application.income_proof.attached?
+      assert application.residency_proof.attached?
+    end
+
     # Test that the application show page loads correctly
     test 'should show application' do
       # Access the application show page
@@ -214,8 +261,6 @@ module ConstituentPortal
 
     # Test submitting a draft application
     test 'should submit draft application' do
-      skip 'This test is currently failing and needs to be fixed'
-
       # Create a new draft application
       application = create(:application,
                            user: @user,
@@ -232,10 +277,12 @@ module ConstituentPortal
           household_size: 4,
           annual_income: 60_000,
           maryland_resident: true,
-          self_certify_disability: true,
+          self_certify_disability: true, # This is an application model field
           terms_accepted: true,
           information_verified: true,
-          medical_release_authorized: true
+          medical_release_authorized: true,
+          residency_proof: @valid_image, # Added residency proof
+          income_proof: @valid_pdf       # Added income proof
         },
         submit_application: 'Submit Application'
       }
@@ -362,23 +409,24 @@ module ConstituentPortal
 
     # Test that user association is maintained during update
     test 'should maintain user association during update' do
-      skip 'This test is currently failing and needs to be fixed'
-
-      # Use the draft application fixture
-      @application = applications(:draft_application)
+      # Set up the application and make it a draft
+      @application.update!(status: :draft,
+                           household_size: 3,
+                           annual_income: 50_000,
+                           medical_provider_name: 'Good Health Clinic')
 
       # Update the application with new values and disability information
       patch constituent_portal_application_path(@application), params: {
         application: {
           household_size: 5,
           annual_income: 75_000,
-          is_guardian: checkbox_params(false),
+          # No more is_guardian field - instead managing_guardian would be set via managing_guardian_id
           hearing_disability: checkbox_params(true),
           vision_disability: checkbox_params(true),
           speech_disability: checkbox_params(false),
           mobility_disability: checkbox_params(false),
           cognition_disability: checkbox_params(false),
-          medical_provider: {
+          medical_provider_attributes: {
             name: 'Dr. Jane Smith',
             phone: '2025559876',
             email: 'drjane@example.com'
@@ -396,8 +444,7 @@ module ConstituentPortal
       assert_equal 5, @application.household_size
       assert_equal 75_000, @application.annual_income
 
-      # The medical provider name should be updated from the fixture's "Good Health Clinic"
-      # to the value we're setting in the test
+      # The medical provider name should be updated
       assert_equal 'Dr. Jane Smith', @application.medical_provider_name
       assert_equal '2025559876', @application.medical_provider_phone
       assert_equal 'drjane@example.com', @application.medical_provider_email
@@ -415,73 +462,216 @@ module ConstituentPortal
       assert_equal false, @user.cognition_disability
     end
 
-    # Test saving all application fields when saving as draft
-    test 'should save all application fields when saving as draft' do
-      # Test data for all fields
-      application_params = {
+    # Test for updating an application to be managed by a guardian
+    test 'should update application with managing guardian' do
+      # Create a dependent user
+      dependent = create(:constituent, :with_disabilities,
+                         email: 'dependent_for_update_test@example.com')
+
+      # Create an application for the dependent
+      dependent_app = create(:application, user: dependent, status: :draft)
+
+      # Set up guardian relationship between current user and dependent
+      relationship = GuardianRelationship.create!(
+        guardian_id: @user.id,
+        dependent_id: dependent.id,
+        relationship_type: 'Parent'
+      )
+
+      # Update the dependent's application to have current user as managing_guardian
+      patch constituent_portal_application_path(dependent_app), params: {
         application: {
-          # Basic application fields
-          maryland_resident: checkbox_params(true),
-          household_size: '3',
-          annual_income: '45000',
-          self_certify_disability: true, # Pass boolean directly
-
-          # Disability selections
-          hearing_disability: checkbox_params(true),
-          vision_disability: checkbox_params(true),
-          speech_disability: checkbox_params(false),
-          mobility_disability: checkbox_params(true),
-          cognition_disability: checkbox_params(false),
-
-          # Guardian information
-          is_guardian: checkbox_params(true),
-          guardian_relationship: 'Parent'
-        },
-
-        # Medical provider information (using the separate hash structure)
-        medical_provider: {
-          name: 'Dr. Jane Smith',
-          phone: '5551234567',
-          fax: '5557654321',
-          email: 'dr.smith@example.com'
-        },
-
-        # Use the save_draft button
-        save_draft: 'Save Application'
+          managing_guardian_id: @user.id,
+          household_size: 2,
+          annual_income: 30_000
+        }
       }
 
-      # Post the data to create a draft application
+      # Verify the update was successful
+      assert_redirected_to constituent_portal_application_path(dependent_app)
+
+      # Reload the application and verify changes
+      dependent_app.reload
+
+      # Verify managing guardian was set correctly
+      assert_equal @user.id, dependent_app.managing_guardian_id
+      assert dependent_app.for_dependent?, 'Application should be marked as for a dependent'
+      assert_equal 'Parent', dependent_app.guardian_relationship_type
+    end
+
+    test 'should save address information to user during application creation' do
+      # Ensure the user starts with no address information
+      @user.update!(
+        physical_address_1: nil,
+        physical_address_2: nil,
+        city: nil,
+        state: nil,
+        zip_code: nil
+      )
+
+      # Create an application with address information
       assert_difference('Application.count') do
-        post constituent_portal_applications_path, params: application_params
+        post constituent_portal_applications_path, params: {
+          application: {
+            maryland_resident: true,
+            household_size: 3,
+            annual_income: 50_000,
+            self_certify_disability: checkbox_params(true),
+            hearing_disability: true,
+            # Address fields that should be saved to the user model
+            physical_address_1: '134 main st',
+            physical_address_2: 'Apt 2B',
+            city: 'baltimore',
+            state: 'MD',
+            zip_code: '21201'
+          },
+          medical_provider: {
+            name: 'Dr. Smith',
+            phone: '2025551234',
+            email: 'drsmith@example.com'
+          },
+          save_draft: 'Save Application'
+        }
       end
 
-      # Get the ID from the assigned instance and reload from DB
-      assigned_application = assigns(:application)
-      assert_not_nil assigned_application, 'Controller should assign @application'
-      application = Application.find(assigned_application.id)
-
-      # Verify application fields were saved
+      # Verify the application was created
+      application = Application.last
+      assert_redirected_to constituent_portal_application_path(application)
       assert_equal 'draft', application.status
-      # assert application.maryland_resident # Removed as per analysis - validation skipped for drafts
-      assert_equal 3, application.household_size
-      assert_equal 45_000, application.annual_income.to_i
-      assert application.self_certify_disability
 
-      # Verify medical provider info was saved
-      assert_equal 'Dr. Jane Smith', application.medical_provider_name
-      assert_equal '5551234567', application.medical_provider_phone
-      assert_equal '5557654321', application.medical_provider_fax
-      assert_equal 'dr.smith@example.com', application.medical_provider_email
+      # CRITICAL: Verify that the address information was saved to the user model
+      @user.reload
+      assert_equal '134 main st', @user.physical_address_1, 'Address line 1 should be saved to user'
+      assert_equal 'Apt 2B', @user.physical_address_2, 'Address line 2 should be saved to user'
+      assert_equal 'baltimore', @user.city, 'City should be saved to user'
+      assert_equal 'MD', @user.state, 'State should be saved to user'
+      assert_equal '21201', @user.zip_code, 'ZIP code should be saved to user'
+    end
 
-      # Verify user attributes were updated
-      user = application.user.reload
-      assert user.is_guardian
-      assert_equal 'Parent', user.guardian_relationship
-      assert user.hearing_disability
-      assert user.vision_disability
-      assert_not user.speech_disability
-      assert user.mobility_disability
-      assert_not user.cognition_disability
+    test 'should save address information to user during application submission' do
+      # Ensure the user starts with no address information
+      @user.update!(
+        physical_address_1: nil,
+        physical_address_2: nil,
+        city: nil,
+        state: nil,
+        zip_code: nil
+      )
+
+      # Submit an application with address information and required proofs
+      assert_difference('Application.count') do
+        post constituent_portal_applications_path, params: {
+          application: {
+            maryland_resident: true,
+            household_size: 4,
+            annual_income: 45_000,
+            self_certify_disability: checkbox_params(true),
+            hearing_disability: true,
+            # Address fields that should be saved to the user model
+            physical_address_1: '456 Oak Street',
+            physical_address_2: '',
+            city: 'Silver Spring',
+            state: 'MD',
+            zip_code: '20901',
+            residency_proof: @valid_image,
+            income_proof: @valid_pdf
+          },
+          medical_provider: {
+            name: 'Dr. Johnson',
+            phone: '3015551234',
+            email: 'drjohnson@example.com'
+          },
+          submit_application: 'Submit Application'
+        }
+      end
+
+      # Verify the application was submitted
+      application = Application.last
+      assert_redirected_to constituent_portal_application_path(application)
+      assert_equal 'in_progress', application.status
+
+      # CRITICAL: Verify that the address information was saved to the user model
+      @user.reload
+      assert_equal '456 Oak Street', @user.physical_address_1, 'Address line 1 should be saved to user'
+      assert_equal '', @user.physical_address_2, 'Address line 2 should be saved to user (empty string)'
+      assert_equal 'Silver Spring', @user.city, 'City should be saved to user'
+      assert_equal 'MD', @user.state, 'State should be saved to user'
+      assert_equal '20901', @user.zip_code, 'ZIP code should be saved to user'
+    end
+
+    test 'should save address information to dependent user when guardian creates application' do
+      # Setup: Create a guardian and a dependent user linked by GuardianRelationship
+      guardian = create(:constituent, 
+                       email: 'guardian.address.test@example.com', 
+                       phone: '5555550030',
+                       # Guardian starts with existing address
+                       physical_address_1: '999 Guardian Lane',
+                       city: 'Bethesda',
+                       state: 'MD',
+                       zip_code: '20814')
+      dependent = create(:constituent, 
+                        email: 'dependent.address.test@example.com', 
+                        phone: '5555550031',
+                        # Start with no address information
+                        physical_address_1: nil,
+                        physical_address_2: nil,
+                        city: nil,
+                        state: nil,
+                        zip_code: nil)
+      GuardianRelationship.create!(guardian_user: guardian, dependent_user: dependent, relationship_type: 'Parent')
+
+      # Sign in as the guardian
+      sign_in guardian
+
+      # Create application for dependent with address information
+      assert_difference('Application.count') do
+        post constituent_portal_applications_path, params: {
+          application: {
+            user_id: dependent.id, # Explicitly setting the applicant user ID
+            maryland_resident: true,
+            household_size: 2,
+            annual_income: 30_000,
+            self_certify_disability: checkbox_params(true),
+            hearing_disability: true,
+            # Address fields that should be saved to the DEPENDENT user model
+            physical_address_1: '789 Elm Avenue',
+            physical_address_2: 'Unit 5',
+            city: 'Rockville',
+            state: 'MD',
+            zip_code: '20850',
+            residency_proof: @valid_image,
+            income_proof: @valid_pdf
+          },
+          medical_provider: {
+            name: 'Dr. Child',
+            phone: '2025551212',
+            email: 'drchild@example.com'
+          },
+          submit_application: 'Submit Application'
+        }
+      end
+
+      application = Application.last
+      assert_redirected_to constituent_portal_application_path(application)
+
+      # Verify the application is linked correctly
+      assert_equal(dependent.id, application.user_id, 'Application user_id should be the dependent')
+      assert_equal(guardian.id, application.managing_guardian_id, 'Application managing_guardian_id should be the guardian')
+
+      # CRITICAL: Verify that the address information was saved to the DEPENDENT user model, not the guardian
+      dependent.reload
+      guardian.reload
+      
+      # Address should be saved to the dependent (the applicant)
+      assert_equal '789 Elm Avenue', dependent.physical_address_1, 'Address line 1 should be saved to dependent user'
+      assert_equal 'Unit 5', dependent.physical_address_2, 'Address line 2 should be saved to dependent user'
+      assert_equal 'Rockville', dependent.city, 'City should be saved to dependent user'
+      assert_equal 'MD', dependent.state, 'State should be saved to dependent user'
+      assert_equal '20850', dependent.zip_code, 'ZIP code should be saved to dependent user'
+      
+             # Guardian's address should remain unchanged
+       assert_equal '999 Guardian Lane', guardian.physical_address_1, 'Guardian address should not be affected'
+       assert_equal 'Bethesda', guardian.city, 'Guardian city should not be affected'
     end
   end
 end

@@ -52,6 +52,28 @@ Rails.application.configure do
 
   # Raise error when a before_action's only/except options reference missing actions.
   config.action_controller.raise_on_missing_callback_actions = true
-  config.log_level = :debug
-  config.active_record.verbose_query_logs = true
+  
+  # Reduce log noise in tests - only show warnings/errors unless verbose mode requested
+  config.log_level = ENV['VERBOSE_TESTS'] ? :debug : :warn
+  config.active_record.verbose_query_logs = ENV['VERBOSE_TESTS'] || false
+  
+  # Configure logger output
+  if ENV['VERBOSE_TESTS']
+    # Detailed logging for debugging
+    config.logger = ActiveSupport::Logger.new($stdout)
+    config.logger.level = :debug
+    config.logger.formatter = config.log_formatter
+  else
+    # Minimal logging for faster test runs
+    config.logger = ActiveSupport::Logger.new($stdout)
+    config.logger.level = :warn
+    config.logger.formatter = proc do |severity, datetime, progname, msg|
+      # Only show the essential info for warnings/errors
+      if %w[WARN ERROR FATAL].include?(severity)
+        "[#{severity}] #{msg}\n"
+      else
+        ""
+      end
+    end
+  end
 end

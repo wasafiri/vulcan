@@ -4,7 +4,7 @@ require 'test_helper'
 
 class VendorTest < ActiveSupport::TestCase
   test 'valid vendor can be created with factory' do
-    vendor = create(:vendor, :approved, :with_w9) # Use :with_w9 trait to attach a W9
+    vendor = create(:vendor, :approved, :with_w9) # Use :with_w9 trait to attach a W9, which sets it to in_progress
 
     assert vendor.valid?
     assert_equal 'Users::Vendor', vendor.type

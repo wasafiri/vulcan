@@ -24,4 +24,4 @@ EmailTemplate.create_or_find_by!(name: 'medical_provider_notifications_certifica
   TEXT
   template.version = 1
 end
-puts 'Seeded medical_provider_notifications_certification_processing_error (text)'
+puts 'Seeded medical_provider_notifications_certification_processing_error (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

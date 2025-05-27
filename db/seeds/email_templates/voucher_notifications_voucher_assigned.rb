@@ -29,4 +29,4 @@ EmailTemplate.create_or_find_by!(name: 'voucher_notifications_voucher_assigned',
   TEXT
   template.version = 1
 end
-puts 'Seeded voucher_notifications_voucher_assigned (text)'
+puts 'Seeded voucher_notifications_voucher_assigned (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

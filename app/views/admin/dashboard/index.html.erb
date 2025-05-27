@@ -21,6 +21,7 @@
         <!-- In Progress Applications Card -->
         <div class="bg-white rounded-lg shadow p-6">
           <h3 class="text-lg font-medium text-gray-900">In Progress Applications</h3>
+          <% Rails.logger.info "View rendering - @open_applications_count: #{@open_applications_count.inspect}" %>
           <p class="text-3xl font-bold text-indigo-600"><%= @open_applications_count %></p>
           <p class="text-sm text-gray-500">Active but unapproved</p>
           <div class="mt-2 space-y-2">
@@ -47,6 +48,7 @@
         <!-- Approved Card -->
         <div class="bg-white rounded-lg shadow p-6">
           <h3 class="text-lg font-medium text-gray-900">Approved</h3>
+          <% Rails.logger.info "View rendering - @pending_services_count: #{@pending_services_count.inspect}" %>
           <p class="text-3xl font-bold text-indigo-600"><%= @pending_services_count %></p>
           <p class="text-sm text-gray-500">Approved and awaiting services</p>
           <div class="mt-2 space-y-2">

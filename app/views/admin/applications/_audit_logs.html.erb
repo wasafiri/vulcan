@@ -71,6 +71,8 @@
                         "Voucher Expired"
                       when "voucher_cancelled"
                         "Voucher Cancelled"
+                      when "profile_updated", "profile_updated_by_guardian"
+                        "Profile Updated"
                       else
                         log.action.titleize.gsub('_', ' ')
                       end
@@ -197,6 +199,19 @@
                       "Voucher #{log.metadata['voucher_code']} expired with unused value #{number_to_currency(log.metadata['unused_value'])}"
                     when "voucher_cancelled"
                       "Voucher #{log.metadata['voucher_code']} cancelled"
+                    when "profile_updated"
+                      target_user_id = log.metadata['user_id'] || log.user_id
+                      target_user = target_user_id == @application.user_id ? @application.user : User.find_by(id: target_user_id)
+                      user_name = target_user&.full_name || "Unknown User"
+                      changes_summary = log.metadata['changes']&.keys&.map(&:humanize)&.join(', ') || 'profile fields'
+                      "#{user_name} updated their profile (#{changes_summary})"
+                    when "profile_updated_by_guardian"
+                      target_user_id = log.metadata['user_id']
+                      target_user = target_user_id == @application.user_id.to_s ? @application.user : User.find_by(id: target_user_id)
+                      user_name = target_user&.full_name || "Unknown User"
+                      guardian_name = log.user&.full_name || "Guardian"
+                      changes_summary = log.metadata['changes']&.keys&.map(&:humanize)&.join(', ') || 'profile fields'
+                      "#{guardian_name} updated #{user_name}'s profile (#{changes_summary})"
                     else
                       log.action.titleize.gsub('_', ' ')
                     end

@@ -1,8 +1,12 @@
 # frozen_string_literal: true
 
 Rails.application.routes.draw do
+  # Handle favicon requests silently to prevent routing errors in tests
+  get '/favicon.ico', to: proc { [204, {}, []] }
+  
   # Test routes (only in test environment)
   get 'test/auth_status', to: 'test#auth_status' if Rails.env.test?
+  
   root to: 'home#index'
 
   # Static pages
@@ -95,6 +99,8 @@ Rails.application.routes.draw do
     get 'dashboard', to: 'dashboard#index', as: :dashboard # Add dashboard route
     root to: 'applications#index'
 
+    resources :guardian_relationships, only: %i[new create destroy]
+
     resources :recovery_requests, only: %i[index show] do
       member do
         post :approve
@@ -179,6 +185,13 @@ Rails.application.routes.draw do
     end
 
     resources :users do
+      collection do
+        get :search
+        get :evaluators
+        get :vendors
+        get :constituents
+      end
+
       member do
         post :approve
         post :suspend
@@ -193,12 +206,6 @@ Rails.application.routes.draw do
         patch :update_role
         patch :update_capabilities
         get :history
-      end
-
-      collection do
-        get :evaluators
-        get :vendors
-        get :constituents
       end
     end
 
@@ -321,6 +328,7 @@ Rails.application.routes.draw do
   # New constituent_portal namespace (replacing constituent)
   namespace :constituent_portal do
     resource :dashboard, only: [:show]
+    resources :dependents
     resources :applications, path: 'applications' do
       collection do
         get :fpl_thresholds
@@ -335,12 +343,15 @@ Rails.application.routes.draw do
         patch :submit
         post :resubmit_proof
         post :request_training
-        # Define the route with a custom name
-        get 'proofs/new/:proof_type', to: 'proofs/proofs#new', as: :new_proof
-        post 'proofs/resubmit', to: 'proofs/proofs#resubmit', as: :resubmit_proof_document
-        post 'proofs/direct_upload', to: 'proofs/proofs#direct_upload', as: :direct_upload_proof
+      end
+
+      scope module: :proofs do
+        get 'proofs/new/:proof_type', to: 'proofs#new', as: :new_proof
+        post 'proofs/resubmit', to: 'proofs#resubmit'
+        post 'proofs/direct_upload', to: 'proofs#direct_upload'
       end
     end
+
     resources :evaluations, only: %i[index show]
     resources :products, only: %i[index show]
 

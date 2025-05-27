@@ -39,4 +39,4 @@ EmailTemplate.create_or_find_by!(name: 'application_notifications_archived_max_r
   TEXT
   template.version = 1
 end
-puts 'Seeded application_notifications_archived_max_revisions (text)'
+puts 'Seeded application_notifications_archived_max_revisions (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

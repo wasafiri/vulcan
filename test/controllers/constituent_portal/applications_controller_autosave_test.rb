@@ -141,37 +141,63 @@ module ConstituentPortal
       assert_equal true, @user.hearing_disability
     end
 
-    test 'should autosave guardian status' do
-      # Test updating is_guardian
+    test 'should autosave application as managing guardian' do
+      # Create a dependent user first
+      create(:constituent, :with_disabilities)
+
+      # Test updating the application to be managed by current user
       patch autosave_field_constituent_portal_application_path(@draft_application),
-            params: { field_name: 'application[is_guardian]', field_value: 'true' },
+            params: { field_name: 'application[managing_guardian_id]', field_value: @user.id.to_s },
             as: :json
 
       # Verify the response
       assert_response :success
       assert_json_response(success: true)
 
-      # Verify the user was updated
-      @user.reload
-      assert_equal true, @user.is_guardian
+      # Verify the application was updated
+      @draft_application.reload
+      assert_equal @user.id, @draft_application.managing_guardian_id
     end
 
-    test 'should autosave guardian relationship' do
-      # First set is_guardian to true
-      @user.update(is_guardian: true)
+    test 'should create guardian relationship when setting up dependent application' do
+      # This test simulates what would happen during full application creation
+      # for a dependent rather than during autosave, since guardian relationships
+      # are set up during the application creation process
 
-      # Test updating guardian_relationship
-      patch autosave_field_constituent_portal_application_path(@draft_application),
-            params: { field_name: 'application[guardian_relationship]', field_value: 'Parent' },
-            as: :json
+      # Create a dependent user
+      dependent = create(:constituent, :with_disabilities)
 
-      # Verify the response
-      assert_response :success
-      assert_json_response(success: true)
+      # Ensure there's no existing relationship
+      assert_equal 0, @user.guardian_relationships_as_guardian.count
 
-      # Verify the user was updated
+      # Create an application for the dependent with @user as the managing guardian
+      application = nil
+      assert_difference('GuardianRelationship.count') do
+        # Create relationship first (would normally happen during user setup)
+        GuardianRelationship.create!(
+          guardian_id: @user.id,
+          dependent_id: dependent.id,
+          relationship_type: 'Parent'
+        )
+
+        # Then create application with managing_guardian_id
+        application = create(
+          :application,
+          user: dependent,
+          managing_guardian: @user,
+          status: :draft
+        )
+      end
+
+      # Verify the relationships were created properly
+      assert_equal 1, @user.guardian_relationships_as_guardian.count
       @user.reload
-      assert_equal 'Parent', @user.guardian_relationship
+      assert @user.is_guardian?, 'User should be recognized as a guardian'
+      assert_equal 'Parent', @user.relationship_types_for_dependent(dependent).first
+
+      # Verify the application is properly set up
+      assert application.for_dependent?, 'Application should be marked for a dependent'
+      assert_equal @user.id, application.managing_guardian_id
     end
 
     test 'should update last_visited_step when autosaving User field' do
@@ -185,33 +211,6 @@ module ConstituentPortal
       assert_response :success
       @draft_application.reload
       assert_equal attribute_name, @draft_application.last_visited_step
-    end
-
-    test 'should not autosave empty guardian relationship when is_guardian is true' do
-      # Set up our test state with update_columns to skip validations
-      @user.update_columns(
-        guardian_relationship: 'Parent',
-        is_guardian: true
-      )
-
-      # Make sure current_user in the controller matches our test user
-      sign_in(@user)
-
-      # Make the request - try to set guardian_relationship to empty
-      patch autosave_field_constituent_portal_application_path(@draft_application),
-            params: { field_name: 'application[guardian_relationship]', field_value: '' },
-            as: :json
-
-      # Verify the response indicates error
-      assert_response :unprocessable_entity
-      response_data = response.parsed_body
-      assert_not response_data['success']
-      assert response_data['errors'].present?
-      assert_includes response_data['errors']['application[guardian_relationship]'].first, "can't be blank"
-
-      # Verify the user was not updated
-      @user.reload
-      assert_equal 'Parent', @user.guardian_relationship
     end
 
     #------------------------------------------

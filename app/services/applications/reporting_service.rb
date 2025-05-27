@@ -68,10 +68,14 @@ module Applications
       data[:previous_fy_evaluations] =
         Evaluation.where(created_at: data[:previous_fy_start]..data[:previous_fy_end]).count
 
+      # Guardian/Dependent data - New section
+      data = add_guardian_dependent_metrics(data, data[:current_fy_start], data[:current_fy_end], :current_fy)
+      data = add_guardian_dependent_metrics(data, data[:previous_fy_start], data[:previous_fy_end], :previous_fy)
+
       # Vendor activity
       data[:active_vendors] = Vendor.joins(:voucher_transactions).distinct.count
       data[:recent_active_vendors] = Vendor.joins(:voucher_transactions)
-                                           .where('voucher_transactions.created_at >= ?', 1.month.ago)
+                                           .where(voucher_transactions: { created_at: 1.month.ago.. })
                                            .distinct.count
 
       # MFR Data (previous full fiscal year)
@@ -110,12 +114,35 @@ module Applications
         previous: { 'Applications Approved' => 0, 'Vouchers Issued' => 0 } # Empty for comparison
       }
 
-      data
+      # Guardian data chart for user dashboard
+      data[:guardian_chart_data] = {
+        current: {
+          'Guardian Users' => data[:current_fy_guardian_users_count],
+          'Dependent Users' => data[:current_fy_dependent_users_count]
+        },
+        previous: {
+          'Guardian Users' => data[:previous_fy_guardian_users_count],
+          'Dependent Users' => data[:previous_fy_dependent_users_count]
+        }
+      }
+
+      # Guardian applications chart for application dashboard
+      data[:guardian_applications_chart_data] = {
+        current: {
+          'Applications for Dependents' => data[:current_fy_dependent_applications_count],
+          'Guardian-Managed Applications' => data[:current_fy_guardian_managed_applications_count]
+        },
+        previous: {
+          'Applications for Dependents' => data[:previous_fy_dependent_applications_count],
+          'Guardian-Managed Applications' => data[:previous_fy_guardian_managed_applications_count]
+        }
+      }
+
+      success(nil, data)
     rescue StandardError => e
       Rails.logger.error "Error generating dashboard data: #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
-      add_error("Error generating dashboard data: #{e.message}")
-      {}
+      failure("Error generating dashboard data: #{e.message}", {})
     end
 
     # Generate index data for the applications index page
@@ -124,9 +151,22 @@ module Applications
 
       data[:current_fiscal_year] = current_fiscal_year
       data[:total_users_count] = User.count
-      data[:ytd_constituents_count] = Application.where('created_at >= ?', fiscal_year_start).count
+      data[:ytd_constituents_count] = Application.where(created_at: fiscal_year_start..).count
       data[:open_applications_count] = Application.active.count
       data[:pending_services_count] = Application.where(status: :approved).count
+
+      # Guardian/Dependent relationship counts - NEW
+      # Check if these associations/scopes exist and handle nil values safely
+      begin
+        data[:guardian_users_count] = User.respond_to?(:with_dependents) ? User.with_dependents.count : 0
+        data[:dependent_users_count] = User.respond_to?(:with_guardians) ? User.with_guardians.count : 0
+        data[:dependent_applications_count] = Application.where.not(managing_guardian_id: nil).count
+      rescue NoMethodError => e
+        Rails.logger.error "Error in guardian relationship counts: #{e.message}"
+        data[:guardian_users_count] = 0
+        data[:dependent_users_count] = 0
+        data[:dependent_applications_count] = 0
+      end
 
       # Load recent notifications
       notifications = Notification.select('id, recipient_id, actor_id, notifiable_id, notifiable_type, action, read_at, created_at, message_id, delivery_status, metadata')
@@ -221,15 +261,78 @@ module Applications
       data[:rejected_count] = rejected_count
       data[:in_progress_count] = in_progress_combined_count # Keep for consistency if used directly
 
-      data
+      success(nil, data)
     rescue StandardError => e
       Rails.logger.error "Error generating index data: #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
-      add_error("Error generating index data: #{e.message}")
-      {}
+      failure("Error generating index data: #{e.message}", {})
     end
 
     private
+
+    def add_guardian_dependent_metrics(data, start_date, end_date, period_key)
+      # Count of guardian users created in the period
+      data[:"#{period_key}_guardian_users_count"] =
+        User.with_dependents
+            .where(created_at: start_date..end_date)
+            .count
+
+      # Count of dependent users created in the period
+      data[:"#{period_key}_dependent_users_count"] =
+        User.with_guardians
+            .where(created_at: start_date..end_date)
+            .count
+
+      # Count of applications for dependents (applications where user is a dependent)
+      data[:"#{period_key}_dependent_applications_count"] =
+        Application.joins(user: :guardian_relationships_as_dependent)
+                   .where(applications: { created_at: start_date..end_date })
+                   .distinct
+                   .count
+
+      # Count of applications managed by guardians
+      data[:"#{period_key}_guardian_managed_applications_count"] =
+        Application.where.not(managing_guardian_id: nil)
+                   .where(created_at: start_date..end_date)
+                   .count
+
+      # Guardian relationship metrics
+      data[:"#{period_key}_avg_dependents_per_guardian"] =
+        calculate_avg_dependents_per_guardian(start_date, end_date)
+
+      data[:"#{period_key}_multi_dependent_guardians_count"] =
+        count_guardians_with_multiple_dependents(start_date, end_date)
+
+      data
+    end
+
+    def calculate_avg_dependents_per_guardian(start_date, end_date)
+      # Get count of dependents per guardian who registered in the given period
+      # Fix the join reference - use the guardian_user association directly
+      guardian_counts = GuardianRelationship
+                        .joins(:guardian_user)
+                        .where(users: { created_at: start_date..end_date })
+                        .group(:guardian_id)
+                        .count
+
+      return 0 if guardian_counts.empty?
+
+      # Calculate average
+      guardian_counts.values.sum.to_f / guardian_counts.size
+    end
+
+    def count_guardians_with_multiple_dependents(start_date, end_date)
+      # Count guardians who have more than one dependent
+      # Fix the join reference - use the guardian_user association directly
+      guardian_counts = GuardianRelationship
+                        .joins(:guardian_user)
+                        .where(users: { created_at: start_date..end_date })
+                        .group(:guardian_id)
+                        .count
+
+      # Return count of guardians with more than one dependent
+      guardian_counts.count { |_guardian_id, count| count > 1 }
+    end
 
     def current_fiscal_year
       return fiscal_year_override if fiscal_year_override.present?

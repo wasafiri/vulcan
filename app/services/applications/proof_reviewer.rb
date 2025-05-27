@@ -16,17 +16,38 @@ module Applications
 
       Rails.logger.info "Converted values - proof_type: #{@proof_type_key.inspect}, status: #{@status_key.inspect}"
 
-      # Create the proof review and update application status in a transaction
+      # Create or update the proof review and update application status in a transaction
       ApplicationRecord.transaction do
-        Rails.logger.info 'Creating proof review record'
-        @proof_review = @application.proof_reviews.create!(
-          admin: @admin,
+        Rails.logger.info 'Finding or initializing proof review record'
+
+        find_attributes = {
           proof_type: @proof_type_key,
-          status: @status_key,
-          rejection_reason: rejection_reason,
+          status: @status_key
+        }
+        # Only include rejection_reason in find query if status is rejected
+        # If rejection_reason is nil, it will match existing records with nil rejection_reason
+        find_attributes[:rejection_reason] = rejection_reason if @status_key == 'rejected'
+
+        @proof_review = @application.proof_reviews.find_or_initialize_by(find_attributes)
+
+        @proof_review.assign_attributes(
+          admin: @admin,
           notes: notes
         )
-        Rails.logger.info "Created ProofReview ID: #{@proof_review.id}, status: #{@proof_review.status}, proof_type: #{@proof_review.proof_type}"
+
+        # If it's an existing record being updated, the `on: :create` `set_reviewed_at` callback
+        # won't run. We need to explicitly update `reviewed_at` to reflect this new review action.
+        # If it's a new record, the `on: :create` callback will set it.
+        # `reviewed_at` is validated for presence, so it must be set before save!.
+        if @proof_review.new_record?
+          # `set_reviewed_at` callback will handle it via `before_validation :set_reviewed_at, on: :create`
+        else
+          @proof_review.reviewed_at = Time.current
+        end
+
+        @proof_review.save! # This will run validations.
+
+        Rails.logger.info "Saved ProofReview ID: #{@proof_review.id}, status: #{@proof_review.status}, proof_type: #{@proof_review.proof_type}, new_record: #{@proof_review.previously_new_record?}"
 
         # Update application status directly
         update_application_status

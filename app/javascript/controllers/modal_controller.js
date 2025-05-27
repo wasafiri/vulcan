@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { setVisible } from "../utils/visibility"
 
 // Declare targets and values for better structure
 export default class extends Controller {
@@ -11,12 +12,16 @@ export default class extends Controller {
   connect() {
     // Fail fast if the container target is missing
     if (!this.hasContainerTarget) {
-      console.error("ModalController: missing container target")
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("ModalController: missing container target")
+      }
       return
     }
 
-    console.log("Modal controller connected with ID:", this.element.id)
-    console.debug("Modal controller targets:", this.targets)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Modal controller connected with ID:", this.element.id)
+      console.debug("Modal controller targets:", this.targets)
+    }
 
     // Ensure modal is hidden on connect
     this.close()
@@ -34,7 +39,9 @@ export default class extends Controller {
     // Safety timeout to restore scroll if needed
     this._setupScrollSafetyTimeout()
 
-    console.log("Modal controller initialization complete")
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Modal controller initialization complete")
+    }
   }
 
   disconnect() {
@@ -68,26 +75,42 @@ export default class extends Controller {
     element.querySelectorAll('iframe[data-original-src]').forEach((iframe) => {
       iframe.removeAttribute("data-pdf-loaded")
     })
-    // Unhide, lock scroll, load PDFs, focus first input
-    element.classList.remove("hidden")
-    document.body.classList.add("overflow-hidden")
+    // Show modal, lock scroll, load PDFs, focus first input
+    setVisible(element, true)
+    this._lockScroll()
     this._loadIframes(element)
     const firstInput = element.querySelector("input, textarea")
     firstInput?.focus()
   }
 
+  _lockScroll() {
+    document.body.classList.add("overflow-hidden")
+  }
+
+  _unlockScroll() {
+    document.body.classList.remove("overflow-hidden")
+  }
+
   _loadIframes(element) {
-    console.log("Loading iframes in element:", element)
-    console.log("Modal ID:", element.id)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Loading iframes in element:", element)
+      console.log("Modal ID:", element.id)
+    }
     const iframes = element.querySelectorAll('iframe[data-original-src]')
-    console.log("Found iframes:", iframes.length)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Found iframes:", iframes.length)
+    }
     
     iframes.forEach((iframe, index) => {
-      console.log(`Processing iframe ${index} in ${element.id}`)
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`Processing iframe ${index} in ${element.id}`)
+      }
       
       const already = iframe.getAttribute("data-pdf-loaded") === "true"
       if (already) {
-        console.log(`Iframe ${index} already loaded, skipping`)
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`Iframe ${index} already loaded, skipping`)
+        }
         return
       }
 
@@ -97,40 +120,41 @@ export default class extends Controller {
         return
       }
       
-      console.log(`Iframe ${index} original src:`, originalSrc)
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`Iframe ${index} original src:`, originalSrc)
+      }
 
       try {
         // Check current src
         const currentSrc = iframe.getAttribute("src") 
-        console.log(`Iframe ${index} current src:`, currentSrc)
-        
-        // Force set iframe src, even if it's the same
-        console.log(`Setting src for iframe ${index} in ${element.id} to:`, originalSrc)
-        
-        // DEBUG: Log the proof type based on modal ID
-        if (element.id === 'incomeProofReviewModal') {
-          console.log('INCOME PROOF PDF LOADING')
-        } else if (element.id === 'residencyProofReviewModal') {
-          console.log('RESIDENCY PROOF PDF LOADING')
-        } else if (element.id === 'medicalCertificationReviewModal') {
-          console.log('MEDICAL CERTIFICATION PDF LOADING')
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`Iframe ${index} current src:`, currentSrc)
+          console.log(`Setting src for iframe ${index} in ${element.id} to:`, originalSrc)
+          
+          // DEBUG: Log the proof type based on modal ID
+          if (element.id === 'incomeProofReviewModal') {
+            console.log('INCOME PROOF PDF LOADING')
+          } else if (element.id === 'residencyProofReviewModal') {
+            console.log('RESIDENCY PROOF PDF LOADING')
+          } else if (element.id === 'medicalCertificationReviewModal') {
+            console.log('MEDICAL CERTIFICATION PDF LOADING')
+          }
         }
         
         // Force refresh by replacing iframe with a new one
         const parent = iframe.parentNode
         const newIframe = iframe.cloneNode(true)
         newIframe.src = originalSrc + '&t=' + new Date().getTime() // Add timestamp to bust cache
-        parent.replaceChild(newIframe, iframe)
         
-        iframe.setAttribute("data-pdf-loading", "true")
+        newIframe.setAttribute("data-pdf-loading", "true")
 
-        iframe.addEventListener("load", () => {
-          iframe.setAttribute("data-pdf-loaded", "true")
-          iframe.removeAttribute("data-pdf-loading")
+        newIframe.addEventListener("load", () => {
+          newIframe.setAttribute("data-pdf-loaded", "true")
+          newIframe.removeAttribute("data-pdf-loading")
         })
-        iframe.addEventListener("error", e => {
+        newIframe.addEventListener("error", e => {
           console.error("Error loading iframe:", e)
-          iframe.removeAttribute("data-pdf-loading")
+          newIframe.removeAttribute("data-pdf-loading")
           const errorContainer = document.createElement("div")
           errorContainer.className = "p-4 bg-red-50 border border-red-100 rounded my-2"
           errorContainer.innerHTML = `
@@ -140,8 +164,11 @@ export default class extends Controller {
               <a href="${originalSrc}" target="_blank" class="underline">Open PDF</a>
             </p>
           `
-          iframe.parentNode.insertBefore(errorContainer, iframe)
+          newIframe.parentNode.insertBefore(errorContainer, newIframe)
         })
+        
+        // Replace after event listeners are attached
+        parent.replaceChild(newIframe, iframe)
       } catch (err) {
         console.error("Exception in _loadIframes:", err)
       }
@@ -155,10 +182,12 @@ export default class extends Controller {
       event?.currentTarget?.closest('[data-modal-target="container"]') ||
       this.containerTarget
 
-    modalElement?.classList.add("hidden")
-    modalElement?.querySelectorAll('iframe[data-original-src]').forEach((iframe) => {
-      iframe.removeAttribute("data-pdf-loaded")
-    })
+    if (modalElement) {
+      setVisible(modalElement, false)
+      modalElement.querySelectorAll('iframe[data-original-src]').forEach((iframe) => {
+        iframe.removeAttribute("data-pdf-loaded")
+      })
+    }
 
     // Only remove overflow-hidden if no other modals are visible
     const anyVisible = this.element.querySelectorAll(
@@ -166,7 +195,7 @@ export default class extends Controller {
     ).length > 0
 
     if (!this.preserveScrollValue && !anyVisible) {
-      document.body.classList.remove("overflow-hidden")
+      this._unlockScroll()
     }
   }
 
@@ -187,12 +216,14 @@ export default class extends Controller {
   }
 
   cleanup() {
-    console.log("Cleaning up modal scroll state")
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Cleaning up modal scroll state")
+    }
     this.preserveScrollValue = false
-    document.body.classList.remove("overflow-hidden")
+    this._unlockScroll()
     this.element
       .querySelectorAll('[data-modal-target="container"]')
-      .forEach(modal => modal.classList.add("hidden"))
+      .forEach(modal => setVisible(modal, false))
     this._setupScrollSafetyTimeout()
   }
 
@@ -200,36 +231,42 @@ export default class extends Controller {
     clearTimeout(this._scrollSafetyTimeout)
     this._scrollSafetyTimeout = setTimeout(() => {
       if (document.body.classList.contains("overflow-hidden")) {
-        console.warn("Safety timeout: restoring scroll")
-        document.body.classList.remove("overflow-hidden")
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn("Safety timeout: restoring scroll")
+        }
+        this._unlockScroll()
       }
     }, 2000)
   }
 
   handleTurboFormSubmit(event) {
-    console.log("Custom turbo-form-submit received")
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Custom turbo-form-submit received")
+    }
     this._formSubmissionInProgress = true
     this.element
       .querySelectorAll('[data-modal-target="container"]')
-      .forEach(modal => modal.classList.add("hidden"))
+      .forEach(modal => setVisible(modal, false))
 
     setTimeout(() => {
-      document.body.classList.remove("overflow-hidden")
+      this._unlockScroll()
     }, 300)
 
     setTimeout(() => {
       if (this._formSubmissionInProgress) {
-        document.body.classList.remove("overflow-hidden")
+        this._unlockScroll()
         this._formSubmissionInProgress = false
       }
       if (document.body.classList.contains("overflow-hidden")) {
-        document.body.classList.remove("overflow-hidden")
+        this._unlockScroll()
       }
     }, 1000)
 
     const onVisible = () => {
-      console.log("Visibility change: cleaning up")
-      document.body.classList.remove("overflow-hidden")
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("Visibility change: cleaning up")
+      }
+      this._unlockScroll()
       document.removeEventListener("visibilitychange", onVisible)
     }
     document.addEventListener("visibilitychange", onVisible, { once: true })
@@ -238,18 +275,20 @@ export default class extends Controller {
   handleTurboSubmitEnd(event) {
     const form = event.detail?.formSubmission?.formElement
     if (form?.closest('[data-modal-target="container"]')) {
-      console.log("Turbo form submission in modal finished")
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("Turbo form submission in modal finished")
+      }
       this._formSubmissionInProgress = false
       this.element
         .querySelectorAll('[data-modal-target="container"]')
-        .forEach(modal => modal.classList.add("hidden"))
+        .forEach(modal => setVisible(modal, false))
 
       setTimeout(() => {
         if (!this.preserveScrollValue) {
-          document.body.classList.remove("overflow-hidden")
+          this._unlockScroll()
         }
         if (document.body.classList.contains("overflow-hidden")) {
-          document.body.classList.remove("overflow-hidden")
+          this._unlockScroll()
         }
       }, 250)
     }

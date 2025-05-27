@@ -26,12 +26,18 @@ module Applications
       # Apply search filter
       result = apply_search_filter(result) if params[:q].present?
 
-      result
+      # Apply guardian relationship filters
+      result = apply_guardian_relationship_filters(result)
+
+      # Return success result with the filtered scope
+      # Use positional parameters to match the BaseService method definition
+      success(nil, result)
     rescue StandardError => e
       Rails.logger.error "Error applying filters: #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
-      add_error("Error applying filters: #{e.message}")
-      scope
+      # Return the original scope in the data field on failure, along with an error message.
+      # Use positional parameters to match the BaseService method definition
+      failure("Error applying filters: #{e.message}", scope)
     end
 
     private
@@ -44,6 +50,8 @@ module Applications
         scope.where(status: :in_progress)
       when 'approved'
         scope.where(status: :approved)
+      when 'rejected'
+        scope.where(status: :rejected)
       when 'proofs_needing_review'
         # Use Rails enum mapping to get the correct integer values
         scope.where(income_proof_status: :not_reviewed).or(scope.where(residency_proof_status: :not_reviewed))
@@ -55,6 +63,9 @@ module Applications
       when 'training_requests'
         # Use scope to filter applications with pending training
         scope.with_pending_training
+      when 'dependent_applications'
+        # Filter applications that are for dependents (have a managing_guardian)
+        scope.where.not(managing_guardian_id: nil)
       else
         scope
       end
@@ -86,6 +97,29 @@ module Applications
         'applications.id::text ILIKE ? OR users.first_name ILIKE ? OR users.last_name ILIKE ? OR users.email ILIKE ?',
         search_term, search_term, search_term, search_term
       )
+    end
+
+    def apply_guardian_relationship_filters(scope)
+      result = scope
+
+      # Filter by managing guardian
+      result = result.where(managing_guardian_id: params[:managing_guardian_id]) if params[:managing_guardian_id].present?
+
+      # Filter by applications for dependents of a specific guardian
+      if params[:guardian_id].present?
+        # Use the scope defined in the Application model
+        guardian = User.find_by(id: params[:guardian_id])
+        result = result.for_dependents_of(guardian) if guardian.present?
+      end
+
+      # Filter by applications for a specific dependent
+      result = result.where(user_id: params[:dependent_id]) if params[:dependent_id].present?
+
+      # Filter to show only applications for dependents
+      result = result.where.not(managing_guardian_id: nil) if params[:only_dependent_apps] == 'true'
+
+      # Always return a relation, even if filters didn't match anything
+      result || Application.none
     end
 
     def fiscal_year

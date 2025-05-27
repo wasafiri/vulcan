@@ -7,7 +7,7 @@ FactoryBot.define do
       password { 'password123' }
       first_name { 'Test' }
       last_name { 'User' }
-      phone # Use the sequence defined in sequences.rb
+      phone { nil } # Don't generate a default phone, tests should supply if needed
       date_of_birth { 30.years.ago }
       timezone { 'Eastern Time (US & Canada)' }
       locale { 'en' }
@@ -16,11 +16,15 @@ FactoryBot.define do
 
       factory :admin, class: 'Users::Administrator' do
         sequence(:email) { |n| "admin#{n}@example.com" }
-        type { 'Administrator' }
+        type { 'Users::Administrator' } # Ensure STI type matches class name
         first_name { 'Admin' }
+        # Ensure admin users are verified for login
+        email_verified { true }
+        verified { true }
       end
 
       factory :evaluator, class: 'Users::Evaluator' do
+        sequence(:email) { |n| "evaluator#{n}@example.com" }
         type { 'Users::Evaluator' }
         first_name { 'Test' }
         last_name { 'Evaluator' }
@@ -37,13 +41,17 @@ FactoryBot.define do
       end
 
       factory :trainer, class: 'Users::Trainer' do
-        sequence(:email) { |n| "trainer#{n}@example.com" }
+        # Add SecureRandom to ensure uniqueness across test runs, avoiding potential sequence reset issues or fixture conflicts
+        sequence(:email) { |n| "trainer_#{n}_#{SecureRandom.hex(4)}@example.com" }
         type { 'Users::Trainer' }
         first_name { 'Test' }
         last_name { 'Trainer' }
       end
 
       factory :constituent, class: 'Users::Constituent' do # Match class name used in controller/associations
+        first_name { 'Test' }
+        last_name { 'Constituent' }
+        sequence(:email) { |n| "constituent#{n}@example.com" }
         type { 'Users::Constituent' } # Set type explicitly to match controller expectation
         physical_address_1 { '123 Main St' }
         city { 'Baltimore' }
@@ -69,14 +77,64 @@ FactoryBot.define do
           cognition_disability { true }
         end
 
+        # DEPRECATED: Use :with_dependent trait instead or create GuardianRelationship directly.
+        # This trait now creates a single dependent for the guardian.
         trait :as_guardian do
-          is_guardian { true }
-          guardian_relationship { 'Parent' }
+          transient do
+            dependent_user { create(:constituent, first_name: 'Dependent', last_name: 'Child') }
+          end
+          after(:create) do |guardian, evaluator|
+            create(:guardian_relationship, guardian_user: guardian, dependent_user: evaluator.dependent_user, relationship_type: 'Parent')
+          end
         end
 
+        # DEPRECATED: Use :with_dependent trait with specific relationship_type.
+        # This trait now creates a single dependent with 'Legal Guardian' relationship.
         trait :as_legal_guardian do
-          is_guardian { true }
-          guardian_relationship { 'Legal Guardian' }
+          transient do
+            dependent_user { create(:constituent, first_name: 'Dependent', last_name: 'Ward') }
+          end
+          after(:create) do |guardian, evaluator|
+            create(:guardian_relationship, guardian_user: guardian, dependent_user: evaluator.dependent_user,
+                                           relationship_type: 'Legal Guardian')
+          end
+        end
+
+        trait :with_dependent do
+          transient do
+            dependent_relationship_type { 'Parent' }
+            dependent_attributes { { first_name: 'Dependent', last_name: 'Child' } }
+          end
+          after(:create) do |guardian, evaluator|
+            dependent = create(:constituent, evaluator.dependent_attributes)
+            create(:guardian_relationship, guardian_user: guardian, dependent_user: dependent,
+                                           relationship_type: evaluator.dependent_relationship_type)
+          end
+        end
+
+        trait :with_dependents do
+          transient do
+            dependents_count { 1 }
+            dependent_relationship_type { 'Parent' }
+          end
+          after(:create) do |guardian, evaluator|
+            evaluator.dependents_count.times do |i|
+              dependent = create(:constituent, first_name: "Dependent#{i + 1}", last_name: guardian.last_name)
+              create(:guardian_relationship, guardian_user: guardian, dependent_user: dependent,
+                                             relationship_type: evaluator.dependent_relationship_type)
+            end
+          end
+        end
+
+        trait :with_guardian do
+          transient do
+            guardian_user { create(:constituent, first_name: 'Guardian', last_name: 'Parent') }
+            guardian_relationship_type { 'Parent' }
+          end
+          after(:create) do |dependent, evaluator|
+            create(:guardian_relationship, guardian_user: evaluator.guardian_user, dependent_user: dependent,
+                                           relationship_type: evaluator.guardian_relationship_type)
+          end
         end
 
         trait :with_internet do
@@ -85,7 +143,7 @@ FactoryBot.define do
 
         trait :with_active_application do
           after(:create) do |constituent|
-            create(:application, user: constituent)
+            create(:application, user: constituent) # This might need adjustment if dependent has guardian
           end
         end
 
@@ -97,11 +155,22 @@ FactoryBot.define do
           zip_code { '20901' }
           phone { '111-222-3333' }
         end
+
+        # Trait for a user who is a guardian
+        # In the paper application context, guardians are created as Constituents.
+        # This trait is primarily to satisfy the `create(:user, :guardian)` call.
+        trait :guardian do
+          # Add any specific guardian attributes here if needed in the future.
+          # For now, being a constituent is sufficient for the search.
+          first_name { 'Guardian' }
+          sequence(:last_name) { |n| "Test#{n}" }
+        end
       end
     end
   end
 
   factory :vendor_user, parent: :user, class: 'Users::Vendor' do
+    sequence(:email) { |n| "vendor#{n}@example.com" }
     type { 'Users::Vendor' }
     business_name { "Vendor Business #{rand(1000)}" }
     phone { "555-#{rand(100..999)}-#{rand(1000..9999)}" }

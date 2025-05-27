@@ -11,4 +11,4 @@ EmailTemplate.create_or_find_by!(name: 'email_header_text', format: :text) do |t
   TEXT
   template.version = 1
 end
-puts 'Seeded email_header_text (text)'
+puts 'Seeded email_header_text (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

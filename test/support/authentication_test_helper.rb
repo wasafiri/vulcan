@@ -2,142 +2,147 @@
 
 # AuthenticationTestHelper
 #
-# This module provides a standardized approach to authentication in tests.
-# It includes methods for all test types (unit, controller, integration, system).
+# Standardised helpers for signing users in/out across non-system tests.
+# – Controller tests → sign_in_as
+# – Integration tests → sign_in_with_headers
+# – Unit/other        → update_current_user
 #
-# Usage:
-# - sign_in_as(user): For controller tests, sets cookies directly
-# - sign_in_with_headers(user): For integration tests, includes HTTP headers
-# - set_current_user(user): For unit tests that need Current.user set
-# - sign_in(user): Unified method that works across test types
+# For system tests, see SystemTestAuthentication module.
+# Add ENV['DEBUG_AUTH']='true' to see verbose output while debugging.
 #
-# The module is automatically included in all test cases via test_helper.rb.
 module AuthenticationTestHelper
-  # Set the current user for a test block - useful for unit tests
-  # @param user [User] The user to set as Current.user
-  # @yield Block to execute with the user set
-  def set_current_user(user)
-    Current.user = user
-    yield
-  ensure
-    Current.user = nil
+  # Include shared authentication core functionality
+  include AuthenticationCore
+  # Unified entry-point -------------------------------------------------------
+
+  # Signs a user in using the best strategy for the current test context.
+  #
+  # @param user [User]
+  # @return [User] the same user, for chaining in tests
+  def sign_in(user)
+    if defined?(@controller) && @controller.is_a?(ActionController::Base)
+      sign_in_as(user) # controller helper
+    elsif is_integration_test?
+      sign_in_with_headers(user) # integration helper
+    else
+      update_current_user(user) # fallback for unit/unknown
+    end
   end
 
-  # Authenticate as a user for controller tests
-  # @param user [User] The user to authenticate as
-  # @return [User] The user that was authenticated
+  #-------------------------------------------------------------------------
+
+  # Controller-level cookie sign-in.
   def sign_in_as(user)
     session = create_test_session(user)
-    if cookies.respond_to?(:signed)
-      cookies.signed[:session_token] = session.session_token
-    else
-      cookies[:session_token] = session.session_token
+
+    # Mirror what Rails would do from the cookie, so authenticate! sees it
+    if defined?(request) && request.respond_to?(:session)
+      request.session[:session_token] = session.session_token
     end
-    # Log authentication in debug mode
-    puts "CONTROLLER AUTH: Setting cookie for #{user.email}" if ENV['DEBUG_AUTH'] == 'true'
-    user
-  end
 
-  # Authenticate with headers for integration tests
-  # @param user [User] The user to authenticate as
-  # @return [User] The user that was authenticated
-  def sign_in_with_headers(user)
-    session = create_test_session(user)
-
-    # For integration tests, we don't have direct access to @request.headers
-    # Instead, we use the built-in methods for setting headers with integration tests
-    headers = { 'HTTP_COOKIE' => "session_token=#{session.session_token}" }
-
-    # Merge our headers with the default headers
-    @headers = default_headers.merge(headers) if respond_to?(:default_headers)
-
-    # Also set the cookies directly for maximum compatibility
-    if cookies.respond_to?(:signed)
-      cookies.signed[:session_token] = session.session_token if respond_to?(:cookies)
+    if respond_to?(:cookies) && cookies.respond_to?(:signed)
+      cookies.signed[:session_token] = { value: session.session_token, httponly: true }
     elsif respond_to?(:cookies)
       cookies[:session_token] = session.session_token
     end
 
-    # Set test user ID for test environment authentication bypass
-    ENV['TEST_USER_ID'] = user.id.to_s
+    # Make Current.user available immediately for any before_action
+    update_current_user(user)
 
-    # Log authentication in debug mode
-    puts "INTEGRATION AUTH: Setting headers and cookies for #{user.email}" if ENV['DEBUG_AUTH'] == 'true'
+    # Store test user ID in thread local variable
+    store_test_user_id(user.id)
 
+    debug_auth "CONTROLLER AUTH: cookie & request.session set for #{user.email}"
     user
   end
 
-  # Sign in a user for integration tests by simulating password sign-in
-  # @param user [User] The user to sign in
-  def sign_in_user(user)
-    post sign_in_path, params: { email: user.email, password: 'password123' }
+  # Integration-level header sign-in.
+  def sign_in_with_headers(user)
+    session = create_test_session(user)
+    raw_cookie = "session_token=#{session.session_token}"
+
+    # Seed the rack mock session cookie (IntegrationTest)
+    if respond_to?(:rack_mock_session) && rack_mock_session.respond_to?(:cookie_jar)
+      rack_mock_session.cookie_jar[:session_token] = session.session_token
+    end
+
+    # `default_headers` is defined by Rails::TestRequest; fall back gracefully.
+    default_headers.merge!('Cookie' => raw_cookie) if respond_to?(:default_headers, true)
+
+    # Set cookies anyway, because some helpers still read them.
+    if respond_to?(:cookies) && cookies.respond_to?(:signed)
+      cookies.signed[:session_token] = session.session_token
+    elsif respond_to?(:cookies)
+      cookies[:session_token] = session.session_token
+    end
+
+    # Make Current.user available immediately
+    update_current_user(user)
+
+    # Store test user ID in thread local variable
+    store_test_user_id(user.id)
+
+    debug_auth "INTEGRATION AUTH: rack_mock_session, cookies & headers set for #{user.email}"
     user
   end
 
-  # Sign out a user in controller/integration tests
-  # @return [nil]
-  def sign_out_with_headers
-    cookies.delete(:session_token) if cookies.respond_to?(:delete)
-    @request.headers.delete('HTTP_COOKIE') if defined?(@request) && @request.respond_to?(:headers)
-    ENV['TEST_USER_ID'] = nil
-    nil
+  # Pure unit-test fallback: just update Current.user.
+  def update_current_user(user)
+    Current.user = user if defined?(Current)
+    @current_user ||= user
+    debug_auth "UNIT AUTH: Current.user set for #{user.email}"
+    user
   end
 
-  # Create a test session for a user
-  # @param user [User] The user to create a session for
-  # @return [Session] The created session object
-  def create_test_session(user)
-    Session.create!(
-      user: user,
-      user_agent: 'Test Browser',
-      ip_address: '127.0.0.1'
-    )
+  # Optional convenience helper: simulate a form-based sign-in (slow!).
+  def sign_in_user(user, password: 'password123')
+    post sign_in_path, params: { email: user.email, password: password }
+    assert_response :redirect
+    assert_redirected_to root_path, 'Sign in failed to redirect properly'
+    update_current_user(user)
+    user
   end
 
-  # Assert that a user is authenticated as the expected user
-  # @param expected_user [User] The user that should be authenticated
+  # Sign out regardless of context.
+  def sign_out
+    # Use the shared cookie deletion logic that handles all driver types
+    delete_session_cookie
+
+    # Clear test identity (thread-locals, Current.user, etc.)
+    clear_test_identity
+  end
+  alias sign_out_with_headers sign_out # preserve original name
+
+  # Assertions ---------------------------------------------------------------
+
   def assert_authenticated(expected_user)
     return unless defined?(@controller) && @controller.respond_to?(:current_user, true)
 
-    actual_user = @controller.send(:current_user)
-    assert_equal expected_user.id, actual_user&.id,
-                 "Expected to be authenticated as #{expected_user.email}, got #{actual_user&.email || 'nil'}"
+    actual = @controller.send(:current_user)
+    assert_equal expected_user.id, actual&.id,
+                 "Expected to be signed in as #{expected_user.email}, got #{actual&.email || 'nil'}"
   end
 
-  # Assert that a request was rejected due to insufficient authentication
   def assert_authentication_required
     assert_response :redirect
     assert_redirected_to sign_in_path
   end
 
-  # Utility to verify the complete authentication state
-  # @param user [User] The user to verify authentication for
-  def verify_authentication_state(user)
-    # Check the Current context if available
-    if defined?(Current) && Current.respond_to?(:user)
-      assert_equal user.id, Current.user&.id, 'Current.user should be set to the authenticated user'
-    end
-
-    # For controller and integration tests, check the controller's current_user
-    if defined?(@controller) && @controller.respond_to?(:current_user, true)
-      actual_user = @controller.send(:current_user)
-      assert_equal user.id, actual_user&.id, 'Controller current_user should be the authenticated user'
-    end
-
-    # Verify session is active in database
-    session = Session.find_by(user_id: user.id)
-    assert session.present?, 'No active session found for user'
-    assert_not session.expired?, 'Session should not be expired' if session.respond_to?(:expired?)
-  end
-
-  # Skip tests that depend on authentication if authentication is broken
-  # This prevents cascading test failures when authentication itself is broken
+  # Skip spec if auth system clearly broken, to avoid cascading failures.
   def skip_unless_authentication_working
     begin
       get root_path
     rescue StandardError
       nil
     end
-    skip 'Authentication not working properly' if response&.redirect? && response&.location.to_s.include?('sign_in')
+    return unless response&.redirect? && response.location.to_s.include?('sign_in')
+
+    skip 'Authentication not working properly'
+  end
+
+  private
+
+  def is_integration_test?
+    defined?(post) && respond_to?(:post) && self.class < ActionDispatch::IntegrationTest
   end
 end

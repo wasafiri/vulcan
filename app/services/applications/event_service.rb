@@ -12,56 +12,74 @@ module Applications
       @user = user || application.user
     end
 
-    # Create a guardian application update event
-    # This checks if only nested user attributes changed to avoid duplicate events
-    # @param guardian_relationship [String] The relationship type ('Parent', 'Legal Guardian', etc.)
+    # Create an event for updating an application submitted for a dependent by a guardian
+    # This checks if relevant attributes related to the dependent or guardian changed
+    # @param dependent [User] The dependent user (optional, defaults to application.user)
+    # @param relationship_type [String] The relationship type (optional, will be looked up if not provided)
     # @return [Event] The created event record, or nil if event should be skipped
-    def log_guardian_update(guardian_relationship)
-      # Check if we should skip event creation because only nested attributes changed
-      return nil if only_nested_attributes_changed?
+    def log_dependent_application_update(dependent: nil, relationship_type: nil)
+      dependent ||= application.user
+
+      # Check if we should skip event creation because only irrelevant attributes changed
+      # We log if the application itself changed, or if the applicant (dependent) or managing guardian changed
+      relevant_changes = application.changed? || dependent.changed? || application.managing_guardian&.changed?
+
+      return nil unless relevant_changes
+
+      # If relationship_type wasn't provided, try to look it up
+      relationship_type ||= GuardianRelationship.find_by(
+        guardian_id: application.managing_guardian_id,
+        dependent_id: dependent.id
+      )&.relationship_type
 
       Event.create!(
-        user: user,
-        action: 'guardian_application_updated',
+        user: user, # The user performing the action (likely the guardian)
+        action: 'application_for_dependent_updated',
         metadata: {
           application_id: application.id,
-          guardian_relationship: guardian_relationship,
+          dependent_id: dependent.id,
+          managing_guardian_id: application.managing_guardian_id,
+          guardian_relationship: relationship_type, # Include for context if found
           timestamp: Time.current.iso8601
         }
       )
     end
 
-    # Create a guardian application submission event
-    # @param guardian_relationship [String] The relationship type ('Parent', 'Legal Guardian', etc.)
+    # Create an event for submitting an application for a dependent by a guardian
+    # @param dependent [User] The dependent user (optional, defaults to application.user)
+    # @param relationship_type [String] The relationship type (optional, will be looked up if not provided)
     # @return [Event] The created event record
-    def log_guardian_submission(guardian_relationship)
+    def log_dependent_application_submission(dependent: nil, relationship_type: nil)
+      dependent ||= application.user
+
+      # If relationship_type wasn't provided, try to look it up
+      relationship_type ||= GuardianRelationship.find_by(
+        guardian_id: application.managing_guardian_id,
+        dependent_id: dependent.id
+      )&.relationship_type
+
       Event.create!(
-        user: user,
-        action: 'guardian_application_submitted',
+        user: user, # The user performing the action (likely the guardian)
+        action: 'application_for_dependent_submitted',
         metadata: {
           application_id: application.id,
-          guardian_relationship: guardian_relationship,
+          dependent_id: dependent.id,
+          managing_guardian_id: application.managing_guardian_id,
+          guardian_relationship: relationship_type, # Include for context if found
           timestamp: Time.current.iso8601
         }
       )
     end
 
-    private
-
-    # Determines if only nested attributes (like user's guardian info) was changed
-    # without any direct changes to the application itself
-    def only_nested_attributes_changed?
-      # If application is new, it's never "only nested attributes"
-      return false if application.new_record?
-
-      # If application record has changed, it's not "only nested attributes"
-      return false if application.changed?
-
-      # If user hasn't changed either, skip the event
-      return true unless user.changed?
-
-      # If user changed but only guardian-related fields, skip the event
-      user.changed.all? { |attr| %w[is_guardian guardian_relationship].include?(attr) }
+    # Another name for log_dependent_application_submission for backward compatibility
+    # @param dependent [User] The dependent user
+    # @param relationship_type [String] The relationship type
+    # @return [Event] The created event record
+    def log_submission_for_dependent(dependent: nil, relationship_type: nil)
+      log_dependent_application_submission(dependent: dependent, relationship_type: relationship_type)
     end
+
+    # The only_nested_attributes_changed? method was removed as it is no longer needed
+    # with the updated event logging logic.
   end
 end

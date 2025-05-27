@@ -75,7 +75,6 @@ module ConstituentPortal
       end
     end
     # Custom exceptions for better error handling
-    class GuardianValidationError < StandardError; end
     class UserAttributeUpdateError < StandardError; end
     class ApplicationCreationError < StandardError; end
     class DisabilityValidationError < StandardError; end
@@ -157,6 +156,22 @@ module ConstituentPortal
       @application = current_user.applications.new
       @application.medical_provider_attributes ||= {}
 
+      # If user_id is provided, set up the application for that dependent
+      if params[:user_id].present?
+        dependent = current_user.dependents.find_by(id: params[:user_id])
+        if dependent
+          @application.user = dependent
+          @application.user_id = dependent.id
+          @application.managing_guardian_id = current_user.id
+        end
+      # If for_self=false is provided, set up for dependent selection (but don't select a specific dependent)
+      elsif params[:for_self] == 'false' || params[:for_self] == false
+        # Don't set a specific dependent, but mark this as a dependent application
+        # The user will need to select a dependent from the dropdown
+        @application.managing_guardian_id = current_user.id
+        # Don't set user_id yet - it will be set when the user selects a dependent
+      end
+
       # Pre-populate address fields from user profile
       @address = Address.new(
         physical_address_1: current_user.physical_address_1,
@@ -174,86 +189,89 @@ module ConstituentPortal
     # with clear responsibilities for each component.
     # @return [void] Redirects to application path or renders form with errors
     def create
-      user_attrs = extract_user_attributes(params)
       is_submission = params[:submit_application].present?
-      return render_guardian_validation_error(user_attrs) if guardian_relationship_missing?(user_attrs)
+      user_disability_attrs = extract_user_attributes(params) # Now only disability flags
+      user_address_attrs = extract_address_attributes(params) # Extract address fields
 
-      # Update user attributes before initializing the application to avoid unsaved instance validations
-      attrs_to_update = user_attrs
+      applicant_user_id = params.dig(:application, :user_id)
+      applicant_user = current_user # Default to current_user applying for self
+      managing_guardian_for_app = nil
+
+      if applicant_user_id.present? && applicant_user_id.to_i != current_user.id
+        # Application is for a dependent
+        selected_dependent = current_user.dependents.find_by(id: applicant_user_id)
+        if selected_dependent
+          applicant_user = selected_dependent
+          managing_guardian_for_app = current_user
+        else
+          # Invalid dependent ID selected, handle error
+          @application = Application.new(filtered_application_params) # Build for form errors
+          @application.errors.add(:user_id, 'is not a valid dependent.')
+          initialize_address_and_provider_for_form
+          return render :new, status: :unprocessable_entity
+        end
+      end
+
+      # Update disability and address attributes on the actual applicant_user
       begin
-        update_user_attributes(attrs_to_update)
+        # Ensure type is set correctly if applicant_user is a new record (should not happen here)
+        # or if it's being updated.
+        applicant_user.type ||= 'Users::Constituent' if applicant_user.type.blank?
+        
+        # If this is a dependent user, skip contact uniqueness validation
+        # since they may share email/phone with their guardian
+        if managing_guardian_for_app.present?
+          applicant_user.skip_contact_uniqueness_validation = true
+        end
+        
+        # Combine disability and address attributes for user update
+        user_attrs = user_disability_attrs.merge(user_address_attrs)
+        applicant_user.update!(user_attrs)
       rescue ActiveRecord::RecordInvalid => e
-        log_error("User update failed outside transaction: #{e.message}", e)
-        @application = current_user.applications.new(filtered_application_params)
-        @application.medical_provider_attributes ||= {}
-        initialize_address
-        build_medical_provider_for_form
+        log_error("Applicant user (ID: #{applicant_user.id}) attribute update failed: #{e.message}", e)
+        @application = Application.new(filtered_application_params)
+        @application.user = applicant_user # Associate with applicant for error display
+        @application.errors.merge!(applicant_user.errors)
+        initialize_address_and_provider_for_form
         return render :new, status: :unprocessable_entity
       end
 
-      # Initialize application after user update
-      log_debug("Raw application_params: #{application_params.inspect}")
-      filtered_params = filtered_application_params
-      log_debug("Filtered application_params: #{filtered_params.inspect}")
-      @application = current_user.applications.new(filtered_params)
+      @application = Application.new(filtered_application_params)
+      @application.user = applicant_user
+      @application.managing_guardian = managing_guardian_for_app
 
       success = ActiveRecord::Base.transaction do
-        if is_submission && !current_user.disability_selected?
-          @application.errors.add(:base, 'At least one disability must be selected before submitting an application.')
+        # Disability check now on applicant_user
+        if is_submission && !applicant_user.disability_selected?
+          @application.errors.add(:base, 'At least one disability must be selected for the applicant before submitting an application.')
           raise ActiveRecord::Rollback
         end
 
-        set_guardian_status(@application, user_attrs)
+        # Old set_guardian_status is removed. The managing_guardian_id handles this.
         set_initial_application_attributes(@application, is_submission)
         set_medical_provider_details(@application)
         @application.assign_attributes(submission_params) if is_submission
 
         begin
-          save_application_with_event_log!
+          save_application_with_event_log! # This will save @application
         rescue ActiveRecord::RecordInvalid => e
           log_error("Application save failed: #{@application.errors.full_messages.join(', ')}", e)
+          # Errors are already on @application from save!
           raise ActiveRecord::Rollback
         end
-
         true
       end
 
       handle_application_creation_result(success)
     end
 
-    # Check if guardian relationship is required but missing
-    # @param user_attrs [Hash] User attributes from params
-    # @return [Boolean] true if guardian relationship is missing
-    def guardian_relationship_missing?(user_attrs)
-      user_attrs[:is_guardian] && user_attrs[:guardian_relationship].blank?
-    end
+    # REMOVED: guardian_relationship_missing? - logic is now part of dependent selection
+    # REMOVED: render_guardian_validation_error - handled by standard validation flow
+    # REMOVED: set_guardian_status - managing_guardian_id now handles this
 
-    # Render form with guardian validation error
-    # @param user_attrs [Hash] User attributes from params
-    # @return [void] Renders the new form with errors
-    def render_guardian_validation_error(user_attrs)
-      @application = current_user.applications.new(filtered_application_params)
-      current_user.assign_attributes(user_attrs)
-
-      # Add explicit validation errors
-      current_user.errors.add(:guardian_relationship, "can't be blank")
-      @application.errors.add(:guardian_relationship, "can't be blank")
-
-      # Prepare form for re-rendering
-      build_medical_provider_for_form
+    def initialize_address_and_provider_for_form
       initialize_address
-
-      render :new, status: :unprocessable_entity
-    end
-
-    # Set guardian status on application
-    # @param application [Application] The application to update
-    # @param user_attrs [Hash] User attributes containing guardian info
-    def set_guardian_status(application, user_attrs)
-      return unless application.respond_to?(:is_guardian=)
-
-      is_guardian_value = safe_boolean_cast(user_attrs[:is_guardian])
-      application.assign_attributes(is_guardian: is_guardian_value)
+      build_medical_provider_for_form
     end
 
     # Set medical provider details from params
@@ -270,6 +288,10 @@ module ConstituentPortal
           email: mp_attrs[:email]
         )
         set_provider_fields(application, provider_info)
+
+        # Enhanced debug logging for nested attributes
+        log_debug("Setting medical provider from nested attributes: #{provider_info.to_h}")
+
       # 2. Check for top-level medical_provider params (used in tests)
       elsif params[:medical_provider].present?
         mp_attrs = params[:medical_provider]
@@ -280,20 +302,42 @@ module ConstituentPortal
           email: mp_attrs[:email]
         )
         set_provider_fields(application, provider_info)
+
+        # Enhanced debug logging for top-level params (common in tests)
+        log_debug("Setting medical provider from top-level params: #{provider_info.to_h}")
+
       # 3. Fall back to @medical_provider instance variable if available
       elsif @medical_provider.present? && @medical_provider.is_a?(MedicalProviderInfo)
         set_provider_fields(application, @medical_provider)
+
+        # Enhanced debug logging for instance variable fallback
+        log_debug("Setting medical provider from instance variable: #{@medical_provider.to_h}")
+      else
+        log_debug('No medical provider data found in params')
       end
+
+      # Always log the final state of medical provider fields
+      log_debug("Final medical provider details: name=#{application.medical_provider_name}, " +
+              "phone=#{application.medical_provider_phone}, " +
+              "email=#{application.medical_provider_email}")
     end
 
     # Helper method to set provider fields on application
     # @param application [Application] The application to update
     # @param provider_info [MedicalProviderInfo] The provider info to use
     def set_provider_fields(application, provider_info)
+      # Only update fields that are actually present in the provided info
+      # This avoids accidentally overwriting existing values with blank ones
       application.medical_provider_name = provider_info.name if provider_info.name.present?
       application.medical_provider_phone = provider_info.phone if provider_info.phone.present?
       application.medical_provider_fax = provider_info.fax if provider_info.fax.present?
       application.medical_provider_email = provider_info.email if provider_info.email.present?
+
+      # Always log what we're actually setting
+      log_debug("Setting provider fields on application #{application.id}:")
+      log_debug("  name: #{provider_info.name.presence || '[not provided]'}")
+      log_debug("  phone: #{provider_info.phone.presence || '[not provided]'}")
+      log_debug("  email: #{provider_info.email.presence || '[not provided]'}")
     end
 
     # Save application and create event log
@@ -326,7 +370,8 @@ module ConstituentPortal
     # @param success [Boolean] Whether creation was successful
     def handle_application_creation_result(success)
       if success
-        log_guardian_event if current_user.is_guardian? && @application.persisted?
+        # log_guardian_event if current_user.is_guardian? && @application.persisted? # OLD LOGIC
+        log_application_for_dependent_event if @application.for_dependent? && @application.persisted?
         redirect_to_app(@application)
       else
         # Prepare form for re-rendering
@@ -353,33 +398,61 @@ module ConstituentPortal
       # Process the application update within a transaction
       is_submission = params[:submit_application].present?
       success = ActiveRecord::Base.transaction do
-        # Ensure user association is maintained (important before user update)
-        @application.user = current_user
+        # Special handling for guardian managing dependent applications
+        if params[:application][:managing_guardian_id].present?
+          guardian_id = params[:application][:managing_guardian_id].to_i
 
-        # Update user attributes
-        # Let update! raise error on failure, causing transaction rollback
-        attrs_to_update = user_attrs
-        update_user_attributes(attrs_to_update) # Calls update!
+          # Verify this is a valid relationship
+          if guardian_id == current_user.id
+            relationship = GuardianRelationship.find_by(
+              guardian_id: current_user.id,
+              dependent_id: @application.user_id
+            )
 
-        # Validate disability ONLY if submitting from draft
-        if is_submission && original_status == 'draft'
-          # Check disability flags directly from the processed user_attrs instead of reloading current_user
-          disability_flags = [
-            user_attrs[:hearing_disability], user_attrs[:vision_disability], user_attrs[:speech_disability],
-            user_attrs[:mobility_disability], user_attrs[:cognition_disability]
-          ]
-          unless disability_flags.any? { |flag| flag == true }
-            log_error("User attributes do not indicate any disability selected during update submission: #{user_attrs.inspect}")
-            @application.errors.add(:base, 'At least one disability must be selected before submitting.')
-            raise ActiveRecord::Rollback # Rollback transaction
+            if relationship.present?
+              log_debug "Setting managing_guardian_id to #{current_user.id} for application #{@application.id}"
+              @application.managing_guardian_id = current_user.id
+              @is_guardian_managed_update = true
+            else
+              log_error "No guardian relationship found between user #{current_user.id} and dependent #{@application.user_id}"
+              @application.errors.add(:managing_guardian_id, 'Invalid guardian relationship')
+              raise ActiveRecord::Rollback
+            end
           end
         end
 
-        # Assign application attributes
+        # Determine the user whose attributes (like disabilities) should be updated.
+        # This is always the actual applicant associated with the application.
+        applicant_user_to_update = @application.user
+
+        # Update disability attributes on the applicant_user_to_update
+        # The user_attrs now only contain disability flags.
+        begin
+          applicant_user_to_update.type ||= 'Users::Constituent' if applicant_user_to_update.type.blank?
+          applicant_user_to_update.update!(user_attrs) # user_attrs contains disability flags
+        rescue ActiveRecord::RecordInvalid => e
+          log_error("Applicant user (ID: #{applicant_user_to_update.id}) attribute update failed during application update: #{e.message}",
+                    e)
+          @application.errors.merge!(applicant_user_to_update.errors)
+          raise ActiveRecord::Rollback # Rollback transaction
+        end
+
+        # Validate disability ONLY if submitting from draft, now checking the applicant_user_to_update
+        if is_submission && original_status == 'draft' && !applicant_user_to_update.disability_selected? # Check on the actual applicant
+          log_error("Applicant user (ID: #{applicant_user_to_update.id}) does not have any disability selected during update submission.")
+          @application.errors.add(:base, 'At least one disability must be selected for the applicant before submitting.')
+          raise ActiveRecord::Rollback # Rollback transaction
+        end
+
+        # Assign application attributes (excluding user/disability which are handled above)
         @application.assign_attributes(application_attrs)
+        set_medical_provider_details(@application)
 
         # Save application with potential status change (raises error on failure)
         save_application_with_status_update!(is_submission) # Use bang method
+
+        # Log debug information about the state after save
+        log_debug "Application was saved successfully. User ID: #{@application.user_id}, Managing Guardian ID: #{@application.managing_guardian_id}"
 
         true # Transaction successful
       rescue ActiveRecord::RecordInvalid => e # Catch validation errors
@@ -412,9 +485,8 @@ module ConstituentPortal
     def prepare_user_attributes_for_update
       # Permit only the user-related attributes from the application params
       # Use .to_h.symbolize_keys to ensure we get a hash with symbol keys
+      # Old guardian fields removed, only disability flags remain relevant for user update here.
       params.require(:application).permit(
-        :is_guardian,
-        :guardian_relationship,
         :hearing_disability,
         :vision_disability,
         :speech_disability,
@@ -426,8 +498,8 @@ module ConstituentPortal
     # Log debug information relevant to the update
     # @param _user_attrs [Hash] User attributes being updated (unused)
     def log_update_debug_info(_user_attrs)
-      log_debug "Update - Guardian checkbox value: #{params[:application][:is_guardian].inspect}"
-      log_debug "Update - Guardian relationship value: #{params[:application][:guardian_relationship].inspect}"
+      # log_debug "Update - Guardian checkbox value: #{params[:application][:is_guardian].inspect}" # Old field
+      # log_debug "Update - Guardian relationship value: #{params[:application][:guardian_relationship].inspect}" # Old field
       log_debug "Before transaction - Application user_id: #{@application.user_id}"
       log_debug "Before transaction - Current user ID: #{current_user.id}"
     end
@@ -441,11 +513,14 @@ module ConstituentPortal
     # @param original_status [Symbol] The original status of the application
     def handle_application_update_result(success, original_status)
       if success
-        # Log guardian event if applicable
-        create_guardian_update_event if current_user.is_guardian? && @application.persisted?
+        # Log dependent application update event if applicable
+        log_dependent_application_update_event if @application.for_dependent? && @application.persisted?
 
         # Determine appropriate notice message
         notice = determine_update_notice(original_status)
+
+        # Always redirect to the application path to ensure guardian can see the result
+        # Note that we always redirect to application_path whether it's a guardian-managed update or not
         redirect_to constituent_portal_application_path(@application), notice: notice
       else
         # Prepare form for re-rendering
@@ -455,13 +530,18 @@ module ConstituentPortal
       end
     end
 
-    # Create guardian update event using the event service
+    # Log an event for updating an application for a dependent
     # @return [void]
-    def create_guardian_update_event
-      # Use the new event service to ensure events are always created
-      # even when only nested attributes change
-      service = Applications::EventService.new(@application, user: current_user)
-      service.log_guardian_update(current_user.guardian_relationship)
+    def log_dependent_application_update_event
+      return unless @application.managing_guardian && @application.user
+
+      relationship = GuardianRelationship.find_by(
+        guardian_id: @application.managing_guardian_id,
+        dependent_id: @application.user_id
+      )
+      # Use the event service to log the application update for a dependent
+      service = Applications::EventService.new(@application, user: @application.managing_guardian)
+      service.log_dependent_application_update(dependent: @application.user, relationship_type: relationship&.relationship_type)
     end
 
     # Determine the appropriate notice for an update
@@ -815,9 +895,8 @@ module ConstituentPortal
     # @param attribute_name [String] The extracted attribute name
     # @return [Array<Symbol, String>] The target model (:user or :application) and the actual attribute name
     def determine_target_model_and_attribute(attribute_name)
-      user_fields = %w[is_guardian guardian_relationship
-                       hearing_disability vision_disability speech_disability
-                       mobility_disability cognition_disability]
+      user_fields = %w[hearing_disability vision_disability speech_disability
+                       mobility_disability cognition_disability] # Removed is_guardian, guardian_relationship
 
       # Fields that should be ignored for autosave
       ignored_fields = %w[physical_address_1 physical_address_2 city state zip_code
@@ -838,23 +917,20 @@ module ConstituentPortal
     # @return [Hash] Result with success flag and any errors
     def autosave_user_field(attribute, value)
       # Cast value if it's a boolean field
-      if %w[is_guardian hearing_disability vision_disability speech_disability mobility_disability
-            cognition_disability].include?(attribute)
+      if %w[hearing_disability vision_disability speech_disability mobility_disability
+            cognition_disability].include?(attribute) # Removed is_guardian
         value = safe_boolean_cast(value)
       end
 
-      # Special validation for guardian_relationship
-      # First check for an empty guardian relationship when the user is already a guardian
-      if attribute == 'guardian_relationship' && value.blank?
-        # Reload to ensure we have the latest data
-        current_user.reload
-        if current_user.is_guardian?
-          return { success: false,
-                   errors: { 'application[guardian_relationship]' => ["can't be blank when you select that you are a guardian"] } }
-        end
-      end
+      # Removed special validation for guardian_relationship as it's deprecated
 
       # Update the attribute directly to bypass validations
+      # Ensure this updates the correct user (applicant_user if application is for dependent)
+      # For autosave, it's tricky as @application.user might not be set if it's a new application.
+      # However, user-specific fields like disabilities should ideally be updated on the current_user
+      # if the application context isn't fully established for a dependent yet.
+      # This part of autosave might need more context if it's intended to update a dependent's user record
+      # before the main create/update action. For now, assume it updates current_user.
       current_user.update_column(attribute, value)
 
       # Update last visited step if application exists
@@ -990,31 +1066,47 @@ module ConstituentPortal
     end
 
     def extract_user_attributes(p)
+      # Only extract disability flags. Guardian status is now managed by GuardianRelationship.
       {
-        is_guardian: ['1', true].include?(p[:application][:is_guardian]),
-        guardian_relationship: p[:application][:guardian_relationship],
-        hearing_disability: ['1', true].include?(p[:application][:hearing_disability]),
-        vision_disability: ['1', true].include?(p[:application][:vision_disability]),
-        speech_disability: ['1', true].include?(p[:application][:speech_disability]),
-        mobility_disability: ['1', true].include?(p[:application][:mobility_disability]),
-        cognition_disability: ['1', true].include?(p[:application][:cognition_disability])
+        hearing_disability: ['1', true].include?(p.dig(:application, :hearing_disability)),
+        vision_disability: ['1', true].include?(p.dig(:application, :vision_disability)),
+        speech_disability: ['1', true].include?(p.dig(:application, :speech_disability)),
+        mobility_disability: ['1', true].include?(p.dig(:application, :mobility_disability)),
+        cognition_disability: ['1', true].include?(p.dig(:application, :cognition_disability))
         # Address fields removed - handle profile updates separately
       }
     end
 
+    def extract_address_attributes(p)
+      # Extract address fields from application params for user update
+      {
+        physical_address_1: p.dig(:application, :physical_address_1),
+        physical_address_2: p.dig(:application, :physical_address_2),
+        city: p.dig(:application, :city),
+        state: p.dig(:application, :state),
+        zip_code: p.dig(:application, :zip_code)
+      }.compact # Remove nil values
+    end
+
     def debug_application_info(app, p)
-      Rails.logger.debug { "Guardian checkbox value: #{p[:application][:is_guardian].inspect}" }
-      Rails.logger.debug { "Guardian relationship value: #{p[:application][:guardian_relationship].inspect}" }
+      # Rails.logger.debug { "Guardian checkbox value: #{p[:application][:is_guardian].inspect}" } # Old field
+      # Rails.logger.debug { "Guardian relationship value: #{p[:application][:guardian_relationship].inspect}" } # Old field
       Rails.logger.debug { "Application attributes before save: #{app.attributes.inspect}" }
       Rails.logger.debug { "Medical provider attributes: #{p.dig(:application, :medical_provider_attributes).inspect}" }
       Rails.logger.debug { "Application valid? #{app.valid?}" }
       Rails.logger.debug { "Application errors: #{app.errors.full_messages}" } if app.invalid?
     end
 
-    def log_guardian_event
-      # Use the event service to log the guardian application submission
-      service = Applications::EventService.new(@application, user: current_user)
-      service.log_guardian_submission(current_user.guardian_relationship)
+    def log_application_for_dependent_event
+      return unless @application.managing_guardian && @application.user
+
+      relationship = GuardianRelationship.find_by(
+        guardian_id: @application.managing_guardian_id,
+        dependent_id: @application.user_id
+      )
+      # Use the event service to log the application submission for a dependent
+      service = Applications::EventService.new(@application, user: @application.managing_guardian)
+      service.log_submission_for_dependent(dependent: @application.user, relationship_type: relationship&.relationship_type)
     end
 
     def redirect_to_app(app)
@@ -1047,8 +1139,8 @@ module ConstituentPortal
       # Exclude medical_provider_attributes as they are handled separately
       application_params.except(
         :medical_provider_attributes,
-        :is_guardian,
-        :guardian_relationship,
+        # :is_guardian, # Deprecated from direct user update here
+        # :guardian_relationship, # Deprecated from direct user update here
         :hearing_disability,
         :vision_disability,
         :speech_disability,
@@ -1089,13 +1181,34 @@ module ConstituentPortal
     # Find application using the standard association
     # @return [Application, nil] The found application or nil
     def find_application_by_standard_query
-      current_user.applications.find_by(id: params[:id])
+      # Include both:
+      # 1. Applications where the user is the direct owner/applicant
+      # 2. Applications where the user is the managing guardian
+      Application.where(id: params[:id])
+                 .where(
+                   'user_id = :uid
+                   OR managing_guardian_id = :uid
+                   OR EXISTS (
+                       SELECT 1 FROM guardian_relationships gr
+                       WHERE gr.guardian_id = :uid
+                         AND gr.dependent_id = applications.user_id
+                   )',
+                   uid: current_user.id
+                 )
+                 .first
     end
 
     # Find application using a more flexible query to work around STI issues
     # @return [Application, nil] The found application or nil
     def find_application_by_flexible_query
-      Application.find_by(id: params[:id], user_id: current_user.id)
+      # First try to find by user_id (when user is the applicant)
+      app = Application.find_by(id: params[:id], user_id: current_user.id)
+
+      # If not found, try to find by managing_guardian_id (when user is the guardian)
+      app ||= Application.find_by(id: params[:id], managing_guardian_id: current_user.id)
+
+      # Return the application found by either method
+      app
     end
 
     # Handle the case when application is not found
@@ -1114,6 +1227,7 @@ module ConstituentPortal
 
     def application_params
       params.require(:application).permit(
+        :user_id, # Allow user_id for selecting dependent
         :application_type,
         :submission_method,
         :maryland_resident,
@@ -1127,9 +1241,12 @@ module ConstituentPortal
         :terms_accepted,
         :information_verified,
         :medical_release_authorized,
-        :is_guardian,
-        :guardian_relationship,
-        :hearing_disability,
+        :alternate_contact_name,
+        :alternate_contact_phone,
+        :alternate_contact_email,
+        # :is_guardian, # Deprecated user fields, not application fields
+        # :guardian_relationship, # Deprecated user fields, not application fields
+        :hearing_disability, # These are user attributes, but often submitted with app
         :vision_disability,
         :speech_disability,
         :mobility_disability,
@@ -1147,8 +1264,7 @@ module ConstituentPortal
     end
 
     def user_params
-      params.expect(application: %i[is_guardian guardian_relationship
-                                    hearing_disability vision_disability
+      params.expect(application: %i[hearing_disability vision_disability
                                     speech_disability mobility_disability
                                     cognition_disability]).transform_values { |v| ActiveModel::Type::Boolean.new.cast(v) }
     end
@@ -1185,12 +1301,6 @@ module ConstituentPortal
     # @return [Hash] Processed attributes with proper types
     def process_user_attributes(attrs)
       processed_attrs = {}
-
-      # Process boolean fields with safe casting
-      processed_attrs[:is_guardian] = safe_boolean_cast(attrs[:is_guardian])
-
-      # Only include guardian relationship if user is a guardian
-      processed_attrs[:guardian_relationship] = attrs[:guardian_relationship] if processed_attrs[:is_guardian]
 
       # Process disability fields
       process_disability_attributes(attrs, processed_attrs)
@@ -1274,7 +1384,6 @@ module ConstituentPortal
         speech_disability
         mobility_disability
         cognition_disability
-        is_guardian
         maryland_resident
         terms_accepted
         information_verified

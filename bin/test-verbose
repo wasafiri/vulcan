@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+# Run tests with full verbose output (for debugging)
+# Usage: ./bin/test-verbose [test_file_or_pattern]
+
+# Enable verbose test output
+export VERBOSE_TESTS=1
+
+# Run the test with full output
+if [ $# -eq 0 ]; then
+  # No arguments - run all tests
+  rails test
+else
+  # Run specific test file(s)
+  rails test "$@"
+fi 

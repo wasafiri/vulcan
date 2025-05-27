@@ -1,0 +1,119 @@
+<%= form_with(model: dependent_user, 
+    url: dependent_user.new_record? ? constituent_portal_dependents_path : constituent_portal_dependent_path(dependent_user),
+    local: true,
+    scope: :dependent,
+    class: "space-y-6",
+    "aria-labelledby": "form-title") do |form| %>
+  
+  <% if dependent_user.errors.any? %>
+    <div class="bg-red-50 p-4 rounded mb-6 text-red-600" role="alert" aria-atomic="true">
+      <h2 class="font-medium">
+        <%= pluralize(dependent_user.errors.count, "error") %> prohibited this dependent from being saved:
+      </h2>
+      <ul class="list-disc list-inside">
+        <% dependent_user.errors.full_messages.each do |msg| %>
+          <li><%= msg %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <!-- Dependent Personal Information Section -->
+  <section aria-labelledby="personal-information-title" class="space-y-4 p-4 bg-gray-50 rounded">
+    <h2 id="personal-information-title" class="text-lg font-medium text-gray-900">Dependent Information</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <%= form.label :first_name, "First Name", class: "block text-sm font-medium text-gray-700" %>
+        <%= form.text_field :first_name, 
+            class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+            required: true %>
+      </div>
+      
+      <div>
+        <%= form.label :last_name, "Last Name", class: "block text-sm font-medium text-gray-700" %>
+        <%= form.text_field :last_name, 
+            class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+            required: true %>
+      </div>
+
+      <div data-dependent-fields-target="emailFieldContainer">
+        <%= form.label :email, "Email", class: "block text-sm font-medium text-gray-700" %>
+        <%= form.email_field :email, 
+            class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+            required: false %>
+        <p class="mt-1 text-xs text-gray-500">Optional; if left blank, guardian's email will be used</p>
+      </div>
+      
+      <div>
+        <%= form.label :phone, "Phone Number", class: "block text-sm font-medium text-gray-700" %>
+        <%= form.telephone_field :phone, 
+            class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+            placeholder: "555-555-5555" %>
+        <p class="mt-1 text-xs text-gray-500">Optional; if left blank, guardian's phone will be used</p>
+      </div>
+
+      <div>
+        <%= form.label :date_of_birth, "Date of Birth", class: "block text-sm font-medium text-gray-700" %>
+        <%= form.date_field :date_of_birth, 
+            class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+            required: true %>
+      </div>
+    </div>
+  </section>
+
+  <!-- Disability Information Section -->
+  <section aria-labelledby="disability-section-title" class="space-y-4 p-4 bg-gray-50 rounded">
+    <h2 id="disability-section-title" class="text-lg font-medium text-gray-900">Disability Information</h2>
+    <fieldset class="space-y-2">
+      <legend class="text-sm text-gray-700 font-medium">Select at least one disability that applies to your dependent:</legend>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <% disabilities = [:hearing, :vision, :speech, :mobility, :cognition] %>
+        <% disabilities.each do |disability| %>
+          <div class="flex items-center">
+            <%= form.check_box "#{disability}_disability",
+                class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
+                "aria-describedby": "#{disability}-description" %>
+            <%= form.label "#{disability}_disability", disability.to_s.titleize,
+                class: "ml-2 text-sm text-gray-700" %>
+          </div>
+          <div id="<%= disability %>-description" class="sr-only">
+            Check if your dependent has a <%= disability %> disability
+          </div>
+        <% end %>
+      </div>
+    </fieldset>
+  </section>
+
+  <!-- Relationship Information Section -->
+  <%= fields_for :guardian_relationship, guardian_relationship do |gr_form| %>
+    <section aria-labelledby="relationship-section-title" class="space-y-4 p-4 bg-gray-50 rounded">
+      <h2 id="relationship-section-title" class="text-lg font-medium text-gray-900">Relationship Information</h2>
+      <div>
+        <%= gr_form.label :relationship_type, "Relationship to Dependent", class: "block text-sm font-medium text-gray-700" %>
+        <%= gr_form.select :relationship_type,
+            options_for_select([
+              ["Parent", "Parent"],
+              ["Legal Guardian", "Legal Guardian"],
+              ["Caretaker", "Caretaker"],
+              ["Other", "Other"]
+            ], guardian_relationship&.relationship_type),
+            { include_blank: "Select Relationship Type" },
+            { class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+              required: true } %>
+      </div>
+    </section>
+  <% end %>
+
+  <!-- Form Actions -->
+  <div class="px-6 py-4 bg-gray-50 flex items-center justify-end space-x-3 rounded-b-lg">
+    <%= link_to "Cancel",
+        constituent_portal_dashboard_path,
+        class: "inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+        role: "button",
+        "aria-label": "Cancel and return to dashboard" %>
+        
+    <%= form.submit dependent_user.new_record? ? "Add Dependent" : "Update Dependent",
+        class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+        "aria-label": dependent_user.new_record? ? "Add new dependent" : "Update dependent information" %>
+  </div>
+<% end %>

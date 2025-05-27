@@ -18,10 +18,10 @@ module Applications
 
       # Create applications with specific statuses and dates for reporting tests using unique users
       # 1 Draft application
-      _draft_app = create(:application,
-                          user: create(:constituent, email: "unique_dashboard_draft_#{Time.now.to_i}@example.com"),
-                          created_at: current_fy_start + 1.month,
-                          status: :draft)
+      draft_app = create(:application,
+                         user: create(:constituent, email: "unique_dashboard_draft_#{Time.now.to_i}@example.com"),
+                         created_at: current_fy_start + 1.month,
+                         status: :draft)
 
       # 2 In-progress applications (submitted by constituent)
       _submitted_app1 = create(:application,
@@ -54,7 +54,9 @@ module Applications
 
       with_mocked_attachments do
         service = ReportingService.new
-        data = service.generate_dashboard_data
+        service_result = service.generate_dashboard_data
+        assert service_result.success?, 'Expected dashboard data generation to succeed'
+        data = service_result.data
 
         # Verify fiscal year data
         assert_equal current_fy_year, data[:current_fy]
@@ -116,7 +118,9 @@ module Applications
 
       with_mocked_attachments do
         service = ReportingService.new
-        data = service.generate_dashboard_data
+        service_result = service.generate_dashboard_data
+        assert service_result.success?, 'Expected dashboard data generation to succeed'
+        data = service_result.data
 
         # Verify application counts - we added 5 current FY apps and 1 previous FY app
         # The expected counts should be the initial counts plus our added test apps
@@ -195,7 +199,9 @@ module Applications
 
       with_mocked_attachments do
         service = ReportingService.new
-        data = service.generate_dashboard_data
+        service_result = service.generate_dashboard_data
+        assert service_result.success?, 'Expected dashboard data generation to succeed'
+        data = service_result.data
 
         # Verify voucher counts
         assert_equal 1, data[:current_fy_vouchers]
@@ -260,7 +266,9 @@ module Applications
                                               ])
 
         service = ReportingService.new
-        data = service.generate_dashboard_data
+        service_result = service.generate_dashboard_data
+        assert service_result.success?, 'Expected dashboard data generation to succeed'
+        data = service_result.data
 
         # Verify chart data exists
         assert data[:applications_chart_data].present?
@@ -321,7 +329,9 @@ module Applications
       with_mocked_attachments do
         # Create a service with a specific fiscal year
         service = ReportingService.new(2023)
-        data = service.generate_dashboard_data
+        service_result = service.generate_dashboard_data
+        assert service_result.success?, 'Expected dashboard data generation to succeed'
+        data = service_result.data
 
         # Verify fiscal year data
         assert_equal 2023, data[:current_fy]
@@ -346,40 +356,40 @@ module Applications
 
       # Create applications with specific statuses and dates for reporting tests using unique users
       # 1 Draft application
-      _draft_app = create(:application,
-                          user: create(:constituent, email: "unique_index_draft_#{Time.now.to_i}@example.com"),
-                          created_at: current_fy_start + 1.month,
-                          status: :draft)
+      draft_app = create(:application,
+                         user: create(:constituent, email: "unique_index_draft_#{Time.now.to_i}@example.com"),
+                         created_at: current_fy_start + 1.month,
+                         status: :draft)
 
       # 2 In-progress applications (submitted by constituent)
-      _submitted_app1 = create(:application,
-                               user: create(:constituent, email: "unique_index_submitted1_#{Time.now.to_i}@example.com"),
-                               created_at: current_fy_start + 2.months,
-                               status: :in_progress)
-      _submitted_app2 = create(:application,
-                               user: create(:constituent, email: "unique_index_submitted2_#{Time.now.to_i}@example.com"),
-                               created_at: current_fy_start + 3.months,
-                               status: :in_progress)
+      submitted_app1 = create(:application,
+                              user: create(:constituent, email: "unique_index_submitted1_#{Time.now.to_i}@example.com"),
+                              created_at: current_fy_start + 2.months,
+                              status: :in_progress)
+      submitted_app2 = create(:application,
+                              user: create(:constituent, email: "unique_index_submitted2_#{Time.now.to_i}@example.com"),
+                              created_at: current_fy_start + 3.months,
+                              status: :in_progress)
 
       # 1 Needs information application (which maps to in_review_count in the service)
-      _needs_info_app = create(:application,
-                               user: create(:constituent, email: "unique_index_needsinfo_#{Time.now.to_i}@example.com"),
-                               created_at: current_fy_start + 3.months + 15.days, # Use 3 months + 15 days instead of 3.5 months
-                               status: :needs_information)
+      needs_info_app = create(:application,
+                              user: create(:constituent, email: "unique_index_needsinfo_#{Time.now.to_i}@example.com"),
+                              created_at: current_fy_start + 3.months + 15.days, # Use 3 months + 15 days instead of 3.5 months
+                              status: :needs_information)
 
       # 3 Approved applications (2 current FY, 1 previous FY)
-      _approved_app1 = create(:application,
-                              user: create(:constituent, email: "unique_index_approved1_#{Time.now.to_i}@example.com"),
-                              created_at: current_fy_start + 4.months,
-                              status: :approved)
-      _approved_app2 = create(:application,
-                              user: create(:constituent, email: "unique_index_approved2_#{Time.now.to_i}@example.com"),
-                              created_at: current_fy_start + 5.months,
-                              status: :approved)
-      _approved_app3 = create(:application,
-                              user: create(:constituent, email: "unique_index_approved3_#{Time.now.to_i}@example.com"),
-                              created_at: previous_fy_start + 1.month,
-                              status: :approved)
+      approved_app1 = create(:application,
+                             user: create(:constituent, email: "unique_index_approved1_#{Time.now.to_i}@example.com"),
+                             created_at: current_fy_start + 4.months,
+                             status: :approved)
+      approved_app2 = create(:application,
+                             user: create(:constituent, email: "unique_index_approved2_#{Time.now.to_i}@example.com"),
+                             created_at: current_fy_start + 5.months,
+                             status: :approved)
+      approved_app3 = create(:application,
+                             user: create(:constituent, email: "unique_index_approved3_#{Time.now.to_i}@example.com"),
+                             created_at: previous_fy_start + 1.month,
+                             status: :approved)
 
       # Set up mocks for ActiveStorage attachments to prevent byte_size() errors
       setup_attachment_mocks_for_audit_logs
@@ -390,7 +400,9 @@ module Applications
 
         # Create a service and get the index data
         service = ReportingService.new
-        data = service.generate_index_data
+        service_result = service.generate_index_data
+        assert service_result.success?, 'Expected index data generation to succeed'
+        data = service_result.data
 
         # Dump info for debugging
         puts "Raw Status Counts: #{new_status_counts.inspect}"
@@ -410,26 +422,26 @@ module Applications
         draft_key_int = Application.statuses[:draft]
         draft_count_before = initial_status_counts.fetch(draft_key, 0) + initial_status_counts.fetch(draft_key_int, 0)
         draft_count_after = new_status_counts.fetch(draft_key, 0) + new_status_counts.fetch(draft_key_int, 0)
-        added_draft = draft_count_after - draft_count_before
+        _added_draft = draft_count_after - draft_count_before
 
         # Do the same for other statuses
         in_progress_key = Application.statuses[:in_progress].to_s
         in_progress_key_int = Application.statuses[:in_progress]
         in_progress_count_before = initial_status_counts.fetch(in_progress_key, 0) + initial_status_counts.fetch(in_progress_key_int, 0)
         in_progress_count_after = new_status_counts.fetch(in_progress_key, 0) + new_status_counts.fetch(in_progress_key_int, 0)
-        added_in_progress = in_progress_count_after - in_progress_count_before
+        _added_in_progress = in_progress_count_after - in_progress_count_before
 
         needs_info_key = Application.statuses[:needs_information].to_s
         needs_info_key_int = Application.statuses[:needs_information]
         needs_info_count_before = initial_status_counts.fetch(needs_info_key, 0) + initial_status_counts.fetch(needs_info_key_int, 0)
         needs_info_count_after = new_status_counts.fetch(needs_info_key, 0) + new_status_counts.fetch(needs_info_key_int, 0)
-        added_needs_info = needs_info_count_after - needs_info_count_before
+        _added_needs_info = needs_info_count_after - needs_info_count_before
 
         approved_key = Application.statuses[:approved].to_s
         approved_key_int = Application.statuses[:approved]
         approved_count_before = initial_status_counts.fetch(approved_key, 0) + initial_status_counts.fetch(approved_key_int, 0)
         approved_count_after = new_status_counts.fetch(approved_key, 0) + new_status_counts.fetch(approved_key_int, 0)
-        added_approved = approved_count_after - approved_count_before
+        _added_approved = approved_count_after - approved_count_before
 
         # We've verified that the database has the right records, but the UI logic in
         # the service may use different criteria to calculate dashboard numbers
@@ -437,10 +449,10 @@ module Applications
         # Check if the applications were correctly created
         # Without relying on the specific added_draft calculation
         created_applications = [
-          _draft_app.id,
-          _submitted_app1.id, _submitted_app2.id,
-          _needs_info_app.id,
-          _approved_app1.id, _approved_app2.id, _approved_app3.id
+          draft_app.id,
+          submitted_app1.id, submitted_app2.id,
+          needs_info_app.id,
+          approved_app1.id, approved_app2.id, approved_app3.id
         ]
 
         # Verify all applications were created and exist in the database
@@ -510,14 +522,16 @@ module Applications
           service = ReportingService.new
 
           # Check dashboard data
-          data = service.generate_dashboard_data
-          assert_empty data
-          assert_includes service.errors, 'Error generating dashboard data: Test error'
+          dashboard_result = service.generate_dashboard_data
+          assert dashboard_result.failure?, 'Expected dashboard data generation to fail'
+          assert_empty dashboard_result.data, 'Expected empty hash in data on failure'
+          assert_equal 'Error generating dashboard data: Test error', dashboard_result.message
 
           # Check index data
-          data = service.generate_index_data
-          assert_empty data
-          assert_includes service.errors, 'Error generating index data: Test error'
+          index_result = service.generate_index_data
+          assert index_result.failure?, 'Expected index data generation to fail'
+          assert_empty index_result.data, 'Expected empty hash in data on failure'
+          assert_equal 'Error generating index data: Test error', index_result.message
         end
       end
     end

@@ -14,7 +14,7 @@
     dashboard_path = if user.admin?
                        admin_applications_path
                      elsif user.constituent?
-                       constituent_dashboard_path
+                       constituent_portal_dashboard_path
                      elsif user.evaluator?
                        evaluators_dashboard_path
                      elsif user.vendor?

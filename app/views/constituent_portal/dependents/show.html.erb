@@ -1,0 +1,213 @@
+<div class="min-h-screen bg-gray-50">
+  <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+    <main role="main">
+      <!-- Header -->
+      <div class="bg-white shadow">
+        <div class="px-4 py-5 sm:px-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <h1 class="text-2xl font-bold text-gray-900"><%= @dependent.full_name %></h1>
+              <p class="mt-1 text-sm text-gray-600">
+                Dependent Information
+                <% if @guardian_relationship %>
+                  • Relationship: <%= @guardian_relationship.relationship_type.titleize %>
+                <% end %>
+              </p>
+            </div>
+            <div class="flex space-x-3">
+              <%= link_to "Edit Information", edit_constituent_portal_dependent_path(@dependent),
+                  class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50" %>
+              <%= link_to "Back to Dashboard", constituent_portal_dashboard_path,
+                  class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700" %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Content -->
+        <div class="lg:col-span-2 space-y-6">
+          <!-- Personal Information -->
+          <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+              <h2 class="text-lg font-medium text-gray-900">Personal Information</h2>
+            </div>
+            <div class="px-4 py-5 sm:p-6">
+              <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+                <div>
+                  <dt class="text-sm font-medium text-gray-500">Full Name</dt>
+                  <dd class="mt-1 text-sm text-gray-900"><%= @dependent.full_name %></dd>
+                </div>
+                <div>
+                  <dt class="text-sm font-medium text-gray-500">Date of Birth</dt>
+                  <dd class="mt-1 text-sm text-gray-900">
+                    <%= @dependent.date_of_birth&.strftime("%B %d, %Y") || "Not provided" %>
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-sm font-medium text-gray-500">Email</dt>
+                  <dd class="mt-1 text-sm text-gray-900">
+                    <%= @dependent.email.present? ? mail_to(@dependent.email) : "Not provided" %>
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-sm font-medium text-gray-500">Phone</dt>
+                  <dd class="mt-1 text-sm text-gray-900">
+                    <%= @dependent.phone.present? ? @dependent.phone : "Not provided" %>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+
+          <!-- Address Information -->
+          <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+              <h2 class="text-lg font-medium text-gray-900">Address</h2>
+            </div>
+            <div class="px-4 py-5 sm:p-6">
+              <% if @dependent.physical_address_1.present? %>
+                <address class="text-sm text-gray-900 not-italic">
+                  <%= @dependent.physical_address_1 %><br>
+                  <% if @dependent.physical_address_2.present? %>
+                    <%= @dependent.physical_address_2 %><br>
+                  <% end %>
+                  <%= @dependent.city %>, <%= @dependent.state %> <%= @dependent.zip_code %>
+                </address>
+              <% else %>
+                <p class="text-sm text-gray-500">No address provided</p>
+              <% end %>
+            </div>
+          </div>
+
+          <!-- Disabilities -->
+          <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+              <h2 class="text-lg font-medium text-gray-900">Disabilities</h2>
+            </div>
+            <div class="px-4 py-5 sm:p-6">
+              <% if @dependent.disabilities.any? %>
+                <ul class="space-y-2">
+                  <% @dependent.disabilities.each do |disability| %>
+                    <li class="flex items-center">
+                      <svg class="h-5 w-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                      <span class="text-sm text-gray-900"><%= disability %></span>
+                    </li>
+                  <% end %>
+                </ul>
+              <% else %>
+                <p class="text-sm text-gray-500">No disabilities specified</p>
+              <% end %>
+            </div>
+          </div>
+
+          <!-- Recent Changes -->
+          <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+              <h2 class="text-lg font-medium text-gray-900">Recent Changes</h2>
+            </div>
+            <div class="px-4 py-5 sm:p-6">
+              <% if @recent_changes.any? %>
+                <div class="flow-root">
+                  <ul role="list" class="-mb-8">
+                    <% @recent_changes.each_with_index do |change, index| %>
+                      <li>
+                        <div class="relative pb-8">
+                          <% unless index == @recent_changes.length - 1 %>
+                            <span class="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+                          <% end %>
+                          <div class="relative flex space-x-3">
+                            <div>
+                              <span class="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center ring-8 ring-white">
+                                <svg class="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                </svg>
+                              </span>
+                            </div>
+                            <div class="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
+                              <div>
+                                <p class="text-sm text-gray-500">
+                                  Profile updated by 
+                                  <span class="font-medium text-gray-900">
+                                    <%= change.user.full_name %>
+                                  </span>
+                                </p>
+                                <% if change.metadata['changes'].present? %>
+                                  <div class="mt-2 text-sm text-gray-700">
+                                    <% change.metadata['changes'].each do |field, values| %>
+                                      <div class="mb-1">
+                                        <span class="font-medium"><%= field.humanize %>:</span>
+                                        <span class="text-red-600 line-through"><%= values['old'] || 'blank' %></span>
+                                        <span class="mx-1">→</span>
+                                        <span class="text-green-600"><%= values['new'] || 'blank' %></span>
+                                      </div>
+                                    <% end %>
+                                  </div>
+                                <% end %>
+                              </div>
+                              <div class="text-right text-sm whitespace-nowrap text-gray-500">
+                                <time datetime="<%= change.created_at.iso8601 %>">
+                                  <%= time_ago_in_words(change.created_at) %> ago
+                                </time>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </li>
+                    <% end %>
+                  </ul>
+                </div>
+              <% else %>
+                <p class="text-sm text-gray-500">No recent changes recorded</p>
+              <% end %>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+          <!-- Applications -->
+          <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+              <h2 class="text-lg font-medium text-gray-900">Applications</h2>
+            </div>
+            <div class="px-4 py-5 sm:p-6">
+              <% if @dependent_applications.any? %>
+                <ul class="space-y-3">
+                  <% @dependent_applications.each do |application| %>
+                    <li class="border border-gray-200 rounded-lg p-3">
+                      <div class="flex items-center justify-between">
+                        <div>
+                          <p class="text-sm font-medium text-gray-900">
+                            Application #<%= application.id %>
+                          </p>
+                          <p class="text-sm text-gray-500">
+                            <%= application.status.titleize %>
+                          </p>
+                        </div>
+                        <%= link_to "View", constituent_portal_application_path(application),
+                            class: "text-indigo-600 hover:text-indigo-900 text-sm font-medium" %>
+                      </div>
+                      <p class="mt-1 text-xs text-gray-500">
+                        <%= application.application_date&.strftime("%b %d, %Y") || application.created_at.strftime("%b %d, %Y") %>
+                      </p>
+                    </li>
+                  <% end %>
+                </ul>
+              <% else %>
+                <p class="text-sm text-gray-500">No applications yet</p>
+                <%= link_to "Start Application", 
+                    new_constituent_portal_application_path(user_id: @dependent.id, for_self: false),
+                    class: "mt-3 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700" %>
+              <% end %>
+            </div>
+          </div>
+
+
+        </div>
+      </div>
+    </main>
+  </div>
+</div> 

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_05_05_192536) do
+ActiveRecord::Schema[8.0].define(version: 2025_05_21_000100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -123,9 +123,14 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_05_192536) do
     t.datetime "medical_certification_requested_at"
     t.integer "medical_certification_request_count", default: 0
     t.string "last_visited_step"
+    t.bigint "managing_guardian_id"
+    t.string "alternate_contact_name"
+    t.string "alternate_contact_phone"
+    t.string "alternate_contact_email"
     t.index ["income_proof_status"], name: "idx_applications_on_income_proof_status"
     t.index ["income_verified_by_id"], name: "index_applications_on_income_verified_by_id"
     t.index ["last_proof_submitted_at"], name: "index_applications_on_last_proof_submitted_at"
+    t.index ["managing_guardian_id"], name: "index_applications_on_managing_guardian_id"
     t.index ["medical_certification_status"], name: "index_applications_on_medical_certification_status"
     t.index ["medical_certification_verified_by_id"], name: "index_applications_on_medical_certification_verified_by_id"
     t.index ["medical_provider_email", "status"], name: "index_applications_on_medical_provider_email_and_status"
@@ -202,6 +207,17 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_05_192536) do
     t.jsonb "metadata", default: {}, null: false
     t.index ["metadata"], name: "index_events_on_metadata", using: :gin
     t.index ["user_id"], name: "index_events_on_user_id"
+  end
+
+  create_table "guardian_relationships", force: :cascade do |t|
+    t.bigint "guardian_id", null: false
+    t.bigint "dependent_id", null: false
+    t.string "relationship_type"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["dependent_id"], name: "index_guardian_relationships_on_dependent_id"
+    t.index ["guardian_id", "dependent_id"], name: "index_guardian_relationships_on_guardian_id_and_dependent_id", unique: true
+    t.index ["guardian_id"], name: "index_guardian_relationships_on_guardian_id"
   end
 
   create_table "invoices", force: :cascade do |t|
@@ -606,9 +622,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_05_192536) do
     t.boolean "email_verified"
     t.string "reset_password_token"
     t.datetime "reset_password_sent_at"
-    t.boolean "is_guardian", default: false
-    t.string "guardian_relationship"
-    t.bigint "guardian_id"
     t.string "fax"
     t.string "business_name"
     t.string "business_tax_id"
@@ -621,12 +634,11 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_05_192536) do
     t.string "webauthn_id"
     t.index ["business_name"], name: "index_users_on_business_name"
     t.index ["business_tax_id"], name: "index_users_on_business_tax_id"
-    t.index ["email"], name: "index_users_on_email", unique: true
+    t.index ["email"], name: "index_users_on_email"
     t.index ["evaluator_id"], name: "index_users_on_evaluator_id"
-    t.index ["guardian_id"], name: "index_users_on_guardian_id"
     t.index ["income_verified_by_id"], name: "index_users_on_income_verified_by_id"
     t.index ["medical_provider_id"], name: "index_users_on_medical_provider_id"
-    t.index ["phone"], name: "index_users_on_phone", unique: true, where: "(phone IS NOT NULL)"
+    t.index ["phone"], name: "index_users_on_phone", where: "(phone IS NOT NULL)"
     t.index ["recipient_id"], name: "index_users_on_recipient_id"
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
     t.index ["type"], name: "index_users_on_type"
@@ -726,12 +738,15 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_05_192536) do
   add_foreign_key "application_status_changes", "users"
   add_foreign_key "applications", "users"
   add_foreign_key "applications", "users", column: "income_verified_by_id"
+  add_foreign_key "applications", "users", column: "managing_guardian_id"
   add_foreign_key "applications", "users", column: "trainer_id"
   add_foreign_key "email_templates", "users", column: "updated_by_id"
   add_foreign_key "evaluations", "applications"
   add_foreign_key "evaluations", "users", column: "constituent_id"
   add_foreign_key "evaluations", "users", column: "evaluator_id"
   add_foreign_key "events", "users"
+  add_foreign_key "guardian_relationships", "users", column: "dependent_id"
+  add_foreign_key "guardian_relationships", "users", column: "guardian_id"
   add_foreign_key "invoices", "users", column: "vendor_id"
   add_foreign_key "notifications", "users", column: "actor_id"
   add_foreign_key "notifications", "users", column: "recipient_id"
@@ -760,7 +775,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_05_192536) do
   add_foreign_key "training_sessions", "products", column: "product_trained_on_id"
   add_foreign_key "training_sessions", "users", column: "trainer_id"
   add_foreign_key "users", "users", column: "evaluator_id"
-  add_foreign_key "users", "users", column: "guardian_id"
   add_foreign_key "users", "users", column: "income_verified_by_id"
   add_foreign_key "users", "users", column: "medical_provider_id"
   add_foreign_key "users", "users", column: "recipient_id"

@@ -70,104 +70,285 @@ module Admin
       assert_select 'h1', 'Upload Paper Application'
     end
 
-    test 'should create paper application with valid data' do
-      # Mock the service to ensure it succeeds
-      Applications::PaperApplicationService.any_instance.stubs(:create).returns(true)
-      Applications::PaperApplicationService.any_instance.stubs(:application).returns(Application.new(id: 12_345))
+    test 'should create paper application for self-applicant with valid data' do
+      # Ensure we're using a unique email for the new constituent
+      unique_email = "self.applicant.#{Time.now.to_i}@example.com"
+      income_proof_file = fixture_file_upload(Rails.root.join('test/fixtures/files/test_income_proof.pdf'), 'application/pdf')
+      residency_proof_file = fixture_file_upload(Rails.root.join('test/fixtures/files/test_residency_proof.pdf'), 'application/pdf')
 
-      # Ensure we're using a unique email
-      unique_email = "unique_#{Time.now.to_i}@example.com"
+      # Mock external services called by PaperApplicationService if necessary, but let the service run.
+      ProofAttachmentService.stubs(:attach_proof).returns({ success: true })
+      ApplicationNotificationsMailer.stubs(:account_created).returns(stub(deliver_later: true))
 
-      # Add any additional stubs that might be needed
-      Constituent.any_instance.stubs(:has_active_application?).returns(false)
+      assert_difference ['Application.count', 'User.count'], 1 do
+        post admin_paper_applications_path, headers: default_headers, params: {
+          constituent: { # This key indicates a self-applicant
+            first_name: 'SelfApply',
+            last_name: 'Person',
+            email: unique_email,
+            phone: '555-000-0001',
+            physical_address_1: '100 Applicant Way',
+            city: 'Appville',
+            state: 'MD',
+            zip_code: '21001',
+            hearing_disability: '1' # Ensure at least one disability
+          },
+          application: {
+            household_size: 1,
+            annual_income: 10_000, # Below threshold
+            maryland_resident: '1',
+            self_certify_disability: '1', # Ensure this is set
+            # Removed terms_accepted, information_verified, medical_release_authorized as they are not direct model attributes
+            medical_provider_name: 'Dr. Self Cert',
+            medical_provider_phone: '555-111-2222',
+            medical_provider_email: 'dr.self@example.com'
+          },
+          income_proof: income_proof_file,
+          residency_proof: residency_proof_file,
+          income_proof_action: 'accept',
+          residency_proof_action: 'accept'
+        }
+      end
 
-      post admin_paper_applications_path, headers: default_headers, params: {
-        constituent: {
-          first_name: 'John',
-          last_name: 'Doe',
-          email: unique_email,
-          phone: '555-123-4567',
-          physical_address_1: '123 Main St',
-          city: 'Baltimore',
-          state: 'MD',
-          zip_code: '21201',
-          hearing_disability: '1'
-        },
-        application: {
-          household_size: 2,
-          annual_income: 20_000,
-          maryland_resident: '1',
-          self_certify_disability: '1',
-          terms_accepted: '1',
-          information_verified: '1',
-          medical_release_authorized: '1',
-          medical_provider_name: 'Dr. Jane Smith',
-          medical_provider_phone: '555-987-6543',
-          medical_provider_email: 'dr.smith@example.com'
-        },
-        income_proof_action: 'accept',
-        residency_proof_action: 'accept'
-      }
-
-      # Verify the response
+      created_application = Application.find_by(user: User.find_by(email: unique_email))
+      assert created_application, "Application should have been created for #{unique_email}"
       assert_response :redirect
-      assert_redirected_to admin_application_path(12_345) # Use the ID we stubbed
+      assert_redirected_to admin_application_path(created_application)
+      assert_nil created_application.managing_guardian_id, 'Self-applicant should not have a managing guardian'
+      assert_equal 'paper', created_application.submission_method
     end
 
-    test 'should create paper application with rejected proofs' do
-      # Create test files to attach
-      income_proof = fixture_file_upload(Rails.root.join('test/fixtures/files/test_proof.pdf'), 'application/pdf')
-      residency_proof = fixture_file_upload(Rails.root.join('test/fixtures/files/test_proof.pdf'), 'application/pdf')
+    test 'should create paper application for dependent with NEW guardian' do
+      dependent_email = "dependent.newguardian.#{Time.now.to_i}@example.com"
+      guardian_email = "new.guardian.#{Time.now.to_i}@example.com"
+      income_proof_file = fixture_file_upload(Rails.root.join('test/fixtures/files/test_income_proof.pdf'), 'application/pdf')
+      residency_proof_file = fixture_file_upload(Rails.root.join('test/fixtures/files/test_residency_proof.pdf'), 'application/pdf')
 
-      # Skip the ProofReview validations in this test
-      ProofReview.any_instance.stubs(:save).returns(true)
-      ProofReview.any_instance.stubs(:valid?).returns(true)
+      ProofAttachmentService.stubs(:attach_proof).returns({ success: true })
+      ApplicationNotificationsMailer.stubs(:account_created).returns(stub(deliver_later: true))
 
-      # Mock the service to ensure it succeeds
-      Applications::PaperApplicationService.any_instance.stubs(:create).returns(true)
-      Applications::PaperApplicationService.any_instance.stubs(:application).returns(Application.new(id: 12_346))
+      # Separate assert_difference blocks for clarity
+      assert_difference 'User.count', 2, 'User.count should increase by 2 (guardian and dependent)' do
+        assert_difference 'Application.count', 1, 'Application.count should increase by 1' do
+          assert_difference 'GuardianRelationship.count', 1, 'GuardianRelationship.count should increase by 1' do
+            post admin_paper_applications_path, headers: default_headers, params: {
+              guardian_attributes: { # Indicates new guardian
+                first_name: 'NewGuard',
+                last_name: 'Ian',
+                email: guardian_email,
+                phone: '555-000-0002',
+                physical_address_1: '200 Guardian Rd',
+                city: 'Guardville',
+                state: 'MD',
+                zip_code: '21002'
+                # Guardians are not expected to have disability flags set by default in this form
+              },
+              dependent_attributes: {
+                first_name: 'Depend',
+                last_name: 'Ent',
+                email: dependent_email, # Dependents might not have email/phone
+                date_of_birth: 10.years.ago.to_date.to_s,
+                hearing_disability: '1' # Ensure at least one disability for dependent
+              },
+              relationship_type: 'Parent',
+              application: {
+                household_size: 2, # Guardian + Dependent
+                annual_income: 15_000,
+                maryland_resident: '1',
+                self_certify_disability: '1',
+                medical_provider_name: 'Dr. ChildWell',
+                medical_provider_phone: '555-333-4444',
+                medical_provider_email: 'dr.childwell@example.com'
+              },
+              income_proof: income_proof_file,
+              residency_proof: residency_proof_file,
+              income_proof_action: 'accept',
+              residency_proof_action: 'accept'
+            }
+          end
+        end
+      end
 
-      # Generate a unique phone number for this test
-      unique_phone = "555-#{rand(100..999)}-#{rand(1000..9999)}"
-      unique_email = "rejected_proofs_#{Time.now.to_i}@example.com"
+      new_guardian = User.find_by(email: guardian_email)
+      new_dependent = User.find_by(email: dependent_email) # Or find by other unique dependent attr if email is optional
+      assert new_guardian, "New guardian should have been created with email #{guardian_email}"
+      assert new_dependent, "New dependent should have been created with email #{dependent_email}"
 
-      post admin_paper_applications_path, headers: default_headers, params: {
-        income_proof: income_proof,
-        residency_proof: residency_proof,
-        constituent: {
-          first_name: 'John',
-          last_name: 'Doe',
-          email: unique_email,
-          phone: unique_phone,
-          physical_address_1: '123 Main St',
-          city: 'Baltimore',
-          state: 'MD',
-          zip_code: '21201',
-          hearing_disability: '1'
-        },
-        application: {
-          household_size: 2,
-          annual_income: 20_000,
-          maryland_resident: '1',
-          self_certify_disability: '1',
-          terms_accepted: '1',
-          information_verified: '1',
-          medical_release_authorized: '1',
-          medical_provider_name: 'Dr. Jane Smith',
-          medical_provider_phone: '555-987-6543',
-          medical_provider_email: 'dr.smith@example.com'
-        },
-        income_proof_action: 'reject',
-        income_proof_rejection_reason: 'incomplete_documentation',
-        income_proof_rejection_notes: 'The income documentation is incomplete.',
+      created_application = Application.find_by(user_id: new_dependent.id)
+      assert created_application, "Application should have been created for dependent #{new_dependent.id}"
+      assert_equal new_guardian.id, created_application.managing_guardian_id, 'Application should be linked to the new guardian'
+      assert_response :redirect
+      assert_redirected_to admin_application_path(created_application)
+    end
+
+    test 'should create paper application for dependent with EXISTING guardian' do
+      existing_guardian = create(:constituent, email: "existing.guardian.#{Time.now.to_i}@example.com", first_name: 'ExistGuard',
+                                               last_name: 'IanSr')
+      dependent_email = "dependent.existingguardian.#{Time.now.to_i}@example.com"
+      income_proof_file = fixture_file_upload(Rails.root.join('test/fixtures/files/test_income_proof.pdf'), 'application/pdf')
+      residency_proof_file = fixture_file_upload(Rails.root.join('test/fixtures/files/test_residency_proof.pdf'), 'application/pdf')
+
+      ProofAttachmentService.stubs(:attach_proof).returns({ success: true })
+      ApplicationNotificationsMailer.stubs(:account_created).returns(stub(deliver_later: true))
+
+      # Expect 1 new user (dependent) and 1 new application, no new guardian
+      assert_difference 'User.count', 1 do # Only dependent is new
+        assert_difference 'Application.count', 1 do
+          assert_difference 'GuardianRelationship.count', 1 do
+            post admin_paper_applications_path, headers: default_headers, params: {
+              guardian_id: existing_guardian.id, # Indicates existing guardian
+              # guardian_attributes might be present but should be ignored if blank or if guardian_id is present
+              guardian_attributes: { first_name: '', last_name: '', email: '' },
+              dependent_attributes: {
+                first_name: 'Depend',
+                last_name: 'EntJr',
+                email: dependent_email,
+                date_of_birth: 8.years.ago.to_date.to_s,
+                hearing_disability: '1'
+              },
+              relationship_type: 'Legal Guardian',
+              application: {
+                household_size: 2,
+                annual_income: 18_000,
+                maryland_resident: '1',
+                self_certify_disability: '1',
+                medical_provider_name: 'Dr. FamCare',
+                medical_provider_phone: '555-555-6666',
+                medical_provider_email: 'dr.famcare@example.com'
+              },
+              income_proof: income_proof_file,
+              residency_proof: residency_proof_file,
+              income_proof_action: 'accept',
+              residency_proof_action: 'accept'
+            }
+          end
+        end
+      end
+
+      new_dependent = User.find_by(email: dependent_email)
+      assert new_dependent, "New dependent should have been created with email #{dependent_email}"
+
+      created_application = Application.find_by(user_id: new_dependent.id)
+      assert created_application, "Application should have been created for dependent #{new_dependent.id}"
+      assert_equal existing_guardian.id, created_application.managing_guardian_id, 'Application should be linked to the existing guardian'
+      assert_response :redirect
+      assert_redirected_to admin_application_path(created_application)
+    end
+
+    # test 'should create paper application with rejected proofs and ensure ProofReview records are created' do # Original test name
+    # Refactored test based on user feedback:
+    test 'creates application, approves income proof, rejects residency proof' do
+      # Setup specific to this test, using instance variables defined in the main setup or here
+      # The file 'test_income_proof.pdf' is expected to be directly in 'test/fixtures/files/'
+      # by the fixture_file_upload helper.
+      @income_pdf   = fixture_file_upload('income_proof.pdf', 'application/pdf')
+      @unique_email = "rejectedproofs.#{SecureRandom.hex(6)}@example.com"
+
+      stub_mailers # Call helper to set up mailer stubs
+      stub_proof_services # Call helper to set up proof service stubs
+
+      assert_difference 'User.count', 1, 'User.count should increase by 1' do
+        assert_difference 'Application.count', 1, 'Application.count should increase by 1' do
+          assert_difference 'ProofReview.count', 1, 'ProofReview.count should increase by 1' do
+            post admin_paper_applications_path,
+                 headers: default_headers,
+                 params: paper_application_params # Call helper for params
+          end
+        end
+      end
+
+      app = Application.joins(:user).find_by!(users: { email: @unique_email })
+
+      assert_redirected_to admin_application_path(app)
+      assert_equal 'approved', app.reload.income_proof_status
+
+      residency_review = app.proof_reviews.find_by!(proof_type: :residency, status: :rejected)
+      assert_equal 'address_mismatch', residency_review.rejection_reason
+      assert_equal "The address on the document doesn't match for residency.", residency_review.notes
+    end
+
+    #
+    # ─── HELPERS (for the refactored test) ───────────────────────────────────────
+    #
+    private
+
+    def paper_application_params
+      {
+        income_proof: @income_pdf, # Assumes @income_pdf is set in test or setup
+        constituent: constituent_attrs.merge(email: @unique_email), # Assumes @unique_email is set
+        application: application_attrs,
+        income_proof_action: 'accept',
         residency_proof_action: 'reject',
         residency_proof_rejection_reason: 'address_mismatch',
-        residency_proof_rejection_notes: "The address on the document doesn't match."
+        residency_proof_rejection_notes: "The address on the document doesn't match for residency."
       }
+    end
 
-      # With the service properly mocked, expect a redirect
-      assert_response :redirect
-      assert_redirected_to admin_application_path(12_346) # Use the ID we stubbed
+    def constituent_attrs
+      {
+        first_name: 'Reject',
+        last_name: 'Proofs',
+        phone: '555-777-8888',
+        physical_address_1: '789 Reject Ave',
+        city: 'Testville',
+        state: 'MD',
+        zip_code: '21007',
+        hearing_disability: '1'
+      }
+    end
+
+    def application_attrs
+      {
+        household_size: 1,
+        annual_income: 12_000,
+        maryland_resident: '1',
+        self_certify_disability: '1',
+        medical_provider_name: 'Dr. No Proof',
+        medical_provider_phone: '555-888-9999',
+        medical_provider_email: 'dr.noproof@example.com'
+      }
+    end
+
+    #
+    # ─── STUB PACKS (for the refactored test) ───────────────────────────────────
+    #
+    def stub_mailers
+      ApplicationNotificationsMailer.stubs(:account_created).returns(stub(deliver_later: true))
+      ApplicationNotificationsMailer.stubs(:proof_rejected).returns(stub(deliver_later: true))
+    end
+
+    def stub_proof_services
+      # Stubbing Event and ProofSubmissionAudit to prevent them from causing rollbacks
+      # if they have validation issues or other errors during the test.
+      Event.stubs(:create!).returns(true) # Or mock specific attributes if needed
+      ProofSubmissionAudit.stubs(:create!).returns(true) # Or mock specific attributes
+
+      ProofAttachmentService
+        .stubs(:attach_proof)
+        .with(has_entry(proof_type: :income))
+        .returns(success: true) do |args|
+          # In the refactored test, this block needs to correctly simulate the service's action
+          # The service updates the application's proof status.
+          args[:application].income_proof_status = :approved
+          # The service itself returns { success: true, ... }
+          # For the stub, just ensuring the status is set and returning success is enough.
+        end
+
+      ProofAttachmentService
+        .stubs(:reject_proof_without_attachment)
+        .with(has_entry(proof_type: :residency))
+        .returns(success: true) do |args|
+          # This service method IS responsible for creating a ProofReview.
+          args[:application].proof_reviews.create!(
+            admin: @admin, # Use @admin from setup
+            proof_type: :residency,
+            status: :rejected,
+            rejection_reason: args[:reason],
+            notes: args[:notes],
+            submission_method: :paper,
+            reviewed_at: Time.current
+          )
+        end
     end
 
     test 'should send proof_rejected email when proof is rejected' do

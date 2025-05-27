@@ -17,7 +17,8 @@ module Applications
         load_proof_reviews,
         load_status_changes,
         load_notifications,
-        load_application_events
+        load_application_events,
+        load_user_profile_changes
       ].flatten.sort_by(&:created_at).reverse
     rescue StandardError => e
       Rails.logger.error "Failed to build audit logs: #{e.message}"
@@ -100,9 +101,28 @@ module Applications
             voucher_assigned voucher_redeemed voucher_expired voucher_cancelled
             application_created evaluator_assigned trainer_assigned application_auto_approved
             medical_certification_requested medical_certification_status_changed # Added certification events
+            alternate_contact_updated # Added to include alternate contact change events
           ],
           application.id.to_s,
           { application_id: application.id }.to_json
+        )
+        .order(created_at: :desc)
+        .to_a
+    end
+
+    # Load user profile changes with minimal eager loading
+    def load_user_profile_changes
+      # Get profile changes for the application's user and any managing guardian
+      user_ids = [application.user_id]
+      user_ids << application.managing_guardian_id if application.managing_guardian_id.present?
+
+      Event
+        .select('id, user_id, action, created_at, metadata')
+        .includes(:user)
+        .where(action: %w[profile_updated profile_updated_by_guardian])
+        .where(
+          "(action = 'profile_updated' AND user_id IN (?)) OR (action = 'profile_updated_by_guardian' AND metadata->>'user_id' IN (?))",
+          user_ids, user_ids.map(&:to_s)
         )
         .order(created_at: :desc)
         .to_a

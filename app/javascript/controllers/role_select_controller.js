@@ -1,5 +1,6 @@
 // app/javascript/controllers/role_select_controller.js
 import { Controller } from "@hotwired/stimulus"
+import { setVisible } from "../utils/visibility"
 
 export default class extends Controller {
   static targets = ["select", "feedback", "capability"]
@@ -8,73 +9,89 @@ export default class extends Controller {
   }
 
   connect() {
-    console.log("RoleSelect Controller connected", {
-      element: this.element,
-      userId: this.userIdValue,
-      hasSelectTarget: this.hasSelectTarget,
-      hasCapabilityTargets: this.hasCapabilityTargets,
-      targetsFound: {
-        select: this.selectTarget,
-        capabilities: this.capabilityTargets,
-        feedback: this.feedbackTarget
-      }
-    })
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("RoleSelect Controller connected", {
+        element: this.element,
+        userId: this.userIdValue,
+        hasSelectTarget: this.hasSelectTarget,
+        hasCapabilityTargets: this.hasCapabilityTargets,
+        targetsFound: {
+          select: this.selectTarget,
+          capabilities: this.capabilityTargets,
+          feedback: this.feedbackTarget
+        }
+      })
+    }
   }
 
   roleChanged(event) {
-    console.log("Role changed triggered", {
-      userId: this.userIdValue,
-      newRole: event.target.value,
-      element: event.target,
-      currentTarget: event.currentTarget
-    })
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Role changed triggered", {
+        userId: this.userIdValue,
+        newRole: event.target.value,
+        element: event.target,
+        currentTarget: event.currentTarget
+      })
+    }
 
     const data = {
       role: event.target.value
     }
 
-    console.log("Sending role update with data:", data)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Sending role update with data:", data)
+    }
     this.saveChanges('role', data)
   }
 
   toggleCapability(event) {
-    console.log("Capability toggle triggered", {
-      userId: this.userIdValue,
-      capability: event.target.dataset.capability,
-      checked: event.target.checked,
-      element: event.target,
-      currentTarget: event.currentTarget
-    })
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Capability toggle triggered", {
+        userId: this.userIdValue,
+        capability: event.target.dataset.capability,
+        checked: event.target.checked,
+        element: event.target,
+        currentTarget: event.currentTarget
+      })
+    }
 
     const data = {
       capability: event.target.dataset.capability,
       enabled: event.target.checked
     }
 
-    console.log("Sending capability update with data:", data)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Sending capability update with data:", data)
+    }
     this.saveChanges('capability', data)
   }
 
   async saveChanges(changeType, data) {
-    console.log("Starting saveChanges", {
-      type: changeType,
-      userId: this.userIdValue,
-      data: data,
-      currentState: {
-        selectValue: this.selectTarget?.value,
-        capabilities: this.capabilityTargets ? [...this.capabilityTargets].map(cb => ({
-          name: cb.dataset.capability,
-          checked: cb.checked
-        })) : []
-      }
-    })
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Starting saveChanges", {
+        type: changeType,
+        userId: this.userIdValue,
+        data: data,
+        currentState: {
+          selectValue: this.selectTarget?.value,
+          capabilities: this.capabilityTargets ? [...this.capabilityTargets].map(cb => ({
+            name: cb.dataset.capability,
+            checked: cb.checked
+          })) : []
+        }
+      })
+    }
 
     const url = `/admin/users/${this.userIdValue}/${changeType === 'role' ? 'update_role' : 'update_capabilities'}`
-    console.log("Making request to:", url)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Making request to:", url)
+    }
 
     try {
       const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
-      console.log("CSRF Token found:", !!csrfToken)
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("CSRF Token found:", !!csrfToken)
+      }
 
       const response = await fetch(url, {
         method: 'PATCH',
@@ -85,11 +102,13 @@ export default class extends Controller {
         body: JSON.stringify(data)
       })
 
-      console.log("Response received", {
-        status: response.status,
-        ok: response.ok,
-        statusText: response.statusText
-      })
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("Response received", {
+          status: response.status,
+          ok: response.ok,
+          statusText: response.statusText
+        })
+      }
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -101,7 +120,9 @@ export default class extends Controller {
       }
 
       const responseData = await response.json()
-      console.log("Response data:", responseData)
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("Response data:", responseData)
+      }
 
       this.showFeedback(responseData.message, 'success')
     } catch (error) {
@@ -126,30 +147,52 @@ export default class extends Controller {
   }
 
   showFeedback(message, type) {
-    console.log("Showing feedback", {
-      message: message,
-      type: type,
-      feedbackTarget: this.feedbackTarget
-    })
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Showing feedback", {
+        message: message,
+        type: type,
+        feedbackTarget: this.feedbackTarget
+      })
+    }
+
+    // Guard against missing feedback target
+    if (!this.hasFeedbackTarget) {
+      console.warn("Missing feedback target for role select controller")
+      return
+    }
 
     const feedback = this.feedbackTarget
     const isSuccess = type === 'success'
 
-    feedback.classList.remove('hidden')
-    feedback.innerHTML = `
-      <div class="flex items-center p-2 ${isSuccess ? 'bg-green-50' : 'bg-red-50'} rounded">
-        <p class="text-sm ${isSuccess ? 'text-green-700' : 'text-red-700'}">${message}</p>
-      </div>
-    `
+    // Clear existing content without wiping out attached controllers
+    feedback.textContent = ''
+    
+    // Create message element using DOM methods
+    const container = document.createElement('div')
+    container.className = `flex items-center p-2 ${isSuccess ? 'bg-green-50' : 'bg-red-50'} rounded`
+    
+    const message_p = document.createElement('p')
+    message_p.className = `text-sm ${isSuccess ? 'text-green-700' : 'text-red-700'}`
+    message_p.textContent = message
+    
+    container.appendChild(message_p)
+    feedback.appendChild(container)
 
-    console.log("Feedback element updated", {
-      visible: !feedback.classList.contains('hidden'),
-      content: feedback.innerHTML
-    })
+    // Use setVisible utility for consistent visibility management
+    setVisible(feedback, true)
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Feedback element updated", {
+        visible: !feedback.classList.contains('hidden'),
+        content: feedback.textContent
+      })
+    }
 
     setTimeout(() => {
-      feedback.classList.add('hidden')
-      console.log("Feedback hidden")
+      setVisible(feedback, false)
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("Feedback hidden")
+      }
     }, 3000)
   }
 }

@@ -21,14 +21,18 @@ module SystemTestHelpers
       Capybara.disable_animation = true
     else
       # Apply custom JS to disable animations if Capybara method not available
-      page.execute_script(<<~JS) rescue nil
-        (function() {
-          var style = document.createElement('style');
-          style.type = 'text/css';
-          style.innerHTML = '* { transition: none !important; animation: none !important; }';
-          document.head.appendChild(style);
-        })();
-      JS
+      begin
+        page.execute_script(<<~JS)
+          (function() {
+            var style = document.createElement('style');
+            style.type = 'text/css';
+            style.innerHTML = '* { transition: none !important; animation: none !important; }';
+            document.head.appendChild(style);
+          })();
+        JS
+      rescue StandardError
+        nil
+      end
     end
 
     @cuprite_configured = true
@@ -43,7 +47,7 @@ module SystemTestHelpers
     message = find('.flash').text.split("\n").last
 
     # Close the flash message to prevent it from covering other elements
-    find(".flash .close").click
+    find('.flash .close').click
 
     # Return the message text
     message
@@ -56,28 +60,46 @@ module SystemTestHelpers
 
     if page.driver.respond_to?(:scroll_to)
       # Use Cuprite's native scroll_to method if available
-      page.driver.scroll_to(element.native, align: :center)
+      begin
+        page.driver.scroll_to(element.native, align: :center)
+      rescue StandardError => e
+        # Fallback if native scroll fails
+        puts "Native scroll failed: #{e.message}, using JS fallback"
+        # Simple JS scroll that's more compatible
+        page.execute_script('arguments[0].scrollIntoView()', element)
+      end
     else
-      # Fallback to JavaScript
-      page.execute_script('arguments[0].scrollIntoView({block: "center"})', element)
+      # Fallback to simpler JavaScript without options object
+      # This is more compatible across different browsers/drivers
+      page.execute_script('arguments[0].scrollIntoView()', element)
     end
 
     # Return the element for chaining
     element
   end
 
-  # Helper to wait for Turbo navigation to complete - optimized version
+  # Helper to wait for Turbo navigation to complete - stabilized version
   def wait_for_turbo
-    # No need for sleep here, just check for the progress bar to be gone
-    Capybara.using_wait_time(2) do
-      has_no_css?('.turbo-progress-bar')
+    # Stabilized version to prevent RAF interference with Cuprite visibility checks
+    Capybara.using_wait_time(5) do
+      assert_no_css('.turbo-progress-bar')
     end
+    # Brief pause to let RAF-driven toggles finish before Capybara DOM probing
+    sleep 0.1
   end
 
   # Helper to click an element with scrolling if needed
   def safe_click(selector)
     element = scroll_to_element(selector)
     element.click
+    # Allow slight pause for any pending JS to execute
+    sleep 0.1
+    wait_for_turbo
+  rescue StandardError => e
+    # If standard click fails, try JavaScript click
+    puts "Standard click failed: #{e.message}, using JS click"
+    element = selector.is_a?(String) ? find(selector) : selector
+    page.execute_script('arguments[0].click()', element)
     wait_for_turbo
   end
 
@@ -97,10 +119,10 @@ module SystemTestHelpers
   # Now it doesn't add unnecessary delay
   def wait_for_animations
     # Only wait if the page has animation elements actively animating
-    if page.has_css?('.animate-in, .animate-out, [data-animation]')
-      # Minimal wait only needed when animations are happening
-      sleep 0.05
-    end
+    return unless page.has_css?('.animate-in, .animate-out, [data-animation]')
+
+    # Minimal wait only needed when animations are happening
+    sleep 0.05
   end
 
   # Save a screenshot to the tmp/screenshots directory

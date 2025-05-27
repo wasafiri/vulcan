@@ -19,14 +19,11 @@ class WebauthnSignInTest < ApplicationSystemTestCase # Renamed class for clarity
   end
 
   test 'webauthn credential creation for user' do
-    user = users(:confirmed_user)
+    user = create(:user, :confirmed)
 
     # Configure WebAuthn
     # Use a fixed origin for testing since we won't navigate to a page
-    WebAuthn.configure do |config|
-      config.allowed_origins = ['https://example.com']
-    end
-    fake_client = WebAuthn::FakeClient.new('https://example.com')
+    fake_client = setup_webauthn_test_environment
 
     # Create WebAuthn credential options
     credential_options = WebAuthn::Credential.options_for_create(user: { id: user.id, name: user.email })
@@ -94,13 +91,7 @@ class WebauthnSignInTest < ApplicationSystemTestCase # Renamed class for clarity
 
   test 'welcome page redirects to dashboard if user has WebAuthn' do
     # Create a user with WebAuthn credentials
-    user = users(:constituent_with_webauthn)
-    user.webauthn_credentials.create!(
-      external_id: SecureRandom.uuid,
-      nickname: 'Test Key',
-      public_key: 'test',
-      sign_count: 0
-    )
+    user = create(:constituent, :with_webauthn_credential)
 
     # Sign in as that user
     system_test_sign_in(user)
@@ -109,7 +100,7 @@ class WebauthnSignInTest < ApplicationSystemTestCase # Renamed class for clarity
     visit welcome_path
 
     # Should be redirected to dashboard - adapt to actual path
-    assert ['/constituent/dashboard', '/constituent_portal/dashboard'].include?(current_path), 
+    assert ['/constituent/dashboard', '/constituent_portal/dashboard'].include?(current_path),
            "Expected to be redirected to dashboard but was at #{current_path}"
 
     # Should not see security reminder in header
@@ -141,7 +132,7 @@ class WebauthnSignInTest < ApplicationSystemTestCase # Renamed class for clarity
     # We should be on the 2FA setup page
     assert_current_path setup_two_factor_authentication_path
 
-    # Navigate to WebAuthn credential setup 
+    # Navigate to WebAuthn credential setup
     # Be more specific with our selector since there might be multiple webauthn-related links
     find('a[href*="two_factor_authentication"][href*="credentials/webauthn"]', text: /Security Key|WebAuthn|Add Key/i).click
     assert_current_path new_credential_two_factor_authentication_path(type: 'webauthn')
@@ -228,12 +219,12 @@ class WebauthnSignInTest < ApplicationSystemTestCase # Renamed class for clarity
   end
 
   test 'user logs in successfully using WebAuthn via UI interaction simulation' do
-    user = users(:confirmed_user) # Use a fixture user
+    user = create(:user, :confirmed) # Use a fixture user
     user.update!(webauthn_id: WebAuthn.generate_user_id) if user.webauthn_id.blank?
 
     # Create a credential programmatically first
     fake_client = setup_webauthn_test_environment
-    credential = create_webauthn_credential_programmatically(user, fake_client, 'Login Key')
+    credential = create_fake_credential(user, fake_client, nickname: 'Login Key')
     assert credential.persisted?
 
     # Sign in
@@ -286,12 +277,12 @@ class WebauthnSignInTest < ApplicationSystemTestCase # Renamed class for clarity
   end
 
   test 'user fails login with invalid WebAuthn assertion via UI interaction simulation' do
-    user = users(:confirmed_user) # Use a fixture user
+    user = create(:user, :confirmed) # Use a fixture user
     user.update!(webauthn_id: WebAuthn.generate_user_id) if user.webauthn_id.blank?
 
     # Create a credential programmatically
     fake_client = setup_webauthn_test_environment
-    credential = create_webauthn_credential_programmatically(user, fake_client, 'Login Key Fail')
+    credential = create_fake_credential(user, fake_client, nickname: 'Login Key Fail')
     assert credential.persisted?
 
     # Sign in
@@ -344,45 +335,6 @@ class WebauthnSignInTest < ApplicationSystemTestCase # Renamed class for clarity
 
   private
 
-  # Helper to retrieve WebAuthn challenge from session
-  # fetch_options: If true, makes a request to the options endpoint first
-  def retrieve_session_webauthn_challenge(fetch_options: false, user: nil)
-    if fetch_options
-      # Need user context if fetching options during verification flow
-      raise ArgumentError, 'User must be provided when fetch_options is true' unless user
-
-      # Simulate the JS fetching options during verification
-      get verification_options_two_factor_authentication_path(type: 'webauthn'), headers: { 'Accept' => 'application/json' }
-      assert_response :ok
-      # Challenge is stored by the options endpoint, now retrieve it from session
-    end
-
-    # Access session data via integration test methods
-    session_data = ActionDispatch::Request.new(Rails.application.env_config.deep_dup).session
-    session_data[TwoFactorAuth::SESSION_KEYS[:challenge]]
-  end
-
-  # Helper to create a credential programmatically using FakeClient
-  def create_webauthn_credential_programmatically(user, fake_client, nickname)
-    # Fetch creation options
-    get webauthn_creation_options_two_factor_authentication_path, headers: { 'Accept' => 'application/json' }
-    assert_response :ok
-    options_json = JSON.parse(@response.body)
-    challenge = options_json['challenge']
-
-    # Generate fake credential response
-    credential_response = fake_client.create(challenge: challenge)
-
-    # Create the credential record
-    user.webauthn_credentials.create!(
-      external_id: credential_response['id'],
-      nickname: nickname,
-      public_key: 'dummy_public_key', # Public key isn't used by FakeClient verification
-      sign_count: 0
-    )
-  end
-
-
   # Helper to try different possible selectors for password confirmation
   def fill_password_confirmation(password)
     # Try different field names for password confirmation
@@ -428,9 +380,7 @@ class WebauthnSignInTest < ApplicationSystemTestCase # Renamed class for clarity
 
     # Try to find any of the possible links
     possible_texts.each do |text|
-      if page.has_link?(text)
-        return page.find_link(text)
-      end
+      return page.find_link(text) if page.has_link?(text)
     end
 
     # If not found by text, try common CSS selectors
@@ -442,9 +392,7 @@ class WebauthnSignInTest < ApplicationSystemTestCase # Renamed class for clarity
     ]
 
     selectors.each do |selector|
-      if page.has_css?(selector)
-        return page.find(selector)
-      end
+      return page.find(selector) if page.has_css?(selector)
     end
 
     # Return nil if no matching link found

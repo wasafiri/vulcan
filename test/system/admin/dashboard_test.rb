@@ -5,7 +5,7 @@ require 'application_system_test_case'
 module Admin
   class DashboardTest < ApplicationSystemTestCase
     setup do
-      @admin = users(:admin_david)
+      @admin = create(:admin)
 
       # Create some applications with different statuses
       @draft_app = create(:application, :draft)

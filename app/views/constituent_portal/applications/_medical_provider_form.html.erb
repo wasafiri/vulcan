@@ -1,5 +1,5 @@
 <section aria-labelledby="medical-info-heading" class="space-y-4 p-4 bg-gray-50 rounded">
-  <h2 id="medical-info-heading" class="text-lg font-medium text-gray-900">Medical Professional Information</h2>
+  <h2 id="medical-info-heading" class="text-lg font-medium text-gray-900">Medical Professional Information and Authorization to Contact</h2>
   
   <p class="text-sm text-gray-700 mb-4">
     Please provide contact information for your Doctor or a qualified Medical Professional. 
@@ -19,6 +19,9 @@
       <li>Registered Nurse (RN)</li>
       <li>Licensed Practical Nurse (LPN)</li>
       <li>Physical Therapist</li>
+      <li>Occupational Therapist</li>
+      <li>Optometrist</li>
+      <li>Nurse Practitioner</li>
     </ul>
   </div>
 
@@ -58,19 +61,53 @@
       "aria-describedby": "email-description" %>
   <p id="email-description" class="mt-1 text-xs text-gray-700">Enter professional email address</p>
 
-  <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded" role="alert">
-    <h3 class="text-sm font-semibold text-blue-800 mb-2">Release of Information Consent</h3>
-    <div class="text-sm text-blue-700 space-y-2">
-      <p>
-        By providing the phone, email address, and/or fax number for your chosen Doctor / Medical Professional,  
-        you consent to the release of your information to the recipient(s). 
-        This release of information will include the capability to view your application, in its entirety.
-      </p>
-      <p>
-        You are responsible for ensuring that the contact information provided is the correct Doctor or Medical 
-        Professional. For security and privacy, you cannot make changes after you submit this application. 
-        If you need to update your doctor / professional's email or fax after submission, you must contact MAT staff.
+  <!-- Enhanced Authorization Section -->
+  <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded">
+    <h3 class="text-base font-medium text-blue-800 mb-3">Medical Information Release Authorization</h3>
+    
+    <!-- MAT Contact Information -->
+    <div class="bg-white p-3 rounded border mb-4">
+      <h4 class="text-sm font-medium text-gray-900 mb-2">MAT Program Contact Information</h4>
+      <div class="space-y-1 text-xs text-gray-700">
+        <p><strong>Email:</strong> <a href="mailto:mat.program1@maryland.gov" class="text-indigo-600 hover:text-indigo-500">mat.program1@maryland.gov</a></p>
+        <p><strong>Phone:</strong> <a href="tel:8005527724" class="text-indigo-600 hover:text-indigo-500">800-552-7724</a></p>
+        <p><strong>Voice/TTY:</strong> <a href="tel:4107677253" class="text-indigo-600 hover:text-indigo-500">410-767-7253</a></p>
+        <p><strong>Video Phone:</strong> <a href="tel:4108019618" class="text-indigo-600 hover:text-indigo-500">410-801-9618</a></p>
+      </div>
+    </div>
+    
+    <div class="text-sm text-blue-700 space-y-3">
+      <p class="font-medium">By providing your medical professional's contact information and checking the authorization below, you consent to:</p>
+      
+      <ul class="list-disc list-inside space-y-1 ml-4">
+        <li>The release of your information to your medical provider, including the capability to view your application in its entirety</li>
+        <li>The MAT program contacting your medical provider to verify medical information related to your application</li>
+        <li>Your medical provider sharing relevant medical documentation with the MAT program for application processing</li>
+        <li>The MAT program sharing relevant medical information with authorized program staff for application review</li>
+      </ul>
+      
+      <p class="text-xs">
+        <strong>Important:</strong> You are responsible for ensuring that the contact information provided is correct. 
+        For security and privacy, you cannot make changes after you submit this application. 
+        If you need to update your medical professional's contact information after submission, you must contact MAT staff.
       </p>
     </div>
+    
+    <!-- Required Authorization Checkbox -->
+    <div class="flex items-start pt-3 mt-3 border-t border-blue-200">
+      <%= check_box_tag "application[medical_release_authorized]", "1", false,
+          class: "mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
+          required: true,
+          "aria-required": "true",
+          "aria-describedby": "medical-release-description",
+          id: "application_medical_release_authorized" %>
+      <%= label_tag "application[medical_release_authorized]",
+          "I authorize the release and sharing of my medical information as described above",
+          class: "ml-2 block text-sm font-medium text-blue-800",
+          for: "application_medical_release_authorized" %>
+    </div>
+    <p id="medical-release-description" class="text-xs text-blue-600 ml-6 mt-1">
+      This authorization is required to process your MAT application and verify your eligibility.
+    </p>
   </div>
 </section>

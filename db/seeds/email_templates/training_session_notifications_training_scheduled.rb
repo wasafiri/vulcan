@@ -26,4 +26,4 @@ EmailTemplate.create_or_find_by!(name: 'training_session_notifications_training_
   TEXT
   template.version = 1
 end
-puts 'Seeded training_session_notifications_training_scheduled (text)'
+puts 'Seeded training_session_notifications_training_scheduled (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

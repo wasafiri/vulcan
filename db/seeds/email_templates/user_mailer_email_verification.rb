@@ -19,4 +19,4 @@ EmailTemplate.create_or_find_by!(name: 'user_mailer_email_verifications', format
   TEXT
   template.version = 1
 end
-puts 'Seeded user_notifications_email_confirmation (text)'
+puts 'Seeded user_notifications_email_confirmation (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

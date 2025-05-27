@@ -4,9 +4,9 @@ require 'application_system_test_case'
 
 class AssignTrainerTest < ApplicationSystemTestCase
   setup do
-    @admin = users(:admin_jane)
-    @application = applications(:approved_application)
-    @trainer = users(:trainer_jane)
+    @admin = create(:admin)
+    @application = create(:application, :approved)
+    @trainer = create(:user, :trainer)
 
     # Sign in as admin
     visit sign_in_path

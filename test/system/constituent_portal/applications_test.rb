@@ -3,17 +3,21 @@
 require 'application_system_test_case'
 
 class ApplicationsSystemTest < ApplicationSystemTestCase
+  include CupriteTestBridge
+
   setup do
-    @user = users(:constituent_john)
+    @user = create(:constituent)
     @valid_pdf = file_fixture('income_proof.pdf').to_s
     @valid_image = file_fixture('residency_proof.pdf').to_s
 
-    # Sign in
-    visit sign_in_path
-    fill_in 'Email Address', with: @user.email
-    fill_in 'Password', with: 'password123'
-    click_button 'Sign In'
-    assert_text 'Dashboard' # Verify we're signed in
+    # Use enhanced sign in for better stability
+    measure_time('Sign in') { enhanced_sign_in(@user) }
+    assert_text 'Dashboard', wait: 10 # Verify we're signed in
+  end
+
+  teardown do
+    # Extra cleanup to ensure browser stability
+    enhanced_sign_out if defined?(page) && page.driver.respond_to?(:browser)
   end
 
   test 'can view new application form' do
@@ -265,10 +269,11 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
     assert_equal '4105555678', application.medical_provider_fax
     assert_equal 'dr.johnson@example.com', application.medical_provider_email
 
-    # Verify user attributes were updated
+    # Verify a GuardianRelationship was created
+    assert GuardianRelationship.exists?(guardian_user: @user, dependent_user: application.user, relationship_type: 'Parent')
+
+    # Verify user attributes were updated (disabilities are on the user model)
     user = application.user.reload
-    assert user.is_guardian
-    assert_equal 'Parent', user.guardian_relationship
     assert user.hearing_disability
     assert user.vision_disability
     assert_not user.speech_disability

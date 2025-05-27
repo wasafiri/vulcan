@@ -12,6 +12,9 @@ module Users
 
     has_one_attached :w9_form
 
+    # Callbacks
+    after_commit :update_w9_status_on_form_upload, on: :update
+
     validates :status, presence: true
     validates :business_name, presence: true
     validates :business_tax_id, presence: true
@@ -106,6 +109,18 @@ module Users
         self.terms_accepted_at ||= Time.current
       else
         self.terms_accepted_at = nil
+      end
+    end
+
+    private
+
+    # Update w9_status when a W9 form is uploaded
+    def update_w9_status_on_form_upload
+      # When a W9 form is uploaded, it should go to pending_review status
+      # unless it's already pending_review (to avoid unnecessary updates)
+      # This handles: not_submitted -> pending_review, rejected -> pending_review, approved -> pending_review
+      if w9_form.attached? && !w9_status_pending_review?
+        update_column(:w9_status, :pending_review)
       end
     end
   end

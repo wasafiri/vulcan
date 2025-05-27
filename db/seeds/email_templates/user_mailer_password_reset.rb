@@ -19,4 +19,4 @@ EmailTemplate.create_or_find_by!(name: 'user_mailer_password_reset', format: :te
   TEXT
   template.version = 1
 end
-puts 'Seeded user_mailer_password_reset (text)'
+puts 'Seeded user_mailer_password_reset (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

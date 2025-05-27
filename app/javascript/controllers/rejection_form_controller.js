@@ -1,10 +1,13 @@
 import { Controller } from "@hotwired/stimulus"
+import { setVisible } from "../utils/visibility"
 
 export default class extends Controller {
   static targets = [
-    "proofType",      // Hidden input for proof type 
-    "reasonField",    // Text area for rejection reason
-    "notesField"      // Optional text area for additional notes
+    "proofType",         // Hidden input for proof type 
+    "reasonField",       // Text area for rejection reason
+    "incomeOnlyReasons", // Income-specific rejection reasons container
+    "medicalOnlyReasons", // Medical-specific rejection reasons container
+    "generalReasons"     // General rejection reasons container (income/residency)
   ]
 
   static values = {
@@ -31,134 +34,145 @@ export default class extends Controller {
   }
 
   connect() {
-    // Clear form on connect
+    // Clear form on connect and reset any error styling
     if (this.hasReasonFieldTarget) {
       this.reasonFieldTarget.value = ""
       this.reasonFieldTarget.classList.remove('border-red-500')
     }
     
-    if (this.hasNotesFieldTarget) {
-      this.notesFieldTarget.value = ""
-    }
-
-    // Listen for proof type changes
-    document.addEventListener('click', (event) => {
-      if (event.target.matches('[data-proof-type]')) {
-        const proofType = event.target.dataset.proofType
-        this.proofTypeTarget.value = proofType
-        
-        // Show/hide specific reason groups based on proof type
-        this.updateReasonGroupsVisibility(proofType)
-      }
-    })
-    
     // Initialize visibility based on initial proof type
-    this.updateReasonGroupsVisibility(this.proofTypeTarget.value)
+    if (this.hasProofTypeTarget) {
+      this._updateReasonGroupsVisibility(this.proofTypeTarget.value)
+    }
+  }
+
+  // Stimulus action for handling proof type selection
+  // HTML: data-action="click->rejection-form#handleProofTypeClick"
+  handleProofTypeClick(event) {
+    const proofType = event.currentTarget.dataset.proofType
+    if (proofType && this.hasProofTypeTarget) {
+      this.proofTypeTarget.value = proofType
+      this._updateReasonGroupsVisibility(proofType)
+    }
   }
   
-  updateReasonGroupsVisibility(proofType) {
-    // Handle income-only reasons
-    const incomeOnlyReasons = document.querySelector('.income-only-reasons')
-    if (incomeOnlyReasons) {
-      if (proofType === 'income') {
-        incomeOnlyReasons.classList.remove('hidden')
-      } else {
-        incomeOnlyReasons.classList.add('hidden')
-      }
+  // Private method for managing reason group visibility
+  _updateReasonGroupsVisibility(proofType) {
+    // Early exit if no reason group targets exist
+    if (!this.hasIncomeOnlyReasonsTarget && !this.hasMedicalOnlyReasonsTarget && !this.hasGeneralReasonsTarget) {
+      return
+    }
+
+    // Handle empty or unknown proof types gracefully - reset all groups to hidden
+    if (!proofType) {
+      if (this.hasIncomeOnlyReasonsTarget) setVisible(this.incomeOnlyReasonsTarget, false, { ariaHidden: true })
+      if (this.hasMedicalOnlyReasonsTarget) setVisible(this.medicalOnlyReasonsTarget, false, { ariaHidden: true })
+      if (this.hasGeneralReasonsTarget) setVisible(this.generalReasonsTarget, false, { ariaHidden: true })
+      return
     }
     
-    // Handle medical-only reasons
-    const medicalOnlyReasons = document.querySelector('.medical-only-reasons')
-    if (medicalOnlyReasons) {
-      if (proofType === 'medical') {
-        medicalOnlyReasons.classList.remove('hidden')
-        
-        // Hide income/residency groups when showing medical
-        if (incomeOnlyReasons) incomeOnlyReasons.classList.add('hidden')
-        const generalReasons = document.querySelector('.general-reasons')
-        if (generalReasons) generalReasons.classList.add('hidden')
-      } else {
-        medicalOnlyReasons.classList.add('hidden')
-        // Show general reasons for income/residency
-        const generalReasons = document.querySelector('.general-reasons')
-        if (generalReasons) generalReasons.classList.remove('hidden')
-      }
-    }
-  }
-
-  disconnect() {
-    // Clean up event listeners
-    document.removeEventListener('click', this._handleProofType)
+    // Use symmetric logic for all reason groups
+    const isIncome = proofType === 'income'
+    const isMedical = proofType === 'medical'
+    
+    const groups = [
+      { target: this.hasIncomeOnlyReasonsTarget ? this.incomeOnlyReasonsTarget : null, show: isIncome },
+      { target: this.hasMedicalOnlyReasonsTarget ? this.medicalOnlyReasonsTarget : null, show: isMedical },
+      { target: this.hasGeneralReasonsTarget ? this.generalReasonsTarget : null, show: !isMedical }
+    ]
+    
+    // Apply visibility with ARIA support
+    groups.forEach(({ target, show }) => {
+      if (target) setVisible(target, show, { ariaHidden: !show })
+    })
   }
 
   // Handle predefined reason selection
   selectPredefinedReason(event) {
     if (!this.hasReasonFieldTarget) {
-      console.warn('Missing reason field target for predefined reason selection')
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Missing reason field target for predefined reason selection')
+      }
       return
     }
 
     const reasonType = event.currentTarget.dataset.reasonType
     if (!reasonType) {
-      console.warn('Missing reason type in button data attribute')
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Missing reason type in button data attribute')
+      }
       return
     }
 
     // Get the proof type from the hidden field, defaulting to a sensible value if missing
+    // Note: 'general' serves as fallback for both income and residency proof types
     let proofType = 'general'
     if (this.hasProofTypeTarget && this.proofTypeTarget.value) {
       proofType = this.proofTypeTarget.value
-      console.log(`Using proof type from field: ${proofType}`)
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`Using proof type from field: ${proofType}`)
+      }
     } else {
       // Try to infer from context - check if this is inside the medical certification modal
       const isMedicalModal = event.currentTarget.closest('#medicalCertificationRejectionModal')
       if (isMedicalModal) {
         proofType = 'medical'
-        console.log('Inferred medical proof type from modal context')
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('Inferred medical proof type from modal context')
+        }
       }
     }
 
-    let reasonText = null
-
-    // For medical certification reasons
-    if (proofType === 'medical') {
-      reasonText = this[`${reasonType}Value`]
-      console.log(`Looking for medical reason: ${reasonType}Value = ${reasonText ? 'Found' : 'Not found'}`)
-    } else {
-      // For income/residency, use the composite key approach
-      const key = `${reasonType}${proofType.charAt(0).toUpperCase() + proofType.slice(1)}`
-      reasonText = this[`${key}Value`]
-      console.log(`Looking for ${proofType} reason: ${key}Value = ${reasonText ? 'Found' : 'Not found'}`)
-    }
-    
-    // Directly search for the value as a fallback
-    if (!reasonText) {
-      // Try direct access to the attribute
-      const dataAttributeName = `data-rejection-form-${reasonType}-value`
-      const directValue = this.element.getAttribute(dataAttributeName)
-      if (directValue) {
-        reasonText = directValue
-        console.log(`Found reason text via direct attribute: ${dataAttributeName}`)
-      }
-    }
+    const reasonText = this._lookupReason(reasonType, proofType)
     
     if (reasonText) {
       this.reasonFieldTarget.value = reasonText
       this.reasonFieldTarget.classList.remove('border-red-500')
     } else {
-      console.warn(`No predefined reason found for type: ${reasonType}, proof type: ${proofType}`)
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`No predefined reason found for type: ${reasonType}, proof type: ${proofType}`)
+      }
     }
+  }
+
+  // Private helper for DRY reason lookup with early returns
+  _lookupReason(reasonType, proofType) {
+    let reasonText = null
+
+    // For medical certification reasons
+    if (proofType === 'medical') {
+      reasonText = this[`${reasonType}Value`]
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`Looking for medical reason: ${reasonType}Value = ${reasonText ? 'Found' : 'Not found'}`)
+      }
+      if (reasonText) return reasonText
+    } else {
+      // For income/residency, use the composite key approach
+      const key = `${reasonType}${proofType.charAt(0).toUpperCase() + proofType.slice(1)}`
+      reasonText = this[`${key}Value`]
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`Looking for ${proofType} reason: ${key}Value = ${reasonText ? 'Found' : 'Not found'}`)
+      }
+      if (reasonText) return reasonText
+    }
+    
+    // No fallback needed - Stimulus values should handle all cases
+    return null
   }
 
   // Handle form validation
   validateForm(event) {
     if (!this.hasReasonFieldTarget) {
-      console.warn('Missing reason field target')
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Missing reason field target')
+      }
       return
     }
 
     if (!this.hasProofTypeTarget || !this.proofTypeTarget.value) {
-      console.warn('Missing proof type')
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Missing proof type')
+      }
       event.preventDefault()
       return
     }
@@ -184,6 +198,8 @@ export default class extends Controller {
       }
     }));
     
-    console.log("Form submission validated, proceeding with submit");
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Form submission validated, proceeding with submit");
+    }
   }
 }

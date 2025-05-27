@@ -5,8 +5,8 @@ require 'application_system_test_case'
 module Admin
   class MedicalCertificationUploadTest < ApplicationSystemTestCase
     setup do
-      @admin = users(:admin)
-      @application = applications(:in_progress)
+      @admin = create(:admin)
+      @application = create(:application, :in_progress)
       @application.update(medical_certification_status: 'requested')
 
       # Sign in as admin
@@ -26,7 +26,7 @@ module Admin
       choose 'Accept Certification and Upload'
 
       # Attach a test file to the upload form
-      file_path = Rails.root.join('test', 'fixtures', 'files', 'test_document.pdf')
+      file_path = Rails.root.join('test/fixtures/files/test_document.pdf')
       attach_file 'medical_certification', file_path, make_visible: true
 
       # Submit the form

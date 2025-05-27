@@ -1,13 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
-
-// Debounce function to prevent excessive API calls
-function debounce(func, wait) {
-  let timeout
-  return function(...args) {
-    clearTimeout(timeout)
-    timeout = setTimeout(() => func.apply(this, args), wait)
-  }
-}
+import { createFormChangeDebounce } from "../utils/debounce"
+import { setVisible } from "../utils/visibility"
 
 export default class extends Controller {
   static targets = ["form", "autosaveStatus", "fieldError"]
@@ -17,12 +10,31 @@ export default class extends Controller {
   }
 
   connect() {
+    // Use our tested debounce utility
+    this.debouncedSave = createFormChangeDebounce(() => this.executeFieldSave())
+    
+    // Store bound handlers for proper cleanup
+    this._boundHandleBlur = this.handleBlur.bind(this)
+    this._fieldElements = []
+    
     this.setupFieldListeners()
-    this.debouncedSave = debounce(this.saveField.bind(this), this.debounceWaitValue)
   }
 
   disconnect() {
-    // Clean up any resources or event listeners if needed
+    // Clean up event listeners to prevent memory leaks
+    this._fieldElements.forEach(element => {
+      element.removeEventListener('blur', this._boundHandleBlur)
+    })
+    this._fieldElements = []
+    this._boundHandleBlur = null
+    this.debouncedSave = null
+    this._pendingElement = null
+    
+    // Clear any pending status timeout
+    if (this._statusTimeout) {
+      clearTimeout(this._statusTimeout)
+      this._statusTimeout = null
+    }
   }
 
   setupFieldListeners() {
@@ -32,9 +44,26 @@ export default class extends Controller {
     )
     
     formInputs.forEach(input => {
+      // Store reference for cleanup
+      this._fieldElements.push(input)
       // Add blur event listener to trigger autosave
-      input.addEventListener('blur', (event) => this.debouncedSave(event.target))
+      input.addEventListener('blur', this._boundHandleBlur)
     })
+  }
+
+  handleBlur(event) {
+    // Store the element for the debounced save
+    this._pendingElement = event.target
+    // Trigger debounced save
+    this.debouncedSave()
+  }
+
+  executeFieldSave() {
+    // Execute the actual save with the stored element
+    if (this._pendingElement) {
+      this.saveField(this._pendingElement)
+      this._pendingElement = null
+    }
   }
 
   async saveField(element) {
@@ -114,9 +143,15 @@ export default class extends Controller {
       this.updateStatus("Failed to save", "text-red-600")
     }
 
+    // Clear any existing status timeout to prevent stacking
+    if (this._statusTimeout) {
+      clearTimeout(this._statusTimeout)
+    }
+    
     // Clear status message after a delay
-    setTimeout(() => {
+    this._statusTimeout = setTimeout(() => {
       this.updateStatus("", "")
+      this._statusTimeout = null
     }, 3000)
   }
 
@@ -131,6 +166,9 @@ export default class extends Controller {
       if (cssClass) {
         this.autosaveStatusTarget.classList.add(cssClass)
       }
+      
+      // Use setVisible utility for consistent visibility management
+      setVisible(this.autosaveStatusTarget, !!message)
     }
   }
 
@@ -140,8 +178,9 @@ export default class extends Controller {
     
     if (errorContainer) {
       errorContainer.textContent = message
-      errorContainer.classList.remove('hidden')
       errorContainer.classList.add('text-red-600', 'text-sm', 'mt-1')
+      // Use setVisible utility for consistent visibility management
+      setVisible(errorContainer, true)
     }
   }
 
@@ -153,7 +192,8 @@ export default class extends Controller {
     const errorContainer = this.findFieldErrorElement(element)
     if (errorContainer) {
       errorContainer.textContent = ''
-      errorContainer.classList.add('hidden')
+      // Use setVisible utility for consistent visibility management
+      setVisible(errorContainer, false)
     }
   }
 

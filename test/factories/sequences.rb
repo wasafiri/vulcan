@@ -9,6 +9,6 @@ FactoryBot.define do
     sequence(:medical_provider_phone) { |n| "123-456-#{n.to_s.rjust(4, '0')}" }
     sequence(:medical_provider_fax) { |n| "098-765-#{n.to_s.rjust(4, '0')}" }
     sequence(:medical_provider_email) { |n| "jane.smith#{n}@medicalclinic.com" }
-    sequence(:phone) { |_n| "555-#{rand(100..999)}-#{rand(1000..9999)}" } # Generates valid 10-digit phone numbers like 555-XXX-XXXX
+    sequence(:phone) { |n| "555-#{(n % 900) + 100}-#{(n % 9000) + 1000}" } # Ensures unique 10-digit phone numbers by using sequence number
   end
 end

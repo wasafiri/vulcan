@@ -10,8 +10,7 @@ class VoucherNotificationsMailer < ApplicationMailer
 
   # Removed prepare_email helper
 
-  def voucher_assigned
-    voucher = params[:voucher]
+  def voucher_assigned(voucher)
     user = voucher.application.user
     template_name = 'voucher_notifications_voucher_assigned'
 

@@ -236,4 +236,37 @@ class ApplicationTest < ActiveSupport::TestCase
 
     assert_equal({}, analysis)
   end
+
+  # --- Managing Guardian Tests ---
+
+  test 'application can have a managing_guardian' do
+    # Use timestamp to ensure unique phone numbers
+    timestamp = Time.current.to_i
+    guardian = create(:constituent, email: "guardian.app.#{timestamp}@example.com", phone: "555555#{timestamp.to_s[-4..]}")
+    applicant_user = create(:constituent, email: "applicant.app.#{timestamp + 1}@example.com", phone: "555556#{timestamp.to_s[-4..]}")
+    application = create(:application, user: applicant_user, managing_guardian: guardian)
+
+    assert_equal(guardian, application.managing_guardian)
+    assert_equal(applicant_user, application.user)
+  end
+
+  test 'application is valid without a managing_guardian' do
+    timestamp = Time.current.to_i
+    applicant_user = create(:constituent, email: "solo.applicant.#{timestamp}@example.com", phone: "555557#{timestamp.to_s[-4..]}")
+    application = create(:application, user: applicant_user, managing_guardian: nil)
+    assert(application.valid?)
+  end
+
+  test 'application user is the actual applicant (e.g. minor)' do
+    timestamp = Time.current.to_i
+    guardian = create(:constituent, email: "guardian.for.minor.#{timestamp}@example.com", phone: "555558#{timestamp.to_s[-4..]}")
+    minor_applicant = create(:constituent, email: "minor.applicant.#{timestamp}@example.com", phone: "555559#{timestamp.to_s[-4..]}")
+    # Create the relationship between guardian and dependent
+    GuardianRelationship.create!(guardian_user: guardian, dependent_user: minor_applicant, relationship_type: 'Parent')
+
+    application_for_minor = create(:application, user: minor_applicant, managing_guardian: guardian)
+
+    assert_equal(minor_applicant, application_for_minor.user, "Application's user should be the minor.")
+    assert_equal(guardian, application_for_minor.managing_guardian, "Application's managing_guardian should be the guardian.")
+  end
 end

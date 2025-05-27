@@ -8,8 +8,9 @@ class PaperApplicationModeSwitchingTest < ActionDispatch::IntegrationTest
     sign_in(@admin)
 
     # Ensure necessary policies exist for income threshold check
-    Policy.create_or_find_by!(key: 'fpl_2_person', value: '21150')
-    Policy.create_or_find_by!(key: 'fpl_modifier_percentage', value: '400')
+    # Using find_or_create_by! to prevent errors if policies already exist from previous test runs or setup.
+    Policy.find_or_create_by!(key: 'fpl_2_person') { |policy| policy.value = '21150' }
+    Policy.find_or_create_by!(key: 'fpl_modifier_percentage') { |policy| policy.value = '400' }
 
     # Create sample proofs for testing using ActiveStorage::Blob.create_and_upload!
     income_file = fixture_file_upload('test/fixtures/files/sample.pdf', 'application/pdf')
@@ -107,7 +108,7 @@ class PaperApplicationModeSwitchingTest < ActionDispatch::IntegrationTest
     application.update_column(:residency_proof_status, Application.residency_proof_statuses[:not_reviewed])
     application.reload
 
-    puts "DEBUG: After attaching residency proof - residency_proof attached? #{application.residency_proof.attached?}"
+    puts "DEBUG: After attaching residency proof - residency_proof attached? #{application.residency_proof.attached?}" if ENV['VERBOSE_TESTS']
 
     # Now we can approve the residency proof
     patch update_proof_status_admin_application_path(application), params: {

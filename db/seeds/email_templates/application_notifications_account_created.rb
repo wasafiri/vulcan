@@ -22,7 +22,7 @@ EmailTemplate.create_or_find_by!(name: 'application_notifications_account_create
 
     For security reasons, you will be required to change your password when you first log in.
 
-    Sign in here: %<sign_in_url>s [data-no-track]
+    Sign in here: %<sign_in_url>s
 
     If you prefer not to access your account online or encounter any issues, do not worry — we will continue to send you important updates and documents by mail.
 
@@ -32,4 +32,4 @@ EmailTemplate.create_or_find_by!(name: 'application_notifications_account_create
   TEXT
   template.version = 1
 end
-puts 'Seeded application_notifications_account_created (text)'
+puts 'Seeded application_notifications_account_created (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

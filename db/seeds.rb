@@ -4,16 +4,31 @@ require 'factory_bot_rails'
 require 'yaml'
 require 'active_record/fixtures'
 
+# Helper method to conditionally output messages
+def seed_puts(message)
+  puts message if ENV['VERBOSE_TESTS'] || Rails.env.development?
+end
+
+# Helper method for error messages (always shown)
+def seed_error(message)
+  puts "[SEED ERROR] #{message}"
+end
+
+# Helper method for success messages (only in verbose mode)
+def seed_success(message)
+  puts message if ENV['VERBOSE_TESTS']
+end
+
 if Rails.env.production?
   puts 'Production environment detected. Seeding skipped to prevent data override.'
 else
   begin
     ActiveRecord::Base.transaction do
       # Optionally clear existing data.
-      puts 'Clearing existing data...'
+      seed_puts 'Clearing existing data...'
 
       # Clear sessions first to avoid foreign key constraint violations
-      puts '  Clearing Session records...'
+      seed_puts '  Clearing Session records...'
       Session.in_batches(of: 100).delete_all
 
       # Then clear other models
@@ -21,7 +36,7 @@ else
         Evaluation, ProofReview, Notification, RoleCapability,
         PolicyChange, EmailTemplate, Product, Event, Policy, Application, User
       ].each do |model|
-        puts "  Clearing #{model.name} records..."
+        seed_puts "  Clearing #{model.name} records..."
         # Delete records in small batches to avoid memory issues
         model.in_batches(of: 100).delete_all
       end
@@ -29,12 +44,12 @@ else
       # ------------------------------
       # Create Products from Fixture
       # ------------------------------
-      puts 'Creating products from fixtures...'
+      seed_puts 'Creating products from fixtures...'
       product_fixture_path = Rails.root.join('test/fixtures/products.yml')
       if File.exist?(product_fixture_path)
         product_data = YAML.load_file(product_fixture_path)
         product_data.each do |key, attributes|
-          puts "  Processing product #{key}..."
+          seed_puts "  Processing product #{key}..."
           # Assume that 'name' is unique for Product.
           Product.find_or_create_by(name: attributes['name']) do |product|
             clean_attributes = attributes.except('recommended_products', 'products_tried')
@@ -43,13 +58,13 @@ else
         end
         raise 'No products created' if Product.count.zero?
       else
-        puts "  Products fixture not found at #{product_fixture_path}"
+        seed_error "Products fixture not found at #{product_fixture_path}"
       end
 
       # ------------------------------
       # Create Policies
       # ------------------------------
-      puts 'Creating policies...'
+      seed_puts 'Creating policies...'
       policies = {
         'fpl_modifier_percentage' => 400,
         'fpl_1_person' => 15_650,
@@ -87,51 +102,51 @@ else
       # ------------------------------
       # Load Users and Applications Fixtures
       # ------------------------------
-      puts 'Loading fixtures in order...'
+      seed_puts 'Loading fixtures in order...'
       fixtures_path = Rails.root.join('test/fixtures')
 
       # Load users first
-      puts 'Loading users fixture...'
+      seed_puts 'Loading users fixture...'
       ActiveRecord::FixtureSet.create_fixtures(fixtures_path, 'users')
 
       # Then load applications that depend on users
-      puts 'Loading applications fixture...'
+      seed_puts 'Loading applications fixture...'
       ActiveRecord::FixtureSet.create_fixtures(fixtures_path, 'applications')
 
       # Then load invoices that depend on users (vendors)
-      puts 'Loading invoices fixture...'
+      seed_puts 'Loading invoices fixture...'
       ActiveRecord::FixtureSet.create_fixtures(fixtures_path, 'invoices')
 
       # ------------------------------
       # Seed Email Templates
       # ------------------------------
-      puts 'Seeding email templates...'
+      seed_puts 'Seeding email templates...'
       load Rails.root.join('db/seeds/email_templates.rb')
 
       # ------------------------------
       # Ensure storage directory exists
       # ------------------------------
-      puts 'Ensuring storage directory exists...'
+      seed_puts 'Ensuring storage directory exists...'
       storage_dir = Rails.root.join('storage')
       FileUtils.mkdir_p(storage_dir) unless storage_dir
 
       # ------------------------------
       # Attaching Files to Applications
       # ------------------------------
-      puts 'Attaching files to applications...'
+      seed_puts 'Attaching files to applications...'
 
       # First, process Rex Canine application specifically
-      puts 'Processing Rex Canine application specifically...'
+      seed_puts 'Processing Rex Canine application specifically...'
       rex_app = Application.joins(:user).where(users: { first_name: 'Rex', last_name: 'Canine' }).first
 
       if rex_app
-        puts "Found Rex's application ##{rex_app.id}"
-        puts "  Current status - Income: #{rex_app.income_proof_status}, Residency: #{rex_app.residency_proof_status}"
-        puts "  Initial state - Income attached: #{rex_app.income_proof.attached?}, Residency attached: #{rex_app.residency_proof.attached?}"
+        seed_puts "Found Rex's application ##{rex_app.id}"
+        seed_puts "  Current status - Income: #{rex_app.income_proof_status}, Residency: #{rex_app.residency_proof_status}"
+        seed_puts "  Initial state - Income attached: #{rex_app.income_proof.attached?}, Residency attached: #{rex_app.residency_proof.attached?}"
 
         # For Rex's application, handle each proof separately
         if rex_app.income_proof_status == 'approved' && !rex_app.income_proof.attached?
-          puts '  Attaching income proof...'
+          seed_puts '  Attaching income proof...'
           income_file_path = Rails.root.join('test/fixtures/files/income_proof.pdf')
           if File.exist?(income_file_path)
             rex_app.income_proof.attach(
@@ -141,15 +156,15 @@ else
             )
             # Use save instead of save! to avoid validation errors
             rex_app.save
-            puts '  ✓ Income proof attached successfully'
+            seed_success '  ✓ Income proof attached successfully'
           else
-            puts "  ✗ Income proof file not found at #{income_file_path}"
+            seed_error "Income proof file not found at #{income_file_path}"
           end
         end
 
         # Also handle residency proof if needed
         if rex_app.residency_proof_status.in?(%w[approved rejected]) && !rex_app.residency_proof.attached?
-          puts '  Attaching residency proof...'
+          seed_puts '  Attaching residency proof...'
           residency_file_path = Rails.root.join('test/fixtures/files/residency_proof.pdf')
           if File.exist?(residency_file_path)
             rex_app.residency_proof.attach(
@@ -159,13 +174,13 @@ else
             )
             # Use save instead of save! to avoid validation errors
             rex_app.save
-            puts '  ✓ Residency proof attached successfully'
+            seed_success '  ✓ Residency proof attached successfully'
           else
-            puts "  ✗ Residency proof file not found at #{residency_file_path}"
+            seed_error "Residency proof file not found at #{residency_file_path}"
           end
         end
       else
-        puts '  ✗ Could not find Rex Canine application'
+        seed_error 'Could not find Rex Canine application'
       end
 
       # Then process all other applications
@@ -175,17 +190,17 @@ else
 
         # Skip applications with missing users
         if app.user.nil?
-          puts "  ⚠️ Skipping Application ##{app.id} - Missing user reference"
+          seed_error "Skipping Application ##{app.id} - Missing user reference"
           next
         end
 
-        puts "  Processing Application ##{app.id} (#{app.user.email})"
+        seed_puts "  Processing Application ##{app.id} (#{app.user.email})"
 
         # Handle each proof type separately with its own save operation
 
         # Process income proof
         if app.income_proof_status.in?(%w[approved rejected]) && !app.income_proof.attached?
-          puts '    Attaching income proof...'
+          seed_puts '    Attaching income proof...'
           income_file_path = Rails.root.join('test/fixtures/files/income_proof.pdf')
           if File.exist?(income_file_path)
             app.income_proof.attach(
@@ -195,15 +210,15 @@ else
             )
             # Use save instead of save! to avoid validation errors
             app.save
-            puts '    ✓ Income proof attached'
+            seed_success '    ✓ Income proof attached'
           else
-            puts "    ✗ Income proof file not found at #{income_file_path}"
+            seed_error "Income proof file not found at #{income_file_path}"
           end
         end
 
         # Process residency proof
         if app.residency_proof_status.in?(%w[approved rejected]) && !app.residency_proof.attached?
-          puts '    Attaching residency proof...'
+          seed_puts '    Attaching residency proof...'
           residency_file_path = Rails.root.join('test/fixtures/files/residency_proof.pdf')
           if File.exist?(residency_file_path)
             app.residency_proof.attach(
@@ -213,15 +228,15 @@ else
             )
             # Use save instead of save! to avoid validation errors
             app.save
-            puts '    ✓ Residency proof attached'
+            seed_success '    ✓ Residency proof attached'
           else
-            puts "    ✗ Residency proof file not found at #{residency_file_path}"
+            seed_error "Residency proof file not found at #{residency_file_path}"
           end
         end
 
         # Process medical certification
         if app.medical_certification_status.to_s.in?(%w[received accepted]) && !app.medical_certification.attached?
-          puts '    Attaching medical certification...'
+          seed_puts '    Attaching medical certification...'
           medical_file_path = Rails.root.join('test/fixtures/files/medical_certification_valid.pdf')
           if File.exist?(medical_file_path)
             app.medical_certification.attach(
@@ -231,9 +246,9 @@ else
             )
             # Use save instead of save! to avoid validation errors
             app.save
-            puts '    ✓ Medical certification attached'
+            seed_success '    ✓ Medical certification attached'
           else
-            puts "    ✗ Medical certification file not found at #{medical_file_path}"
+            seed_error "Medical certification file not found at #{medical_file_path}"
           end
         end
       end
@@ -241,7 +256,7 @@ else
       # ------------------------------
       # Verify and Fix Missing Files
       # ------------------------------
-      puts 'Verifying all application attachments...'
+      seed_puts 'Verifying all application attachments...'
 
       Application.find_each do |app|
         fixed_files = []
@@ -253,7 +268,7 @@ else
           disk_path = Rails.root.join('storage', disk_key[0, 2], disk_key[2, 2], disk_key)
 
           unless File.exist?(disk_path)
-            puts "  Fixing missing income proof for Application ##{app.id}..."
+            seed_puts "  Fixing missing income proof for Application ##{app.id}..."
 
             # Create directory structure if needed
             dir_path = Rails.root.join('storage', disk_key[0, 2], disk_key[2, 2])
@@ -274,7 +289,7 @@ else
           disk_path = Rails.root.join('storage', disk_key[0, 2], disk_key[2, 2], disk_key)
 
           unless File.exist?(disk_path)
-            puts "  Fixing missing residency proof for Application ##{app.id}..."
+            seed_puts "  Fixing missing residency proof for Application ##{app.id}..."
 
             # Create directory structure if needed
             dir_path = Rails.root.join('storage', disk_key[0, 2], disk_key[2, 2])
@@ -295,7 +310,7 @@ else
           disk_path = Rails.root.join('storage', disk_key[0, 2], disk_key[2, 2], disk_key)
 
           unless File.exist?(disk_path)
-            puts "  Fixing missing medical certification for Application ##{app.id}..."
+            seed_puts "  Fixing missing medical certification for Application ##{app.id}..."
 
             # Create directory structure if needed
             dir_path = Rails.root.join('storage', disk_key[0, 2], disk_key[2, 2])
@@ -310,11 +325,11 @@ else
         end
 
         # Report fixed files
-        puts "  ✓ Fixed #{fixed_files.size} missing files for Application ##{app.id}: #{fixed_files.join(', ')}" if fixed_files.any?
+        seed_success "  ✓ Fixed #{fixed_files.size} missing files for Application ##{app.id}: #{fixed_files.join(', ')}" if fixed_files.any?
       end
     end
   rescue StandardError => e
-    puts "Seeding failed: #{e.message}"
+    seed_error "Seeding failed: #{e.message}"
     puts 'Backtrace:'
     e.backtrace.first(10).each { |line| puts line }
     exit 1

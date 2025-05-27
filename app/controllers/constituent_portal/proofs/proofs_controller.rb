@@ -77,10 +77,11 @@ module ConstituentPortal
         flash.keep(:alert)
         redirect_to constituent_portal_application_path(@application)
       rescue StandardError => e
-        # Add debug marker for standard error
         Rails.logger.debug 'RESUBMIT: StandardError caught'
-        Rails.logger.error "ERROR IN RESUBMIT: #{e.class.name}: #{e.message}"
-        Rails.logger.error e.backtrace.join("\n")
+        unless Rails.env.test?
+          Rails.logger.error "ERROR IN RESUBMIT: #{e.class.name}: #{e.message}"
+          Rails.logger.error e.backtrace.join("\n")
+        end
         raise
       end
 
@@ -200,7 +201,7 @@ module ConstituentPortal
             submission_method: :web,
             metadata: {
               ip_address: request.remote_ip,
-              user_agent: request.user_agent,
+              user_agent: request.user_agent || 'Rails Testing',
               resubmitting: is_resubmitting # Pass resubmission flag in metadata
             }
           )

@@ -1,290 +1,292 @@
 # System Testing Guide
 
-This comprehensive guide explains how to run and maintain system tests in the MAT Vulcan application using Cuprite with Chrome.
+This guide provides a comprehensive approach to debugging and fixing system test failures and errors in this application. It incorporates lessons learned from recent debugging efforts and outlines common issues, strategies, and best practices for effective system testing.
 
-## Table of Contents
-1. [Overview](#overview)
-2. [Current Architecture](#current-architecture)
-3. [Running Tests](#running-tests)
-4. [Configuration Details](#configuration-details)
-5. [Headless Testing](#headless-testing)
-6. [Browser Management](#browser-management)
-7. [CI/CD Integration](#cicd-integration)
-8. [Troubleshooting](#troubleshooting)
-9. [Best Practices](#best-practices)
+## Quick Start
 
-## Overview
-
-System tests allow us to verify the application's functionality from the user's perspective by automating browser interactions. Our system tests use:
-
-- **Rails System Testing**: Built on Rails' integration with Capybara
-- **Cuprite**: A headless Chrome driver for Capybara (replacing Selenium)
-- **Chrome**: As the default browser for testing
-- **CDP (Chrome DevTools Protocol)**: For direct browser control
-
-## Current Architecture
-
-Our system testing architecture consists of:
-
-1. **Cuprite**: Directly controls Chrome via CDP without requiring ChromeDriver
-2. **Capybara**: Provides a user-friendly DSL for browser interaction
-3. **Chrome**: Standard Chrome browser (no special version needed)
-4. **Minitest**: The testing framework
-
-This architecture provides faster, more reliable end-to-end testing with significantly reduced configuration complexity.
-
-## Running Tests
-
-To run system tests, use the standard Rails test commands:
-
-### Running All System Tests
+### Running Tests with Minimal Noise (Recommended)
 
 ```bash
-bin/rails test:system
+# Regular test run with minimal output (default)
+rails test test/system/some_test.rb
+
+# Or use the provided script
+./bin/test-quiet test/system/some_test.rb
 ```
 
-### Running Specific Test Files
+### Running Tests with Full Verbosity (For Debugging)
 
 ```bash
-bin/rails test test/system/path/to/test.rb
+# Enable verbose logging when you need to debug
+VERBOSE_TESTS=1 rails test test/system/some_test.rb
+
+# Or use the provided script
+./bin/test-verbose test/system/some_test.rb
 ```
 
-### Running Individual Tests
+## Test Log Noise Reduction
+
+### Problem
+System tests can generate extremely verbose logs that make it difficult to spot actual failures:
+- Massive SQL statements from database operations
+- ActiveRecord INSERT/UPDATE statements with full parameter lists
+- ActiveStorage blob creation and upload logs
+- Database seeding verbose output (clearing data, processing products)
+- Custom debug logging from application concerns
+- Browser connection management messages
+- Route helper test warnings
+- Favicon routing errors
+
+### Solution
+The test suite has been configured to minimize log noise by default:
+
+#### Environment Configuration
+- **Log Level**: Set to `:warn` by default (only errors and warnings shown)
+- **ActiveRecord Logging**: Reduced verbosity unless `VERBOSE_TESTS=1`
+- **ActiveStorage Logging**: Set to `:error` level
+- **Query Logs**: Disabled verbose query logs and caller tracking
+
+#### Database Strategy
+- **Default**: Uses `transaction` strategy (fast, clean)
+- **Fallback**: Use `USE_TRUNCATION=1` for tests requiring multiple DB connections
+
+#### Seeding Output
+- **Quiet Mode**: Only shows errors and completion messages
+- **Verbose Mode**: Shows all processing steps when `VERBOSE_TESTS=1`
+
+#### Browser Management
+- **Connection Clearing**: Browser connection management messages only shown in verbose mode
+- **Chrome Logging**: Reduced to fatal errors only unless `VERBOSE_TESTS=1`
+- **Setup Messages**: Browser configuration messages suppressed by default
+
+#### Route Helpers
+- **Test Route Warnings**: Route helper tests only run when `VERBOSE_TESTS=1`
+- **Favicon Handling**: Added silent favicon route to prevent routing errors
+
+### Usage Examples
 
 ```bash
-bin/rails test test/system/path/to/test.rb:line_number
+# Minimal output (recommended for development)
+rails test test/system/admin/paper_applications_test.rb
+
+# Full debugging output
+VERBOSE_TESTS=1 rails test test/system/admin/paper_applications_test.rb
+
+# Force truncation strategy if needed
+USE_TRUNCATION=1 rails test test/system/some_test.rb
 ```
 
-## Configuration Details
+## Browser Configuration
 
-System tests are configured in `test/application_system_test_case.rb`:
+### Current Setup
+- **Primary Driver**: Cuprite (Chrome via CDP)
+- **Fallback**: Selenium with Chrome
+- **Configuration**: Located in `test/support/browsers/setup.rb`
 
+### Key Features
+- **Headless Mode**: Controlled by `HEADLESS` environment variable
+- **Animation Disabled**: For faster, more reliable tests
+- **Optimized Chrome Options**: Performance and stability focused
+- **Error Recovery**: Built-in handling for common browser errors
+
+### Browser Options
+```bash
+# Run with visible browser (for debugging)
+HEADLESS=false rails test test/system/some_test.rb
+
+# Add slowmo for debugging
+SLOWMO=0.5 rails test test/system/some_test.rb
+```
+
+## Common Issues and Strategies
+
+### 1. Authentication and Page Load Issues
+Tests fail because the user is not properly signed in, or the page has not fully loaded before interaction.
+
+**Strategy:**
+- Use `system_test_sign_in(user)` from `SystemTestAuthentication`
+- Use `wait_for_turbo` after navigation or Turbo Stream responses
+- Verify authentication with `assert_authenticated_as(user)`
+- Check for user-specific content (e.g., "Hello [User Name]", "Sign Out" link)
+
+**Example:**
 ```ruby
-class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
-  include SystemTestAuthentication
-  include SystemTestHelpers
-
-  driven_by :cuprite
+def test_authenticated_user_can_access_dashboard
+  user = create(:user)
+  system_test_sign_in(user)
+  
+  visit admin_dashboard_path
+  wait_for_turbo
+  
+  assert_authenticated_as(user)
+  assert_text "Welcome to the Dashboard"
 end
 ```
 
-The primary configuration is set in `config/initializers/capybara.rb`, which:
+### 2. Element Not Found (`Capybara::ElementNotFound`)
+Tests cannot find or interact with required elements.
 
+**Strategy:**
+- **Verify Selectors**: Use stable selectors (IDs, data attributes)
+- **Check Visibility**: Use `visible: true` or `visible: :all` as needed
+- **Add Waits**: Use `assert_selector 'selector', wait: N`
+- **Use Safe Helpers**: `safe_click`, `safe_fill_in` from `SystemTestHelpers`
+
+**Example:**
 ```ruby
-Capybara.register_driver(:cuprite) do |app|
-  Capybara::Cuprite::Driver.new(
-    app,
-    window_size: [1440, 900],
-    browser_options: ENV['DOCKER'] ? { 'no-sandbox' => nil } : {},
-    process_timeout: 15,
-    inspector: true,
-    js_errors: true,
-    headless: !%w[0 false].include?(ENV.fetch('HEADLESS', 'true').downcase),
-    slowmo: ENV['SLOWMO']&.to_f
-  )
-end
+# Instead of this:
+find('#submit-button').click
 
-# Additional configuration options
-Capybara.default_driver = :cuprite
-Capybara.javascript_driver = :cuprite
-Capybara.disable_animation = true
+# Use this:
+assert_selector '#submit-button', wait: 5
+safe_click('#submit-button')
 ```
 
-We also provide helper methods in `test/support/system_test_helpers.rb` for:
-- Managing flash messages
-- Scrolling to elements
-- Handling animations
-- Safe element clicking
+### 3. JavaScript/Stimulus Controller Issues
+Functionality driven by JavaScript doesn't behave as expected.
 
-## Headless Testing
+**Strategy:**
+- Verify Stimulus controllers are registered in `app/javascript/controllers/index.js`
+- Ensure correct `data-controller` and `data-target` attributes
+- Add waits after JavaScript-triggered actions
+- Use `wait_for_turbo` after Turbo Stream updates
 
-With Cuprite, headless mode is enabled by default but can be easily toggled:
+**Example:**
+```ruby
+def test_dynamic_form_updates
+  click_button "Add Item"
+  wait_for_turbo
+  
+  assert_selector '[data-controller="dynamic-form"]'
+  assert_selector '.new-item-field', count: 2
+end
+```
 
-### Disabling Headless Mode for Debugging
+### 4. Database/Backend Errors
+Tests trigger backend errors due to data handling issues.
 
-You can run tests in a visible browser by setting the `HEADLESS` environment variable:
+**Strategy:**
+- Examine test setup and factory usage
+- Analyze backtraces to find error origins
+- Review application code for query/data manipulation issues
+- Ensure valid test data creation
+
+### 5. Timing Issues / Race Conditions
+Tests run faster than browser UI updates.
+
+**Strategy:**
+- Use explicit waits: `assert_selector 'selector', wait: N`
+- Use `wait_for_turbo` after navigation
+- Consider small `sleep` calls for complex async sequences
+- Ensure background jobs complete if test depends on results
+
+## Advanced Debugging
+
+### Debug Tools Available
+
+```ruby
+# Take screenshot for visual debugging
+take_screenshot("debug-state")
+
+# Output current page state
+debug_page  # Shows URL, path, and HTML summary
+
+# Check authentication state
+assert_authenticated_as(user)
+assert_not_authenticated
+
+# Scroll to elements before interaction
+scroll_to_element('#target-element')
+scroll_to_and_click('#button')
+```
+
+### Environment Variables for Debugging
 
 ```bash
-HEADLESS=0 bin/rails test:system
+# Show all test output
+VERBOSE_TESTS=1
+
+# Show authentication debug info
+DEBUG_AUTH=true
+
+# Run browser visibly
+HEADLESS=false
+
+# Add slowmo for step-by-step debugging
+SLOWMO=1.0
+
+# Use database truncation instead of transactions
+USE_TRUNCATION=1
 ```
 
-You can also slow down browser interactions to better see what's happening:
+### Common Debug Workflow
 
-```bash
-HEADLESS=0 SLOWMO=0.5 bin/rails test:system
-```
+1. **Run in Isolation**: Test single files to reduce noise
+2. **Enable Verbose Mode**: `VERBOSE_TESTS=1` for full output
+3. **Use Visual Browser**: `HEADLESS=false` to see what's happening
+4. **Add Screenshots**: `take_screenshot` before failing assertions
+5. **Check Page State**: `debug_page` to understand current state
+6. **Verify Authentication**: Ensure user is properly signed in
 
-The `SLOWMO` value is in seconds (e.g., 0.5 means each action takes half a second).
+## Test Helpers Reference
 
-## Browser Management
+### SystemTestAuthentication
+- `system_test_sign_in(user)` - Reliable user authentication
+- `system_test_sign_out` - Clean sign out and session cleanup
+- `assert_authenticated_as(user)` - Verify authentication state
+- `with_authenticated_user(user) { ... }` - Scoped authentication
 
-Our Cuprite implementation has several advantages:
+### SystemTestHelpers
+- `safe_click(selector)` - Click with scrolling and error handling
+- `safe_fill_in(selector, with: value)` - Fill with scrolling
+- `wait_for_turbo` - Wait for Turbo navigation completion
+- `take_screenshot(name)` - Save debugging screenshots
+- `debug_page` - Output current page state
 
-1. **No ChromeDriver dependency** - Cuprite connects directly to Chrome via CDP
-2. **Simpler installation** - Just need Chrome installed, no need for driver management
-3. **Faster execution** - Direct browser control results in ~40% faster tests
-4. **Better error handling** - More informative error messages and JavaScript debugging
-
-### Transition from Selenium to Cuprite
-
-In April 2025, we completed our transition from Selenium WebDriver to Cuprite:
-
-1. **What Changed?**
-   - Removed all Selenium WebDriver dependencies
-   - Eliminated the need for ChromeDriver management
-   - Consolidated configuration into one central location
-   - Added helper methods for handling common Cuprite-specific scenarios
-
-2. **Why We Changed**
-   - The Selenium approach required complex version matching between Chrome and ChromeDriver
-   - Tests were slower due to the additional layers between our test code and Chrome
-   - Cuprite provides better debugging tools and error messages
-   - Simplified configuration makes maintaining tests easier
-
-3. **For Developers**
-   - You only need standard Chrome installed on your system
-   - No need to worry about driver versions or compatibility
-   - Tests run faster and are more reliable
-   - New helper methods simplify common testing patterns
-
-## CI/CD Integration
-
-Our GitHub Actions workflow uses `browser-actions/setup-chrome@v1` to ensure a consistent Chrome installation in the CI environment. This setup is compatible with Cuprite and provides reliable test execution in automated environments.
-
-```yaml
-# Example GitHub Actions configuration
-steps:
-  - uses: browser-actions/setup-chrome@v1
-  - name: Run system tests
-    run: bin/rails test:system
-```
-
-For Docker environments, we ensure the `no-sandbox` option is enabled:
-
-```yaml
-env:
-  DOCKER: true
-```
-
-## Troubleshooting
-
-### Common Issues and Solutions
-
-#### Browser Issues
-
-If you encounter browser-related issues:
-
-1. Ensure you have a stable version of Chrome installed (Cuprite is compatible with most versions)
-2. Set `inspector: true` in the Cuprite driver config to enable Chrome DevTools debugging
-3. Add the environment variable `DEBUG=true` for verbose Cuprite logging
-
-#### Test Flakiness
-
-For flaky tests (tests that inconsistently pass or fail):
-
-1. Use the `SystemTestHelpers#wait_for_animations` method to ensure animations complete
-2. Add explicit waits using Capybara's `have_content` or similar matchers
-3. Use the `safe_click` helper to ensure elements are scrolled into view before clicking
-
-#### Element Interaction Issues
-
-When encountering element interaction problems:
-
-1. Use `scroll_to_element` before interacting with elements that might be outside the viewport
-2. Use Capybara's built-in retry mechanism with finders
-3. Consider using `wait_for_animations` after actions that trigger CSS transitions
-
-#### JavaScript Errors
-
-Cuprite can capture and report JavaScript errors:
-
-```ruby
-# Check for JavaScript errors after an action
-page.driver.browser.evaluate('window.jsErrors')
-```
-
-### Debugging Tips
-
-1. **Check the Logs**: Cuprite captures JavaScript console output and exceptions
-2. **Use Screenshot Helpers**: Capture screenshots at critical points with `page.save_screenshot`
-3. **Use Inspector Mode**: Set `INSPECTOR=true` to enable Chrome DevTools Protocol inspector
-4. **Visual Debugging**: Set `HEADLESS=0` to watch the browser execute your tests
-5. **Slow Motion Testing**: Use `SLOWMO=0.5` to slow down operations for better visibility
-
-## Testing Special Features
-
-### Testing WebAuthn Authentication
-
-WebAuthn (Web Authentication) testing presents unique challenges because it interacts with hardware security keys or platform-specific APIs (like Touch ID, Face ID, or Windows Hello). Here's our approach for testing WebAuthn:
-
-#### Challenges with WebAuthn Testing
-
-1. **Browser API Limitations**: WebAuthn API calls require secure contexts and user gestures in real browsers
-2. **Hardware Dependencies**: Physical security keys and biometric authenticators aren't available in automated test environments
-3. **Browser Window Issues**: WebAuthn prompts can cause browser focus issues and teardown problems in tests
-
-#### Our WebAuthn Testing Strategy
-
-We use a focused approach that tests the core WebAuthn functionality without relying on complex browser interactions:
-
-1. **Use `webauthn-ruby` Fake Client**: We leverage the testing tools provided by the WebAuthn gem
-2. **Test Core Functionality**: Focus on credential creation, storage, and user status verification
-3. **Avoid Browser UI Testing**: Skip testing modal dialogs or platform-specific authentication prompts
-4. **Implement Robust Teardown**: Handle browser cleanup issues gracefully (see implementation below)
-
-#### Example WebAuthn Test Implementation
-
-See `test/system/webauthn_sign_in_test.rb` for an implementation example. Key features include:
-
-```ruby
-# Robust teardown handling to recover from WebAuthn-related browser issues
-def teardown
-  begin
-    super
-  rescue Selenium::WebDriver::Error::NoSuchWindowError,
-         Selenium::WebDriver::Error::InvalidArgumentError,
-         NoMethodError => e
-    puts "Rescued error during teardown: #{e.class} - #{e.message}"
-  end
-end
-
-# Use fixed origins for testing
-WebAuthn.configuration.origin = "https://example.com"
-fake_client = WebAuthn::FakeClient.new("https://example.com")
-
-# Focus on credential creation and verification
-credential_hash = fake_client.create(challenge: credential_options.challenge)
-credential = user.webauthn_credentials.create!(
-  external_id: credential_hash["id"],
-  public_key: "dummy_public_key_for_testing",
-  nickname: "Test Key",
-  sign_count: 0
-)
-
-# Verify the credential was saved correctly
-assert_not_nil credential.id
-assert user.reload.second_factor_enabled?
-```
-
-For more detailed information about WebAuthn implementation and testing, see [WebAuthn Guide](webauthn_guide.md).
+### CupriteTestBridge
+- `enhanced_sign_in(user)` - Cuprite-optimized authentication
+- `safe_interaction { ... }` - Error-resilient browser operations
+- `wait_for_page_load` - Wait for complete page loading
 
 ## Best Practices
 
-1. **Keep Tests Independent**: Each test should be able to run in isolation
-2. **Clean Up After Tests**: Reset the application state after each test
-3. **Use Page Objects**: Encapsulate page structure in reusable classes
-4. **Avoid Sleep Statements**: Use explicit waits instead of arbitrary sleeps
-5. **Test What Users Care About**: Focus on user-visible behavior rather than implementation details
-6. **Write Resilient Selectors**: Use data attributes instead of CSS classes that might change
-7. **Mock External Services**: Use WebMock or similar tools to avoid external dependencies
-8. **Use Factories**: Create test data consistently with FactoryBot. Note: Fixtures are being actively phased out in favor of factories, especially for system and integration tests. See the [Test Suite Fixing Guide](test_suite_fixing_guide.md) for details on this ongoing effort.
-9. **Handle Special Features Appropriately**: Use specialized approaches for WebAuthn and other platform-specific features. Create feature-specific helper modules (e.g., `PaperApplicationsTestHelper`) for complex scenarios to keep tests clean.
-10. **Leverage Mocha for Mocking/Stubbing**: Mocha is configured (`mocha/minitest`) and available for creating mock objects and stubbing methods in unit or integration tests, or within helpers (e.g., see `test/support/attachment_test_helper.rb` for mocking ActiveStorage). Use it judiciously to isolate components or simplify test setup where appropriate, complementing full-stack system tests.
+### Test Structure
+```ruby
+class MySystemTest < ApplicationSystemTestCase
+  def setup
+    # Minimal setup - let helpers handle browser configuration
+    @user = create(:user)
+  end
 
-## References
+  def test_feature_works
+    system_test_sign_in(@user)
+    
+    visit feature_path
+    wait_for_turbo
+    
+    # Use safe helpers for interactions
+    safe_fill_in('#input-field', with: 'test value')
+    safe_click('#submit-button')
+    
+    # Assert expected outcomes
+    assert_text 'Success message'
+    assert_current_path success_path
+  end
+end
+```
 
-- [Selenium Manager Documentation](https://www.selenium.dev/documentation/webdriver/drivers/selenium_manager/)
-- [Rails System Testing Guide](https://guides.rubyonrails.org/testing.html#system-testing)
-- [Capybara Documentation](https://github.com/teamcapybara/capybara)
-- [WebAuthn Testing Guide](https://github.com/cedarcode/webauthn-ruby/blob/master/README.md#testing)
-- [Test Suite Fixing Guide (Internal)](test_suite_fixing_guide.md) - Tracks ongoing efforts to refactor tests.
+### Performance Tips
+- Use `transaction` strategy (default) for faster tests
+- Disable animations (already configured)
+- Use stable selectors (IDs, data attributes)
+- Minimize database seeding in individual tests
+- Group related assertions to reduce page interactions
+
+### Debugging Tips
+- Start with minimal output, add verbosity only when needed
+- Use screenshots liberally during development
+- Test authentication separately from feature logic
+- Verify page state before making assertions
+- Use browser dev tools when running with `HEADLESS=false`
+
+By following this guide and using the provided helpers, you can create reliable, maintainable system tests that effectively validate your application's functionality while minimizing debugging overhead.

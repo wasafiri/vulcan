@@ -95,30 +95,24 @@
         </div>
       </fieldset>
 
-       <!-- Guardian Information Section -->
-       <section aria-labelledby="guardian-section-title" class="space-y-4 p-4 bg-gray-50 rounded">
-         <h2 id="guardian-section-title" class="text-lg font-medium text-gray-900">Guardian Information</h2>
-         
-         <div class="flex items-start">
-           <%= f.check_box :is_guardian,
-               class: "mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
-               "aria-describedby": "guardian-description" %>
-           <%= f.label :is_guardian, "I am applying on behalf of someone under 18",
-               class: "ml-2 block text-sm text-gray-700" %>
-         </div>
-         <p id="guardian-description" class="text-sm text-gray-600">Check this box if you are a parent or legal guardian applying on behalf of a minor</p>
-
-         <div class="guardian-fields" data-controller="guardian">
-           <%= f.label :guardian_relationship, "Relationship to Applicant",
-               class: "block text-sm font-medium text-gray-700" %>
-           <%= f.select :guardian_relationship,
-               options_for_select(["Parent", "Legal Guardian"]),
-               { include_blank: "Select Relationship" },
-               { class: "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500",
-                 "aria-describedby": "relationship-hint" } %>
-           <p id="relationship-hint" class="mt-1 text-sm text-gray-500">Select your relationship to the applicant if you are applying on behalf of a minor</p>
-         </div>
-       </section>
+        <!-- Applicant and Guardian Display -->
+        <section aria-labelledby="applicant-guardian-title" class="space-y-4 p-4 bg-gray-50 rounded">
+          <h2 id="applicant-guardian-title" class="text-lg font-medium text-gray-900">Application Details</h2>
+          <div>
+            <p class="text-sm text-gray-700">
+              <strong>This application is for:</strong> <%= @application.user.full_name %>
+            </p>
+            <% if @application.managing_guardian %>
+              <% guardian_relationship = GuardianRelationship.find_by(guardian: @application.managing_guardian, dependent: @application.user) %>
+              <p class="text-sm text-gray-700 mt-2">
+                <strong>Managed by:</strong> <%= @application.managing_guardian.full_name %>
+                <% if guardian_relationship %>
+                  (<%= guardian_relationship.relationship_type %>)
+                <% end %>
+              </p>
+            <% end %>
+          </div>
+        </section>
 
        <!-- Disability Section -->
        <section aria-labelledby="disability-section-title" class="space-y-4 p-4 bg-gray-50 rounded">
@@ -163,6 +157,30 @@
        <!-- Medical Provider Information -->
        <%= render "medical_provider_form", form: f %>
 
+       <!-- Alternate Contact Section (optional) -->
+       <section aria-labelledby="alternate-contact-section-title" class="space-y-4 p-4 bg-gray-50 rounded">
+         <h2 id="alternate-contact-section-title" class="text-lg font-medium text-gray-900">Alternate Contact (Optional)</h2>
+         <p class="text-sm text-gray-700">You may provide an alternate contact person who can be contacted regarding your application.</p>
+         
+         <div class="space-y-4">
+           <div>
+             <%= f.label :alternate_contact_name, "Name", class: "block text-sm font-medium text-gray-700" %>
+             <%= f.text_field :alternate_contact_name, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" %>
+           </div>
+           
+           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+             <div>
+               <%= f.label :alternate_contact_phone, "Phone", class: "block text-sm font-medium text-gray-700" %>
+               <%= f.telephone_field :alternate_contact_phone, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" %>
+             </div>
+             <div>
+               <%= f.label :alternate_contact_email, "Email", class: "block text-sm font-medium text-gray-700" %>
+               <%= f.email_field :alternate_contact_email, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" %>
+             </div>
+           </div>
+         </div>
+       </section>
+
        <!-- Document Upload Section -->
        <section aria-labelledby="documents-section-title" class="space-y-4 p-4 bg-gray-50 rounded">
          <h2 id="documents-section-title" class="text-lg font-medium text-gray-900">Required Documentation</h2>
@@ -172,7 +190,8 @@
              <%= f.label :residency_proof, "Proof of Residency",
                  class: "block text-sm font-medium text-gray-700" %>
              <p id="residency-hint" class="text-xs text-gray-500 mb-2">
-               Upload driver's license, state ID, or identification card
+               Upload one of the following acceptable documents: <strong>driver's license</strong>, <strong>state ID</strong>, 
+               <strong>identification card</strong>, <strong>utility bill</strong>, or <strong>patient photo ID</strong>
              </p>
              <%= f.file_field :residency_proof,
                  class: "block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100",

@@ -19,49 +19,13 @@ module Admin
     before_action :load_audit_logs_with_service, only: %i[show approve reject]
 
     def index
-      # Load index data using the reporting service
-      reporting_service = Applications::ReportingService.new
-      report_data = reporting_service.generate_index_data
+      load_dashboard_metrics
 
-      # Assign instance variables from the report data
-      report_data.each do |key, value|
-        instance_variable_set("@#{key}", value)
-      end
+      scoped = filtered_scope(base_scope)
+      @pagy, page_of_apps = paginate(scoped)
+      attachments_index   = preload_attachments(page_of_apps)
 
-      # Get base scope – avoid using with_attached_* which triggers eager loading
-      scope = Application.includes(:user)
-                         .distinct
-
-      # Apply base scope exclusion only if no specific status filter is applied
-      scope = scope.where.not(status: %i[rejected archived]) unless params[:status].present?
-
-      # Apply filters using the filter service
-      filter_service = Applications::FilterService.new(scope, params)
-      scope = filter_service.apply_filters
-
-      # Use pagy for pagination
-      @pagy, applications_relation = pagy(scope, items: 20)
-
-      # Fetch applications for the current page
-      applications = applications_relation.to_a
-      application_ids = applications.map(&:id)
-
-      # Preload attachment existence data for the current page's applications
-      attachments_exist_data = {}
-      if application_ids.present?
-        attachments_exist_data = ActiveStorage::Attachment
-                                 .where(record_type: 'Application', record_id: application_ids, name: %w[income_proof residency_proof
-                                                                                                         medical_certification])
-                                 .group(:record_id, :name)
-                                 .pluck(:record_id, :name)
-                                 .group_by(&:first)
-                                 .transform_values { |v| v.map(&:second).to_set }
-      end
-
-      # Apply decorator, passing preloaded attachment existence data
-      @applications = applications.map do |app|
-        ApplicationStorageDecorator.new(app, attachments_exist_data[app.id] || Set.new)
-      end
+      @applications = decorate_apps(page_of_apps, attachments_index)
     end
 
     def show
@@ -80,7 +44,15 @@ module Admin
       @certification_events = certification_service.certification_events
       @certification_requests = certification_service.request_events
       @max_training_sessions = Policy.get('max_training_sessions').to_i # Fetch policy limit, ensure integer
-      @completed_training_sessions_count = @application.training_sessions.completed_sessions.count # Count completed sessions
+
+      # Handle potential nil case for completed_sessions
+      @completed_training_sessions_count = if @application.respond_to?(:training_sessions) &&
+                                              @application.training_sessions.respond_to?(:completed_sessions) &&
+                                              @application.training_sessions.completed_sessions.present?
+                                             @application.training_sessions.completed_sessions.count
+                                           else
+                                             0 # Default to 0 if there are no completed sessions or the method doesn't exist
+                                           end
     end
 
     # Load only the associations that are actually needed for the show view
@@ -123,7 +95,7 @@ module Admin
     end
 
     def filter
-      @applications = Application.includes(:user).where(status: params[:status])
+      @applications = Application.includes(:user, :managing_guardian).where(status: params[:status])
     end
 
     def batch_approve
@@ -783,7 +755,10 @@ module Admin
         :medical_provider_name,
         :medical_provider_phone,
         :medical_provider_fax,
-        :medical_provider_email
+        :medical_provider_email,
+        :alternate_contact_name,
+        :alternate_contact_phone,
+        :alternate_contact_email
       )
     end
 
@@ -793,6 +768,119 @@ module Admin
 
     def set_current_attributes
       Current.set(request, current_user)
+    end
+    ### metrics --------------------------------------------------------------------
+
+    def load_dashboard_metrics
+      begin
+        # Direct approach - use the database counts as our primary source
+        @open_applications_count = Application.active.count
+        @pending_services_count = Application.where(status: :approved).count
+
+        # Load all other counts from the reporting service
+        service_result = Applications::ReportingService.new.generate_index_data
+
+        if service_result.is_a?(BaseService::Result) && service_result.success?
+          # Extract data based on result type
+          service_data = service_result.data || {}
+
+          # Assign instance variables for all other data we might want from the service
+          service_data.each_pair do |key, value|
+            next if %w[open_applications_count pending_services_count].include?(key.to_s)
+            next if key.to_s.strip.empty? || value.nil?
+
+            # Use our safe_assign method to avoid invalid variable names
+            instance_variable_set("@#{key}", value)
+          end
+        end
+      rescue StandardError => e
+        Rails.logger.error "Dashboard metric error: #{e.message}"
+        # No need to set flash alert since we already have the counts
+      end
+
+      # Ensure counts for Common Tasks section are also directly set
+      @proofs_needing_review_count = Application.where(income_proof_status: :not_reviewed)
+                                                .or(Application.where(residency_proof_status: :not_reviewed))
+                                                .distinct
+                                                .count
+
+      @medical_certs_to_review_count = Application.where.not(status: %i[rejected archived])
+                                                  .where(medical_certification_status: :received)
+                                                  .count
+
+      # Count training requests from both sources
+      @training_requests_count = Notification.where(action: 'training_requested')
+                                             .where(notifiable_type: 'Application')
+                                             .select(:notifiable_id)
+                                             .distinct
+                                             .count
+
+      return unless @training_requests_count.zero?
+
+      @training_requests_count = Application.joins(:training_sessions)
+                                            .where(training_sessions: { status: %i[requested scheduled confirmed] })
+                                            .distinct
+                                            .count
+    end
+    ### scope / filtering ----------------------------------------------------------
+
+    def base_scope
+      Application
+        .includes(:user, :managing_guardian)
+        .distinct
+        .then { |rel| params[:status].present? ? rel : rel.where.not(status: %i[rejected archived]) }
+    end
+
+    def filtered_scope(scope)
+      result = Applications::FilterService.new(scope, params).apply_filters
+      if result.is_a?(BaseService::Result)
+        result.success? ? result.data : scope
+      else
+        result
+      end
+    rescue StandardError => e
+      Rails.logger.error "Filter error: #{e.message}"
+      flash.now[:alert] = 'Filter error – showing unfiltered results.'
+      scope
+    end
+
+    ### pagination -----------------------------------------------------------------
+
+    def paginate(scope)
+      pagy(scope, items: 20)
+    rescue StandardError => e
+      Rails.logger.error "Pagination failed: #{e.message}"
+      [Pagy.new(count: scope.count, page: 1), scope.limit(20)]
+    end
+
+    ### attachments ----------------------------------------------------------------
+
+    def preload_attachments(apps)
+      ids = apps.map(&:id)
+      return {} if ids.empty?
+
+      begin
+        ActiveStorage::Attachment
+          .where(record_type: 'Application', record_id: ids, name: WANTED_ATTACHMENT_NAMES)
+          .group(:record_id, :name)
+          .pluck(:record_id, :name)
+          .group_by(&:first)
+          .transform_values { |rows| rows.map(&:second).to_set }
+      rescue StandardError => e
+        # If the query fails, log the error and return an empty hash
+        Rails.logger.error "Error preloading attachments: #{e.message}"
+        {}
+      end
+    end
+
+    ### decoration -----------------------------------------------------------------
+
+    WANTED_ATTACHMENT_NAMES = %w[income_proof residency_proof medical_certification].freeze
+
+    def decorate_apps(apps, attachment_index)
+      apps.map do |app|
+        ApplicationStorageDecorator.new(app, attachment_index[app.id] || Set.new)
+      end
     end
   end
 end

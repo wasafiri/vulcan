@@ -305,7 +305,7 @@ module ProofManageable
   def validate_approved_proof(proof:, status_check_method:, error_field:, label:)
     return unless send(status_check_method) && !proof.attached?
 
-    Rails.logger.error("#{label} marked as approved but no file is attached for application #{id}")
+    Rails.logger.debug { "#{label} marked as approved but no file is attached for application #{id}" }
     errors.add(error_field, 'must be attached when status is approved')
   end
 

@@ -30,6 +30,37 @@
       </div>
     </div>
 
+    <!-- Applicant and Managing Guardian Details Section -->
+    <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="applicant-guardian-details-title">
+      <h2 id="applicant-guardian-details-title" class="text-xl font-semibold text-gray-900 mb-4">Applicant and Managing Guardian Details</h2>
+      <dl class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Applicant</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <% if @application.user.present? %>
+              <%= link_to @application.user.full_name, admin_user_path(@application.user), class: "text-indigo-600 hover:text-indigo-500" %>
+              <span class="text-gray-500">(ID: <%= @application.user.id %>)</span>
+            <% else %>
+              Unknown Applicant
+            <% end %>
+          </dd>
+        </div>
+        <% if @application.managing_guardian.present? %>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Managed By</dt>
+            <dd class="mt-1 text-sm text-gray-900">
+              <%= link_to @application.managing_guardian.full_name, admin_user_path(@application.managing_guardian), class: "text-indigo-600 hover:text-indigo-500" %>
+              <span class="text-gray-500">(ID: <%= @application.managing_guardian.id %>)</span>
+              <% guardian_relationship = GuardianRelationship.find_by(guardian_id: @application.managing_guardian.id, dependent_id: @application.user.id) %>
+              <% if guardian_relationship %>
+                <span class="text-gray-500 text-xs">(<%= guardian_relationship.relationship_type %>)</span>
+              <% end %>
+            </dd>
+          </div>
+        <% end %>
+      </dl>
+    </section>
+
     <!-- Applicant Information Section -->
     <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="applicant-info-title">
       <h2 id="applicant-info-title" class="text-xl font-semibold text-gray-900 mb-4">Applicant Information</h2>
@@ -121,6 +152,35 @@
           <dd class="mt-1 text-sm text-gray-900"><%= @application.income_details.presence || "No additional details provided" %></dd>
         </div>
       </dl>
+    </section>
+
+    <!-- Alternate Contact Information Section -->
+    <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="alternate-contact-info-title">
+      <h2 id="alternate-contact-info-title" class="text-xl font-semibold text-gray-900 mb-4">Alternate Contact Information</h2>
+      <% if @application.alternate_contact_name.present? || @application.alternate_contact_phone.present? || @application.alternate_contact_email.present? %>
+        <dl class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <% if @application.alternate_contact_name.present? %>
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Name</dt>
+              <dd class="mt-1 text-sm text-gray-900"><%= @application.alternate_contact_name %></dd>
+            </div>
+          <% end %>
+          <% if @application.alternate_contact_phone.present? %>
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Phone</dt>
+              <dd class="mt-1 text-sm text-gray-900"><%= @application.alternate_contact_phone %></dd>
+            </div>
+          <% end %>
+          <% if @application.alternate_contact_email.present? %>
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Email</dt>
+              <dd class="mt-1 text-sm text-gray-900"><%= mail_to @application.alternate_contact_email, class: "text-indigo-600 hover:text-indigo-500" %></dd>
+            </div>
+          <% end %>
+        </dl>
+      <% else %>
+        <p class="text-sm text-gray-500">No alternate contact information provided.</p>
+      <% end %>
     </section>
 
     <!-- Medical Certification Section -->

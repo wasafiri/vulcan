@@ -1,0 +1,16 @@
+# Guardian Relationship Fixtures
+
+john_parent_of_rex:
+  guardian_id: <%= ActiveRecord::FixtureSet.identify(:constituent_john) %>
+  dependent_id: <%= ActiveRecord::FixtureSet.identify(:constituent_rex) %>
+  relationship_type: Parent
+
+alex_guardian_of_mark:
+  guardian_id: <%= ActiveRecord::FixtureSet.identify(:constituent_alex) %>
+  dependent_id: <%= ActiveRecord::FixtureSet.identify(:constituent_mark) %>
+  relationship_type: Legal Guardian
+
+jane_parent_of_wilbur:
+  guardian_id: <%= ActiveRecord::FixtureSet.identify(:constituent_jane) %>
+  dependent_id: <%= ActiveRecord::FixtureSet.identify(:constituent_wilbur) %>
+  relationship_type: Parent

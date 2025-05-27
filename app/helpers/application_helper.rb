@@ -105,6 +105,8 @@ module ApplicationHelper
     end
   end
 
+
+
   private
 
   # Fetches the latest proof review and submission audit for a given proof type

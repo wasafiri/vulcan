@@ -8,11 +8,11 @@ module Admin
     include ActiveJob::TestHelper
 
     setup do
-      @admin = users(:admin_david)
-      @application = applications(:submitted_proofs_pending_application)
+      @admin = create(:admin)
+      @application = create(:application, :submitted_proofs_pending)
 
       # Create and attach test proofs
-      fixture_dir = Rails.root.join('test', 'fixtures', 'files')
+      fixture_dir = Rails.root.join('test/fixtures/files')
       FileUtils.mkdir_p(fixture_dir)
 
       # Create test files if they don't exist

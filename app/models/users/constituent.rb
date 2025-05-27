@@ -20,25 +20,9 @@ module Users
 
     DISABILITY_TYPES = %w[hearing vision speech mobility cognition].freeze
 
-    # Define boolean attributes with defaults
-    attribute :is_guardian, :boolean, default: false
-    attribute :guardian_relationship, :string
-
     # Define disability attributes with defaults
     DISABILITY_TYPES.each do |type|
       attribute :"#{type}_disability", :boolean, default: false
-    end
-
-    validates :guardian_relationship, presence: true, if: :is_guardian
-
-    # Cast boolean values properly
-    def is_guardian=(value)
-      super(ActiveModel::Type::Boolean.new.cast(value))
-    end
-
-    # Make guardian_relationship= public for Constituent
-    def guardian_relationship=(value)
-      write_attribute(:guardian_relationship, value)
     end
 
     DISABILITY_TYPES.each do |type|

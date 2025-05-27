@@ -73,12 +73,16 @@ class RegistrationsMailerTest < ActiveSupport::TestCase
       EmailTemplate.create!(
         name: 'application_notifications_registration_confirmation',
         format: :text,
+        # Ensure required variables are present for EmailTemplate validation
         body: "Subject: Welcome to the Maryland Accessible Telecommunications Program\n\n" \
               "%<header_text>s\n\n" \
-              "Dear %<user_first_name>s,\n\n" \
+              "Dear %<user_first_name>s (%<user_full_name>s),\n\n" \
               "Welcome to the program.\n\n" \
+              "Access your dashboard here: %<dashboard_url>s\n\n" \
               '%<footer_text>s',
-        subject: 'Welcome to the Maryland Accessible Telecommunications Program'
+        subject: 'Welcome to the Maryland Accessible Telecommunications Program',
+        # Add description to satisfy validation
+        description: 'Email sent to constituents upon successful registration.'
       )
     end
 
@@ -87,7 +91,8 @@ class RegistrationsMailerTest < ActiveSupport::TestCase
         name: 'email_header_text',
         format: :text,
         body: "=== %<title>s ===\n\n",
-        subject: 'Header Template'
+        subject: 'Header Template',
+        description: 'Standard email header partial.'
       )
     end
 
@@ -97,7 +102,8 @@ class RegistrationsMailerTest < ActiveSupport::TestCase
       name: 'email_footer_text',
       format: :text,
       body: "\n\nThank you,\nThe MAT Team\nContact: %<contact_email>s",
-      subject: 'Footer Template'
+      subject: 'Footer Template',
+      description: 'Standard email footer partial.'
     )
   end
 end
