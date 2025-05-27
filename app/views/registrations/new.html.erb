@@ -93,6 +93,29 @@
               <p id="phone-error" role="alert" class="mt-1 text-sm text-red-600"><%= @user.errors[:phone].join(", ") %></p>
             <% end %>
           </div>
+          <div class="mb-4">
+            <%= form.label :phone_type, "Phone Type", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <div role="radiogroup" aria-labelledby="phone-type-legend" class="space-y-2">
+              <div class="flex items-center">
+                <%= form.radio_button :phone_type, "voice", id: "phone_type_voice", checked: true,
+                       class: "h-4 w-4 focus:ring-indigo-500" %>
+                <%= form.label :phone_type_voice, "Voice", for: "phone_type_voice", class: "ml-3 text-sm text-gray-700" %>
+              </div>
+                          <div class="flex items-center">
+              <%= form.radio_button :phone_type, "videophone", id: "phone_type_videophone",
+                     class: "h-4 w-4 focus:ring-indigo-500" %>
+              <%= form.label :phone_type_videophone, "Videophone", for: "phone_type_videophone", class: "ml-3 text-sm text-gray-700" %>
+            </div>
+            <div class="flex items-center">
+              <%= form.radio_button :phone_type, "text", id: "phone_type_text",
+                     class: "h-4 w-4 focus:ring-indigo-500" %>
+              <%= form.label :phone_type_text, "Text/SMS", for: "phone_type_text", class: "ml-3 text-sm text-gray-700" %>
+            </div>
+            </div>
+            <% if @user.errors[:phone_type].any? %>
+              <p id="phone-type-error" role="alert" class="mt-1 text-sm text-red-600"><%= @user.errors[:phone_type].join(", ") %></p>
+            <% end %>
+          </div>
         </fieldset>
 
         <!-- Security Fields -->
@@ -242,7 +265,7 @@
                       ['Vermont', 'VT'], ['Virginia', 'VA'], ['Washington', 'WA'], ['West Virginia', 'WV'],
                       ['Wisconsin', 'WI'], ['Wyoming', 'WY'], ['District of Columbia', 'DC']
                     ],
-                    { include_blank: 'Select State' },
+                    { selected: @user.state || 'MD' },
                     { id: "state", disabled: true,
                       class: "block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm" } %>
               </div>

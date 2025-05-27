@@ -220,8 +220,26 @@ module ConstituentPortal
     # PATCH/PUT /constituent_portal/dependents/:id
     def update
       # @dependent is set by before_action
+      # Check if dependent is using guardian's contact info and skip uniqueness validation if so
+      params_to_update = dependent_user_params
+      
+      # Skip uniqueness validation if:
+      # 1. Email matches guardian's email (current or new)
+      # 2. Phone matches guardian's phone (current or new)  
+      # 3. Dependent currently shares guardian's contact info (existing dependent)
+      should_skip_validation = (
+        params_to_update[:email] == current_user.email ||
+        params_to_update[:phone] == current_user.phone ||
+        @dependent.email == current_user.email ||
+        @dependent.phone == current_user.phone
+      )
+      
+      if should_skip_validation
+        @dependent.skip_contact_uniqueness_validation = true
+      end
+      
       # Similar to create, handle updates to dependent_user and potentially guardian_relationship
-      if @dependent.update(dependent_user_params) # And update relationship if editable
+      if @dependent.update(params_to_update) # And update relationship if editable
         # For consistency with application updates, check if we're coming from an application update
         # which would have the application_id parameter
         if params[:application_id].present?
@@ -234,6 +252,10 @@ module ConstituentPortal
 
         redirect_to constituent_portal_dashboard_path, notice: 'Dependent was successfully updated.'
       else
+        # Set @dependent_user for the edit template when there are errors
+        @dependent_user = @dependent
+        @guardian_relationship = @dependent.guardian_relationships_as_dependent.find_by(guardian_user: current_user)
+        @recent_changes = get_recent_profile_changes(@dependent)
         render :edit, status: :unprocessable_entity
       end
     end
@@ -267,14 +289,14 @@ module ConstituentPortal
       redirect_to constituent_portal_dashboard_path, alert: 'Dependent not found.' unless @dependent
     end
 
-    def dependent_user_params
-      # Define strong parameters for the dependent User
-      # Ensure to permit all necessary fields for creating a User (e.g., email, name, dob)
-      # Handle password creation strategy for dependents (e.g., generate random, or no login)
-      params.require(:dependent).permit(:first_name, :last_name, :email, :phone, :date_of_birth,
-                                        :hearing_disability, :vision_disability,
-                                        :speech_disability, :mobility_disability, :cognition_disability)
-    end
+      def dependent_user_params
+    # Define strong parameters for the dependent User
+    # Ensure to permit all necessary fields for creating a User (e.g., email, name, dob)
+    # Handle password creation strategy for dependents (e.g., generate random, or no login)
+    params.require(:dependent).permit(:first_name, :last_name, :email, :phone, :phone_type, :date_of_birth,
+                                      :hearing_disability, :vision_disability,
+                                      :speech_disability, :mobility_disability, :cognition_disability)
+  end
 
     def guardian_relationship_params
       params.require(:guardian_relationship).permit(:relationship_type)

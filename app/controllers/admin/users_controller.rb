@@ -140,7 +140,9 @@ module Admin
       end
     end
 
-    def edit; end
+    def edit
+      @user = User.find(params[:id])
+    end
 
     # Create action for creating a new guardian from the paper application form
     def create
@@ -365,7 +367,15 @@ module Admin
       }, status: :unprocessable_entity
     end
 
-    def update; end
+    def update
+      @user = User.find(params[:id])
+      
+      if @user.update(admin_user_params)
+        redirect_to admin_user_path(@user), notice: 'User was successfully updated.'
+      else
+        render :edit, status: :unprocessable_entity
+      end
+    end
 
     def constituents
       @q = params[:q]
@@ -397,6 +407,15 @@ module Admin
       params.expect(user: [:type, { capabilities: [] }])
     end
 
+    # Parameters for admin user edit form
+    def admin_user_params
+      params.require(:user).permit(
+        :first_name, :last_name, :email, :phone, :phone_type,
+        :physical_address_1, :physical_address_2, :city, :state, :zip_code,
+        :communication_preference
+      )
+    end
+
     # Handles updating capabilities for a user
     # Used by update_role to ensure capabilities are maintained when changing user types
     def update_user_capabilities(user, capabilities)
@@ -418,7 +437,7 @@ module Admin
       # When called from the paper application form, parameters come directly (unwrapped)
       if params.key?(:user)
         params.expect(
-          user: %i[first_name last_name email phone
+          user: %i[first_name last_name email phone phone_type
                    physical_address_1 physical_address_2
                    city state zip_code date_of_birth
                    communication_preference locale]
@@ -426,7 +445,7 @@ module Admin
       else
         # Handle direct params from paper application form's guardian_attributes
         params.permit(
-          :first_name, :last_name, :email, :phone,
+          :first_name, :last_name, :email, :phone, :phone_type,
           :physical_address_1, :physical_address_2,
           :city, :state, :zip_code, :date_of_birth,
           :communication_preference, :locale

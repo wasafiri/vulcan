@@ -3,7 +3,7 @@
 This document outlines steps to encrypt sensitive database columns using Rails ActiveRecord Encryption to protect PII.
 
 ## Columns to Encrypt
-Per docs/security_controls.yaml (DATA-001), we need to encrypt:
+Per docs/security/controls.yaml (DATA-001), we need to encrypt:
 - `users.password_digest`
 - `users.ssn_last4`
 - `users.email`

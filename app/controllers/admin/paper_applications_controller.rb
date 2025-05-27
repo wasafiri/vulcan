@@ -5,7 +5,7 @@ module Admin
     before_action :cast_boolean_params, only: %i[create update]
 
     USER_BASE_FIELDS = %i[
-      first_name last_name email phone
+      first_name last_name email phone phone_type
       physical_address_1 physical_address_2 city state zip_code
       communication_preference
     ].freeze

@@ -40,7 +40,16 @@
         </div>
         <div>
           <dt class="text-sm font-medium text-gray-500">Phone</dt>
-          <dd class="mt-1 text-sm text-gray-900"><%= @user.phone || "Not provided" %></dd>
+          <dd class="mt-1 text-sm text-gray-900">
+            <% if @user.phone.present? %>
+              <%= @user.phone %>
+              <% if @user.phone_type.present? %>
+                (<%= @user.phone_type %>)
+              <% end %>
+            <% else %>
+              Not provided
+            <% end %>
+          </dd>
         </div>
         <div>
           <dt class="text-sm font-medium text-gray-500">Date of Birth</dt>
@@ -133,7 +142,16 @@
                     <div class="mt-2">
                       <p class="text-xs text-gray-500">Contact:</p>
                       <p class="text-sm text-gray-700">Email: <%= mail_to guardian.email, guardian.email, class: "text-indigo-600 hover:text-indigo-500" %></p>
-                      <p class="text-sm text-gray-700">Phone: <%= guardian.phone || "Not provided" %></p>
+                      <p class="text-sm text-gray-700">Phone: 
+                        <% if guardian.phone.present? %>
+                          <%= guardian.phone %>
+                          <% if guardian.phone_type.present? %>
+                            (<%= guardian.phone_type %>)
+                          <% end %>
+                        <% else %>
+                          Not provided
+                        <% end %>
+                      </p>
                     </div>
                   </div>
                 </li>

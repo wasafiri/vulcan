@@ -119,7 +119,7 @@ class RegistrationsController < ApplicationController
     params.require(:user).permit(
       :email, :password, :password_confirmation,
       :first_name, :last_name, :middle_initial,
-      :date_of_birth, :phone, :timezone, :locale,
+      :date_of_birth, :phone, :phone_type, :timezone, :locale,
       :hearing_disability, :vision_disability,
       :speech_disability, :mobility_disability, :cognition_disability,
       :communication_preference,

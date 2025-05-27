@@ -117,6 +117,9 @@ class User < ApplicationRecord
   # Communication preference enum
   enum :communication_preference, { email: 0, letter: 1 }, default: :email
 
+  # Phone type enum
+  enum :phone_type, { voice: 'voice', videophone: 'videophone', text: 'text' }, default: :voice
+
   # Class methods for capabilities
   def self.capable_types_for(capability)
     case capability

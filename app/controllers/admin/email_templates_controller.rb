@@ -35,6 +35,18 @@ module Admin
     def show
       # @email_template is set by before_action
       # @template_definition is set by before_action
+      
+      # Log the email template view for audit purposes
+      Event.create!(
+        user: current_user,
+        action: 'email_template_viewed',
+        metadata: {
+          email_template_id: @email_template.id,
+          email_template_name: @email_template.name,
+          email_template_format: @email_template.format,
+          timestamp: Time.current.iso8601
+        }
+      )
     end
 
     # GET /admin/email_templates/:id/new_test_email
@@ -66,7 +78,34 @@ module Admin
     def update
       # @email_template is set by before_action
       # @template_definition is set by before_action
+      
+      # Store original values for audit logging
+      original_subject = @email_template.subject
+      original_body = @email_template.body
+      
       if @email_template.update(email_template_params.merge(updated_by: current_user))
+        # Log the email template update for audit purposes
+        Event.create!(
+          user: current_user,
+          action: 'email_template_updated',
+          metadata: {
+            email_template_id: @email_template.id,
+            email_template_name: @email_template.name,
+            email_template_format: @email_template.format,
+            changes: {
+              subject: {
+                from: original_subject,
+                to: @email_template.subject
+              },
+              body: {
+                from: original_body,
+                to: @email_template.body
+              }
+            }.select { |_key, change| change[:from] != change[:to] }, # Only include actual changes
+            timestamp: Time.current.iso8601
+          }
+        )
+        
         redirect_to admin_email_template_path(@email_template), notice: 'Email template was successfully updated.'
       else
         flash.now[:alert] = "Failed to update template: #{@email_template.errors.full_messages.join(', ')}"
@@ -95,6 +134,19 @@ module Admin
           body: rendered_body,
           format: @email_template.format
         ).test_email.deliver_later
+
+        # Log the test email send for audit purposes
+        Event.create!(
+          user: current_user,
+          action: 'email_template_test_sent',
+          metadata: {
+            email_template_id: @email_template.id,
+            email_template_name: @email_template.name,
+            email_template_format: @email_template.format,
+            recipient_email: @test_email_form.email,
+            timestamp: Time.current.iso8601
+          }
+        )
 
         redirect_to admin_email_template_path(@email_template),
                     notice: "Test email sent successfully to #{@test_email_form.email}."

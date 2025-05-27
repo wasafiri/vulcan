@@ -53,7 +53,14 @@
                 <div>
                   <dt class="text-sm font-medium text-gray-500">Phone</dt>
                   <dd class="mt-1 text-sm text-gray-900">
-                    <%= @dependent.phone.present? ? @dependent.phone : "Not provided" %>
+                    <% if @dependent.phone.present? %>
+                      <%= @dependent.phone %>
+                      <% if @dependent.phone_type.present? %>
+                        (<%= @dependent.phone_type %>)
+                      <% end %>
+                    <% else %>
+                      Not provided
+                    <% end %>
                   </dd>
                 </div>
               </dl>

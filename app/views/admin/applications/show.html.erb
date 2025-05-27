@@ -85,7 +85,16 @@
         </div>
         <div>
           <dt class="text-sm font-medium text-gray-500">Phone</dt>
-          <dd class="mt-1 text-sm text-gray-900"><%= @application.user&.phone || "Not provided" %></dd>
+          <dd class="mt-1 text-sm text-gray-900">
+            <% if @application.user&.phone.present? %>
+              <%= @application.user.phone %>
+              <% if @application.user.phone_type.present? %>
+                (<%= @application.user.phone_type %>)
+              <% end %>
+            <% else %>
+              Not provided
+            <% end %>
+          </dd>
         </div>
         <div>
           <dt class="text-sm font-medium text-gray-500">Address</dt>

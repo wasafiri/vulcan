@@ -156,6 +156,33 @@ Fixed Postmark InboundEmailsController test issues:
 - Added authentication strategies with both password and webhook token support
 - Properly handled the RawEmail parameter as expected by Postmark
 
+## Recent Fixes (May 8, 2025)
+
+### 8. Fixing Controller Tests Related to Email
+
+We've fixed several controller-related test issues:
+
+#### Admin::DashboardController
+
+- Fixed the incorrect helper method placement that was causing scope-related errors
+- Enhanced the training_requests filter to correctly find applications regardless of status 
+- Added debug output to help diagnose future issues
+- Properly organized helper methods into the private section of the controller class
+- This ensured the dashboard counts service worked correctly without relying on fixture data
+
+#### ConstituentPortal::ApplicationsController
+
+- Added unique email generation for each test to avoid email uniqueness validation errors
+- Fixed test_should_update_draft_application to include required disability selection fields
+- Updated test to verify that user disability attributes are correctly updated
+- This addressed the underlying validation requirements in the application without changing production behavior
+
+### 9. Job and Mailer Method Signatures
+
+- Fixed MedicalCertificationEmailJob and MedicalProviderMailer parameter handling
+- Updated method parameter lists to match expected argument formats
+- Ensured proper ActiveJob parameter serialization
+
 ## Future Considerations
 
 1. **Template Testing**: Consider adding direct tests for the `EmailTemplate` model itself
@@ -163,3 +190,4 @@ Fixed Postmark InboundEmailsController test issues:
 3. **Test Isolation**: Ensure better isolation between tests to avoid state leakage
 4. **Factory Improvements**: Update factories for users with letter preferences to include all required fields by default
 5. **Webhooks and Inbound Email Testing**: Explore better strategies for testing inbound email processing that don't rely on complex HTTP stubbing
+6. **Application Feature Test Coverage**: Add feature tests that verify end-to-end email functionality from user actions

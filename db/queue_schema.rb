@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_05_21_000100) do
+ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -632,6 +632,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_21_000100) do
     t.boolean "force_password_change", default: false, null: false
     t.string "website_url"
     t.string "webauthn_id"
+    t.string "phone_type", default: "voice"
     t.index ["business_name"], name: "index_users_on_business_name"
     t.index ["business_tax_id"], name: "index_users_on_business_tax_id"
     t.index ["email"], name: "index_users_on_email"
@@ -639,6 +640,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_21_000100) do
     t.index ["income_verified_by_id"], name: "index_users_on_income_verified_by_id"
     t.index ["medical_provider_id"], name: "index_users_on_medical_provider_id"
     t.index ["phone"], name: "index_users_on_phone", where: "(phone IS NOT NULL)"
+    t.index ["phone_type"], name: "index_users_on_phone_type"
     t.index ["recipient_id"], name: "index_users_on_recipient_id"
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
     t.index ["type"], name: "index_users_on_type"

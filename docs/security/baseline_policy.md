@@ -8,7 +8,7 @@
 
 ## Overview
 
-This document outlines **all external compliance obligations** (Maryland DoIT directives & minimum standards) **and our internal security controls**.  It supersedes prior versions of `security_baseline_policy.md`.
+This document outlines **all external compliance obligations** (Maryland DoIT directives & minimum standards) **and our internal security controls**.  It supersedes prior versions of this policy document.
 
 It applies to:
 
@@ -28,7 +28,7 @@ Tick **every** box before requesting an Authorization-to-Operate (ATO) or major 
 | ✅     | MFA for **all external users** *and* every remote admin session.                            | **IT Security Manual IA-2**, **External User Auth G21-1**, **State Min Cyber Standards PR.AC-1** |
 | ⬜︎     | Maintain complete asset & software inventory; map all data flows.                           | **State Min Cyber Standards ID.AM-1/2**, **CSF Guidebook ID.AM**                                 |
 | ⬜︎     | Encrypt data *in transit* (TLS 1.2+) & *at rest* (AES-256 / Rails ActiveRecord Encryption) — attribute encryption pending. | **IT Security Manual SC-13**, **CSF Guidebook PR.DS-2**                                          |
-| ⬜︎     | Annual independent penetration test + quarterly vulnerability scans. Vendor for independent penetration test, and script for quarterly vulnerability scans needed.                        | **IT Security Manual CA-2.1 & RA-5**, **CSF Guidebook DE.CM-8**                                  |
+| ⬜︎     | Annual independent penetration test + quarterly vulnerability scans. Vendor for independent penetration test, and scripts for quarterly vulnerability scans needed. Specific tools are documented in `docs/security/controls.yaml`. | **IT Security Manual CA-2.1 & RA-5**, **CSF Guidebook DE.CM-8**                                  |
 | ✅     | Centralised logs retained ≥ 1 year; alert on auth failure spikes & privilege misuse.        | **State Min Cyber Standards DE.AE-1/2**, **CSF Guidebook DE controls**                           |
 | ⬜︎     | Submit Statement of Compliance & full ATO package to OSM before launch.                     | **IT Security Manual CA-1/2**, **State Min Cyber Standards Appendix A**                          |
 
@@ -86,24 +86,26 @@ Key outputs:
 
 ### Default security config
 
+Mat Vulcan leverages Rails 8+ defaults for many security configurations. Explicit configurations are noted below.
+
 ```ruby
-config.force_ssl = true                       # HTTPS + HSTS
-config.action_dispatch.cookies_same_site_protection = :lax
-config.action_dispatch.default_headers = {
-  'X-Frame-Options' => 'SAMEORIGIN',
-  'X-XSS-Protection' => '1; mode=block',
-  'X-Content-Type-Options' => 'nosniff',
-  'Referrer-Policy' => 'strict-origin-when-cross-origin'
-}
-config.filter_parameters += %i[password password_confirmation ssn medical_provider_email]
-config.active_record.encryption.add_to_filter_parameters = true
+config.force_ssl = true                       # HTTPS + HSTS (explicitly set in config/environments/production.rb)
+# config.action_dispatch.cookies_same_site_protection = :lax # Rails 8 default
+# config.action_dispatch.default_headers = { # Rails 8 default
+#   'X-Frame-Options' => 'SAMEORIGIN',
+#   'X-XSS-Protection' => '1; mode=block',
+#   'X-Content-Type-Options' => 'nosniff',
+#   'Referrer-Policy' => 'strict-origin-when-cross-origin'
+# }
+# config.filter_parameters += %i[password password_confirmation ssn medical_provider_email] # Rails 8 default; sensitive parameters filtered via config/initializers/filter_parameter_logging.rb
+# config.active_record.encryption.add_to_filter_parameters = true # Rails 8 default
 ```
 
 ---
 
 ## Machine-Readable Controls
 
-Controls live in `docs/security_controls.yaml` and are linted in CI (**`scripts/lint_security_yaml.rb`**).  Each control tracks status, evidence, DoIT/NIST mapping, and test coverage.
+Controls live in `docs/security/controls.yaml` and are linted in CI (**`scripts/lint_security_yaml.rb`**).  Each control tracks status, evidence, DoIT/NIST mapping, and test coverage.
 
 ### CI Integration
 
@@ -125,9 +127,7 @@ SAST (Brakeman) and dependency scans (`bundler-audit`, Dependabot) run on every 
 
 | File                                 | Purpose                      | DoIT alignment | Status                  |
 | ------------------------------------ | ---------------------------- | -------------- | ----------------------- |
-| `config/initializers/security.rb`    | Global hardening tweaks      | SC-13 / IA-7   | ✅                       |
 | `content_security_policy.rb`         | CSP header                   | SC-13          | ⚠️ review nonce rollout |
-| `permissions_policy.rb`              | Browser feature restrictions | SC-13          | ✅                       |
 | `two_factor_auth.rb` / `webauthn.rb` | MFA config                   | IA-2 / G21-1   | ✅                       |
 | `credentials.yml.enc`                | Secrets store                | SC-13 / IA-7   | ✅                       |
 
@@ -163,7 +163,7 @@ SAST (Brakeman) and dependency scans (`bundler-audit`, Dependabot) run on every 
 #### DATA-001 — Encryption *(Critical)*
 
 * **DoIT refs:** SC-13, PR.DS-2
-* **Status:** Partial — TLS 1.2+ enforced; AES-256 at rest encryption via ActiveRecord `encrypts` pending for sensitive columns (see `security_controls.yaml`).
+* **Status:** Partial — TLS 1.2+ enforced; AES-256 at rest encryption via ActiveRecord `encrypts` pending for sensitive columns (see `controls.yaml`).
 
 #### DATA-002 — Input Validation & Filtering *(High)*
 
@@ -212,7 +212,7 @@ SAST (Brakeman) and dependency scans (`bundler-audit`, Dependabot) run on every 
 #### TEST-001 — Security Testing & Assessment *(Critical)*
 
 * **DoIT refs:** CA-2.1, RA-5, SI-2
-* **Status:** SAST & dep-scans in CI; annual pen-test **scheduled Q3-2025**; patch SLO ≤ 30 days.
+* **Status:** SAST & dependency scans are integrated into CI. An annual third-party penetration test is **scheduled for Q3-2025**. Patching of critical vulnerabilities adheres to an SLO of ≤ 30 days.
 
 ### Error Handling
 
@@ -270,7 +270,7 @@ SAST (Brakeman) and dependency scans (`bundler-audit`, Dependabot) run on every 
 
 ## Next Steps
 
-1. Update `security_controls.yaml` with new TEST-001 & CONFIG status.
+1. Update `controls.yaml` with new TEST-001 & CONFIG status.
 2. Complete Argon2id spike (due 2025-06-30).
 3. Auto-generate checklist section from YAML to avoid drift.
 

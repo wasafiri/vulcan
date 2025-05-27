@@ -8,6 +8,7 @@ FactoryBot.define do
       first_name { 'Test' }
       last_name { 'User' }
       phone { nil } # Don't generate a default phone, tests should supply if needed
+      phone_type { 'voice' } # Default phone type
       date_of_birth { 30.years.ago }
       timezone { 'Eastern Time (US & Canada)' }
       locale { 'en' }
@@ -154,6 +155,35 @@ FactoryBot.define do
           state { 'MD' }
           zip_code { '20901' }
           phone { '111-222-3333' }
+          phone_type { 'voice' }
+        end
+
+        # Phone type traits
+        trait :voice_phone do
+          phone_type { 'voice' }
+        end
+
+        trait :videophone do
+          phone_type { 'videophone' }
+        end
+
+        trait :text_phone do
+          phone_type { 'text' }
+        end
+
+        trait :with_voice_phone do
+          phone { '301-555-0001' }
+          phone_type { 'voice' }
+        end
+
+        trait :with_videophone do
+          phone { '301-555-0002' }
+          phone_type { 'videophone' }
+        end
+
+        trait :with_text_phone do
+          phone { '301-555-0003' }
+          phone_type { 'text' }
         end
 
         # Trait for a user who is a guardian
@@ -174,6 +204,7 @@ FactoryBot.define do
     type { 'Users::Vendor' }
     business_name { "Vendor Business #{rand(1000)}" }
     phone { "555-#{rand(100..999)}-#{rand(1000..9999)}" }
+    phone_type { 'voice' }
     business_tax_id { "ABCDEF#{rand(100_000..999_999)}" }
     terms_accepted_at { Time.current }
     status { :approved } # Default to an approved vendor

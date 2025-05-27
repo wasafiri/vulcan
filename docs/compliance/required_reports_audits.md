@@ -14,7 +14,7 @@ All Mat Vulcan environments and third-party services must adhere to a defined sc
 ## Quarterly Tasks
 
 1. **Vulnerability Scans (External & Internal)**
-   - Tools: Qualys/Nessus for network, OWASP ZAP or Burp Suite for web app  
+   - Tools: Industry-standard network and web application scanners.  
    - Steps:
      - Schedule automated scan at start of quarter.  
      - Export scan report (PDF/CSV).  
@@ -22,7 +22,7 @@ All Mat Vulcan environments and third-party services must adhere to a defined sc
        - Critical & High → assign remediation tickets (due within 30 days).  
        - Medium → review and schedule patch or workaround.  
        - Low → document and monitor.  
-     - Update `security_controls.yaml` audit.coverage and next_review_due.
+     - Update `docs/security/controls.yaml` audit.coverage and next_review_due.
 
 2. **Static Application Security Testing (SAST)**
    - Tool: Brakeman  
@@ -41,7 +41,7 @@ All Mat Vulcan environments and third-party services must adhere to a defined sc
      - Update Software Composition Analysis report.
 
 4. **Centralized Log Review & Alert Validation**
-   - Platform: SIEM (e.g., SumoLogic)  
+   - Platform: SIEM (Security Information and Event Management) system  
    - Steps:
      - Review authentication failure spikes, privilege-use anomalies, and error-rate alerts.  
      - Validate that log retention ≥ 1 year is operational.  
@@ -49,7 +49,7 @@ All Mat Vulcan environments and third-party services must adhere to a defined sc
      - Document findings in quarterly security report.
 
 5. **Control Self-Assessment**
-   - Tool: `docs/security_controls.yaml`  
+   - Tool: `docs/security/controls.yaml`  
    - Steps:
      - Run CI lint and test for security YAML.  
      - Manually verify `audit.next_review_due` dates and statuses.  
@@ -93,11 +93,11 @@ All Mat Vulcan environments and third-party services must adhere to a defined sc
 ## Continuous & Ongoing Activities
 
 - **Automated Intrusion Detection Checks**
-  - Integrate OS-level IDS (e.g., OSSEC) or cloud guardrails.  
+  - Integrate OS-level IDS or cloud guardrails.  
   - Monitor alerts daily; escalate as needed.
 
 - **Error-Handling & Exception Logging**
-  - Verify Sentry (or equivalent) captures and aggregates all exceptions.  
+  - Verify an exception tracking system (e.g., Sentry) captures and aggregates all exceptions.  
   - Review monthly exception dashboard for spikes.
 
 - **Patch Management (Weekly)**
@@ -128,5 +128,5 @@ All Mat Vulcan environments and third-party services must adhere to a defined sc
 
 1. At each period start (quarter/annual), consult the relevant section.  
 2. Tick off each actionable sub-task and record completion dates.  
-3. Update both this document and `docs/security_controls.yaml` to reflect changing statuses.  
+3. Update both this document and `docs/security/controls.yaml` to reflect changing statuses.  
 4. Archive past reports under `docs/security/reports/YYYY-QX/` for audit traceability.
