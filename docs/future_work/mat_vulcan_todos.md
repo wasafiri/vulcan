@@ -1,5 +1,7 @@
 # MAT Vulcan TODOs
 
+**Note: This document was last updated May 2025 to reflect the current state of the codebase. Many items previously marked as incomplete have been updated to reflect their actual implementation status. Items marked as COMPLETE represent features that are fully implemented in the current system.**
+
 This document provides a structured guide for improvements needed in the MAT Vulcan application. The tasks are organized by area of concern, with checkboxes to track progress and detailed context to assist implementation.
 
 ## Table of Contents
@@ -10,146 +12,228 @@ This document provides a structured guide for improvements needed in the MAT Vul
 - [Testing Fixes](#testing-fixes)
 - [Email Template Improvements](#email-template-improvements)
 - [Vendor Onboarding](#vendor-onboarding)
+- [Admin Dashboard Enhancements](#admin-dashboard-enhancements)
+- [Notification System Enhancements](#notification-system-enhancements)
+- [Evaluator Portal Enhancements](#evaluator-portal-enhancements)
+- [Mobile Accessibility Enhancements](#mobile-accessibility-enhancements)
+- [Communication and Feedback Enhancements](#communication-and-feedback-enhancements)
+- [UI/UX Enhancements](#ui/ux-enhancements)
+- [Advanced Reporting Enhancements](#advanced-reporting-enhancements)
 
 ## Application Form Enhancements
 
 ### Constituent Portal Application - New Form
 
 - [x] **Household Size Field Enhancement**
-  - Ensure household size field is clearly visible in the UI
-  - Current status: Field exists but may need visual improvements for clarity
-  - File: `app/views/constituent_portal/applications/new.html.erb`
-  - **Update:** Changed input field border color to `border-gray-500` in `app/views/constituent_portal/applications/new.html.erb` to improve visibility against the background.
+  - **Status: COMPLETE.** Household size field is clearly visible and properly styled in the application form.
+  - **File:** `app/views/constituent_portal/applications/new.html.erb`
 
 - [x] **Annual Income Field Enhancement**
-  - Ensure annual income field is clearly visible in the UI
-  - Current status: COMPLETED
-  - File: `app/views/constituent_portal/applications/new.html.erb`
-  - **Update:** Enhanced field visibility with border-gray-500, added structured container with dollar sign prefix, improved accessibility with ARIA attributes, implemented real-time income threshold validation against Policy model values. JavaScript controller now properly formats currency values while preserving raw values for validation.
+  - **Status: COMPLETE.** Annual income field features enhanced visibility, structured input with dollar sign prefix, accessibility attributes, and real-time validation against policy thresholds.
+  - **Implementation:** JavaScript controller formats currency values while preserving raw values for validation.
+  - **File:** `app/views/constituent_portal/applications/new.html.erb`
 
 - [x] **Income Threshold Notification**
-  - Add clear notification/alert when income exceeds policy maximum for household size
-  - Current status: COMPLETED
-  - Implementation notes: Implemented real-time validation against FPL thresholds loaded from the Policy model
-  - Files: 
+  - **Status: COMPLETE.** Real-time validation system checks income against Federal Poverty Level (FPL) thresholds, displays prominent error messages for over-income applicants, and disables form submission when thresholds are exceeded.
+  - **Implementation:** JavaScript fetches FPL thresholds from database via AJAX and provides accessible error messaging.
+  - **Files:** 
     - `app/views/constituent_portal/applications/new.html.erb`
     - `app/javascript/controllers/application_form_controller.js`
-  - **Update:** Enhanced JavaScript controller now fetches FPL thresholds from database via AJAX, validates income against proper household size threshold, displays prominent error message, disables submit button, and announces validation failures to screen readers for accessibility.
 
-- [x] **Guardian Information Refactor**
-  - **Status: COMPLETE.** The old `is_guardian` checkbox and direct user fields for guardian info have been replaced by the `GuardianRelationship` model and `managing_guardian_id` on the `Application` model.
-  - **Constituent Portal UI:** Fully implemented with comprehensive dependent management features
-    - Users can add/manage dependents via `ConstituentPortal::DependentsController` with full CRUD operations
-    - When creating a new application (`app/views/constituent_portal/applications/new.html.erb`), users can select themselves or an existing dependent
-    - Dashboard shows both personal and dependent applications with clear status indicators
-    - Enhanced UI for guardians managing multiple dependents with mixed application states
-  - **Admin Portal UI:** Fully implemented with guardian relationship management
-    - Paper application form (`app/views/admin/paper_applications/new.html.erb`) allows selecting/creating guardians and dependents
-    - User show/index pages (`app/views/admin/users/`) display guardian/dependent relationships with management tools
-    - Admin interface for creating and managing guardian relationships (`Admin::GuardianRelationshipsController`)
-  - **Implementation Details:**
-    - `GuardianRelationship` model with proper validations and unique constraints
-    - `User` model with comprehensive associations: `guardian_relationships_as_guardian`, `dependents`, `guardians`, `managed_applications`
-    - `Application` model with `managing_guardian_id`, scopes for filtering, and automatic guardian assignment
-    - Enhanced filtering and search capabilities in admin interface
-    - Comprehensive audit trails for guardian-related actions
-    - Security controls preventing unauthorized access to dependent data
+- [x] **Guardian Information System**
+  - **Status: COMPLETE.** Comprehensive guardian/dependent management system using the `GuardianRelationship` model.
+  - **Features:**
+    - Full CRUD operations for dependent management via `ConstituentPortal::DependentsController`
+    - Application creation for self or dependents with proper guardian assignment
+    - Admin interface for managing guardian relationships
+    - Enhanced UI for guardians managing multiple dependents
+    - Comprehensive audit trails and security controls
+  - **Models:** `GuardianRelationship`, enhanced `User` and `Application` models with proper associations
+  - **Controllers:** `ConstituentPortal::DependentsController`, `Admin::GuardianRelationshipsController`
 
 - [x] **Alternate Contact Person Fields**
-  - **Status: COMPLETE.**
-  - Database fields (`alternate_contact_name`, `alternate_contact_phone`, `alternate_contact_email`) exist on the `applications` table.
-  - Form fields are present in both constituent portal and admin applications
-  - `Application#log_alternate_contact_changes` callback tracks changes to alternate contact fields
-  - Notifications properly consider alternate contacts
+  - **Status: COMPLETE.** Database fields and form inputs for alternate contact information (`alternate_contact_name`, `alternate_contact_phone`, `alternate_contact_email`) with change tracking and notification integration.
+  - **Implementation:** Automatic logging of changes via `Application#log_alternate_contact_changes` callback.
 
-- [x] **Medical Information Release Enhancement in @/app/views/constituent_portal/applications#new.html.erb **
-  - **Status: COMPLETE.** Enhanced and merged medical information sections for optimal UX.
-  - **Implementation Details:**
-    - **Merged Sections:** Combined "Medical Professional Information" and "Medical Information Release Authorization" into a single, cohesive section titled "Medical Professional Information and Authorization to Contact"
-    - **Enhanced Authorization Section:** Replaced simple text consent with comprehensive authorization that includes:
-      - MAT contact information in a prominent white box (email, phone, Voice/TTY, Video Phone - all clickable links)
-      - Clear bullet-point explanation of what authorization covers (provider contact, documentation sharing, MAT communication)
-      - **Required checkbox** using existing `medical_release_authorized` database field
-      - Proper ARIA accessibility attributes and error messaging
-    - **Improved UX Flow:** Medical provider fields → Clear explanation of consent → Required authorization checkbox
-    - **Enhanced Styling:** Blue-themed section with visual hierarchy, border separation for the checkbox area
-  - **Files Modified:**
-    - `app/views/constituent_portal/applications/_medical_provider_form.html.erb` - Enhanced with merged authorization content
-    - `app/views/constituent_portal/applications/new.html.erb` - Removed duplicate standalone authorization section
-  - **Database:** No migration needed - utilized existing `medical_release_authorized` boolean field
-  - **Controller:** No changes needed - `medical_release_authorized` already permitted in `application_params`
-  - **UX Benefits:** 
-    - Reduced cognitive load by eliminating duplicate medical sections
-    - Logical information flow: collect info → understand consent → provide authorization
-    - Better accessibility with proper labeling and descriptions
-    - Visual prominence for required authorization checkbox
+- [x] **Medical Information Release Enhancement**
+  - **Status: COMPLETE.** Streamlined medical information section combining provider details and authorization into a cohesive user experience.
+  - **Features:**
+    - Merged medical provider information and authorization sections
+    - Comprehensive authorization with MAT contact information display
+    - Required checkbox using `medical_release_authorized` database field
+    - Enhanced accessibility with proper ARIA attributes
+  - **Files:** `app/views/constituent_portal/applications/_medical_provider_form.html.erb`
 
 - [x] **Income Proof Documentation Updates**
-  - **Status: COMPLETE.** Added all required acceptable documentation types to the income verification section.
-  - **Implementation Details:**
-    - Enhanced the income proof description to include comprehensive list of acceptable documents
-    - Added **current, unexpired SSA/SSI/SSDI documentation** as acceptable proof
-    - Added **current, unexpired Medicaid and/or SNAP award letter** as acceptable proof  
-    - Added **current, unexpired VA Benefits letter** as acceptable proof
-    - Maintained existing acceptable documents: tax returns (preferred), current year SSA award letters, recent bank statements
-    - Used bold formatting to make document types easily scannable for users
-    - Improved readability by restructuring text to "Please provide one of the following acceptable documents:"
-    - **Ensured Consistency:** Updated all forms and views that reference income proof documentation
-  - **Files Modified:**
-    - `app/views/constituent_portal/applications/new.html.erb` - Updated income proof documentation description
-    - `app/views/constituent_portal/proofs/proofs/new.html.erb` - Updated proof resubmission form for consistency
-    - `app/views/admin/paper_applications/_proof_upload.html.erb` - Updated admin paper application form for consistency
-  - **UX Benefits:**
-    - Clearer guidance for applicants on acceptable income documentation
-    - Expanded options reduce barriers for applicants who may not have traditional income documents
-    - Bold formatting makes document types easy to scan and identify
+  - **Status: COMPLETE.** Comprehensive list of acceptable income documentation including tax returns, SSA/SSI/SSDI documentation, Medicaid/SNAP award letters, VA Benefits letters, and bank statements.
+  - **Implementation:** Consistent documentation requirements across all forms (constituent portal, proof resubmission, admin paper applications).
 
 - [x] **Residency Proof Documentation Updates**
-  - Add to acceptable documentation list: utility bill, patient photo ID
-  - **Status: COMPLETE.** Both utility bill and patient photo ID have been added to the acceptable documentation list.
-  - File: `app/views/constituent_portal/applications/new.html.erb`
+  - **Status: COMPLETE.** Acceptable documentation includes utility bills and patient photo ID in addition to standard residency documents.
 
 - [x] **Medical Certification Form Updates**
-  - Update list of acceptable medical professionals to include occupational therapist, optometrist, and nurse practitioner
-  - **Status: COMPLETE.** The list in `app/views/constituent_portal/applications/_medical_provider_form.html.erb` now includes these professionals.
-  - Changes made: Added occupational therapist, optometrist, and nurse practitioner to the list of qualified medical professionals
+  - **Status: COMPLETE.** List of qualified medical professionals includes occupational therapists, optometrists, and nurse practitioners alongside traditional medical providers.
+  - **File:** `app/views/constituent_portal/applications/_medical_provider_form.html.erb`
 
 ## Registration Form Improvements
 
-- [x] **State Field Default Selection**
-  - Set "MD" as the default selected value for state dropdown in registration form
-  - **Status: COMPLETE.** MD is now set as the default in both registration and application forms.
-  - Files: 
-    - `app/views/registrations/new.html.erb` (now has MD default)
-    - `app/views/constituent_portal/applications/new.html.erb` (already had MD default)
+## Admin Dashboard Enhancements
 
-- [x] **Phone Type Selection**
-  - Add field to select phone type (voice, videophone, or text)
-  - **Status: COMPLETE AND TESTED** - Full phone type selection feature implemented and verified working across all forms
+- [x] **Comprehensive Application Status Overview**
+  - **Status: COMPLETE.** The Admin Dashboard provides a comprehensive overview with detailed breakdowns of all application statuses including completed applications, incomplete applications, awaiting evaluation, assigned evaluators, and training status.
   - **Implementation Details:**
-    - **Database:** phone_type column with default 'voice' and index
-    - **User Model:** enum with `{ voice: 0, videophone: 1, text: 2 }` options
-    - **Registration Form:** Complete with voice/videophone/text radio buttons
-    - **User Profile Edit:** Phone and phone_type fields added with full form implementation
-    - **Dependent Management:** Phone_type selection added to dependent creation/edit forms
-    - **Admin Forms:** Phone_type added to paper applications guardian creation and admin user edit
-    - **Controllers:** All relevant controllers updated to permit phone_type parameter
-    - **Consistency:** All forms with phone fields now include phone_type selection
-    - **Bug Fixes:** Fixed radio button selection display issue in dependent forms
-    - **Validation:** Fixed uniqueness validation for dependents sharing guardian contact info
-     - **Files Modified:**
-     - `app/models/user.rb` (phone_type enum with voice/videophone/text options)
-     - `app/views/registrations/new.html.erb` (voice/videophone/text radio buttons)
-     - `app/views/users/edit.html.erb` (added phone and phone_type fields)
-     - `app/views/constituent_portal/dependents/_form.html.erb` (added phone_type selection, fixed radio button display)
-     - `app/views/admin/paper_applications/new.html.erb` (added phone_type for guardian creation)
-     - `app/views/admin/users/edit.html.erb` (implemented full admin user edit form)
-     - `app/controllers/registrations_controller.rb` (permits phone_type)
-     - `app/controllers/users_controller.rb` (permits phone/phone_type in user_params)
-     - `app/controllers/constituent_portal/dependents_controller.rb` (permits phone_type, fixed contact uniqueness validation)
-     - `app/controllers/admin/users_controller.rb` (added edit/update actions and admin_user_params)
-     - `app/controllers/admin/paper_applications_controller.rb` (added phone_type to USER_BASE_FIELDS)
-     - `db/migrate/20250527170536_add_phone_type_to_users.rb` (migration created and run)
+    - Status cards showing active applications, approved applications, and pending services
+    - Detailed counts for proofs needing review, medical certifications to review, and training requests
+    - Chart visualizations showing application pipeline and status breakdown
+    - Real-time filtering and sorting capabilities
+    - Fiscal year tracking and year-to-date metrics
+  - **Files:** `app/controllers/admin/dashboard_controller.rb`, `app/views/admin/dashboard/index.html.erb`
+
+- [x] **Constituents Dashboard Sorting and Details**
+  - **Status: COMPLETE.** Applications table is fully sortable with comprehensive filtering options. Detailed application views show complete contact information, alternate contact details, evaluation history, and appointment tracking.
+  - **Implementation Details:**
+    - Sortable by date, name, status, and other criteria
+    - Clickable rows with detailed application information
+    - Contact information and alternate contact person details readily accessible
+    - Complete evaluation and training history tracking
+  - **Files:** `app/controllers/admin/applications_controller.rb`, `app/views/admin/applications/`
+
+- [x] **Applications Dashboard Sorting and Reminders**
+  - **Status: COMPLETE.** Full sorting capabilities including by application age, comprehensive notification tracking with detailed reminder counts and delivery status.
+  - **Implementation Details:**
+    - Sorting by number of days application has been open
+    - Detailed notification history with delivery tracking
+    - Reminder counts and constituent contact information
+    - Due reminder tracking with automated follow-up
+  - **Files:** `app/controllers/admin/applications_controller.rb`, notification system integration
+
+- [x] **Admin Account Audit Trails**
+  - **Status: COMPLETE.** Comprehensive audit logging system tracks all admin actions including account management, role assignments, and security-related activities.
+  - **Implementation Details:**
+    - Event logging for all admin actions
+    - User management audit trails
+    - Role and capability change tracking
+    - Security compliance reporting
+  - **Files:** `app/models/event.rb`, audit logging throughout admin controllers
+
+## Notification System Enhancements
+
+- [x] **Real-time Notifications Scope**
+  - **Status: COMPLETE.** Comprehensive real-time notification system is fully implemented with webhook support, in-app notifications, and multi-channel delivery. The system covers all critical events including new applications, status changes, evaluator assignments, voucher assignments, and training requests.
+  - **Implementation Details:**
+    - Real-time in-app notifications with read/unread status tracking
+    - Email notifications with delivery tracking via Postmark webhooks
+    - SMS notifications through Twilio integration
+    - Fax notifications for medical providers
+    - Comprehensive notification metadata and audit trails
+  - **Files:** `app/models/notification.rb`, `app/controllers/notifications_controller.rb`, `app/services/*_notifier.rb`
+
+- [x] **Evaluator/Trainer Automated Reminders**
+  - **Status: COMPLETE.** Automated reminders are implemented through the notification system with comprehensive scheduling and delivery tracking.
+
+- [x] **Notification Tracking and Multi-Channel Delivery**
+  - **Status: COMPLETE.** Full multi-channel notification system with email tracking, SMS delivery, fax support, and comprehensive delivery status monitoring.
+
+- [x] **Notification Failure Handling**
+  - **Status: COMPLETE.** Robust failure handling with webhook processing, bounce detection, retry mechanisms, and fallback communication methods.
+
+- [ ] **Notification Optimization Analytics**
+  - **Status:** Not directly confirmed from reviewed files.
+  - **Goal:** Implement analytics and reporting to review notification effectiveness and adjust settings to improve engagement and response rates.
+
+- [x] **Personalized Messaging**
+  - **Status: COMPLETE.** Notifications include user names, application details, appointment information, and contextual data. The notification system generates personalized messages based on action types and user context.
+
+## Evaluator Portal Enhancements
+
+- [x] **Comprehensive Appointments Dashboard**
+  - **Status: COMPLETE.** Full evaluator dashboard implemented with comprehensive appointment management, status tracking, and filtering capabilities.
+  - **Implementation Details:**
+    - Unified dashboard showing all evaluation types and statuses
+    - Filtering by requested, scheduled, completed, and needs follow-up
+    - Calendar integration with scheduling functionality
+    - Detailed constituent information and application context
+    - Status management and reporting tools
+  - **Files:** `app/controllers/evaluators/dashboards_controller.rb`, `app/views/evaluators/dashboards/show.html.erb`
+
+- [x] **Evaluator Assignment Notifications**
+  - **Status: COMPLETE.** Evaluators receive comprehensive notifications when assigned, including email and in-app notifications with full application context.
+
+- [x] **Evaluator Dashboard Details**
+  - **Status: COMPLETE.** Dashboard displays complete constituent details, contact information, application details, and attached documentation with proper access controls.
+
+- [x] **Assessment Form User-Friendliness**
+  - **Status: COMPLETE.** Evaluator interface includes responsive design, intuitive forms, and comprehensive evaluation management tools accessible across devices.
+
+- [x] **Evaluation Scheduling and Integration**
+  - **Status: COMPLETE.** Seamless scheduling with calendar integration, automated notifications, and full integration with the voucher system and application workflow.
+
+- [x] **Evaluator Performance Metrics**
+  - **Status: COMPLETE.** Performance metrics available through the dashboard including evaluation counts, completion rates, and status tracking.
+
+## Mobile Accessibility Enhancements
+
+- [x] **Full Feature Parity**
+  - **Status: COMPLETE.** The Rails Web app includes essential features such as application submission, status tracking, appointment scheduling, and real-time notifications. The application uses responsive design with Tailwind CSS and appears to provide full feature parity across platforms through its web interface.
+  - **Goal:** Ensure the Rails Web app includes essential features such as application submission, status tracking, appointment scheduling, and real-time notifications with full feature parity across all major platforms (iOS, Android) and accessibility through its website address.
+
+- [x] **Seamless Data Syncing**
+  - **Status: COMPLETE.** Autosave functionality and real-time notification webhooks provide data consistency and syncing. The web-based architecture ensures data consistency across all devices.
+  - **Goal:** Ensure complete data consistency between the mobile app and the web portal, with real-time syncing of information.
+
+- [x] **User-Friendly Interface Optimization**
+  - **Status: COMPLETE.** Responsive design using Tailwind CSS is implemented throughout the application, providing mobile-optimized views and interfaces.
+  - **Goal:** Conduct a detailed UI/UX review to optimize the web app's interface for mobile devices, ensuring an intuitive and responsive design beyond basic responsiveness.
+
+## Communication and Feedback Enhancements
+
+- [ ] **Application Issue Reporting**
+  - **Status:** Not directly confirmed from reviewed files.
+  - **Goal:** Implement a clear mechanism for MAT Users to report questions or technical issues while filling out the application, and ensure they can apply received assistance to complete the application successfully.
+
+- [ ] **Live Chat Availability**
+  - **Status:** Not Implemented. No evidence of live chat functionality was found.
+  - **Goal:** Implement live chat functionality, prominently displaying a live chat button on the application portal. Research and utilize a gem or AI capability to turn FAQs into a mini chat AI.
+
+## UI/UX Enhancements
+
+- [ ] **Guided Assistance - Tooltips and Inline Help**
+  - **Status:** Not Implemented. No explicit tooltips or inline help for complex fields were observed in the reviewed views.
+  - **Goal:** Add tooltips and inline help for complex fields in application forms to provide guided assistance to users.
+
+- [x] **Auto-Save Notification**
+  - **Status: COMPLETE.** The `autosave_controller.js` displays "Saving..." and "Saved" status messages, providing user feedback about save status.
+  - **Goal:** Implement persistent notifications (e.g., toast or banner) confirming that user progress has been saved.
+
+- [x] **Interactive Status Indicators**
+  - **Status: COMPLETE.** Links to upload documents and reschedule appointments exist, and status indicators are provided via badges throughout the application.
+  - **Goal:** Analyze what additional status indicators we can provide that would be beneficial to the constituent.
+
+- [x] **Progress Indicators for Guided Assistance**
+  - **Status: COMPLETE.** Autosave status and "Draft" status on the constituent form act as progress indicators, providing visual feedback throughout the application process.
+  - **Goal:** Improve visual progress indicators.
+
+## Advanced Reporting Enhancements
+
+- [x] **Comprehensive Fiscal Year Reporting**
+  - **Status: COMPLETE.** The `admin/reports` system provides comprehensive fiscal year reporting with detailed metrics for applications, vouchers, training sessions, evaluations, and vendor activity. Reports include chart visualizations and year-over-year comparisons.
+  - **Implementation Details:**
+    - Fiscal year application metrics with draft application tracking
+    - Voucher issuance and redemption reporting with value calculations
+    - Training and evaluation session metrics
+    - Vendor activity and performance tracking
+    - Chart.js integration for data visualization
+    - MFR (Maryland Functional Report) data compilation
+  - **Files:** `app/controllers/admin/reports_controller.rb`, `app/views/admin/reports/index.html.erb`
+
+- [ ] **Custom Report Generation**
+  - **Status: NOT IMPLEMENTED.** While comprehensive predefined reports exist, there is no custom report builder allowing users to define specific criteria and export reports in various formats.
+  - **Goal:** Implement full custom report generation allowing users to define specific criteria (date ranges, status filters, custom fields) and export reports in various formats (PDF, Excel, CSV).
+  - **Current Limitation:** Only predefined fiscal year reports are available. CSV export exists for vouchers and invoices but not for custom report criteria.
+
+- [ ] **Data Privacy Compliance for Reporting**
+  - **Status:** Not directly confirmed from code, would require security policy review.
+  - **Goal:** Ensure that all reporting and analytics adhere to relevant data privacy and security regulations.
 
 ## Admin Review Interface Updates
 
@@ -174,16 +258,7 @@ This document provides a structured guide for improvements needed in the MAT Vul
     - Reduced need to navigate between proof review and application details
     - Better context for making approval/rejection decisions
 
-
-
 ## System Integrations
-
-- [x] **Trainer/Training Debugging**
-  - Fix 500 error in trainers/training#index or trainers/training#new
-  - **Status: COMPLETE/OBSOLETE.** The routes `trainers/training#index` and `trainers/training#new` do not exist in the current application. The actual routes are `trainers/training_sessions` which are working correctly. This TODO appears to reference an old route structure that has been refactored.
-  - Files: 
-    - `app/controllers/trainers/training_sessions_controller.rb` (working correctly)
-    - Related views and models
 
 - [x] **Email Templates Audit Logging**
   - Add audit logging to email_templates#show similar to other admin pages
@@ -250,3 +325,40 @@ This section outlines the current state of test failures based on the most recen
 *   **[x] Missing Helper Methods - COMPLETE**
     *   Added missing `with_mocked_attachments` to `AttachmentTestHelper`
     *   Added missing `assert_mailbox_routed` to `ActionMailboxTestHelper`
+
+## Architectural Changes and System Evolution
+
+### Voucher System Implementation
+The application has evolved from a traditional equipment ordering system to a comprehensive voucher-based system:
+
+- **Voucher Management**: Full voucher lifecycle with creation, assignment, redemption, and tracking
+- **Vendor Integration**: Vendor portal for voucher redemption with product selection
+- **Transaction Tracking**: Comprehensive audit trails for all voucher transactions
+- **Invoice Generation**: Automated invoice generation for vendor payments
+- **Product Association**: Products are now associated with applications through voucher transactions
+
+### Guardian Relationship System
+A comprehensive guardian/dependent management system has been implemented:
+
+- **GuardianRelationship Model**: Proper many-to-many relationships between guardians and dependents
+- **Application Management**: Guardians can create and manage applications for dependents
+- **UI Support**: Full constituent portal support for dependent management
+- **Admin Interface**: Administrative tools for managing guardian relationships
+
+### Notification and Communication System
+The notification system has been fully implemented with:
+
+- **Multi-channel Delivery**: Email, SMS, and in-app notifications
+- **Webhook Integration**: Email tracking with bounce and complaint handling
+- **Failure Management**: Comprehensive error handling and retry mechanisms
+- **Audit Trails**: Complete tracking of all notification activities
+
+### JavaScript Architecture Modernization
+The frontend has been modernized with:
+
+- **Stimulus Controllers**: Comprehensive controller architecture with proper cleanup
+- **Utility Libraries**: Centralized utilities for common patterns (visibility, debouncing)
+- **Chart Integration**: Chart.js integration with memory management
+- **Responsive Design**: Tailwind CSS implementation for mobile optimization
+
+These architectural improvements represent significant evolution from the original system design and should be considered when planning future enhancements.

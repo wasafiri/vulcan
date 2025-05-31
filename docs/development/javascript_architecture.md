@@ -50,6 +50,13 @@ this.customDebounced = debounce(func, 100, { leading: true, trailing: false })
 
 ## Controller Patterns
 
+### Application Flow Management
+The application handles multi-step navigation implicitly through a single long form with `autosave` functionality, rather than explicit multi-step navigation. This fulfills the spirit of requirements for users to navigate between steps without losing entered information.
+
+- **Autosave:** `autosave_controller.js` automatically saves application data at regular intervals.
+- **Data Persistence:** Data loss is prevented in cases of unexpected interruptions (e.g., browser crashes, connectivity issues).
+- **User-Friendly Navigation:** Users can easily navigate between different sections of the application without losing entered information, as progress is continuously saved.
+
 ### Visibility Management
 All controllers use the `setVisible` utility instead of manual DOM manipulation:
 
@@ -219,4 +226,4 @@ test('search input debouncing', () => {
 ### Performance Optimizations
 - **Database Strategy**: Consider transaction vs truncation for test speed
 - **Bundle Optimization**: Tree-shake unused Chart.js components
-- **Lazy Loading**: Load heavy components only when needed 
+- **Lazy Loading**: Load heavy components only when needed

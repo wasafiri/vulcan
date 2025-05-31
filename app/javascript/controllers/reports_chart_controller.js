@@ -1,279 +1,196 @@
-import { Controller } from "@hotwired/stimulus";
+import ChartBaseController from "./chart_base_controller"
 
 /**
  * ReportsChartController
- *
- * Lazy‑initialises a Chart.js visualisation once the element becomes visible.
- * – Guards against double‑rendering with `this.initialised` flag
- * – Uses `IntersectionObserver` (with a MutationObserver fallback) to detect
- *   visibility instead of polling
- * – Cleans up the created `Chart` instance on disconnect
- * – Gated console output so production consoles stay clean
+ * 
+ * Specialized Chart.js controller for reports with visibility event handling.
+ * Uses centralized base functionality with data validation and default options.
  */
-export default class extends Controller {
-  /* ------------------------------------------------------------------
-   * Stimulus values
-   * ----------------------------------------------------------------*/
+export default class extends ChartBaseController {
   static values = {
-    currentData: { type: Object, default: {} },
-    previousData: { type: Object, default: {} },
-    type: { type: String, default: "bar" },
-    title: { type: String, default: "Comparison Chart" },
-    compact: { type: Boolean, default: false },
-    yAxisLabel: { type: String, default: "Count" }
-  };
+    currentData: Object,
+    previousData: Object,
+    type: String,
+    title: String,
+    compact: Boolean,
+    yAxisLabel: String,
+    chartHeight: { type: Number, default: 300 }
+  }
 
-  /* Utility classes (Tailwind's `hidden` works nicely) */
-  static classes = ["hidden"];
-
-  /* ------------------------------------------------------------------
-   * Lifecycle
-   * ----------------------------------------------------------------*/
   connect() {
-    this.initialised = false;
-    this.chartInstance = null;
+    super.connect()
+    
+    const Chart = this.getChart()
+    if (!Chart) {
+      return this.handleUnavailable()
+    }
 
-    this.log("connected");
+    // Validate data before proceeding
+    if (!this.validateData(this.currentDataValue, "current data")) {
+      return
+    }
 
-    // If we're already visible – fire immediately, otherwise observe.
-    this.isVisible() ? this.initialise() : this.observeVisibility();
+    // Bind handler for visibility change events
+    this.onVisibilityChange = this.onVisibilityChange.bind(this)
+    this.element.addEventListener('visibility-changed', this.onVisibilityChange)
+
+    // If already visible on connect, init immediately
+    if (this.isVisible() && !this.chartInstance) {
+      this.initializeChart()
+    }
   }
 
   disconnect() {
-    this.visibilityObserver?.disconnect();
-    this.mutationObserver?.disconnect();
-    this.chartInstance?.destroy();
-    this.chartInstance = null;
+    // Remove event listener
+    this.element.removeEventListener('visibility-changed', this.onVisibilityChange)
+    
+    // Call parent cleanup
+    super.disconnect()
   }
 
-  /* ------------------------------------------------------------------
-   * Visibility helpers
-   * ----------------------------------------------------------------*/
-  isVisible() {
-    return (
-      this.element.offsetParent !== null &&
-      !this.element.closest("." + this.hiddenClass)
-    );
-  }
-
-  observeVisibility() {
-    // Use IntersectionObserver.
-    this.visibilityObserver = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          this.visibilityObserver.disconnect();
-          this.initialise();
-        }
-      },
-      { root: null, threshold: 0 }
-    );
-    this.visibilityObserver.observe(this.element);
-  }
-
-  /* ------------------------------------------------------------------
-   * Chart initialisation
-   * ----------------------------------------------------------------*/
-  async initialise() {
-    if (this.initialised) return; // Guard against double init
-    this.initialised = true;
-
-    // Lazy‑load Chart.js if it's not on the page already.
-    if (typeof Chart === "undefined") {
-      try {
-        await import(/* webpackChunkName: "chartjs" */ "chart.js/auto" /* @vite-ignore */);
-        this.log("Chart.js dynamically imported");
-      } catch (e) {
-        this.renderError("Chart.js failed to load");
-        return;
-      }
+  // Stimulus value change callbacks for live updates
+  currentDataValueChanged() {
+    if (this.chartInstance && this.validateData(this.currentDataValue, "current data")) {
+      this.initializeChart()
     }
+  }
 
-    this.renderChart();
+  previousDataValueChanged() {
+    if (this.chartInstance) {
+      this.initializeChart()
+    }
+  }
+
+  onVisibilityChange(event) {
+    if (event.detail.visible && !this.chartInstance) {
+      this.initializeChart()
+    }
+  }
+
+  isVisible() {
+    // Simple visibility check
+    return this.element.offsetParent !== null
+  }
+
+  async initializeChart() {
+    try {
+      // Next animation frame to ensure DOM ready
+      await new Promise(r => requestAnimationFrame(r))
+      this.renderChart()
+    } catch (error) {
+      this.handleError("Chart initialization failed", error)
+    }
+  }
+
+  // Implement recreateChart for base controller resize handling
+  recreateChart() {
+    if (this.validateData(this.currentDataValue, "current data")) {
+      this.renderChart()
+    }
   }
 
   renderChart() {
-    const canvas = document.createElement("canvas");
-    const id = `chart-${crypto.randomUUID()}`;
-    canvas.id = id;
+    const Chart = this.getChart()
+    
+    // Clean up any existing chart
+    this.cleanupExistingChart()
 
-    // Compact dimensions
-    canvas.width = this.compactValue ? 400 : 800;
-    canvas.height = this.compactValue ? 200 : 300;
-    canvas.style.width = "100%";
-    canvas.style.height = this.compactValue ? "200px" : "300px";
+    // Override chartHeightValue based on compact mode
+    const height = this.compactValue ? 200 : this.chartHeightValue
+    this.chartHeightValue = height
+    
+    // Create and mount canvas
+    const { canvas, desc } = this.createCanvas(
+      this.titleValue || "Chart visualization",
+      `Chart showing ${this.titleValue || "data comparison"}`
+    )
+    this.mountCanvas(canvas, desc)
 
-    // a11y
-    canvas.setAttribute("role", "img");
-    canvas.setAttribute(
-      "aria-label",
-      `${this.titleValue} – compares current & previous fiscal year data`
-    );
+    // Get context and create chart
+    const ctx = this.getCtx(canvas)
+    if (!ctx) return
 
-    this.element.replaceChildren(canvas);
+    const { labels, currentValues, previousValues } = this.extractData()
+    const config = this.buildConfig(Chart, labels, currentValues, previousValues)
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      this.renderError("Canvas context unavailable");
-      return;
-    }
-
-    const config = this.buildConfig();
-    this.chartInstance = new Chart(ctx, config);
+    // Create chart directly 
+    this.chartInstance = new Chart(ctx, config)
   }
 
-  renderError(msg) {
-    this.element.innerHTML = `<p class="text-red-500">${msg}</p>`;
-    this.log(msg, "error");
+  extractData() {
+    const current = this.currentDataValue || {}
+    const previous = this.previousDataValue || {}
+    const labels = Object.keys(current)
+    const currentValues = labels.map(k => {
+      const value = Number(current[k] || 0)
+      return isNaN(value) ? 0 : value
+    })
+    const previousValues = labels.map(k => {
+      const value = Number(previous[k] || 0)
+      return isNaN(value) ? 0 : value
+    })
+    return { labels, currentValues, previousValues }
   }
 
-  /* ------------------------------------------------------------------
-   * Config builder
-   * ----------------------------------------------------------------*/
-  buildConfig() {
-    const kind = this.typeValue;
-    const current = this.safeObj(this.currentDataValue);
-    const previous = this.safeObj(this.previousDataValue);
-
-    const sharedDatasetProps = {
-      borderWidth: 2
-    };
-
-    const colors = {
-      current: "rgba(79, 70, 229, ", // indigo‑500
-      previous: "rgba(156, 163, 175, " // gray‑400
-    };
-
-    const datasets = {
-      current: {
-        label: "Current Fiscal Year",
-        backgroundColor: colors.current + "0.7)",
-        borderColor: colors.current + "1)",
-        data: Object.values(current),
-        ...sharedDatasetProps
-      },
-      previous: {
-        label: "Previous Fiscal Year",
-        backgroundColor: colors.previous + "0.7)",
-        borderColor: colors.previous + "1)",
-        data: Object.values(previous),
-        ...sharedDatasetProps
-      }
-    };
-
-    const base = {
-      type: kind,
-      data: {
-        labels: Object.keys(current),
-        datasets: [datasets.current, datasets.previous]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          title: {
-            display: !this.compactValue,
-            text: this.titleValue,
-            font: { size: this.compactValue ? 14 : 18, weight: "bold" }
-          },
-          legend: {
-            display: !this.compactValue
-          }
+  buildConfig(Chart, labels, currentValues, previousValues) {
+    const type = this.typeValue === 'horizontalBar' ? 'bar' : this.typeValue
+    
+    // Get base options and customize for reports
+    const defaultOptions = this.getDefaultOptions()
+    const customOptions = {
+      plugins: {
+        title: { 
+          display: !this.compactValue, 
+          text: this.titleValue, 
+          font: { size: this.compactValue ? 12 : 16 }
         },
-        interaction: { mode: "index", intersect: false }
-      }
-    };
-
-    /* ------------------- type‑specific tweaks ------------------- */
-    switch (kind) {
-      case "horizontalBar":
-        base.type = "bar";
-        base.options.indexAxis = "y";
-        // falls through
-      case "bar":
-      case "line": {
-        const axisCfg = {
-          beginAtZero: true,
-          title: {
-            display: !this.compactValue,
-            text: this.yAxisLabelValue,
-            font: { size: this.compactValue ? 12 : 16, weight: "bold" }
-          },
-          ticks: { font: { size: this.compactValue ? 10 : 14 } }
-        };
-        base.options.scales = kind === "horizontalBar" ? { x: axisCfg } : { y: axisCfg };
-        if (kind === "line") {
-          base.data.datasets.forEach((d) => (d.fill = false));
+        legend: { 
+          display: !this.compactValue, 
+          position: 'top' 
         }
-        break;
       }
-
-      case "pie":
-      case "doughnut":
-        base.data = {
-          labels: ["Current Fiscal Year", "Previous Fiscal Year"],
-          datasets: [
-            {
-              label: "Data",
-              data: [
-                this.sum(Object.values(current)),
-                this.sum(Object.values(previous))
-              ],
-              backgroundColor: [colors.current + "0.7)", colors.previous + "0.7)"],
-              borderColor: [colors.current + "1)", colors.previous + "1)"],
-              borderWidth: 2
-            }
-          ]
-        };
-        break;
-
-      case "polarArea": {
-        const mergedValues = [...Object.values(current), ...Object.values(previous)];
-        base.data.datasets = [
-          {
-            label: "Data",
-            data: mergedValues,
-            backgroundColor: mergedValues.map((_, i) =>
-              i < Object.values(current).length
-                ? colors.current + "0.7)"
-                : colors.previous + "0.7)"
-            ),
-            borderColor: mergedValues.map((_, i) =>
-              i < Object.values(current).length ? colors.current + "1)" : colors.previous + "1)"
-            ),
-            borderWidth: 2
-          }
-        ];
-        base.data.labels = [
-          ...Object.keys(current).map((k) => `${k} (Current FY)`),
-          ...Object.keys(previous).map((k) => `${k} (Previous FY)`)
-        ];
-        break;
-      }
-
-      case "radar":
-        base.options.elements = { line: { borderWidth: 3 } };
-        datasets.current.pointBackgroundColor = colors.current + "1)";
-        datasets.previous.pointBackgroundColor = colors.previous + "1)";
-        break;
     }
 
-    return base;
-  }
+    // Configure scales based on chart type
+    if (this.typeValue === 'horizontalBar') {
+      customOptions.indexAxis = 'y'
+      customOptions.scales = {
+        x: { beginAtZero: true },
+        y: { beginAtZero: true }
+      }
+    } else if (this.typeValue === 'radar') {
+      customOptions.scales = { r: { beginAtZero: true } }
+    } else {
+      customOptions.scales = {
+        y: { beginAtZero: true },
+        x: { beginAtZero: true }
+      }
+    }
 
-  /* ------------------------------------------------------------------
-   * Helpers
-   * ----------------------------------------------------------------*/
-  safeObj(o) {
-    return typeof o === "object" && o !== null ? o : {};
-  }
+    const finalOptions = this.mergeOptions(defaultOptions, customOptions)
 
-  sum(arr) {
-    return arr.reduce((a, b) => a + b, 0);
-  }
-
-  log(msg, lvl = "log") {
-    if (process?.env?.NODE_ENV === "development") console[lvl](
-      `ReportsChart: ${msg}`
-    );
+    return {
+      type,
+      data: { 
+        labels, 
+        datasets: [
+          { 
+            label: 'Current Fiscal Year', 
+            data: currentValues, 
+            backgroundColor: 'rgba(79,70,229,0.8)', 
+            borderColor: 'rgba(79,70,229,1)',
+            borderWidth: 1 
+          },
+          { 
+            label: 'Previous Fiscal Year', 
+            data: previousValues, 
+            backgroundColor: 'rgba(156,163,175,0.8)', 
+            borderColor: 'rgba(156,163,175,1)',
+            borderWidth: 1 
+          }
+        ]
+      },
+      options: finalOptions
+    }
   }
 }

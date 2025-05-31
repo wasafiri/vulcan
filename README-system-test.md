@@ -15,6 +15,9 @@ bin/rails test:system
 
 # Run a specific system test file
 bin/rails test test/system/admin/medical_certification_test.rb
+
+# Run with specific tags (if implemented)
+bin/rails test:system -- --tag=authentication
 ```
 
 ## Test Environment Setup
@@ -26,6 +29,7 @@ For local development, system tests use headless Chrome with the following confi
 1. **Browser Driver**: Headless Chrome
 2. **Window Size**: 1400x1400
 3. **Default Wait Time**: 5 seconds
+4. **Authentication Helpers**: Consolidated authentication system with `AuthenticationCore` module
 
 ### CI Environment
 
@@ -34,6 +38,35 @@ When running in CI (GitHub Actions), the system tests use a similar configuratio
 1. **Browser**: Chrome (installed via browser-actions/setup-chrome@v1)
 2. **Network Settings**: Binds to all interfaces ('0.0.0.0')
 3. **Default Wait Time**: 10 seconds (increased for CI stability)
+4. **Enhanced Error Handling**: Improved session management and form detection
+
+## Authentication Testing Infrastructure
+
+### Consolidated Authentication Helpers
+
+The test suite uses a unified authentication system:
+
+- **`AuthenticationCore` module**: Shared authentication logic across test types
+- **Progressive form detection**: Enhanced sign-in form field detection
+- **Session leak prevention**: Proper session cleanup between tests
+- **Header handling**: Consistent authentication header management
+
+### Test Helper Usage
+
+```ruby
+# In system tests
+include AuthenticationTestHelper
+
+def setup
+  @user = create(:user)
+end
+
+test "authenticated user can access dashboard" do
+  sign_in_as(@user)
+  visit dashboard_path
+  assert_text "Welcome"
+end
+```
 
 ## Troubleshooting
 
@@ -54,9 +87,19 @@ When running in CI (GitHub Actions), the system tests use a similar configuratio
    end
    ```
 
-3. **Random failures in CI**: Add debug output and increase timeouts:
+3. **Authentication failures**: Use the consolidated authentication helpers:
+   ```ruby
+   # Instead of manual form filling
+   sign_in_as(@user)
+   
+   # For specific authentication flows
+   sign_in_with_2fa(@user, method: :totp)
+   ```
+
+4. **Random failures in CI**: Add debug output and increase timeouts:
    ```ruby
    puts page.html # Print current page HTML
+   take_screenshot('debug-screenshot') # Capture visual state
    ```
 
 ### Marking Tests to Skip in CI
@@ -69,14 +112,37 @@ test "feature that doesn't work in CI", ci_skip: true do
 end
 ```
 
+### Test Data Management
+
+- **Factories**: Use FactoryBot for consistent test data creation
+- **Traits**: Leverage factory traits for specific test scenarios
+- **Cleanup**: Proper test data cleanup between tests
+- **Mocking**: Use `with_mocked_attachments` for file upload tests
+
 ## Notes on Browser Testing Infrastructure
 
 The application uses:
 
-1. **Capybara**: For browser automation
-2. **Selenium WebDriver**: For browser control
-3. **Chrome for Testing**: For consistent browser behavior
+1. **Capybara**: For browser automation with enhanced configuration
+2. **Selenium WebDriver**: For browser control with Chrome for Testing
+3. **Enhanced Helpers**: Consolidated authentication and form interaction helpers
+4. **Screenshot Support**: Automated screenshot capture for debugging
 
 The configuration can be found in:
 - `config/initializers/capybara.rb`
 - `test/application_system_test_case.rb`
+- `test/support/authentication_test_helper.rb`
+
+## Current Test Status
+
+### Passing Test Categories
+- Authentication flows (sign-in, 2FA setup)
+- Guardian relationship management
+- Application creation and submission
+- Admin interface interactions
+- Proof review workflows
+
+### Known Issues
+- Some system tests may experience connection timeouts in CI
+- Browser environment configuration requires ongoing maintenance
+- Complex multi-step workflows may need additional wait time adjustments

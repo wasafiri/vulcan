@@ -5,50 +5,88 @@ Vulcan is a Ruby on Rails application that facilitates Maryland Accessible Telec
 ## Features
 
 1. **Online Application Process**
-   - Digital application submission
+   - Digital application submission with real-time validation
    - Paper application processing and uploads
-   - Document upload and verification
-   - Application status tracking
+   - Document upload and verification with multiple submission methods
+   - Application status tracking with comprehensive audit trails
+   - Guardian/dependent application management
 
-2. **Evaluation Management**
+2. **Guardian Relationship Management**
+   - Guardian-dependent relationship establishment and tracking
+   - Multi-user application workflows (guardians applying for dependents)
+   - Comprehensive relationship validation and security controls
+   - Admin interface for relationship management
+
+3. **Medical Certification System**
+   - Automated certification requests to medical providers
+   - Multi-channel provider communication (email, fax)
+   - Document upload and review workflows
+   - Email delivery tracking with Postmark integration
+   - Comprehensive audit trails and status tracking
+
+4. **Proof Attachment System**
+   - Unified document attachment service for all submission methods
+   - Support for web uploads, email submissions, and faxed documents
+   - Transaction-safe file operations with comprehensive error handling
+   - Proof resubmission workflows with rate limiting
+   - Automated metrics and failure monitoring
+
+5. **Evaluation Management**
    - Scheduling and tracking evaluations
    - Training session management
    - Evaluator assignment and availability tracking
    - Documentation of evaluation outcomes
 
-3. **Equipment Management**
+6. **Equipment Management**
    - Vendor equipment catalog
    - Order processing and tracking
    - Voucher generation and redemption
    - Equipment distribution management
 
-4. **Program Policy Enforcement**
-   - Automated eligibility checks
+7. **Program Policy Enforcement**
+   - Automated eligibility checks with real-time validation
    - Waiting period enforcement
    - Training session limits
-   - Income verification rules
+   - Income verification rules with FPL threshold validation
 
-5. **Constituent Portal**
-   - Application status checking
-   - Document submission
+8. **Constituent Portal**
+   - Application status checking with detailed progress tracking
+   - Document submission and resubmission
+   - Dependent management for guardians
    - Appointment scheduling
-   - Profile management
+   - Profile management with audit logging
 
-6. **Print System**
-   - Letter generation for various notifications
-   - Print queue management
-   - Batch PDF downloads
+9. **Two-Factor Authentication**
+   - WebAuthn support (security keys, biometrics)
+   - TOTP authenticator app integration
+   - SMS verification
+   - Standardized session management
+
+10. **Print System**
+    - Letter generation for various notifications
+    - Print queue management
+    - Batch PDF downloads
+
+11. **Email System**
+    - Template-based email generation
+    - Delivery tracking and status monitoring
+    - Multi-stream message routing
+    - Inbound email processing
 
 ## Current Implementation Status
 
 - ✅ Authentication system (using [authentication-zero](https://github.com/DiegoSalazar/rails-authentication-zero))
+- ✅ Two-factor authentication (WebAuthn, TOTP, SMS)
 - ✅ Basic CRUD operations
 - ✅ Core views and layouts
 - ✅ Admin dashboard
 - ✅ Test data seeding
 - ✅ User role management (Admin, Evaluator, Constituent, Vendor, Trainer, Medical Provider)
 - ✅ Role-capabilities system with Stimulus controllers for toggling capabilities
-- ✅ Postmark API integration for sending emails
+- ✅ Guardian relationship management system
+- ✅ Medical certification system with email tracking
+- ✅ Proof attachment system with unified service architecture
+- ✅ Postmark API integration for sending emails with delivery tracking
 - ✅ Print queue system for letter generation and management
 - ✅ Voucher management and redemption system
 - ✅ Vendor W9 review process
@@ -57,6 +95,8 @@ Vulcan is a Ruby on Rails application that facilitates Maryland Accessible Telec
 - ✅ Inbound email processing (via Action Mailbox)
 - ✅ Communication preference system (email/letter)
 - ✅ Enhanced vendor transaction tracking
+- ✅ Real-time income threshold validation
+- ✅ Comprehensive audit logging and event tracking
 - ⏳ Document OCR processing (planned)
 - ⏳ Enhanced reporting system (in progress)
 
@@ -76,20 +116,20 @@ Vulcan is a Ruby on Rails application that facilitates Maryland Accessible Telec
 ## Documentation
 
 ### Core Functionality
-- [Inbound Email Processing Guide](doc/inbound_email_processing_guide.md) - Setup and usage of email-based proof submission
-- [Email/Letter Template Management](doc/mailer_template_management.md) - Documentation on the database email template and letter generation system
-- [Constituent Type Standardization](doc/constituent_type_standardization.md) - Standards for constituent type handling
+- [Inbound Email Processing Guide](docs/inbound_email_processing_guide.md) - Setup and usage of email-based proof submission
+- [Email/Letter Template Management](docs/mailer_template_management.md) - Documentation on the database email template and letter generation system
+- [Constituent Type Standardization](docs/constituent_type_standardization.md) - Standards for constituent type handling
 
 ### Proof System
-- [Proof Attachment Guide](doc/proof_attachment_guide.md) - Comprehensive guide to the proof attachment system including submission, resubmission, monitoring, and improvements
+- [Proof Attachment Guide](docs/proof_attachment_guide.md) - Comprehensive guide to the proof attachment system including submission, resubmission, monitoring, and improvements
 
 ### Medical Certification
-- [Medical Certification Guide](doc/medical_certification_guide.md) - Complete guide to the medical certification process including requesting, approving, and rejecting certifications
+- [Medical Certification Guide](docs/medical_certification_guide.md) - Complete guide to the medical certification process including requesting, approving, and rejecting certifications
 
 ### System Configuration
-- [System Testing Guide](doc/system_testing_guide.md) - Comprehensive guide to system testing with Chrome and Selenium
-- [Paper Application File Uploads](doc/paper_application_file_uploads.md) - Paper application processing
-- [Email Delivery Tracking](doc/email_delivery_tracking.md) - Email delivery monitoring
+- [System Testing Guide](docs/system_testing_guide.md) - Comprehensive guide to system testing with Chrome and Selenium
+- [Paper Application File Uploads](docs/paper_application_file_uploads.md) - Paper application processing
+- [Email Delivery Tracking](docs/email_delivery_tracking.md) - Email delivery monitoring
 
 ## Prerequisites
 
