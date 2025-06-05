@@ -19,12 +19,6 @@ module ApplicationStatusManagement
       email: 3
     }, prefix: true
 
-    enum :income_verification_status, {
-      pending: 0,
-      verified: 1,
-      failed: 2
-    }, prefix: true
-
     # Status-related scopes - These rely on the enum defined in the model
     scope :active, -> { where(status: %i[in_progress needs_information reminder_sent awaiting_documents]) }
     scope :draft, -> { where(status: :draft) }

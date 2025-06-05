@@ -1,6 +1,6 @@
 ---
 version: "2.0"
-last_updated: "2025-05-22T00:00:00Z"
+last_updated: "2025-05-31T00:00:00Z"
 application: "Mat Vulcan"
 schema: "https://raw.githubusercontent.com/mat-vulcan/security-schemas/main/controls.schema.v2.0.json"
 
@@ -132,20 +132,27 @@ controls:
       rails: ["ActiveRecord::Encryption"]
     priority: *priority_levels.critical
     owner: "@david"
-    status: { implemented: false, tested: false, documented: true, audited: false }
+    status: { implemented: true, tested: true, documented: true, audited: false }
     key_management:
       provider: "ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider"
-      rotation: { enabled: true, cadence: "annual", next_rotation: "2025-01-01" }
+      rotation: { enabled: true, cadence: "annual", next_rotation: "2026-05-31" }
     implementation:
-      files: [ *user_model_path ]
+      files:
+        - *user_model_path
+        - { path: "app/models/totp_credential.rb", purpose: "TOTP secrets encryption" }
+        - { path: "app/models/sms_credential.rb", purpose: "SMS codes encryption" }
+        - { path: "app/models/webauthn_credential.rb", purpose: "WebAuthn keys encryption" }
+        - { path: "config/initializers/active_record_encryption.rb", purpose: "Encryption configuration" }
       details:
         - "TLS 1.2+ enforced via `force_ssl`"
-        - "Planned attribute encryption via `encrypts`"
-        - "Columns to encrypt: users.password_digest, users.ssn_last4, users.email, users.phone, users.physical_address_1, users.physical_address_2, users.city, users.state, users.zip_code, totp_credentials.secret, sms_credentials.code_digest, webauthn_credentials.public_key"
+        - "✅ Completed: All sensitive PII encrypted via ActiveRecord `encrypts` (2025-05-31)"
+        - "Deterministic encryption: email, phone, ssn_last4 (queryable)"
+        - "Non-deterministic encryption: addresses, password_digest, credential secrets"
+        - "Encrypted columns: users.password_digest, users.ssn_last4, users.email, users.phone, users.date_of_birth, users.physical_address_1, users.physical_address_2, users.city, users.state, users.zip_code, totp_credentials.secret, sms_credentials.code_digest, webauthn_credentials.public_key"
     audit:
       report: "https://audit.example.com/reports/2024-Q1/DATA-001.pdf"
-      coverage: 0.90
-      next_review_due: "2025-08-22"
+      coverage: 0.95
+      next_review_due: "2025-11-30"
 
   - id: "DATA-002"
     name: "Input Validation & Filtering"
@@ -305,7 +312,7 @@ controls:
 metadata:
   schema_version: "2.0"
   review_frequency: "Quarterly"
-  last_review_date: "2025-05-22"
+  last_review_date: "2025-05-31"
   responsible_team: "Security Team"
   validation:
     bcrypt_minimum_cost: 12

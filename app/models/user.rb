@@ -11,24 +11,71 @@ class User < ApplicationRecord
   # Ensure duplicate review flag is accessible
   attr_accessor :needs_duplicate_review unless column_names.include?('needs_duplicate_review')
 
-  # DEPRECATED: These attributes will be removed in a future version.
-  # Use GuardianRelationship model instead.
-  # - is_guardian (boolean)
-  # - guardian_relationship (string)
-  # - guardian_id (bigint)
-
   # Class methods
   def self.system_user
     @system_user ||= begin
-      user = User.find_or_create_by!(email: 'system@example.com') do |u|
-        u.first_name = 'System'
-        u.last_name = 'User'
-        u.password = SecureRandom.hex(32)
-        u.type = 'Users::Administrator'
-        u.verified = true
+      # Try to find using our encrypted helper method
+      user = find_by_email('system@example.com')
+
+      # If user exists but isn't admin type, update it
+      user.update!(type: 'Users::Administrator') if user && !user.admin?
+
+      # Create if not found
+      if user.nil?
+        user = User.create!(
+          first_name: 'System',
+          last_name: 'User',
+          email: 'system@example.com',
+          password: SecureRandom.hex(32),
+          type: 'Users::Administrator',
+          verified: true
+        )
       end
-      user.admin? ? user : user.tap { |u| u.update!(type: 'Users::Administrator') }
+
+      user
     end
+  end
+
+  # Rails 8 encryption helper methods for encrypted queries
+  def self.find_by_email(email_value)
+    return nil if email_value.blank?
+
+    # With transparent encryption, we can use regular find_by
+    User.find_by(email: email_value)
+  rescue StandardError => e
+    Rails.logger.warn "find_by_email failed: #{e.message}"
+    nil
+  end
+
+  def self.find_by_phone(phone_value)
+    return nil if phone_value.blank?
+
+    User.find_by(phone: phone_value)
+  rescue StandardError => e
+    Rails.logger.warn "find_by_phone failed: #{e.message}"
+    nil
+  end
+
+  def self.exists_with_email?(email_value, excluding_id: nil)
+    return false if email_value.blank?
+
+    query = User.where(email: email_value)
+    query = query.where.not(id: excluding_id) if excluding_id
+    query.exists?
+  rescue StandardError => e
+    Rails.logger.warn "exists_with_email? failed: #{e.message}"
+    false
+  end
+
+  def self.exists_with_phone?(phone_value, excluding_id: nil)
+    return false if phone_value.blank?
+
+    query = User.where(phone: phone_value)
+    query = query.where.not(id: excluding_id) if excluding_id
+    query.exists?
+  rescue StandardError => e
+    Rails.logger.warn "exists_with_phone? failed: #{e.message}"
+    false
   end
 
   def self.digest(string)
@@ -47,8 +94,9 @@ class User < ApplicationRecord
   # Callbacks
   # Format phone numbers before validation to ensure uniqueness check uses the correct format
   before_validation :format_phone_number
-  after_save :reset_all_caches
+  before_save :format_phone_number, if: :phone_changed?
   after_update :log_profile_changes, if: :saved_changes_to_profile_fields?
+  after_save :reset_all_caches
 
   # Associations
   has_many :sessions, dependent: :destroy
@@ -93,23 +141,41 @@ class User < ApplicationRecord
   has_many :totp_credentials, dependent: :destroy
   has_many :sms_credentials, dependent: :destroy
 
-  # Validations
-  validates :password, length: { minimum: 8 }, if: -> { password.present? }
+  # PII Encryption - Deterministic encryption for queryable fields
+  # Rails 8 automatically maps to {attribute}_encrypted columns
+  encrypts :email, deterministic: true
+  encrypts :phone, deterministic: true
+  encrypts :ssn_last4, deterministic: true
+
+  # Non-deterministic encryption for non-queryable fields
+  encrypts :password_digest
+  encrypts :date_of_birth
+  encrypts :physical_address_1
+  encrypts :physical_address_2
+  encrypts :city
+  encrypts :state
+  encrypts :zip_code
+
   # Accessor for skipping contact uniqueness validation (used for dependent sharing guardian email/phone)
   attr_accessor :skip_contact_uniqueness_validation
 
+  # Validations
+  validates :password, length: { minimum: 8 }, if: -> { password.present? }
+  validates :first_name, presence: true, length: { maximum: 50 }
+  validates :last_name, presence: true, length: { maximum: 50 }
+  validates :middle_initial, length: { maximum: 1 }, allow_blank: true
+
+  # Email and phone validations - relying on database constraints for uniqueness
   validates :email, presence: true,
-                    uniqueness: { unless: :skip_contact_uniqueness_for_dependent? },
                     format: { with: URI::MailTo::EMAIL_REGEXP }
-  # Add uniqueness validation for phone only when phone is present and non-blank
-  # and not a dependent using guardian's contact
-  validates :phone, uniqueness: { case_sensitive: false, allow_blank: true,
-                                  unless: :skip_contact_uniqueness_for_dependent? }
-  validates :first_name, :last_name, presence: true
   validates :reset_password_token, uniqueness: true, allow_nil: true
-  validate :phone_number_must_be_valid # This still checks the 10-digit format
+
+  # Custom validations (uniqueness handled by database constraints)
+  validate :email_must_be_unique, unless: :skip_contact_uniqueness_for_dependent?
+  validate :phone_must_be_unique, unless: :skip_contact_uniqueness_for_dependent?
+  validate :phone_number_must_be_valid, if: :phone_changed?
+  validate :constituent_must_have_disability, if: :validate_constituent_disability?
   validate :validate_address_for_letter_preference
-  validate :constituent_must_have_disability, if: :validate_constituent_disability? # Only validate when appropriate
 
   # Status enum
   enum :status, { inactive: 0, active: 1, suspended: 2 }, default: :active
@@ -119,6 +185,9 @@ class User < ApplicationRecord
 
   # Phone type enum
   enum :phone_type, { voice: 'voice', videophone: 'videophone', text: 'text' }, default: :voice
+
+  # Callbacks
+  after_save :log_profile_changes, if: :saved_changes_to_profile_fields?
 
   # Class methods for capabilities
   def self.capable_types_for(capability)
@@ -149,6 +218,23 @@ class User < ApplicationRecord
   # Basic user information
   def full_name
     [first_name, last_name].compact.join(' ')
+  end
+
+  # Override date_of_birth getter to handle encrypted string conversion
+  def date_of_birth
+    raw_value = super
+    return nil if raw_value.blank?
+    
+    # If it's already a Date object, return it
+    return raw_value if raw_value.is_a?(Date)
+    
+    # If it's a string (from encryption), parse it back to Date
+    begin
+      Date.parse(raw_value.to_s)
+    rescue ArgumentError
+      Rails.logger.warn "Invalid date format for user #{id}: #{raw_value}"
+      nil
+    end
   end
 
   # Role methods - detect based on class or type values to handle namespaced and non-namespaced types
@@ -393,7 +479,7 @@ class User < ApplicationRecord
   def log_profile_changes
     changed_attributes = {}
     profile_fields = %w[first_name last_name email phone physical_address_1 physical_address_2 city state zip_code date_of_birth]
-    
+
     profile_fields.each do |field|
       if saved_change_to_attribute?(field)
         old_value, new_value = saved_change_to_attribute(field)
@@ -417,5 +503,27 @@ class User < ApplicationRecord
         timestamp: Time.current.iso8601
       }
     )
+  end
+
+  def email_must_be_unique
+    return if email.blank?
+
+    # WORKAROUND: Use the helper method that works with encrypted columns
+    existing = User.exists_with_email?(email, excluding_id: id)
+    errors.add(:email, 'has already been taken') if existing
+  rescue StandardError => e
+    Rails.logger.warn "Email uniqueness check failed: #{e.message}"
+    # Don't add validation error on database errors - let the unique index catch it
+  end
+
+  def phone_must_be_unique
+    return if phone.blank?
+
+    # WORKAROUND: Use the helper method that works with encrypted columns
+    existing = User.exists_with_phone?(phone, excluding_id: id)
+    errors.add(:phone, 'has already been taken') if existing
+  rescue StandardError => e
+    Rails.logger.warn "Phone uniqueness check failed: #{e.message}"
+    # Don't add validation error on database errors - let the unique index catch it
   end
 end

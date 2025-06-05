@@ -8,6 +8,10 @@ This directory contains operational security documentation for the Mat Vulcan ap
 - **`baseline_policy.md`** - Comprehensive security policy document for Maryland DoIT compliance  
 - **`authentication_system.md`** - Technical documentation of the current authentication and 2FA system
 
+## Recent Updates
+
+- **2025-05-31**: PII encryption implementation completed using Rails ActiveRecord Encryption for all sensitive database columns
+
 ## Purpose
 
 These documents define and document the security posture of the Mat Vulcan application. They are actively maintained and referenced during:
@@ -25,4 +29,4 @@ These documents define and document the security posture of the Mat Vulcan appli
 
 ## Maintenance
 
-The `controls.yaml` file is validated in CI and should be updated whenever security controls are modified. The policy documents should be reviewed quarterly as part of the security review process. 
+The `controls.yaml` file is validated in CI and should be updated whenever security controls are modified. The policy documents should be reviewed quarterly as part of the security review process.

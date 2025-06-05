@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
+ActiveRecord::Schema[8.0].define(version: 2025_06_05_030158) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -90,7 +90,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
     t.datetime "application_date"
     t.integer "household_size"
     t.decimal "annual_income"
-    t.integer "income_verification_status"
     t.datetime "income_verified_at"
     t.bigint "income_verified_by_id"
     t.text "income_details"
@@ -101,13 +100,11 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
     t.integer "review_count"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.boolean "self_certify_disability", default: false
+    t.boolean "self_certify_disability"
     t.boolean "maryland_resident"
     t.boolean "terms_accepted"
     t.boolean "information_verified"
     t.boolean "medical_release_authorized"
-    t.integer "income_proof_status", default: 0, null: false
-    t.integer "residency_proof_status", default: 0, null: false
     t.string "medical_provider_name"
     t.string "medical_provider_phone"
     t.string "medical_provider_fax"
@@ -115,7 +112,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
     t.integer "total_rejections", default: 0, null: false
     t.datetime "last_proof_submitted_at"
     t.datetime "needs_review_since"
-    t.bigint "trainer_id"
     t.integer "medical_certification_status", default: 0, null: false
     t.datetime "medical_certification_verified_at"
     t.bigint "medical_certification_verified_by_id"
@@ -127,6 +123,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
     t.string "alternate_contact_name"
     t.string "alternate_contact_phone"
     t.string "alternate_contact_email"
+    t.integer "income_proof_status", default: 0, null: false
+    t.integer "residency_proof_status", default: 0, null: false
     t.index ["income_proof_status"], name: "idx_applications_on_income_proof_status"
     t.index ["income_verified_by_id"], name: "index_applications_on_income_verified_by_id"
     t.index ["last_proof_submitted_at"], name: "index_applications_on_last_proof_submitted_at"
@@ -138,7 +136,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
     t.index ["residency_proof_status"], name: "idx_applications_on_residency_proof_status"
     t.index ["status", "needs_review_since"], name: "index_applications_on_status_and_needs_review_since"
     t.index ["total_rejections"], name: "index_applications_on_total_rejections"
-    t.index ["trainer_id"], name: "index_applications_on_trainer_id"
     t.index ["user_id"], name: "index_applications_on_user_id"
     t.check_constraint "income_proof_status = ANY (ARRAY[0, 1, 2])", name: "income_proof_status_check"
     t.check_constraint "residency_proof_status = ANY (ARRAY[0, 1, 2])", name: "residency_proof_status_check"
@@ -159,14 +156,13 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
     t.bigint "updated_by_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.integer "format"
+    t.integer "format", default: 0
     t.text "description"
-    t.integer "version"
+    t.integer "version", default: 1
     t.string "previous_subject"
     t.text "previous_body"
     t.index ["name"], name: "index_email_templates_on_name", unique: true
     t.index ["updated_by_id"], name: "index_email_templates_on_updated_by_id"
-    t.index ["version"], name: "index_email_templates_on_version"
   end
 
   create_table "evaluations", force: :cascade do |t|
@@ -181,8 +177,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
     t.integer "status", default: 0
     t.bigint "application_id", null: false
     t.text "needs"
-    t.integer "recommended_product_ids", default: [], array: true
-    t.datetime "evaluation_datetime"
     t.string "location"
     t.jsonb "attendees", default: []
     t.jsonb "products_tried", default: []
@@ -195,6 +189,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
   create_table "evaluations_products", id: false, force: :cascade do |t|
     t.bigint "evaluation_id", null: false
     t.bigint "product_id", null: false
+    t.index ["evaluation_id"], name: "index_evaluations_products_on_evaluation_id"
+    t.index ["product_id"], name: "index_evaluations_products_on_product_id"
   end
 
   create_table "events", force: :cascade do |t|
@@ -312,7 +308,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
     t.string "name"
     t.text "description"
     t.decimal "price"
-    t.integer "quantity"
     t.datetime "archived_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -321,7 +316,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
     t.text "features"
     t.text "compatibility_notes"
     t.string "documentation_url"
-    t.string "device_types", default: [], array: true
+    t.text "device_types", default: [], array: true
     t.index ["device_types"], name: "index_products_on_device_types", using: :gin
   end
 
@@ -335,8 +330,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
   create_table "proof_reviews", force: :cascade do |t|
     t.bigint "application_id", null: false
     t.bigint "admin_id", null: false
-    t.integer "proof_type", null: false
-    t.integer "status", null: false
+    t.integer "proof_type"
+    t.integer "status"
     t.text "rejection_reason"
     t.integer "submission_method"
     t.datetime "reviewed_at", null: false
@@ -346,7 +341,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
     t.index ["admin_id", "created_at"], name: "index_proof_reviews_on_admin_id_and_created_at"
     t.index ["admin_id"], name: "index_proof_reviews_on_admin_id"
     t.index ["application_id", "proof_type", "created_at"], name: "idx_on_application_id_proof_type_created_at_4b8ffa7c5f"
+    t.index ["application_id", "proof_type", "status"], name: "idx_on_application_id_proof_type_status_78cb268d0d"
     t.index ["application_id"], name: "index_proof_reviews_on_application_id"
+    t.index ["reviewed_at"], name: "index_proof_reviews_on_reviewed_at"
     t.index ["status"], name: "index_proof_reviews_on_status"
   end
 
@@ -409,7 +406,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
     t.bigint "user_id", null: false
     t.string "phone_number", null: false
     t.datetime "last_sent_at", null: false
-    t.string "code_digest"
+    t.text "code_digest"
     t.datetime "code_expires_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -550,7 +547,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
 
   create_table "totp_credentials", force: :cascade do |t|
     t.bigint "user_id", null: false
-    t.string "secret", null: false
+    t.text "secret", null: false
     t.string "nickname", null: false
     t.datetime "last_used_at", null: false
     t.datetime "created_at", null: false
@@ -578,8 +575,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
   end
 
   create_table "users", force: :cascade do |t|
-    t.string "email", null: false
-    t.string "password_digest", null: false
+    t.string "email", limit: 510, null: false
+    t.string "password_digest", limit: 500, null: false
     t.boolean "verified", default: false, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -587,14 +584,13 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
     t.string "first_name"
     t.string "middle_initial"
     t.string "last_name"
-    t.string "phone"
-    t.date "date_of_birth"
-    t.string "ssn_last4"
-    t.string "physical_address_1"
-    t.string "physical_address_2"
-    t.string "city"
-    t.string "state"
-    t.string "zip_code"
+    t.string "phone", limit: 300
+    t.string "ssn_last4", limit: 300
+    t.string "physical_address_1", limit: 1000
+    t.string "physical_address_2", limit: 1000
+    t.string "city", limit: 500
+    t.string "state", limit: 300
+    t.string "zip_code", limit: 300
     t.string "county_of_residence"
     t.datetime "last_sign_in_at"
     t.string "last_sign_in_ip"
@@ -632,14 +628,18 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
     t.boolean "force_password_change", default: false, null: false
     t.string "website_url"
     t.string "webauthn_id"
+    t.boolean "needs_duplicate_review", default: false, null: false
     t.string "phone_type", default: "voice"
+    t.text "date_of_birth"
     t.index ["business_name"], name: "index_users_on_business_name"
     t.index ["business_tax_id"], name: "index_users_on_business_tax_id"
     t.index ["email"], name: "index_users_on_email"
+    t.index ["email"], name: "index_users_on_email_unique", unique: true
     t.index ["evaluator_id"], name: "index_users_on_evaluator_id"
     t.index ["income_verified_by_id"], name: "index_users_on_income_verified_by_id"
     t.index ["medical_provider_id"], name: "index_users_on_medical_provider_id"
     t.index ["phone"], name: "index_users_on_phone", where: "(phone IS NOT NULL)"
+    t.index ["phone"], name: "index_users_on_phone_unique", unique: true, where: "(phone IS NOT NULL)"
     t.index ["phone_type"], name: "index_users_on_phone_type"
     t.index ["recipient_id"], name: "index_users_on_recipient_id"
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
@@ -722,7 +722,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
   create_table "webauthn_credentials", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.string "external_id", null: false
-    t.string "public_key", null: false
+    t.text "public_key", null: false
     t.string "nickname", null: false
     t.bigint "sign_count", default: 0, null: false
     t.datetime "created_at", null: false
@@ -741,7 +741,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_27_170536) do
   add_foreign_key "applications", "users"
   add_foreign_key "applications", "users", column: "income_verified_by_id"
   add_foreign_key "applications", "users", column: "managing_guardian_id"
-  add_foreign_key "applications", "users", column: "trainer_id"
+  add_foreign_key "applications", "users", column: "medical_certification_verified_by_id"
   add_foreign_key "email_templates", "users", column: "updated_by_id"
   add_foreign_key "evaluations", "applications"
   add_foreign_key "evaluations", "users", column: "constituent_id"

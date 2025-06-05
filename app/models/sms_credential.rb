@@ -3,6 +3,8 @@
 class SmsCredential < ApplicationRecord
   belongs_to :user
 
+  encrypts :code_digest
+
   validates :phone_number, presence: true
   validates :last_sent_at, presence: true
 
@@ -31,6 +33,7 @@ class SmsCredential < ApplicationRecord
 
   def format_phone_number
     return if phone_number.blank?
+
     # Use the same formatting logic as in User model
     # Strip all non-digit characters
     digits = phone_number.gsub(/\D/, '')

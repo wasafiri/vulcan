@@ -27,7 +27,7 @@ Tick **every** box before requesting an Authorization-to-Operate (ATO) or major 
 | ✅     | Remove prohibited tech & vendors (TikTok, Kaspersky, Huawei, etc.).  None are used in the codebase. Confirmed 5/22/25.                      | **Emergency Directive 2022-12-001**                                                              |
 | ✅     | MFA for **all external users** *and* every remote admin session.                            | **IT Security Manual IA-2**, **External User Auth G21-1**, **State Min Cyber Standards PR.AC-1** |
 | ⬜︎     | Maintain complete asset & software inventory; map all data flows.                           | **State Min Cyber Standards ID.AM-1/2**, **CSF Guidebook ID.AM**                                 |
-| ⬜︎     | Encrypt data *in transit* (TLS 1.2+) & *at rest* (AES-256 / Rails ActiveRecord Encryption) — attribute encryption pending. | **IT Security Manual SC-13**, **CSF Guidebook PR.DS-2**                                          |
+| ✅     | Encrypt data *in transit* (TLS 1.2+) & *at rest* (AES-256 / Rails ActiveRecord Encryption) — completed 2025-05-31. | **IT Security Manual SC-13**, **CSF Guidebook PR.DS-2**                                          |
 | ⬜︎     | Annual independent penetration test + quarterly vulnerability scans. Vendor for independent penetration test, and scripts for quarterly vulnerability scans needed. Specific tools are documented in `docs/security/controls.yaml`. | **IT Security Manual CA-2.1 & RA-5**, **CSF Guidebook DE.CM-8**                                  |
 | ✅     | Centralised logs retained ≥ 1 year; alert on auth failure spikes & privilege misuse.        | **State Min Cyber Standards DE.AE-1/2**, **CSF Guidebook DE controls**                           |
 | ⬜︎     | Submit Statement of Compliance & full ATO package to OSM before launch.                     | **IT Security Manual CA-1/2**, **State Min Cyber Standards Appendix A**                          |
@@ -163,7 +163,7 @@ SAST (Brakeman) and dependency scans (`bundler-audit`, Dependabot) run on every 
 #### DATA-001 — Encryption *(Critical)*
 
 * **DoIT refs:** SC-13, PR.DS-2
-* **Status:** Partial — TLS 1.2+ enforced; AES-256 at rest encryption via ActiveRecord `encrypts` pending for sensitive columns (see `controls.yaml`).
+* **Status:** ✅ **Completed** — TLS 1.2+ enforced; AES-256 at rest encryption via ActiveRecord `encrypts` implemented for all sensitive columns (completed 2025-05-31).
 
 #### DATA-002 — Input Validation & Filtering *(High)*
 

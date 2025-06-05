@@ -3,6 +3,8 @@
 class WebauthnCredential < ApplicationRecord
   belongs_to :user
 
+  encrypts :public_key
+
   validates :external_id, presence: true, uniqueness: true
   validates :public_key, presence: true
   validates :nickname, presence: true

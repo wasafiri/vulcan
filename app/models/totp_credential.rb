@@ -3,6 +3,8 @@
 class TotpCredential < ApplicationRecord
   belongs_to :user
 
+  encrypts :secret
+
   validates :secret, presence: true
   validates :nickname, presence: true
   validates :last_used_at, presence: true

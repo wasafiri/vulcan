@@ -106,16 +106,77 @@ else
       fixtures_path = Rails.root.join('test/fixtures')
 
       # Load users first
-      seed_puts 'Loading users fixture...'
-      ActiveRecord::FixtureSet.create_fixtures(fixtures_path, 'users')
+      seed_puts 'Loading users fixture via ActiveRecord models...'
+      user_fixture_file = fixtures_path.join('users.yml')
+      if File.exist?(user_fixture_file)
+        # Disable uniqueness validation on plaintext email column for seeding
+        User._validators[:email].reject! { |v| v.is_a?(ActiveRecord::Validations::UniquenessValidator) }
+        user_data = YAML.safe_load(ERB.new(File.read(user_fixture_file)).result, permitted_classes: [Date, DateTime, Time])
+        users_map = {}
+        user_data.each do |key, attributes|
+          seed_puts "  Creating user #{key}..."
+          # Map vendor fixture status 'approved' to valid user status 'active'
+          attributes['status'] = 'active' if attributes['status'] == 'approved'
+          user = User.new
+          attributes.each do |attr, value|
+            setter = "#{attr}="
+            user.send(setter, value) if user.respond_to?(setter)
+          end
+          user.save!(validate: false)
+          users_map[key] = user
+        end
+      else
+        seed_error "Users fixture not found at #{user_fixture_file}"
+      end
 
       # Then load applications that depend on users
-      seed_puts 'Loading applications fixture...'
-      ActiveRecord::FixtureSet.create_fixtures(fixtures_path, 'applications')
+      seed_puts 'Loading applications fixture via ActiveRecord models...'
+      app_fixture_file = fixtures_path.join('applications.yml')
+      if File.exist?(app_fixture_file)
+        app_data = YAML.safe_load(ERB.new(File.read(app_fixture_file)).result, permitted_classes: [Date, DateTime, Time])
+        app_data.each do |key, attributes|
+          seed_puts "  Creating application #{key}..."
+          # Map legacy fixture status "in_review" to valid enum "in_progress"
+          attributes['status'] = 'in_progress' if attributes['status'] == 'in_review'
+          # Map fixture submission_method values to valid enum keys
+          attributes['submission_method'] = 'online' if attributes['submission_method'] == 'web'
+          # Map fixture user reference to user_id
+          if attributes['user']
+            user_key = attributes.delete('user')
+            attributes['user_id'] = users_map[user_key]&.id
+          end
+          filtered_attributes = attributes.slice(*Application.attribute_names)
+          app = Application.new(filtered_attributes)
+          app.save!(validate: false)
+        end
+      else
+        seed_error "Applications fixture not found at #{app_fixture_file}"
+      end
 
+      # Disable invoice payment notifications during seeding
+      Invoice.skip_callback(:save, :after, :send_payment_notification)
       # Then load invoices that depend on users (vendors)
-      seed_puts 'Loading invoices fixture...'
-      ActiveRecord::FixtureSet.create_fixtures(fixtures_path, 'invoices')
+      seed_puts 'Loading invoices fixture via ActiveRecord models...'
+      invoice_fixture_file = fixtures_path.join('invoices.yml')
+      if File.exist?(invoice_fixture_file)
+        invoice_data = YAML.safe_load(ERB.new(File.read(invoice_fixture_file)).result, permitted_classes: [Date, DateTime, Time])
+        invoices_map = {}
+        invoice_data.each do |key, attributes|
+          seed_puts "  Creating invoice #{key}..."
+          # No status mapping needed; fixtures use Invoice enum keys
+          # Map vendor fixture reference to vendor_id
+          if attributes['vendor']
+            vendor_key = attributes.delete('vendor')
+            attributes['vendor_id'] = users_map[vendor_key]&.id
+          end
+          filtered_attributes = attributes.slice(*Invoice.attribute_names)
+          invoice = Invoice.new(filtered_attributes)
+          invoice.save!(validate: false)
+          invoices_map[key] = invoice
+        end
+      else
+        seed_error "Invoices fixture not found at #{invoice_fixture_file}"
+      end
 
       # ------------------------------
       # Seed Email Templates

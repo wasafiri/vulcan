@@ -373,7 +373,7 @@ module Applications
       elsif attrs[:email].present?
         # Not a dependent using guardian's contact info, so try to find an existing user
         Rails.logger.info { "[PAPER_APP] Looking up user by email: #{attrs[:email]}" }
-        user = User.find_by(email: attrs[:email])
+        user = User.find_by_email(attrs[:email])
         if user
           # Never return the guardian as a dependent
           if is_dependent && user.id == @guardian_user_for_app&.id
@@ -387,7 +387,7 @@ module Applications
         # Ensure phone is formatted for lookup if needed
         formatted_phone = User.new(phone: attrs[:phone]).phone # Use formatted phone for lookup
         Rails.logger.info { "[PAPER_APP] Looking up user by phone: #{formatted_phone}" }
-        user = User.find_by(phone: formatted_phone)
+        user = User.find_by_phone(formatted_phone)
         if user
           # Never return the guardian as a dependent
           if is_dependent && user.id == @guardian_user_for_app&.id

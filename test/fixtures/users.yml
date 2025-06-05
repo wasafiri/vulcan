@@ -7,6 +7,7 @@ admin:
   first_name: Admin
   last_name: User
   password_digest: <%= User.digest('password123') %>
+  phone: 555-100-0001
   email_verified: true
   date_of_birth: <%= 45.years.ago.to_date %>
   status: active
@@ -69,6 +70,7 @@ trainer:
   first_name: Trainer
   last_name: Person
   password_digest: <%= User.digest('password123') %>
+  phone: 555-100-0002
   email_verified: true
   date_of_birth: <%= 39.years.ago.to_date %>
   status: active
@@ -83,6 +85,7 @@ evaluator:
   first_name: Evaluator
   last_name: Person
   password_digest: <%= User.digest('password123') %>
+  phone: 555-100-0003
   email_verified: true
   date_of_birth: <%= 42.years.ago.to_date %>
   status: active
@@ -97,6 +100,7 @@ medical_provider:
   first_name: Doctor
   last_name: Smith
   password_digest: <%= User.digest('password123') %>
+  phone: 555-100-0004
   email_verified: true
   date_of_birth: <%= 48.years.ago.to_date %>
   status: active

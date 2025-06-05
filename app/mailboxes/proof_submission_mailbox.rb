@@ -206,7 +206,7 @@ class ProofSubmissionMailbox < ApplicationMailbox
     from_email = mail.from&.first
 
     # Try to find the user by email first
-    @constituent = from_email.present? ? User.find_by(email: from_email) : nil
+    @constituent = from_email.present? ? User.find_by_email(from_email) : nil
 
     # If we can't find a constituent but can find an application via app_id_from_subject
     # and the from_email matches a provider's email in the app metadata, use the application's user

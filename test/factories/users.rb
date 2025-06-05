@@ -7,7 +7,7 @@ FactoryBot.define do
       password { 'password123' }
       first_name { 'Test' }
       last_name { 'User' }
-      phone { nil } # Don't generate a default phone, tests should supply if needed
+      sequence(:phone) { |n| "555-#{format('%03d', (n % 900) + 100)}-#{format('%04d', (n % 9000) + 1000)}" }
       phone_type { 'voice' } # Default phone type
       date_of_birth { 30.years.ago }
       timezone { 'Eastern Time (US & Canada)' }
