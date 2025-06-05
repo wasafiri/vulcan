@@ -92,8 +92,105 @@ class UserSearchController extends BaseFormController {
     
     this.clearResults()
     
+    // DON'T clear the guardian selection here - that would undo the selection we just made!
+    // The guardian picker outlet should maintain its selected state
+  }
+  
+  // Separate method for when we actually want to clear everything
+  clearSearchAndSelection() {
+    this.withTarget('searchInput', (input) => {
+      input.value = ""
+      input.focus()
+    })
+    
+    this.clearResults()
+    
     if (this.hasGuardianPickerOutlet) {
       this.guardianPickerOutlet.clearSelection()
+    }
+  }
+
+  // Handle guardian creation from button click events (matching HTML and documentation)
+  async createGuardian(event) {
+    event.preventDefault()
+    
+    // Collect form data from guardian fields since they're not in an actual form element
+    const formData = new FormData()
+    
+    // Find all guardian input fields within our controller element
+    const guardianFields = this.element.querySelectorAll('input[name^="guardian_attributes"], select[name^="guardian_attributes"]')
+    
+    if (guardianFields.length === 0) {
+      console.error('Guardian form fields not found')
+      return
+    }
+    
+    // Collect all field values and convert guardian_attributes[field] to direct field names
+    guardianFields.forEach(field => {
+      if (field.type === 'radio' || field.type === 'checkbox') {
+        if (field.checked) {
+          // Convert guardian_attributes[field_name] to just field_name
+          const fieldName = field.name.replace('guardian_attributes[', '').replace(']', '')
+          formData.append(fieldName, field.value)
+        }
+      } else if (field.value.trim() !== '') {
+        // Convert guardian_attributes[field_name] to just field_name
+        const fieldName = field.name.replace('guardian_attributes[', '').replace(']', '')
+        formData.append(fieldName, field.value)
+      }
+    })
+    
+    // Clear any previous errors
+    this.clearFieldErrors()
+    
+    // Validate required fields
+    const validationResult = await this.validateBeforeSubmit(formData)
+    if (!validationResult.valid) {
+      this.handleValidationErrors(validationResult.errors)
+      return
+    }
+
+    try {
+      // Show loading state on the button
+      const button = event.target
+      const originalText = button.textContent
+      button.disabled = true
+      button.textContent = 'Creating...'
+
+      // Convert FormData to JSON object for Rails controller
+      const userData = {}
+      for (const [key, value] of formData.entries()) {
+        userData[key] = value
+      }
+
+      const result = await railsRequest.perform({
+        method: 'post',
+        url: '/admin/users',
+        body: userData,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        key: 'create-guardian'
+      })
+
+      if (result.success) {
+        await this.handleSuccess(result.data)
+        // Restore button state after success
+        button.disabled = false
+        button.textContent = originalText
+      } else {
+        throw new Error('Guardian creation failed')
+      }
+
+    } catch (error) {
+      console.error('Guardian creation error:', error)
+      this.showErrorNotification(error.message || 'Failed to create guardian')
+      
+      // Restore button state on error
+      const button = event.target
+      button.disabled = false
+      button.textContent = 'Save Guardian'
     }
   }
 
@@ -167,17 +264,56 @@ class UserSearchController extends BaseFormController {
 
   // Override from BaseFormController for custom validation
   async validateBeforeSubmit(data) {
-    if (!data.first_name || !data.last_name || !data.email) {
+    // Handle both FormData and plain objects
+    const firstName = data instanceof FormData ? data.get('first_name') : data.first_name
+    const lastName = data instanceof FormData ? data.get('last_name') : data.last_name
+    const email = data instanceof FormData ? data.get('email') : data.email
+    
+    if (!firstName || !lastName || !email) {
       return { 
         valid: false,
         errors: {
-          first_name: !data.first_name ? 'First name is required' : null,
-          last_name: !data.last_name ? 'Last name is required' : null,
-          email: !data.email ? 'Email is required' : null
+          first_name: !firstName ? 'First name is required' : null,
+          last_name: !lastName ? 'Last name is required' : null,
+          email: !email ? 'Email is required' : null
         }
       }
     }
     return { valid: true }
+  }
+
+  // Clear field validation errors
+  clearFieldErrors() {
+    // Remove error styling from inputs
+    this.element.querySelectorAll('input.border-red-500').forEach(input => {
+      input.classList.remove('border-red-500')
+    })
+    
+    // Remove error messages
+    this.element.querySelectorAll('.field-error-message').forEach(errorEl => {
+      errorEl.remove()
+    })
+  }
+
+  // Handle validation errors display
+  handleValidationErrors(errors) {
+    Object.entries(errors).forEach(([field, message]) => {
+      if (message) {
+        // Look for input with guardian_attributes format
+        const input = this.element.querySelector(`input[name="guardian_attributes[${field}]"], select[name="guardian_attributes[${field}]"]`)
+        if (input) {
+          input.classList.add('border-red-500')
+          // Try to find or create error display
+          let errorEl = input.parentElement.querySelector('.field-error-message')
+          if (!errorEl) {
+            errorEl = document.createElement('div')
+            errorEl.className = 'field-error-message text-red-600 text-sm mt-1'
+            input.parentElement.appendChild(errorEl)
+          }
+          errorEl.textContent = message
+        }
+      }
+    })
   }
 
   // Override from BaseFormController for success handling
