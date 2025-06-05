@@ -84,4 +84,6 @@ export function createFormChangeDebounce(func)   { return debounce(func, DEBOUNC
 export function createUIUpdateDebounce(func)     { return debounce(func, DEBOUNCE_DELAYS.UI_UPDATE) }
 export function createVeryShortDebounce(func)    { return debounce(func, DEBOUNCE_DELAYS.VERY_SHORT) }
 export function simpleDebounce(func, wait)        { return debounce(func, wait, { leading: false, trailing: true }) }
-export function throttle(func, wait)              { return debounce(func, wait, { leading: true, trailing: true, maxWait: wait }) }
+
+// Note: throttle function removed - it was unused and referenced non-existent maxWait option
+// For throttling behavior, use Stimulus native debouncing: data-action="input->controller#method:debounce(300)"

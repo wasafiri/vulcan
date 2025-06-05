@@ -1,5 +1,5 @@
 import { Application } from "@hotwired/stimulus"
-import ChartToggleController from "controllers/chart_toggle_controller"
+import ChartToggleController from "controllers/charts/toggle_controller"
 
 describe("ChartToggleController", () => {
   let application
