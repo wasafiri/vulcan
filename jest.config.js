@@ -3,7 +3,8 @@ module.exports = {
   roots: ['test/javascript'],
   moduleDirectories: ['node_modules', 'app/javascript'],
   moduleNameMapper: {
-    '^controllers/(.*)$': '<rootDir>/app/javascript/controllers/$1'
+    '^controllers/(.*)$': '<rootDir>/app/javascript/controllers/$1',
+    '^@rails/request\\.js$': '<rootDir>/test/javascript/mocks/rails_request.js'
   },
   setupFilesAfterEnv: ['<rootDir>/test/javascript/setup.js'],
   testPathIgnorePatterns: ['/node_modules/'],
@@ -13,5 +14,8 @@ module.exports = {
   ],
   transform: {
     '^.+\\.jsx?$': 'babel-jest'
-  }
+  },
+  transformIgnorePatterns: [
+    'node_modules/(?!(@rails/request\\.js)/)'
+  ]
 };
