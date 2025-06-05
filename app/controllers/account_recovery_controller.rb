@@ -9,7 +9,7 @@ class AccountRecoveryController < ApplicationController
 
   def create
     # Find user by email
-    @user = User.find_by(email: params[:email])
+    @user = User.find_by_email(params[:email])
 
     if @user.present?
       # Create a recovery request record
@@ -35,7 +35,7 @@ class AccountRecoveryController < ApplicationController
 
   def create_recovery_request(user)
     # Record the recovery request in the database
-    recovery_request = RecoveryRequest.create!(
+    RecoveryRequest.create!(
       user: user,
       status: 'pending',
       details: params[:details],
@@ -44,7 +44,6 @@ class AccountRecoveryController < ApplicationController
     )
 
     # Return the recovery request object
-    recovery_request
   end
 
   def notify_admins_of_recovery_request(recovery_request)

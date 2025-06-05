@@ -198,6 +198,47 @@ describe('RailsRequestService', () => {
         })
       )
     })
+
+    it('defaults to text parsing for unknown content types', async () => {
+      mockResponse.headers.get.mockReturnValue('application/octet-stream')
+      mockResponse.text.mockResolvedValue('raw data')
+
+      const result = await service.perform({ url: '/api/test' })
+
+      expect(result.data).toBe('raw data')
+    })
+
+    it('handles @rails/request.js response where json is already a Promise', async () => {
+      // Simulate @rails/request.js response structure
+      const railsResponse = {
+        ok: true,
+        status: 200,
+        headers: { get: () => 'application/json' },
+        json: Promise.resolve({ message: 'success from rails request' })
+      }
+      
+      mockPerform.mockResolvedValue(railsResponse)
+
+      const result = await service.perform({ url: '/api/test' })
+
+      expect(result.data).toEqual({ message: 'success from rails request' })
+    })
+
+    it('handles @rails/request.js response where text is already a Promise', async () => {
+      // Simulate @rails/request.js response structure
+      const railsResponse = {
+        ok: true,
+        status: 200,
+        headers: { get: () => 'text/html' },
+        text: Promise.resolve('<div>HTML from rails request</div>')
+      }
+      
+      mockPerform.mockResolvedValue(railsResponse)
+
+      const result = await service.perform({ url: '/api/test' })
+
+      expect(result.data).toBe('<div>HTML from rails request</div>')
+    })
   })
 
   describe('error handling', () => {
@@ -362,6 +403,18 @@ describe('RailsRequestService', () => {
       const result = await service.parseErrorResponse(errorResponse)
 
       expect(result).toEqual({ error: 'Server error: 422' })
+    })
+
+    it('handles @rails/request.js error response where json is already a Promise', async () => {
+      const errorResponse = {
+        status: 422,
+        headers: { get: () => 'application/json' },
+        json: Promise.resolve({ error: 'Validation failed from rails request' })
+      }
+
+      const result = await service.parseErrorResponse(errorResponse)
+
+      expect(result).toEqual({ error: 'Validation failed from rails request' })
     })
   })
 

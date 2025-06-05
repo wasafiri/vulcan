@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_06_05_030158) do
+ActiveRecord::Schema[8.0].define(version: 2025_06_05_180941) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -631,8 +631,12 @@ ActiveRecord::Schema[8.0].define(version: 2025_06_05_030158) do
     t.boolean "needs_duplicate_review", default: false, null: false
     t.string "phone_type", default: "voice"
     t.text "date_of_birth"
+    t.string "dependent_email", comment: "Optional email for dependents; if blank, uses guardian email"
+    t.string "dependent_phone", comment: "Optional phone for dependents; if blank, uses guardian phone"
     t.index ["business_name"], name: "index_users_on_business_name"
     t.index ["business_tax_id"], name: "index_users_on_business_tax_id"
+    t.index ["dependent_email"], name: "index_users_on_dependent_email"
+    t.index ["dependent_phone"], name: "index_users_on_dependent_phone"
     t.index ["email"], name: "index_users_on_email"
     t.index ["email"], name: "index_users_on_email_unique", unique: true
     t.index ["evaluator_id"], name: "index_users_on_evaluator_id"

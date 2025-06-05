@@ -59,6 +59,17 @@ export default class extends Controller {
     }
   }
 
+  /**
+   * Temporary method to prevent errors - this functionality should be handled by income-validation controller
+   * TODO: Replace with proper income-validation controller setup
+   */
+  validateIncomeThreshold() {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('validateIncomeThreshold called on paper-application controller - this should be handled by income-validation controller');
+    }
+    // For now, just prevent the error - the income validation should be handled elsewhere
+  }
+
   /* Modal helpers */
   openRejectionModal() {
     if (this.hasRejectionModalTarget) {

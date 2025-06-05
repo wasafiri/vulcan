@@ -220,6 +220,8 @@ module Applications
       # and self-applicant attributes also into params[:constituent] for self-applications.
       applicant_data_for_constituent = params[:constituent]
       relationship_type = params[:relationship_type]
+      
+
 
       # Determine if this is a guardian scenario
       # It's a guardian scenario if a guardian_id is provided OR new_guardian_attributes are provided,
@@ -256,49 +258,8 @@ module Applications
         Rails.logger.debug { "[PAPER_APP] Dependent email value in form: #{applicant_data_for_constituent[:email].inspect}" }
         Rails.logger.debug { "[PAPER_APP] Dependent phone value in form: #{applicant_data_for_constituent[:phone].inspect}" }
 
-        # Always use the guardian's email if either:
-        # 1. The 'use_guardian_email' or 'use_guardian_address' checkbox is checked (value '1')
-        # 2. No email is provided for the dependent (which happens when the email field is hidden)
-        should_use_guardian_email = @guardian_user_for_app&.email.present? &&
-                                    (params[:use_guardian_email] == '1' ||
-                                     params[:use_guardian_address] == '1' ||
-                                     applicant_data_for_constituent[:email].blank?)
-
-        # Force use of guardian email if it exists and the dependent email is blank
-        if @guardian_user_for_app&.email.present? && applicant_data_for_constituent[:email].blank?
-          should_use_guardian_email = true
-          Rails.logger.warn { '[PAPER_APP] Forcing use of guardian email because dependent email is blank' }
-        end
-
-        if should_use_guardian_email
-          # Use guardian's email for dependent
-          Rails.logger.info { "[PAPER_APP] Using guardian's email (#{@guardian_user_for_app.email}) for dependent" }
-          # Explicitly set the email in the hash
-          applicant_data_for_constituent[:email] = @guardian_user_for_app.email
-        else
-          Rails.logger.info { "[PAPER_APP] Using provided email (#{applicant_data_for_constituent[:email]}) for dependent" }
-        end
-
-        # Check if we should use guardian's phone for dependent
-        should_use_guardian_phone = @guardian_user_for_app&.phone.present? &&
-                                    (params[:use_guardian_phone] == '1' ||
-                                     params[:use_guardian_address] == '1' ||
-                                     applicant_data_for_constituent[:phone].blank?)
-
-        # Force use of guardian phone if it exists and the dependent phone is blank
-        if @guardian_user_for_app&.phone.present? && applicant_data_for_constituent[:phone].blank?
-          should_use_guardian_phone = true
-          Rails.logger.warn { '[PAPER_APP] Forcing use of guardian phone because dependent phone is blank' }
-        end
-
-        if should_use_guardian_phone
-          # Use guardian's phone for dependent
-          Rails.logger.info { "[PAPER_APP] Using guardian's phone (#{@guardian_user_for_app.phone}) for dependent" }
-          # Explicitly set the phone in the hash
-          applicant_data_for_constituent[:phone] = @guardian_user_for_app.phone
-        else
-          Rails.logger.info { "[PAPER_APP] Using provided phone (#{applicant_data_for_constituent[:phone]}) for dependent" }
-        end
+        # Handle contact strategy for dependent using new radio button approach
+        determine_dependent_contact_strategy(applicant_data_for_constituent)
 
         # Process dependent (the actual applicant) using applicant_data_for_constituent
         @constituent = find_or_create_user(applicant_data_for_constituent, is_managing_adult: false)
@@ -349,28 +310,9 @@ module Applications
       # If this is a dependent, check if it's using guardian's contact info
       is_dependent = !is_managing_adult && @guardian_user_for_app
 
-      # Determine if this is a dependent using guardian's contact information
-      is_dependent_using_guardian_email = is_dependent &&
-                                          attrs[:email].present? &&
-                                          attrs[:email] == @guardian_user_for_app.email
-
-      is_dependent_using_guardian_phone = is_dependent &&
-                                          attrs[:phone].present? &&
-                                          attrs[:phone].present? &&
-                                          User.new(phone: attrs[:phone]).phone == @guardian_user_for_app.phone
-
-      # If this is a dependent using guardian's contact info, always create a new user
-      # with uniqueness validation bypass for email/phone
-      if is_dependent_using_guardian_email || is_dependent_using_guardian_phone
-        if is_dependent_using_guardian_email
-          Rails.logger.info { "[PAPER_APP] This is a dependent using guardian's email. Creating new user with uniqueness bypass." }
-        end
-        if is_dependent_using_guardian_phone
-          Rails.logger.info { "[PAPER_APP] This is a dependent using guardian's phone. Creating new user with uniqueness bypass." }
-        end
-        # Create new user with uniqueness validation bypass
-        return create_new_user(attrs, is_managing_adult: is_managing_adult, bypass_uniqueness: true)
-      elsif attrs[:email].present?
+      # For dependents, we now use system-generated emails/phones so no uniqueness conflicts
+      # Try to find existing user first (but skip for dependents with system emails)
+      if attrs[:email].present? && !attrs[:email].include?('@system.matvulcan.local')
         # Not a dependent using guardian's contact info, so try to find an existing user
         Rails.logger.info { "[PAPER_APP] Looking up user by email: #{attrs[:email]}" }
         user = User.find_by_email(attrs[:email])
@@ -405,8 +347,8 @@ module Applications
         Rails.logger.error { "[PAPER_APP] CRITICAL: Attempting to create dependent without email. Full attributes: #{attrs.inspect}" }
         # Include more helpful messaging for the error
         guardian_info = @guardian_user_for_app ? "Guardian info: #{@guardian_user_for_app.id}/#{@guardian_user_for_app.email}" : 'No guardian selected'
-        use_guardian_val = "use_guardian_address=#{params[:use_guardian_address].inspect}, use_guardian_email=#{params[:use_guardian_email].inspect}"
-        add_error("Cannot create dependent: Email is required. Please ensure either a dedicated email is provided for the dependent, or 'Use Guardian Email' is selected. #{guardian_info}. Form params: #{use_guardian_val}")
+        strategy_info = "email_strategy=#{params[:email_strategy].inspect}, phone_strategy=#{params[:phone_strategy].inspect}, address_strategy=#{params[:address_strategy].inspect}"
+        add_error("Cannot create dependent: Email is required. Please ensure either a dedicated email is provided for the dependent, or email strategy is set to 'guardian'. #{guardian_info}. Form params: #{strategy_info}")
         return nil
       end
 
@@ -414,7 +356,7 @@ module Applications
       create_new_user(attrs, is_managing_adult: is_managing_adult)
     end
 
-    def create_new_user(attrs, is_managing_adult:, bypass_uniqueness: false)
+    def create_new_user(attrs, is_managing_adult:)
       # For paper applications, disability selection is usually on the form for the applicant.
       # If this is a dependent, ensure_disability_selection should apply.
       # If it's a guardian being created, they don't need disability flags set.
@@ -437,27 +379,6 @@ module Applications
       new_user.password_confirmation = temp_password
       new_user.verified = true
       new_user.force_password_change = true
-
-      # Set flag to bypass email/phone uniqueness validation for dependents
-      if bypass_uniqueness
-        Rails.logger.info { '[PAPER_APP] Setting skip_contact_uniqueness_validation flag for dependent' }
-        new_user.skip_contact_uniqueness_validation = true
-
-        # Debug the attribute assignment for validation skipping
-        Rails.logger.debug do
-          "[PAPER_APP] skip_contact_uniqueness_validation set to: #{new_user.skip_contact_uniqueness_validation.inspect} (#{new_user.skip_contact_uniqueness_validation.class})"
-        end
-        Rails.logger.debug { "[PAPER_APP] Will skip uniqueness? #{new_user.skip_contact_uniqueness_for_dependent?}" }
-
-        # Double check if the email/phone match the guardian's
-        if @guardian_user_for_app
-          is_email_dupe = @guardian_user_for_app.email.present? && @guardian_user_for_app.email == new_user.email
-          is_phone_dupe = @guardian_user_for_app.phone.present? && @guardian_user_for_app.phone == new_user.phone
-
-          Rails.logger.debug { "[PAPER_APP] Email matches guardian? #{is_email_dupe}" }
-          Rails.logger.debug { "[PAPER_APP] Phone matches guardian? #{is_phone_dupe}" }
-        end
-      end
 
       # STI type is handled by Users::Constituent.new
 
@@ -487,6 +408,75 @@ module Applications
 
       # Default to hearing disability if none are selected
       attrs[:hearing_disability] = '1' unless has_any_disability
+    end
+
+    def determine_dependent_contact_strategy(applicant_data_for_constituent)
+      return unless @guardian_user_for_app
+
+      # Handle email strategy
+      case params[:email_strategy]
+      when 'guardian'
+        # Dependent shares guardian's email
+        Rails.logger.info { "[PAPER_APP] Dependent will share guardian's email (#{@guardian_user_for_app.email})" }
+        applicant_data_for_constituent[:dependent_email] = @guardian_user_for_app.email
+        applicant_data_for_constituent[:email] = "dependent-#{SecureRandom.uuid}@system.matvulcan.local"
+      when 'dependent'
+        # Dependent has their own email
+        if applicant_data_for_constituent[:dependent_email].present?
+          Rails.logger.info { "[PAPER_APP] Dependent will use their own email (#{applicant_data_for_constituent[:dependent_email]})" }
+          applicant_data_for_constituent[:email] = applicant_data_for_constituent[:dependent_email]
+        else
+          Rails.logger.warn { '[PAPER_APP] Email strategy is "dependent" but no dependent_email provided, falling back to guardian email' }
+          # Fall back to guardian's email when dependent_email is blank
+          applicant_data_for_constituent[:dependent_email] = @guardian_user_for_app.email
+          applicant_data_for_constituent[:email] = "dependent-#{SecureRandom.uuid}@system.matvulcan.local"
+        end
+      else
+        # Default to guardian's email if no strategy specified
+        Rails.logger.info { '[PAPER_APP] No email strategy specified, defaulting to guardian email' }
+        applicant_data_for_constituent[:dependent_email] = @guardian_user_for_app.email
+        applicant_data_for_constituent[:email] = "dependent-#{SecureRandom.uuid}@system.matvulcan.local"
+      end
+
+      # Handle phone strategy  
+      case params[:phone_strategy]
+      when 'guardian'
+        # Dependent shares guardian's phone
+        Rails.logger.info { "[PAPER_APP] Dependent will share guardian's phone (#{@guardian_user_for_app.phone})" }
+        applicant_data_for_constituent[:dependent_phone] = @guardian_user_for_app.phone
+        applicant_data_for_constituent[:phone] = "000-000-#{rand(1000..9999)}"
+      when 'dependent'
+        # Dependent has their own phone
+        if applicant_data_for_constituent[:dependent_phone].present?
+          Rails.logger.info { "[PAPER_APP] Dependent will use their own phone (#{applicant_data_for_constituent[:dependent_phone]})" }
+          applicant_data_for_constituent[:phone] = applicant_data_for_constituent[:dependent_phone]
+        else
+          Rails.logger.warn { '[PAPER_APP] Phone strategy is "dependent" but no dependent_phone provided, falling back to guardian phone' }
+          # Fall back to guardian's phone when dependent_phone is blank
+          applicant_data_for_constituent[:dependent_phone] = @guardian_user_for_app.phone
+          applicant_data_for_constituent[:phone] = "000-000-#{rand(1000..9999)}"
+        end
+      else
+        # Default to guardian's phone if no strategy specified
+        Rails.logger.info { '[PAPER_APP] No phone strategy specified, defaulting to guardian phone' }
+        applicant_data_for_constituent[:dependent_phone] = @guardian_user_for_app.phone
+        applicant_data_for_constituent[:phone] = "000-000-#{rand(1000..9999)}"
+      end
+
+      # Handle address strategy (optional - defaults to guardian's address)
+      case params[:address_strategy]
+      when 'dependent'
+        # Dependent has their own address - no action needed, use provided address fields
+        Rails.logger.info { '[PAPER_APP] Dependent will use their own address' }
+      else
+        # Default to guardian's address - copy from guardian
+        Rails.logger.info { '[PAPER_APP] Dependent will use guardian address' }
+        applicant_data_for_constituent[:physical_address_1] = @guardian_user_for_app.physical_address_1
+        applicant_data_for_constituent[:physical_address_2] = @guardian_user_for_app.physical_address_2
+        applicant_data_for_constituent[:city] = @guardian_user_for_app.city
+        applicant_data_for_constituent[:state] = @guardian_user_for_app.state
+        applicant_data_for_constituent[:zip_code] = @guardian_user_for_app.zip_code
+      end
     end
 
     def create_application

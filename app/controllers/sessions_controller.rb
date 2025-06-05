@@ -10,7 +10,7 @@ class SessionsController < ApplicationController
   end
 
   def create
-    user = User.find_by(email: params[:email])
+    user = User.find_by_email(params[:email])
 
     if user && user.authenticate(params[:password])
       if user.second_factor_enabled?

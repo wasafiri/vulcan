@@ -9,20 +9,21 @@ module Applications
       @guardian = create(:constituent, email: 'guardian@example.com')
     end
 
-    test 'creates dependent using guardian email when use_guardian_address is checked' do
-      # Create parameters for a paper application with use_guardian_address checked
+    test 'creates dependent using guardian email when email_strategy is guardian' do
+      # Create parameters for a paper application with email_strategy set to 'guardian'
       service = PaperApplicationService.new(
         params: {
           applicant_type: 'dependent',
           guardian_id: @guardian.id,
-          use_guardian_address: '1', # This should trigger using guardian's email
+          email_strategy: 'guardian', # Use guardian's email
+          phone_strategy: 'guardian', # Use guardian's phone
           relationship_type: 'Parent',
           constituent: {
             first_name: 'Dependent',
             last_name: 'User',
-            date_of_birth: '2015-01-01'
-            # NOTE: email intentionally omitted to simulate when it's not filled in
-            # since the checkbox for using guardian's email is checked
+            date_of_birth: '2015-01-01',
+            hearing_disability: '1' # Ensure at least one disability
+            # NOTE: dependent_email intentionally omitted since strategy is 'guardian'
           },
           application: {
             household_size: 2,
@@ -32,9 +33,6 @@ module Applications
             medical_provider_phone: '555-123-4567',
             medical_provider_email: 'doctor@example.com',
             self_certify_disability: true
-          },
-          applicant_attributes: {
-            hearing_disability: '1'
           },
           income_proof_action: 'accept',
           residency_proof_action: 'accept'
@@ -52,26 +50,32 @@ module Applications
       dependent = service.constituent
       assert_not_nil dependent, 'Dependent should have been created'
 
-      # Key assertion: The dependent should have the guardian's email
-      assert_equal @guardian.email, dependent.email,
-                   "Dependent should have guardian's email when use_guardian_address is checked"
+      # Key assertions: The dependent should have a system email but the guardian's email in dependent_email
+      assert_match /dependent-.*@system\.matvulcan\.local/, dependent.email,
+                   'Dependent should have a system-generated email to avoid uniqueness conflicts'
+      assert_equal @guardian.email, dependent.dependent_email,
+                   "Dependent should have guardian's email in dependent_email field when email_strategy is 'guardian'"
+      assert_equal @guardian.email, dependent.effective_email,
+                   'Dependent effective_email should return guardian email'
     end
 
-    test 'creates dependent with their own email when provided' do # rubocop:disable Metrics/BlockLength
+    test 'creates dependent with their own email when email_strategy is dependent' do
       dependent_email = "dependent_#{Time.now.to_i}@example.com"
 
-      # Create parameters for a paper application with the dependent's own email
+      # Create parameters for a paper application with email_strategy set to 'dependent'
       service = PaperApplicationService.new(
         params: {
           applicant_type: 'dependent',
           guardian_id: @guardian.id,
-          use_guardian_address: '0', # Not using guardian's address/email
+          email_strategy: 'dependent', # Use dependent's own email
+          phone_strategy: 'dependent', # Use dependent's own phone
           relationship_type: 'Parent',
           constituent: {
             first_name: 'Dependent',
             last_name: 'User',
             date_of_birth: '2015-01-01',
-            email: dependent_email # Providing a distinct email for the dependent
+            dependent_email: dependent_email, # Providing a distinct email for the dependent
+            hearing_disability: '1' # Ensure at least one disability
           },
           application: {
             household_size: 2,
@@ -81,9 +85,6 @@ module Applications
             medical_provider_phone: '555-123-4567',
             medical_provider_email: 'doctor@example.com',
             self_certify_disability: true
-          },
-          applicant_attributes: {
-            hearing_disability: '1'
           },
           income_proof_action: 'accept',
           residency_proof_action: 'accept'
@@ -102,6 +103,10 @@ module Applications
       assert_not_nil dependent, 'Dependent should have been created'
       assert_equal dependent_email, dependent.email,
                    'Dependent should keep their own email when provided'
+      assert_equal dependent_email, dependent.dependent_email,
+                   'Dependent should have their own email in dependent_email field'
+      assert_equal dependent_email, dependent.effective_email,
+                   'Dependent effective_email should return their own email'
     end
   end
 end

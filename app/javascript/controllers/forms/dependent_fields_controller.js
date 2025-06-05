@@ -7,7 +7,7 @@ import { createFormChangeDebounce } from "../../utils/debounce"
  * Controller for managing dependent-related fields
  * 
  * Responsible for toggling dependent contact information visibility and handling
- * the "Same as Guardian's" functionality for both address and email.
+ * the "Same as Guardian's" functionality for address, email, and phone.
  */
 class DependentFieldsController extends Controller {
   static targets = [
@@ -15,10 +15,14 @@ class DependentFieldsController extends Controller {
     "addressFields", 
     "sameAddressCheckbox", 
     "sameEmailCheckbox", 
+    "samePhoneCheckbox",
     "relationshipType", 
     "emailFieldContainer",
+    "phoneFieldContainer",
     "dependentEmail",
+    "dependentPhone",
     "guardianEmail", 
+    "guardianPhone",
     "guardianAddress1",
     "guardianAddress2", 
     "guardianCity",
@@ -28,8 +32,7 @@ class DependentFieldsController extends Controller {
     "dependentAddress2",
     "dependentCity", 
     "dependentState",
-    "dependentZip",
-    "useGuardianEmailInput"
+    "dependentZip"
   ]
   
   static outlets = ["flash"] // Declare flash outlet
@@ -44,14 +47,23 @@ class DependentFieldsController extends Controller {
     // Set up debounced applicant type change handler
     this.debouncedApplicantTypeChange = createFormChangeDebounce(() => this.executeApplicantTypeChange())
     
-    // Set initial state based on checkbox if available - use target safety
+    // Set initial state based on checkboxes if available - use target safety
     this.withTarget('sameAddressCheckbox', (checkbox) => {
-      this.toggleContactFields({ target: checkbox })
+      if (this.hasAddressFieldsTarget) {
+        this.toggleContactFields({ target: checkbox })
+      }
     })
     
-    // Set initial state for email checkbox - use target safety
     this.withTarget('sameEmailCheckbox', (checkbox) => {
-      this.toggleEmailField({ target: checkbox })
+      if (this.hasDependentEmailTarget) {
+        this.toggleEmailField({ target: checkbox })
+      }
+    })
+    
+    this.withTarget('samePhoneCheckbox', (checkbox) => {
+      if (this.hasDependentPhoneTarget) {
+        this.togglePhoneField({ target: checkbox })
+      }
     })
     
     // Listen for applicant-type change events from ApplicantTypeController
@@ -78,7 +90,7 @@ class DependentFieldsController extends Controller {
   }
   
   /**
-   * Toggle contact fields based on "Same as Guardian's Address" checkbox
+   * Toggle address fields based on "Same as Guardian's Address" checkbox
    * @param {Event} event The change event from the checkbox
    */
   toggleContactFields(event) {
@@ -112,12 +124,11 @@ class DependentFieldsController extends Controller {
     const useGuardianEmail = event.target.checked;
     
     if (!this.hasDependentEmailTarget) {
-      console.warn("Missing dependentEmail target - check HTML structure");
+      if (process.env.NODE_ENV !== 'production' && this.element.offsetParent !== null) {
+        console.warn("Missing dependentEmail target - check HTML structure");
+      }
       return;
     }
-    
-    // Update the hidden input value
-    this.updateUseGuardianEmailInput(useGuardianEmail);
     
     // Use utility to handle email field visibility and required state
     setVisible(this.dependentEmailTarget, !useGuardianEmail, { required: !useGuardianEmail });
@@ -129,22 +140,35 @@ class DependentFieldsController extends Controller {
     
     // Copy guardian's email if needed
     if (useGuardianEmail) {
-      this.copyGuardianEmail();
+      this.copyGuardianEmail()
     }
   }
   
   /**
-   * Update the hidden form field to indicate whether to use guardian's email
-   * @param {boolean} useGuardianEmail Whether to use guardian's email
+   * Toggle dependent phone field based on "Use Guardian's Phone" checkbox
+   * @param {Event} event The change event from the checkbox
    */
-  updateUseGuardianEmailInput(useGuardianEmail) {
-    const visibleCheckbox = this.hasSameEmailCheckboxTarget 
-      ? this.sameEmailCheckboxTarget 
-      : (this.hasUseGuardianEmailInputTarget ? this.useGuardianEmailInputTarget : null);
+  togglePhoneField(event) {
+    const useGuardianPhone = event.target.checked;
     
-    // Ensure the checkbox value matches our parameter
-    if (visibleCheckbox && visibleCheckbox.checked !== useGuardianEmail) {
-      visibleCheckbox.checked = useGuardianEmail;
+    if (!this.hasDependentPhoneTarget) {
+      if (process.env.NODE_ENV !== 'production' && this.element.offsetParent !== null) {
+        console.warn("Missing dependentPhone target - check HTML structure");
+      }
+      return;
+    }
+    
+    // Use utility to handle phone field visibility and required state
+    setVisible(this.dependentPhoneTarget, !useGuardianPhone, { required: !useGuardianPhone });
+    
+    // Handle phone field container visibility if available
+    if (this.hasPhoneFieldContainerTarget) {
+      setVisible(this.phoneFieldContainerTarget, !useGuardianPhone);
+    }
+    
+    // Copy guardian's phone if needed
+    if (useGuardianPhone) {
+      this.copyGuardianPhone()
     }
   }
   
@@ -165,7 +189,9 @@ class DependentFieldsController extends Controller {
                                     this.hasDependentZipTarget;
     
     if (!guardianTargetsAvailable || !dependentTargetsAvailable) {
-      console.warn("Missing address field targets - check HTML structure");
+      if (process.env.NODE_ENV !== 'production' && this.element.offsetParent !== null) {
+        console.warn("Missing address field targets - check HTML structure");
+      }
       return;
     }
     
@@ -182,7 +208,9 @@ class DependentFieldsController extends Controller {
    */
   copyGuardianEmail() {
     if (!this.hasGuardianEmailTarget || !this.hasDependentEmailTarget) {
-      console.warn("Missing email field targets - check HTML structure");
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn("Missing email field targets - check HTML structure");
+      }
       return;
     }
     
@@ -192,6 +220,26 @@ class DependentFieldsController extends Controller {
     } else {
       // Clear the field to ensure the server knows to use guardian's email
       this.dependentEmailTarget.value = '';
+    }
+  }
+  
+  /**
+   * Copy guardian's phone to dependent phone field
+   */
+  copyGuardianPhone() {
+    if (!this.hasGuardianPhoneTarget || !this.hasDependentPhoneTarget) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn("Missing phone field targets - check HTML structure");
+      }
+      return;
+    }
+    
+    // Copy phone if guardian phone is available, otherwise clear
+    if (this.guardianPhoneTarget.value) {
+      this.dependentPhoneTarget.value = this.guardianPhoneTarget.value;
+    } else {
+      // Clear the field to ensure the server knows to use guardian's phone
+      this.dependentPhoneTarget.value = '';
     }
   }
   
@@ -222,14 +270,21 @@ class DependentFieldsController extends Controller {
         setVisible(this.relationshipTypeTarget, true, { required: isForDependent });
       }
       
-      // Re-apply email and address checkbox states when applicant type changes
-      // Only if we're showing the dependent fields
+      // Re-apply checkbox states when applicant type changes
+      // Only if we're showing the dependent fields AND the required targets exist
       if (isForDependent) {
-        if (this.hasSameEmailCheckboxTarget) {
+        // Check for email checkbox and targets before trying to toggle
+        if (this.hasSameEmailCheckboxTarget && this.hasDependentEmailTarget) {
           this.toggleEmailField({ target: this.sameEmailCheckboxTarget });
         }
         
-        if (this.hasSameAddressCheckboxTarget) {
+        // Check for phone checkbox and targets before trying to toggle
+        if (this.hasSamePhoneCheckboxTarget && this.hasDependentPhoneTarget) {
+          this.togglePhoneField({ target: this.samePhoneCheckboxTarget });
+        }
+        
+        // Check for address checkbox and targets before trying to toggle
+        if (this.hasSameAddressCheckboxTarget && this.hasAddressFieldsTarget) {
           this.toggleContactFields({ target: this.sameAddressCheckboxTarget });
         }
       }

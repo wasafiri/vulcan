@@ -18,6 +18,7 @@ module Admin
     DEPENDENT_BASE_FIELDS = %i[
       first_name last_name date_of_birth
       physical_address_1 physical_address_2 city state zip_code
+      dependent_email dependent_phone
     ].freeze
 
     APPLICATION_FIELDS = %i[
@@ -31,10 +32,9 @@ module Admin
     def new
       @paper_application = {
         application: Application.new,
-        guardian_attributes: Users::Constituent.new, # Ensure this key exists for fields_for
-        dependent_attributes: {},
-        applicant_attributes: {},
-        constituent: Constituent.new
+        guardian_attributes: Users::Constituent.new, # For fields_for
+        applicant_attributes: {}, # For disability attributes
+        constituent: Constituent.new # For dependent or self-applicant
       }
       # Ensure guardian_attributes is an empty hash if not already set,
       # or build from an existing model if @paper_application was a real model instance.
@@ -130,8 +130,9 @@ module Admin
         guardian_user_for_app: service.guardian_user_for_app, # For repopulating guardian fields
         # Pass back the original params to help repopulate complex forms
         submitted_params: params.to_unsafe_h.slice(:applicant_type, :relationship_type, :guardian_id, :dependent_id,
-                                                   :guardian_attributes, :dependent_attributes, :applicant_attributes,
-                                                   :application, :constituent)
+                                                   :guardian_attributes, :applicant_attributes,
+                                                   :application, :constituent, :email_strategy, :phone_strategy, :address_strategy,
+                                                   :use_guardian_email, :use_guardian_phone, :use_guardian_address)
       }
       render (existing_application ? :edit : :new), status: :unprocessable_entity
     end
@@ -167,69 +168,62 @@ module Admin
     # Main method to construct parameters for the PaperApplicationService
     def paper_application_processing_params
       # Start with top-level permitted scalar values
-      # Infer applicant_type if guardian_id is present, as the radio buttons might be hidden
+      # Infer applicant_type if guardian_id OR guardian_attributes is present and constituent data exists
       current_applicant_type = params[:applicant_type]
-      if params[:guardian_id].present? && params[:dependent_attributes].present? && params.require(:dependent_attributes).permit(:first_name).present?
+      if (params[:guardian_id].present? || params[:guardian_attributes].present?) &&
+         params[:constituent].present? && params.require(:constituent).permit(:first_name).present?
         current_applicant_type = 'dependent'
       end
 
-      service_params = params.permit(:relationship_type, :guardian_id, :dependent_id, :use_guardian_address, :use_guardian_email)
+      # Translate checkbox parameters to strategy parameters (maintaining backward compatibility)
+      email_strategy = determine_email_strategy
+      phone_strategy = determine_phone_strategy
+      address_strategy = determine_address_strategy
+
+      service_params = params.permit(:relationship_type, :guardian_id, :dependent_id)
                              .to_h.with_indifferent_access
-      service_params[:applicant_type] = current_applicant_type # Add inferred or passed applicant_type
+      service_params[:applicant_type] = current_applicant_type
+      service_params[:email_strategy] = email_strategy
+      service_params[:phone_strategy] = phone_strategy
+      service_params[:address_strategy] = address_strategy
 
       # Application attributes - initialize with permitted ones
       service_params[:application] = permitted_application_attributes if params[:application].present?
-      service_params[:application] ||= {} # Ensure it's a hash
+      service_params[:application] ||= {}
 
       # Applicant disability attributes (from applicant_attributes section of the form)
-      all_applicant_attrs = permitted_applicant_disability_attributes # This includes self_certify_disability and specific flags
+      all_applicant_attrs = permitted_applicant_disability_attributes
 
       # Separate self_certify_disability for the Application model
       if all_applicant_attrs.key?(:self_certify_disability)
         service_params[:application][:self_certify_disability] = all_applicant_attrs.delete(:self_certify_disability)
       end
-      # Remaining attrs in all_applicant_attrs are the specific disability flags for the User model
-
-      # `all_applicant_attrs` now only contains specific disability flags for the User model (e.g. hearing_disability)
 
       if service_params[:applicant_type] == 'dependent'
-        # The APPLICANT is the DEPENDENT. Their attributes are prepared for the :constituent key for the service.
-        # Ensure dependent_attributes are present and permitted
-        dep_attrs = {}
-        dep_attrs = permitted_dependent_attributes if params[:dependent_attributes].present?
-        service_params[:constituent] = dep_attrs.deep_merge(all_applicant_attrs) # Populate :constituent with dependent's data
+        # The APPLICANT is the DEPENDENT - clean parameter handling with constituent
+        constituent_attrs = {}
+        constituent_attrs = permitted_constituent_attributes if params[:constituent].present?
+        service_params[:constituent] = constituent_attrs.deep_merge(all_applicant_attrs)
 
         # Handle the Guardian separately
-        if service_params[:guardian_id].present? # Check service_params for guardian_id
-          # guardian_id is already in service_params if present and permitted at the start
+        if service_params[:guardian_id].present?
+          # Existing guardian selected
         elsif params[:guardian_attributes].present?
           # New guardian to be created
           service_params[:new_guardian_attributes] = permitted_guardian_attributes
         end
-        # Remove original keys if they might conflict or be misinterpreted by the service
-        service_params.delete(:dependent_attributes)
-        service_params.delete(:guardian_attributes)
 
       else # Self-application (applicant_type == 'guardian' or legacy/unspecified)
-        # The APPLICANT is the self-applying adult. Their attributes go into :constituent.
-        # Data could be from params[:constituent] (from _self_application_fields rendered on the form)
-        # or params[:guardian_attributes] (if "Create New Guardian" form was used for a self-applicant)
-
-        # Prioritize params[:constituent] if its fields (like first_name) are actually filled.
+        # The APPLICANT is the self-applying adult
         service_params[:constituent] = if params[:constituent].present? && params.require(:constituent).permit(:first_name).present?
-                                         permitted_constituent_basic_attributes.deep_merge(all_applicant_attrs)
-                                       elsif params[:guardian_attributes].present? # Check if creating a new user who is the self-applicant
-                                         # This implies the "Create New Guardian" form was filled, and it's a self-application.
-                                         # So, these guardian_attributes are for the applicant.
+                                         permitted_constituent_attributes.deep_merge(all_applicant_attrs)
+                                       elsif params[:guardian_attributes].present?
+                                         # "Create New Guardian" form was filled for self-applicant
                                          permitted_guardian_attributes.deep_merge(all_applicant_attrs)
                                        else
-                                         # Fallback: ensure only disability flags are passed if other fields are empty
+                                         # Fallback: ensure only disability flags are passed
                                          all_applicant_attrs
                                        end
-        # No separate guardian in self-application; the applicant IS the guardian.
-        # Clear out other potentially confusing keys.
-        service_params.delete(:dependent_attributes)
-        service_params.delete(:guardian_attributes) # Data was merged into :constituent if applicable
       end
 
       add_proof_params(service_params)
@@ -237,16 +231,70 @@ module Admin
       service_params
     end
 
-    def permitted_guardian_attributes
-      params.require(:guardian_attributes).permit(*USER_BASE_FIELDS, *USER_DISABILITY_FIELDS)
-            .to_h.with_indifferent_access
+    # Translate checkbox UI to email strategy parameter
+    def determine_email_strategy
+      # Check for direct strategy parameter first (for API/test compatibility)
+      return params[:email_strategy] if params[:email_strategy].present?
+
+      # For dependent applications, check the "use guardian's email" checkbox
+      if params[:applicant_type] == 'dependent' || inferred_dependent_application?
+        use_guardian_email = ActiveModel::Type::Boolean.new.cast(params[:use_guardian_email])
+        return use_guardian_email ? 'guardian' : 'dependent'
+      end
+
+      # For self-applications, always use their own email
+      'dependent'
     end
 
-    def permitted_dependent_attributes
-      # Permit base user fields, dependent-specific fields, and disability flags for dependent creation
-      params.require(:dependent_attributes)
-            .permit(*USER_BASE_FIELDS, *DEPENDENT_BASE_FIELDS, *USER_DISABILITY_FIELDS)
-            .to_h.with_indifferent_access
+    # Translate checkbox UI to phone strategy parameter
+    def determine_phone_strategy
+      # Check for direct strategy parameter first (for API/test compatibility)
+      return params[:phone_strategy] if params[:phone_strategy].present?
+
+      # For dependent applications, check the "use guardian's phone" checkbox
+      if params[:applicant_type] == 'dependent' || inferred_dependent_application?
+        use_guardian_phone = ActiveModel::Type::Boolean.new.cast(params[:use_guardian_phone])
+        return use_guardian_phone ? 'guardian' : 'dependent'
+      end
+
+      # For self-applications, always use their own phone
+      'dependent'
+    end
+
+    # Translate checkbox UI to address strategy parameter
+    def determine_address_strategy
+      # Check for direct strategy parameter first (for API/test compatibility)
+      return params[:address_strategy] if params[:address_strategy].present?
+
+      # For dependent applications, check the "same as guardian's address" checkbox
+      if params[:applicant_type] == 'dependent' || inferred_dependent_application?
+        use_guardian_address = ActiveModel::Type::Boolean.new.cast(params[:use_guardian_address])
+        return use_guardian_address ? 'guardian' : 'dependent'
+      end
+
+      # For self-applications, always use their own address
+      'dependent'
+    end
+
+    # Helper to determine if this is a dependent application based on guardian presence
+    def inferred_dependent_application?
+      (params[:guardian_id].present? || params[:guardian_attributes].present?) &&
+        params[:constituent].present? && params.require(:constituent).permit(:first_name).present?
+    end
+
+    def permitted_guardian_attributes
+      if params[:guardian_attributes].present?
+        params.require(:guardian_attributes).permit(*USER_BASE_FIELDS, *USER_DISABILITY_FIELDS)
+              .to_h.with_indifferent_access
+      else
+        {}
+      end
+    end
+
+    def permitted_constituent_attributes
+      # For constituents (including dependents), permit all standard user fields plus dependent-specific fields
+      permitted_fields = USER_BASE_FIELDS + DEPENDENT_BASE_FIELDS + USER_DISABILITY_FIELDS
+      params.require(:constituent).permit(*permitted_fields).to_h.with_indifferent_access
     end
 
     def permitted_applicant_disability_attributes
@@ -259,12 +307,6 @@ module Admin
 
     def permitted_application_attributes
       params.require(:application).permit(*APPLICATION_FIELDS).to_h.with_indifferent_access
-    end
-
-    # For the old :constituent path, permit base fields + disability fields
-    def permitted_constituent_basic_attributes
-      params.require(:constituent).permit(*USER_BASE_FIELDS, *USER_DISABILITY_FIELDS)
-            .to_h.with_indifferent_access
     end
 
     def add_proof_params(service_params)
@@ -304,10 +346,12 @@ module Admin
       # Cast for disability attributes within nested structures
       cast_boolean_for(params[:applicant_attributes], USER_DISABILITY_FIELDS) if params[:applicant_attributes].present?
       cast_boolean_for(params[:guardian_attributes], USER_DISABILITY_FIELDS) if params[:guardian_attributes].present?
-      cast_boolean_for(params[:dependent_attributes], USER_DISABILITY_FIELDS) if params[:dependent_attributes].present?
-
-      # Cast for fallback constituent structure
       cast_boolean_for(params[:constituent], USER_DISABILITY_FIELDS) if params[:constituent].present?
+
+      # Cast contact strategy checkboxes
+      %w[use_guardian_email use_guardian_phone use_guardian_address].each do |checkbox_param|
+        params[checkbox_param] = ActiveModel::Type::Boolean.new.cast(params[checkbox_param]) if params[checkbox_param].present?
+      end
     end
 
     def cast_boolean_for(hash, fields)

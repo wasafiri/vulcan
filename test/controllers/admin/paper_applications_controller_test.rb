@@ -143,13 +143,14 @@ module Admin
                 zip_code: '21002'
                 # Guardians are not expected to have disability flags set by default in this form
               },
-              dependent_attributes: {
+              constituent: {
                 first_name: 'Depend',
                 last_name: 'Ent',
-                email: dependent_email, # Dependents might not have email/phone
+                dependent_email: dependent_email, # Dependent has their own email
                 date_of_birth: 10.years.ago.to_date.to_s,
                 hearing_disability: '1' # Ensure at least one disability for dependent
               },
+              use_guardian_email: false, # Dependent has their own email (unchecked checkbox)
               relationship_type: 'Parent',
               application: {
                 household_size: 2, # Guardian + Dependent
@@ -170,13 +171,90 @@ module Admin
       end
 
       new_guardian = User.find_by(email: guardian_email)
-      new_dependent = User.find_by(email: dependent_email) # Or find by other unique dependent attr if email is optional
+      # For dependents with their own email, dependent_email should match the provided email
+      new_dependent = User.find_by(dependent_email: dependent_email)
       assert new_guardian, "New guardian should have been created with email #{guardian_email}"
-      assert new_dependent, "New dependent should have been created with email #{dependent_email}"
+      assert new_dependent, "New dependent should have been created with dependent_email #{dependent_email}"
+      
+      # Verify the dependent has their own email in both fields since they provided one
+      assert_equal dependent_email, new_dependent.email, "Dependent should keep their own email when provided"
+      assert_equal dependent_email, new_dependent.dependent_email, "Dependent should have their own email in dependent_email"
 
       created_application = Application.find_by(user_id: new_dependent.id)
       assert created_application, "Application should have been created for dependent #{new_dependent.id}"
       assert_equal new_guardian.id, created_application.managing_guardian_id, 'Application should be linked to the new guardian'
+      assert_response :redirect
+      assert_redirected_to admin_application_path(created_application)
+    end
+
+    test 'should create paper application for dependent using guardian email' do
+      guardian_email = "shared.guardian.#{Time.now.to_i}@example.com"
+      income_proof_file = fixture_file_upload(Rails.root.join('test/fixtures/files/test_income_proof.pdf'), 'application/pdf')
+      residency_proof_file = fixture_file_upload(Rails.root.join('test/fixtures/files/test_residency_proof.pdf'), 'application/pdf')
+
+      ProofAttachmentService.stubs(:attach_proof).returns({ success: true })
+      ApplicationNotificationsMailer.stubs(:account_created).returns(stub(deliver_later: true))
+
+      # Dependent shares guardian's contact info
+      assert_difference 'User.count', 2, 'User.count should increase by 2 (guardian and dependent)' do
+        assert_difference 'Application.count', 1, 'Application.count should increase by 1' do
+          assert_difference 'GuardianRelationship.count', 1, 'GuardianRelationship.count should increase by 1' do
+            post admin_paper_applications_path, headers: default_headers, params: {
+              guardian_attributes: {
+                first_name: 'SharedContact',
+                last_name: 'Guardian',
+                email: guardian_email,
+                phone: '555-000-0003',
+                physical_address_1: '300 Shared Contact Ave',
+                city: 'Shareville',
+                state: 'MD',
+                zip_code: '21003'
+              },
+              constituent: {
+                first_name: 'Dependent',
+                last_name: 'SharesEmail',
+                date_of_birth: 12.years.ago.to_date.to_s,
+                hearing_disability: '1'
+                # NOTE: No dependent_email provided - they'll use guardian's
+              },
+              email_strategy: 'guardian', # Explicitly set to use guardian's email
+              relationship_type: 'Parent',
+              application: {
+                household_size: 2,
+                annual_income: 18_000,
+                maryland_resident: '1',
+                self_certify_disability: '1',
+                medical_provider_name: 'Dr. Shared',
+                medical_provider_phone: '555-444-5555',
+                medical_provider_email: 'dr.shared@example.com'
+              },
+              income_proof: income_proof_file,
+              residency_proof: residency_proof_file,
+              income_proof_action: 'accept',
+              residency_proof_action: 'accept'
+            }
+          end
+        end
+      end
+
+      new_guardian = User.find_by(email: guardian_email)
+      # For dependents using guardian's email, find by dependent_email matching guardian's email
+      new_dependent = User.find_by(dependent_email: guardian_email)
+      
+      assert new_guardian, "New guardian should have been created with email #{guardian_email}"
+      assert new_dependent, "New dependent should have been created with dependent_email matching guardian's email"
+      
+      # Verify the dependent uses guardian's email but has system-generated primary email
+      assert_match /dependent-.*@system\.matvulcan\.local/, new_dependent.email,
+                   'Dependent should have system-generated email to avoid uniqueness conflicts'
+      assert_equal guardian_email, new_dependent.dependent_email,
+                   'Dependent should have guardian email in dependent_email field'
+      assert_equal guardian_email, new_dependent.effective_email,
+                   'Dependent effective_email should return guardian email'
+
+      created_application = Application.find_by(user_id: new_dependent.id)
+      assert created_application, "Application should have been created for dependent #{new_dependent.id}"
+      assert_equal new_guardian.id, created_application.managing_guardian_id, 'Application should be linked to the guardian'
       assert_response :redirect
       assert_redirected_to admin_application_path(created_application)
     end
@@ -199,13 +277,14 @@ module Admin
               guardian_id: existing_guardian.id, # Indicates existing guardian
               # guardian_attributes might be present but should be ignored if blank or if guardian_id is present
               guardian_attributes: { first_name: '', last_name: '', email: '' },
-              dependent_attributes: {
+              constituent: {
                 first_name: 'Depend',
                 last_name: 'EntJr',
-                email: dependent_email,
+                dependent_email: dependent_email,
                 date_of_birth: 8.years.ago.to_date.to_s,
                 hearing_disability: '1'
               },
+              use_guardian_email: false, # Dependent has their own email (unchecked checkbox)
               relationship_type: 'Legal Guardian',
               application: {
                 household_size: 2,
@@ -225,8 +304,13 @@ module Admin
         end
       end
 
-      new_dependent = User.find_by(email: dependent_email)
-      assert new_dependent, "New dependent should have been created with email #{dependent_email}"
+      # For dependents with their own email, dependent_email should match the provided email
+      new_dependent = User.find_by(dependent_email: dependent_email)
+      assert new_dependent, "New dependent should have been created with dependent_email #{dependent_email}"
+      
+      # Verify the dependent has their own email in both fields since they provided one
+      assert_equal dependent_email, new_dependent.email, "Dependent should keep their own email when provided"
+      assert_equal dependent_email, new_dependent.dependent_email, "Dependent should have their own email in dependent_email"
 
       created_application = Application.find_by(user_id: new_dependent.id)
       assert created_application, "Application should have been created for dependent #{new_dependent.id}"

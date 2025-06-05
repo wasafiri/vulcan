@@ -342,6 +342,41 @@ has_many :guardian_relationships_as_dependent
 has_many :guardians, through: :guardian_relationships_as_dependent
 ```
 
+#### Dependent Contact Information Management
+The system supports flexible contact information handling for dependents:
+
+```ruby
+# Dependent-specific contact fields (encrypted)
+dependent_email    # Optional email specific to dependent
+dependent_phone    # Optional phone specific to dependent
+
+# Helper methods for effective contact information
+def effective_email
+  return dependent_email if dependent_email.present?
+  email  # Falls back to primary email (often system-generated for shared contacts)
+end
+
+def effective_phone  
+  return dependent_phone if dependent_phone.present?
+  phone  # Falls back to primary phone (often system-generated for shared contacts)
+end
+
+# Contact info strategy helpers
+def has_own_contact_info?
+  dependent_email.present? || dependent_phone.present?
+end
+
+def uses_guardian_contact_info?
+  !has_own_contact_info?
+end
+```
+
+**Key Benefits:**
+- No database uniqueness constraint violations when dependents share guardian contact info
+- Clear separation between system-required unique fields and actual communication preferences
+- Flexible support for dependents who have their own contact info vs. those who share guardian's
+- Maintains data integrity while supporting real-world family contact scenarios
+
 #### Application Scopes
 - `managed_by(guardian_user)`: Applications managed by a specific guardian
 - `for_dependents_of(guardian_user)`: Applications for dependents of a guardian
@@ -423,10 +458,13 @@ These features work together to provide a comprehensive application management s
 - **Medical certifications** can be submitted via the **proof attachment system** through email
 - **Email tracking** monitors the delivery of medical certification requests
 - **Guardian relationships** enable complex application workflows where guardians manage dependent applications
+- **Dependent contact handling** uses flexible contact strategies (email_strategy, phone_strategy, address_strategy) allowing dependents to either have their own contact information or share their guardian's without database conflicts
+- **Paper application system** supports unified parameter handling with clean contact strategy logic
 - **Proof attachment system** handles documents for both self-applications and guardian-managed applications
 - All systems use consistent **audit trails** and **error handling** patterns
 - **Policy enforcement** applies across all document submission methods
 - **Guardian context** is preserved throughout the application lifecycle and audit processes
+- **Contact information flexibility** supports real-world family scenarios while maintaining data integrity
 
 ## Troubleshooting
 

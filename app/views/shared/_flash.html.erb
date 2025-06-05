@@ -1,5 +1,28 @@
 <% flash.each do |type, message| %>
-  <div class="<%= type == 'notice' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' %> p-4 rounded-md mb-4" role="alert">
-    <p class="text-sm"><%= message %></p>
-  </div>
+  <script type="module">
+    // Secure message handling with proper JSON encoding and event queueing
+    const eventData = {
+      message: <%= message.to_json %>,
+      type: "<%= j case type.to_s
+                   when 'notice' then 'success'
+                   when 'alert' then 'warning'  
+                   when 'info' then 'info'
+                   else 'error'
+                   end %>"
+    };
+    
+    // Try immediate dispatch, queue if no flash controller available
+    const event = new CustomEvent('rails-request:flash', { detail: eventData });
+    const dispatched = document.dispatchEvent(event);
+    
+    // If no controller handled the event, queue it for when controller connects
+    if (!dispatched || !document.querySelector('[data-controller*="flash"]')) {
+      window._queuedFlashMessages = window._queuedFlashMessages || [];
+      window._queuedFlashMessages.push(eventData);
+      
+      if (window._queuedFlashMessages.length > 10) {
+        window._queuedFlashMessages = window._queuedFlashMessages.slice(-10); // Keep last 10
+      }
+    }
+  </script>
 <% end %>

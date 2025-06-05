@@ -13,7 +13,7 @@ class PasswordsController < ApplicationController
   end
 
   def create
-    @user = User.find_by(email: params[:email])
+    @user = User.find_by_email(params[:email])
     if @user
       # Generate reset token and send email
       @user.generate_password_reset_token!

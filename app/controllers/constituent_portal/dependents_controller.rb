@@ -11,10 +11,10 @@ module ConstituentPortal
     def show
       # @dependent is set by before_action
       @guardian_relationship = @dependent.guardian_relationships_as_dependent.find_by(guardian_user: current_user)
-      
+
       # Get recent profile changes for this dependent
       @recent_changes = get_recent_profile_changes(@dependent)
-      
+
       # Get dependent's applications if any
       @dependent_applications = @dependent.applications.order(created_at: :desc).limit(5)
     end
@@ -30,7 +30,7 @@ module ConstituentPortal
       # @dependent is set by before_action
       @dependent_user = @dependent # Set this for consistency with the new action and template
       @guardian_relationship = @dependent.guardian_relationships_as_dependent.find_by(guardian_user: current_user)
-      
+
       # Get recent profile changes for this dependent
       @recent_changes = get_recent_profile_changes(@dependent)
     end
@@ -48,7 +48,7 @@ module ConstituentPortal
 
         Rails.logger.info '-------------------------'
         Rails.logger.info "Checking for existing users with email: #{email_to_check}"
-        existing_email_user = User.find_by(email: email_to_check)
+        existing_email_user = User.find_by_email(email_to_check)
         if existing_email_user
           Rails.logger.warn "⚠️ User already exists with this email: ID #{existing_email_user.id}, type: #{existing_email_user.type}"
         else
@@ -121,9 +121,7 @@ module ConstituentPortal
           # Ensure confirmation matches
           @dependent_user.email_confirmation = current_user.email if @dependent_user.respond_to?(:email_confirmation=)
         end
-        if @dependent_user.phone.blank?
-          @dependent_user.phone = current_user.phone
-        end
+        @dependent_user.phone = current_user.phone if @dependent_user.phone.blank?
         # Skip uniqueness validation for contact since using guardian's info
         @dependent_user.skip_contact_uniqueness_validation = true
       rescue StandardError => e
@@ -222,22 +220,19 @@ module ConstituentPortal
       # @dependent is set by before_action
       # Check if dependent is using guardian's contact info and skip uniqueness validation if so
       params_to_update = dependent_user_params
-      
+
       # Skip uniqueness validation if:
       # 1. Email matches guardian's email (current or new)
-      # 2. Phone matches guardian's phone (current or new)  
+      # 2. Phone matches guardian's phone (current or new)
       # 3. Dependent currently shares guardian's contact info (existing dependent)
-      should_skip_validation = (
+      should_skip_validation =
         params_to_update[:email] == current_user.email ||
         params_to_update[:phone] == current_user.phone ||
         @dependent.email == current_user.email ||
         @dependent.phone == current_user.phone
-      )
-      
-      if should_skip_validation
-        @dependent.skip_contact_uniqueness_validation = true
-      end
-      
+
+      @dependent.skip_contact_uniqueness_validation = true if should_skip_validation
+
       # Similar to create, handle updates to dependent_user and potentially guardian_relationship
       if @dependent.update(params_to_update) # And update relationship if editable
         # For consistency with application updates, check if we're coming from an application update
@@ -289,14 +284,14 @@ module ConstituentPortal
       redirect_to constituent_portal_dashboard_path, alert: 'Dependent not found.' unless @dependent
     end
 
-      def dependent_user_params
-    # Define strong parameters for the dependent User
-    # Ensure to permit all necessary fields for creating a User (e.g., email, name, dob)
-    # Handle password creation strategy for dependents (e.g., generate random, or no login)
-    params.require(:dependent).permit(:first_name, :last_name, :email, :phone, :phone_type, :date_of_birth,
-                                      :hearing_disability, :vision_disability,
-                                      :speech_disability, :mobility_disability, :cognition_disability)
-  end
+    def dependent_user_params
+      # Define strong parameters for the dependent User
+      # Ensure to permit all necessary fields for creating a User (e.g., email, name, dob)
+      # Handle password creation strategy for dependents (e.g., generate random, or no login)
+      params.require(:dependent).permit(:first_name, :last_name, :email, :phone, :phone_type, :date_of_birth,
+                                        :hearing_disability, :vision_disability,
+                                        :speech_disability, :mobility_disability, :cognition_disability)
+    end
 
     def guardian_relationship_params
       params.require(:guardian_relationship).permit(:relationship_type)

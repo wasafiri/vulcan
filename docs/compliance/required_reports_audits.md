@@ -80,6 +80,7 @@ All Mat Vulcan environments and third-party services must adhere to a defined sc
      - Rotate keys via Rails credentials (`bin/rails credentials:edit`).  
      - Deploy updated credentials to production and staging.  
      - Verify application can decrypt existing data.
+   - Note: PII encryption implementation completed 2025-05-31; all sensitive columns now encrypted.
 
 4. **Audit Trail & PaperTrail Review**
    - Scope: Sensitive models (User, Application, etc.).  

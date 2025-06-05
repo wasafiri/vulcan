@@ -34,7 +34,7 @@ module Admin
 
       # Explicitly select the "Adult" radio button
       assert_selector 'label', text: 'An Adult (applying for themselves)' # Wait for label
-      choose 'An Adult (applying for themselves)'
+      choose 'applicant_is_adult'
 
       # Verify the constituent section is visible
       assert_selector '#self-info-section', visible: true

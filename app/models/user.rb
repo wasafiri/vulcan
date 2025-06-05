@@ -145,6 +145,8 @@ class User < ApplicationRecord
   # Rails 8 automatically maps to {attribute}_encrypted columns
   encrypts :email, deterministic: true
   encrypts :phone, deterministic: true
+  encrypts :dependent_email, deterministic: true
+  encrypts :dependent_phone, deterministic: true
   encrypts :ssn_last4, deterministic: true
 
   # Non-deterministic encryption for non-queryable fields
@@ -156,8 +158,7 @@ class User < ApplicationRecord
   encrypts :state
   encrypts :zip_code
 
-  # Accessor for skipping contact uniqueness validation (used for dependent sharing guardian email/phone)
-  attr_accessor :skip_contact_uniqueness_validation
+
 
   # Validations
   validates :password, length: { minimum: 8 }, if: -> { password.present? }
@@ -168,12 +169,14 @@ class User < ApplicationRecord
   # Email and phone validations - relying on database constraints for uniqueness
   validates :email, presence: true,
                     format: { with: URI::MailTo::EMAIL_REGEXP }
+  validates :dependent_email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_blank: true
   validates :reset_password_token, uniqueness: true, allow_nil: true
 
   # Custom validations (uniqueness handled by database constraints)
-  validate :email_must_be_unique, unless: :skip_contact_uniqueness_for_dependent?
-  validate :phone_must_be_unique, unless: :skip_contact_uniqueness_for_dependent?
+  validate :email_must_be_unique
+  validate :phone_must_be_unique
   validate :phone_number_must_be_valid, if: :phone_changed?
+  validate :dependent_phone_number_must_be_valid, if: :dependent_phone_changed?
   validate :constituent_must_have_disability, if: :validate_constituent_disability?
   validate :validate_address_for_letter_preference
 
@@ -370,11 +373,58 @@ class User < ApplicationRecord
       .pluck(:relationship_type)
   end
 
-  # Method to check if this user is dependent sharing guardian's contact info
-  def skip_contact_uniqueness_for_dependent?
-    # Handle both boolean and string values (form params may come as strings)
-    [true, 'true', '1'].include?(skip_contact_uniqueness_validation)
+  # Helper methods for dependent contact information
+  # These methods determine the effective contact information for a dependent
+  # using dependent-specific contact info if available, otherwise falling back to guardian
+  
+  def effective_email
+    if is_dependent? && dependent_email.present?
+      dependent_email
+    elsif is_dependent? && guardian_for_contact
+      guardian_for_contact.email
+    else
+      email
+    end
   end
+  
+  def effective_phone
+    if is_dependent? && dependent_phone.present?
+      dependent_phone
+    elsif is_dependent? && guardian_for_contact
+      guardian_for_contact.phone
+    else
+      phone
+    end
+  end
+  
+  def effective_phone_type
+    if is_dependent? && dependent_phone.present?
+      phone_type # Use dependent's preferred phone type
+    elsif is_dependent? && guardian_for_contact
+      guardian_for_contact.phone_type
+    else
+      phone_type
+    end
+  end
+  
+  def effective_communication_preference
+    if is_dependent? && guardian_for_contact
+      guardian_for_contact.communication_preference
+    else
+      communication_preference
+    end
+  end
+  
+  # Get the primary guardian for contact purposes
+  def guardian_for_contact
+    return nil unless is_dependent?
+    
+    @guardian_for_contact ||= guardian_relationships_as_dependent
+                                .joins(:guardian_user)
+                                .first&.guardian_user
+  end
+
+
 
   private
 
@@ -417,6 +467,19 @@ class User < ApplicationRecord
 
     # Validate that there are exactly 10 digits
     errors.add(:phone, 'must be a valid 10-digit US phone number') if digits.length != 10
+  end
+
+  def dependent_phone_number_must_be_valid
+    return if dependent_phone.blank?
+
+    # Strip all non-digit characters
+    digits = dependent_phone.gsub(/\D/, '')
+
+    # Remove leading '1' if present
+    digits = digits[1..] if digits.length == 11 && digits.start_with?('1')
+
+    # Validate that there are exactly 10 digits
+    errors.add(:dependent_phone, 'must be a valid 10-digit US phone number') if digits.length != 10
   end
 
   def available_capabilities_list

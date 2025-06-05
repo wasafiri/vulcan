@@ -31,6 +31,52 @@ has_many :guardians, through: :guardian_relationships_as_dependent, source: :gua
 has_many :managed_applications, foreign_key: 'managing_guardian_id'
 ```
 
+## Dependent Contact Information
+
+The system includes dedicated fields for dependent contact information to avoid database uniqueness constraint conflicts:
+
+### Database Fields
+- `dependent_email` (encrypted) - Optional email specific to dependent
+- `dependent_phone` (encrypted) - Optional phone specific to dependent
+
+### Contact Information Strategy
+
+**Option 1: Dependent has own contact info**
+```ruby
+dependent = User.create!(
+  email: "child@example.com",        # Dependent's own email
+  phone: "555-0001",                 # Dependent's own phone
+  dependent_email: "child@example.com",  # Same as primary
+  dependent_phone: "555-0001"           # Same as primary
+)
+```
+
+**Option 2: Dependent shares guardian's contact info**
+```ruby
+dependent = User.create!(
+  email: "dependent-abc123@system.matvulcan.local",  # System-generated unique email
+  phone: "000-000-1234",                             # System-generated unique phone
+  dependent_email: "guardian@example.com",           # Guardian's actual email
+  dependent_phone: "555-0002"                        # Guardian's actual phone
+)
+```
+
+### Helper Methods
+```ruby
+# Get the effective contact information for communications
+dependent.effective_email  # Returns dependent_email if present, otherwise email
+dependent.effective_phone  # Returns dependent_phone if present, otherwise phone
+
+# Determine contact strategy
+dependent.has_own_contact_info?      # True if dependent has own email/phone
+dependent.uses_guardian_contact_info?  # True if dependent shares guardian's contact
+```
+
+This approach ensures:
+- No database uniqueness violations when dependents share guardian contact info
+- Clean separation between system-required unique identifiers and communication preferences
+- Flexibility for real-world family contact scenarios
+
 ## Key Methods
 
 ### User Model

@@ -13,6 +13,13 @@ export default class extends Controller {
     
     this._lastState = null; // Track last state to prevent unnecessary dispatches
     this.debouncedRefresh = createVeryShortDebounce(() => this.executeRefresh());
+    
+    // Store bound method reference for cleanup
+    this._boundGuardianPickerSelectionChange = this.guardianPickerSelectionChange.bind(this);
+    
+    // Listen for guardian picker selection changes
+    this.element.addEventListener('guardian-picker:selectionChange', this._boundGuardianPickerSelectionChange);
+    
     this.refresh();
     // If the guardian picker outlet is available, observe it for changes.
     // This is an alternative to custom events if direct observation is preferred for future Stimulus versions.
@@ -23,6 +30,11 @@ export default class extends Controller {
     this._connected = false;
     this.debouncedRefresh?.cancel();
     this._lastState = null;
+    
+    // Clean up event listener
+    if (this._boundGuardianPickerSelectionChange) {
+      this.element.removeEventListener('guardian-picker:selectionChange', this._boundGuardianPickerSelectionChange);
+    }
   }
 
   // This can be called by an action on the guardian-picker if its selection changes,
@@ -41,6 +53,15 @@ export default class extends Controller {
     }
     // Use a delayed refresh to avoid immediate recursion
     setTimeout(() => this.refresh(), 50);
+  }
+
+  // Handle guardian picker selection changes
+  guardianPickerSelectionChange(event) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("ApplicantTypeController: Guardian selection changed:", event.detail);
+    }
+    // Refresh to update visibility based on new guardian selection
+    this.refresh();
   }
 
   updateApplicantTypeDisplay() { // Called by radio button change
@@ -69,6 +90,16 @@ export default class extends Controller {
       // It's shown if a guardian is chosen OR if the 'dependent' radio is manually checked (and no guardian is chosen)
       const dependentRadioSelected = this.isDependentRadioChecked();
 
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("ApplicantTypeController: State check:", {
+          hasGuardianPickerOutlet: this.hasGuardianPickerOutlet,
+          guardianPickerSelectedValue: this.hasGuardianPickerOutlet ? this.guardianPickerOutlet.selectedValue : null,
+          guardianChosen: guardianChosen,
+          dependentRadioSelected: dependentRadioSelected,
+          showDependentSections: dependentRadioSelected && guardianChosen
+        });
+      }
+
       // Hide the applicant-type radio section when a guardian is chosen
       if (this.hasRadioSectionTarget) {
         setVisible(this.radioSectionTarget, !guardianChosen);
@@ -86,6 +117,9 @@ export default class extends Controller {
       const showDependentSections = dependentRadioSelected && guardianChosen;
       if (this.hasSectionsForDependentWithGuardianTarget) {
         setVisible(this.sectionsForDependentWithGuardianTarget, showDependentSections);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`ApplicantTypeController: Dependent Sections ${showDependentSections ? "SHOWN" : "HIDDEN"}`);
+        }
       }
 
       // Manage 'required' attribute for dependent fields

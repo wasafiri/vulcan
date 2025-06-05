@@ -187,15 +187,26 @@ end
 ### Parameter Structure
 ```ruby
 {
-  applicant_type: 'dependent',
+  applicant_type: 'dependent', # Auto-inferred when guardian_attributes present
   relationship_type: 'Parent',
   guardian_id: 123, # OR guardian_attributes for new guardian
-  dependent_attributes: {
+  guardian_attributes: {
+    first_name: 'Guardian',
+    last_name: 'Name',
+    email: 'guardian@example.com',
+    # ... other guardian fields
+  },
+  constituent: { # Unified parameter for applicant info
     first_name: 'Child',
     last_name: 'Doe',
     date_of_birth: '2010-01-01',
-    # ... other fields
+    dependent_email: 'child@example.com', # Optional - dependent's own email
+    dependent_phone: '555-1234', # Optional - dependent's own phone
+    # ... other constituent fields
   },
+  email_strategy: 'dependent', # 'guardian' or 'dependent'
+  phone_strategy: 'guardian', # 'guardian' or 'dependent' 
+  address_strategy: 'guardian', # 'guardian' or 'dependent'
   application: {
     household_size: 3,
     annual_income: 25000,
@@ -212,11 +223,16 @@ end
 1. **Validate Parameters** - Check required fields and FPL thresholds
 2. **Process Guardian** - Create/find guardian user if dependent application
 3. **Process Applicant** - Create/find the actual applicant user
-4. **Create Relationship** - Link guardian and dependent if applicable
-5. **Create Application** - Build application with proper user associations
-6. **Process Proofs** - Handle proof uploads/rejections
-7. **Create Audits** - Log events and proof submissions
-8. **Send Notifications** - Notify relevant parties
+4. **Apply Contact Strategies** - Set dependent contact info based on strategies:
+   - **Email Strategy 'guardian'**: Store guardian's email in `dependent_email`, generate system email for uniqueness
+   - **Email Strategy 'dependent'**: Use provided `dependent_email` or fall back to guardian's if blank
+   - **Phone Strategy**: Similar logic for `dependent_phone` field
+   - **Address Strategy**: Handle dependent address fields similarly
+5. **Create Relationship** - Link guardian and dependent if applicable
+6. **Create Application** - Build application with proper user associations
+7. **Process Proofs** - Handle proof uploads/rejections
+8. **Create Audits** - Log events and proof submissions
+9. **Send Notifications** - Notify relevant parties
 
 ## Testing Considerations
 
@@ -313,3 +329,11 @@ end
 - Form state management could be more robust
 - Error handling could be more granular
 - Some validation bypassing is manual rather than systematic 
+
+**Controller Changes**:
+- Removed `dependent_attributes` mapping cruft from `paper_application_processing_params`
+- Changed parameters to accept unified `constituent` attributes for both self and dependent applications
+- Added support for contact strategy parameters: `email_strategy`, `phone_strategy`, `address_strategy`
+- Fixed applicant type inference to detect dependents when `guardian_attributes` are present (not just `guardian_id`)
+- Unified `permitted_constituent_attributes` method for both application types
+- Added new strategy parameters to boolean casting and error handling 
