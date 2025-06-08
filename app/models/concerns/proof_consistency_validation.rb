@@ -14,7 +14,7 @@ module ProofConsistencyValidation
 
   # Helper method to check if proof validation should be skipped
   def skip_proof_validation?
-    Thread.current[:paper_application_context].present?
+    Current.paper_context?
   end
 
   private

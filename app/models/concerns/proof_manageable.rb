@@ -273,12 +273,12 @@ module ProofManageable
   def verify_proof_attachments
     # --- DEBUG LOGGING ---
     Rails.logger.debug do
-      "[ProofManageable] Checking verify_proof_attachments. Paper context: #{Thread.current[:paper_application_context].inspect}"
+      "[ProofManageable] Checking verify_proof_attachments. Paper context: #{Current.paper_context.inspect}"
     end
     # --- END DEBUG ---
 
     # Skip for new records, explicit skips, OR during paper application processing
-    if new_record? || Thread.current[:skip_proof_validation] || Thread.current[:paper_application_context]
+    if new_record? || Current.skip_proof_validation? || Current.paper_context?
       Rails.logger.debug '[ProofManageable] Skipping verify_proof_attachments.'
       return
     end
@@ -319,8 +319,8 @@ module ProofManageable
   def validate_not_reviewed_proofs
     # Skip this set of validations for paper applications, when reviewing a single proof,
     # or when resubmitting any proof
-    return if Thread.current[:paper_application_context] ||
-              Thread.current[:reviewing_single_proof] ||
+    return if Current.paper_context? ||
+              Current.reviewing_single_proof? ||
               resubmitting_proof?
 
     validate_not_reviewed_proof(
@@ -425,9 +425,9 @@ module ProofManageable
     false
   end
 
-  # Check if the thread local variable is set that communicates resubmission context from controller
+  # Check if the Current attribute is set that communicates resubmission context from controller
   def explicit_resubmission_context?
-    Thread.current[:resubmitting_proof].present?
+    Current.resubmitting_proof?
   end
 
   # Check if income proof is being resubmitted
@@ -472,14 +472,14 @@ module ProofManageable
 
   def require_proof_validations?
     Rails.logger.debug do
-      "[ProofManageable] Checking require_proof_validations?. Paper context: #{Thread.current[:paper_application_context].inspect}"
+      "[ProofManageable] Checking require_proof_validations?. Paper context: #{Current.paper_context.inspect}"
     end
 
     # Skip for administrative actions like purging proofs
     return false if Thread.current[:skip_proof_validation]
 
     # Skip for paper applications processed by admins - CHECK THIS FIRST
-    return false if Thread.current[:paper_application_context]
+    return false if Current.paper_context?
 
     # Skip validation for new records (attachments handled by AS on initial save)
     return false if new_record?

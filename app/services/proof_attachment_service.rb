@@ -347,15 +347,15 @@ class ProofAttachmentService
     end
 
     def with_paper_context(submission_method, proof_type)
-      original_context = Thread.current[:paper_application_context]
+      original_context = Current.paper_context
       begin
         if submission_method.to_sym == :paper
-          Thread.current[:paper_application_context] = true
+          Current.paper_context = true
           Rails.logger.debug { "ProofAttachmentService: Setting paper_application_context=true for #{proof_type} rejection" }
         end
         yield
       ensure
-        Thread.current[:paper_application_context] = original_context
+        Current.paper_context = original_context
         Rails.logger.debug { "ProofAttachmentService: Restored paper_application_context=#{original_context.inspect}" }
       end
     end

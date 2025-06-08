@@ -34,8 +34,8 @@ module Applications
 
     def update(application)
       # Set the paper application context flag
-      Thread.current[:paper_application_context] = true
-      Rails.logger.debug { "UPDATE: Set paper_application_context to #{Thread.current[:paper_application_context].inspect}" }
+      Current.paper_context = true
+      Rails.logger.debug { "UPDATE: Set paper_application_context to #{Current.paper_context.inspect}" }
 
       begin
         ActiveRecord::Base.transaction do
@@ -44,7 +44,7 @@ module Applications
 
           # Double-check the context is still set
           Rails.logger.debug do
-            "UPDATE (before process_proof_uploads): paper_application_context is #{Thread.current[:paper_application_context].inspect}"
+            "UPDATE (before process_proof_uploads): paper_application_context is #{Current.paper_context.inspect}"
           end
 
           # The process_proof_uploads method also sets and clears the context, so we need to ensure
@@ -52,9 +52,9 @@ module Applications
           result = process_proof_uploads
 
           # Re-set the context in case process_proof_uploads cleared it
-          Thread.current[:paper_application_context] = true
+          Current.paper_context = true
           Rails.logger.debug do
-            "UPDATE (after process_proof_uploads): paper_application_context is #{Thread.current[:paper_application_context].inspect}"
+            "UPDATE (after process_proof_uploads): paper_application_context is #{Current.paper_context.inspect}"
           end
 
           return failure('Proof upload failed') unless result
@@ -67,9 +67,9 @@ module Applications
         @errors << e.message
         false
       ensure
-        # Always clear the thread-local variable
+        # Always clear the Current attribute
         Rails.logger.debug { 'UPDATE (ensure): Clearing paper_application_context' }
-        Thread.current[:paper_application_context] = nil
+        Current.paper_context = nil
       end
     end
 
@@ -123,7 +123,7 @@ module Applications
       Rails.logger.debug { "Param key as symbol: #{params[:"#{type}_proof_action"].inspect}" }
       Rails.logger.debug { "Param key as string: #{params["#{type}_proof_action"].inspect}" }
       Rails.logger.debug { "File param present? #{params["#{type}_proof"].present?}" }
-      return unless params["#{type}_proof"].present?
+      return if params["#{type}_proof"].blank?
 
       Rails.logger.debug { "File param type: #{params["#{type}_proof"].class.name}" }
       Rails.logger.debug { "File param details: #{params["#{type}_proof"].inspect}" }
@@ -139,12 +139,11 @@ module Applications
       # Determine if a file is being uploaded
       file_present = params["#{type}_proof"].present? || params["#{type}_proof_signed_id"].present?
 
-      if Thread.current[:paper_application_context] && !file_present
+      if Current.paper_context? && !file_present
         # Scenario: Paper application where admin is marking proof as accepted without a digital upload
         Rails.logger.debug { "Paper context: Marking #{type} proof as approved without file attachment." }
-        @application.update_column(
-          "#{type}_proof_status",
-          Application.public_send("#{type}_proof_statuses")['approved']
+        @application.update!(
+          "#{type}_proof_status" => Application.public_send("#{type}_proof_statuses")['approved']
         )
         true
       elsif file_present
@@ -152,13 +151,13 @@ module Applications
         blob_or_file = params["#{type}_proof"].presence || params["#{type}_proof_signed_id"].presence
 
         result = ProofAttachmentService.attach_proof({
-          application: @application,
-          proof_type: type,
-          blob_or_file: blob_or_file,
-          status: :approved,
-          admin: @admin,
-          submission_method: :paper,
-          metadata: {}
+                                                       application: @application,
+                                                       proof_type: type,
+                                                       blob_or_file: blob_or_file,
+                                                       status: :approved,
+                                                       admin: @admin,
+                                                       submission_method: :paper,
+                                                       metadata: {}
         })
 
         unless result[:success]
@@ -167,9 +166,8 @@ module Applications
         end
 
         # Persist approved status for paper applications, including when attach_proof is stubbed
-        @application.update_column(
-          "#{type}_proof_status",
-          Application.public_send("#{type}_proof_statuses")['approved']
+        @application.update!(
+          "#{type}_proof_status" => Application.public_send("#{type}_proof_statuses")['approved']
         )
         Rails.logger.debug { "Successfully attached #{type} proof for application #{@application.id}" }
         true
@@ -477,7 +475,7 @@ module Applications
 
     def create_application
       # Set the paper application context flag
-      Thread.current[:paper_application_context] = true
+      Current.paper_context = true
 
       begin
         application_attrs = params[:application]
@@ -507,14 +505,14 @@ module Applications
 
         true
       ensure
-        # Always clear the thread-local variable
-        Thread.current[:paper_application_context] = nil
+        # Always clear the Current attribute
+        Current.paper_context = nil
       end
     end
 
     def process_proof_uploads
       # Set paper application context again
-      Thread.current[:paper_application_context] = true
+      Current.paper_context = true
 
       # Enhanced debugging
       Rails.logger.debug '==== PAPER APPLICATION PROOF UPLOAD STARTED ===='
@@ -537,8 +535,8 @@ module Applications
         Rails.logger.debug '==== PAPER APPLICATION PROOF UPLOAD FINISHED ===='
         true
       ensure
-        # Always clear the thread-local variable
-        Thread.current[:paper_application_context] = nil
+        # Always clear the Current attribute
+        Current.paper_context = nil
       end
     end
 

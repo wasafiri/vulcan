@@ -1420,7 +1420,7 @@ module ConstituentPortal
     # Set paper application context for tests to bypass proof validations
     # @return [void]
     def set_paper_application_context
-      Thread.current[:paper_application_context] = true
+      Current.paper_context = true
       log_debug('Paper application context set for tests - bypassing proof validations')
     end
   end
