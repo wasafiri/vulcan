@@ -6,6 +6,7 @@ class Voucher < ApplicationRecord
   belongs_to :vendor, optional: true, class_name: 'User'
   belongs_to :invoice, optional: true
   has_many :transactions, class_name: 'VoucherTransaction', dependent: :restrict_with_error
+  has_many :events, as: :auditable, dependent: :destroy
 
   validates :code, presence: true, uniqueness: true
   validates :initial_value, :remaining_value, presence: true, numericality: { greater_than_or_equal_to: 0 }
@@ -13,7 +14,6 @@ class Voucher < ApplicationRecord
 
   before_validation :generate_code, on: :create
   before_validation :set_initial_values, on: :create
-  after_create :send_assigned_notification
   after_update :check_status_changes
   after_update :log_status_change, if: -> { saved_change_to_status? && respond_to?(:events) }
 
@@ -88,13 +88,10 @@ class Voucher < ApplicationRecord
     true
   end
 
-  # Processes the redemption of a voucher.
-  # This method handles the financial transaction and updates the voucher's state.
+  # This method handles the financial transaction (redemption) and updates the voucher's state.
   # It assumes that any necessary identity verification (e.g., DOB) has already
-  # been performed by an external service (e.g., VoucherVerificationService)
-  # prior to this method being called.
+  # been performed by an external service (e.g., VoucherVerificationService) prior to this method being called.
   def redeem!(amount, vendor, product_data = nil)
-    # VoucherVerificationService is responsible for identify verification, like checking DOB
     # Ensure the voucher meets basic redemption criteria (active, not expired, sufficient funds)
     return false unless can_redeem?(amount)
 
@@ -202,15 +199,16 @@ class Voucher < ApplicationRecord
 
   # Send the redemption notification
   def notify_voucher_redemption(transaction)
-    VoucherNotificationsMailer.voucher_redeemed(transaction).deliver_later
+    VoucherNotificationsMailer.with(transaction: transaction).voucher_redeemed.deliver_later
   end
 
   # Create an event record for voucher redemption
   # This method is fault-tolerant - if it fails, it logs the error but doesn't raise an exception
   def log_redemption_event(vendor, amount, transaction, product_data)
-    events.create!(
-      user: vendor,
+    AuditEventService.log(
       action: 'voucher_redeemed',
+      actor: vendor,
+      auditable: self,
       metadata: {
         application_id: application.id,
         voucher_code: code,
@@ -238,23 +236,21 @@ class Voucher < ApplicationRecord
     end
   end
 
-  def send_assigned_notification
-    VoucherNotificationsMailer.voucher_assigned(self).deliver_later
-  end
 
   def check_status_changes
     return unless saved_change_to_status?
 
     case status
     when 'expired'
-      VoucherNotificationsMailer.voucher_expired(self).deliver_later
+      VoucherNotificationsMailer.with(voucher: self).voucher_expired.deliver_later
     end
   end
 
   def log_status_change
-    events.create!(
-      user: nil,
+    AuditEventService.log(
       action: "status_changed_to_#{status}",
+      actor: Current.user,
+      auditable: self,
       metadata: {
         previous_status: status_before_last_save,
         current_status: status,

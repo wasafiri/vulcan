@@ -25,35 +25,16 @@ module Admin
     end
 
     def test_creates_proof_with_valid_parameters
-      audit_count_before = ProofSubmissionAudit.count
+      # Clear events before the test to ensure we only count events from this test
+      Event.delete_all
 
-      # Ensure both audit trail and attachment work properly by directly testing 
-      # the file attachment and creating a manual audit record
-      post admin_application_scanned_proofs_path(@application),
-           params: {
-             proof_type: 'income',
-             file: @file
-           },
-           headers: default_headers
-
-      # Manually create the audit if it wasn't created by the controller
-      if ProofSubmissionAudit.count == audit_count_before
-        # Use metadata for file information
-        metadata = {
-          user_agent: 'Rails Testing',
-          filename: @file.original_filename,
-          file_size: @file.size,
-          content_type: @file.content_type
-        }
-
-        ProofSubmissionAudit.create!(
-          application: @application,
-          user: @admin,
-          proof_type: 'income',
-          submission_method: :paper,
-          ip_address: '127.0.0.1',
-          metadata: metadata
-        )
+      assert_difference 'Event.count', 1 do # Expect one event from ProofAttachmentService
+        post admin_application_scanned_proofs_path(@application),
+             params: {
+               proof_type: 'income',
+               file: @file
+             },
+             headers: default_headers
       end
 
       # Verify the application has the proof attached first
@@ -62,10 +43,17 @@ module Admin
       # Verify the redirect
       assert_redirected_to admin_application_path(@application)
 
-      # Since we're focusing on functionality, we'll make sure the audit count increases
-      # by at least 1 - either from the controller action or our manual creation
-      assert_operator ProofSubmissionAudit.count, :>, audit_count_before,
-                      'ProofSubmissionAudit count did not increase at all'
+      # Verify the audit event was created correctly
+      event = Event.last
+      assert_equal 'proof_submitted', event.action
+      assert_equal @application.id, event.auditable_id
+      assert_equal 'Application', event.auditable_type
+      assert_equal @admin.id, event.user_id
+      assert_equal 'income', event.metadata['proof_type']
+      assert_equal 'paper', event.metadata['submission_method']
+      assert_equal true, event.metadata['success']
+      assert_not_nil event.metadata['blob_id']
+      assert_equal @file.original_filename, event.metadata['filename']
     end
 
     def test_handles_missing_files

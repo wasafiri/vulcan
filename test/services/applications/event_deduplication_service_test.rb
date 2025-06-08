@@ -25,29 +25,34 @@ module Applications
         # Create test scenario with key duplicates:
         time = Time.current
 
-        # Create a Notification and a corresponding StatusChange (same event, different sources)
-        notification = Notification.create!(
-          notifiable: application,
+        # Create an Event for medical certification requested (simulating AuditEventService.log)
+        event1 = AuditEventService.log(
           action: 'medical_certification_requested',
-          created_at: time
+          actor: application.user,
+          auditable: application,
+          created_at: time,
+          metadata: { provider_name: 'Dr. Test' }
         )
 
+        # Create a corresponding ApplicationStatusChange (same underlying event, different source)
         status_change = ApplicationStatusChange.create!(
           application: application,
+          user: application.user,
           from_status: 'not_requested',
           to_status: 'requested',
           created_at: time + 5.seconds,
-          metadata: { change_type: 'medical_certification' }
+          metadata: { change_type: 'medical_certification', provider_name: 'Dr. Test' }
         )
 
         # Execute
-        result = service.deduplicate([notification, status_change])
+        result = service.deduplicate([event1, status_change])
 
         # Verify: only one event should remain after deduplication
         assert_equal 1, result.size, 'Should have deduplicated to exactly one event'
 
-        # The ApplicationStatusChange should have been kept (has more context)
+        # The ApplicationStatusChange should have been kept (has more context and is preferred)
         assert_equal ApplicationStatusChange, result.first.class
+        assert_equal status_change.id, result.first.id
       end
     end
   end

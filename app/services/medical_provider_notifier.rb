@@ -47,6 +47,17 @@ class MedicalProviderNotifier
       end
     end
 
+    # Log the audit event first, regardless of delivery success
+    AuditEventService.log(
+      action: 'medical_certification_rejected',
+      actor: admin,
+      auditable: application,
+      metadata: {
+        rejection_reason: rejection_reason,
+        medical_provider_name: application.medical_provider_name
+      }
+    )
+
     if delivery_result[:success]
       metadata = {
         medical_provider_name: application.medical_provider_name,
@@ -77,8 +88,6 @@ class MedicalProviderNotifier
   # @return [Boolean] Whether the fax was sent successfully
   def notify_by_fax(rejection_reason)
     fax_number = application.medical_provider_fax
-    fax_sid = nil
-    
     # Generate a PDF for faxing
     pdf_path = generate_fax_pdf(rejection_reason)
     return { success: false, fax_sid: nil } unless pdf_path
@@ -118,28 +127,24 @@ class MedicalProviderNotifier
   # @param admin [User] The admin who rejected the certification
   # @return [Hash] Hash containing success status
   def notify_by_email(rejection_reason, admin)
-    email = application.medical_provider_email
-    
-    begin
-      # Send the email - ensure message_id is captured for tracking
-      mail = MedicalProviderMailer.certification_rejected(
-        application,
-        rejection_reason,
-        admin
-      )
-      
-      # Store message ID before delivering
-      message_id = mail.message_id
-      
-      # Deliver later via background job
-      mail.deliver_later
+    # Send the email - ensure message_id is captured for tracking
+    mail = MedicalProviderMailer.certification_rejected(
+      application,
+      rejection_reason,
+      admin
+    )
 
-      Rails.logger.info "Email successfully queued for medical provider for Application ID: #{application.id} with message ID: #{message_id}"
-      return { success: true, message_id: message_id }
-    rescue StandardError => e
-      Rails.logger.error "Email sending error for Application ID: #{application.id} - #{e.message}"
-      return { success: false, message_id: nil }
-    end
+    # Store message ID before delivering
+    message_id = mail.message_id
+
+    # Deliver later via background job
+    mail.deliver_later
+
+    Rails.logger.info "Email successfully queued for medical provider for Application ID: #{application.id} with message ID: #{message_id}"
+    { success: true, message_id: message_id }
+  rescue StandardError => e
+    Rails.logger.error "Email sending error for Application ID: #{application.id} - #{e.message}"
+    { success: false, message_id: nil }
   end
 
   # Generate a PDF document for faxing
@@ -149,50 +154,50 @@ class MedicalProviderNotifier
     begin
       # Generate a temporary file path
       temp_file_path = Rails.root.join('tmp', "certification_rejection_#{application.id}_#{Time.now.to_i}.pdf")
-      
+
       # Create the PDF using Prawn
       Prawn::Document.generate(temp_file_path) do |pdf|
         # Add logo
         # pdf.image Rails.root.join('app', 'assets', 'images', 'logo.png'), width: 200 if File.exist?(Rails.root.join('app', 'assets', 'images', 'logo.png'))
-        
+
         # Add header
-        pdf.text "Maryland Accessible Telecommunications", size: 18, style: :bold
+        pdf.text 'Maryland Accessible Telecommunications', size: 18, style: :bold
         pdf.move_down 10
-        pdf.text "Disability Certification Form for Patient needs Updates", size: 16, style: :bold
+        pdf.text 'Disability Certification Form for Patient needs Updates', size: 16, style: :bold
         pdf.move_down 20
-        
+
         # Add patient information
         pdf.text "Patient: #{application.user.full_name}", size: 12
         pdf.text "Application ID: #{application.id}", size: 12
         pdf.move_down 20
-        
+
         # Add rejection reason
-        pdf.text "Reason for Revision:", size: 14, style: :bold
+        pdf.text 'Reason for Revision:', size: 14, style: :bold
         pdf.move_down 5
         pdf.text rejection_reason, size: 12
         pdf.move_down 20
-        
+
         # Add remaining attempts information
         remaining_attempts = 8 - application.total_rejections
         pdf.text "Remaining Attempts: #{remaining_attempts}", size: 12
         pdf.move_down 20
-        
+
         # Add instructions
         pdf.text "Instructions for Submitting Revised Documentation:", size: 14, style: :bold
         pdf.move_down 5
         pdf.text "1. Fax the revised certification to: 410-767-4276", size: 12
         pdf.text "2. Or reply to this communication with the revised certification attached", size: 12
         pdf.move_down 20
-        
+
         # Add footer
         pdf.text "Thank you for your assistance in helping your patient access needed telecommunications services.", size: 12
         pdf.text "For questions, please contact: medical-cert@mdmat.org", size: 12
       end
-      
-      return temp_file_path
+
+      temp_file_path
     rescue StandardError => e
       Rails.logger.error "Error generating PDF for Application ID: #{application.id} - #{e.message}"
-      return nil
+      nil
     end
   end
 
@@ -206,13 +211,14 @@ class MedicalProviderNotifier
       rejection_reason: rejection_reason,
       notification_methods: notification_methods
     }
-    
-    Notification.create!(
+
+    NotificationService.create_and_deliver!(
+      type: 'medical_certification_rejected',
       recipient: application.user,
       actor: admin,
-      action: 'medical_certification_rejected',
       notifiable: application,
-      metadata: default_metadata.merge(metadata)
+      metadata: default_metadata.merge(metadata),
+      channel: :email
     )
   end
 

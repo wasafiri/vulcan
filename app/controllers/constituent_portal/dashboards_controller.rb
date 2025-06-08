@@ -3,8 +3,7 @@
 module ConstituentPortal
   class DashboardsController < ApplicationController
     before_action :authenticate_user!
-    before_action :require_constituent!
-    
+    before_action :require_constitu
     # Make these methods available as helper methods in views
     helper_method :get_latest_rejection_reason, :get_latest_rejection_date, :can_resubmit_proof?
 
@@ -105,7 +104,7 @@ module ConstituentPortal
     end
 
     def count_proof_submissions(application, proof_type)
-      application.proof_submission_audits.where(proof_type: proof_type).count
+      application.events.where(action: 'proof_submitted', metadata: { proof_type: proof_type }).count
     end
 
     def get_recent_activities(application)

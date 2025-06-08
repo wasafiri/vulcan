@@ -12,7 +12,7 @@ module Applications
 
     def request_certification
       # Validate medical provider email
-      return failure(message: 'Medical provider email is required') unless application.medical_provider_email.present?
+      return failure(message: 'Medical provider email is required') if application.medical_provider_email.blank?
 
       # Get current time once to ensure consistency
       current_time = Time.current
@@ -65,14 +65,13 @@ module Applications
       )
 
       # Create event for audit trail with clear context
-      Event.create!(
-        user: actor,
+      AuditEventService.log(
         action: 'medical_certification_requested',
+        actor: actor,
+        auditable: application,
         metadata: {
-          application_id: application.id,
           old_status: previous_status || 'not_requested',
           new_status: 'requested',
-          timestamp: timestamp.iso8601,
           change_type: 'medical_certification',
           provider_name: application.medical_provider_name
         }
@@ -87,7 +86,7 @@ module Applications
       )
     end
 
-    def create_notification(timestamp)
+    def create_notification(_timestamp)
       # Check for existing notification with this request count
       request_count = application.medical_certification_request_count
       existing_notification = Notification.find_by(
@@ -105,21 +104,21 @@ module Applications
         return existing_notification
       end
 
-      # No duplicate found, create a new notification
-      Notification.create!(
+      # Use NotificationService for centralized notification creation
+      result = NotificationService.create_and_deliver!(
+        type: 'medical_certification_requested',
         recipient: application.user,
         actor: actor,
-        action: 'medical_certification_requested',
         notifiable: application,
         metadata: {
           request_count: request_count,
-          timestamp: timestamp.iso8601,
           provider: application.medical_provider_name,
           provider_email: application.medical_provider_email
-        }
+        },
+        channel: :email
       )
 
-      # Return the notification for use in email tracking
+      result.notification
     rescue StandardError => e
       # Log but don't fail the process
       log_error(e, 'Failed to create notification')

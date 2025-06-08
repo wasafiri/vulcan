@@ -56,16 +56,30 @@ class MedicalCertificationEmailJob < ApplicationJob
       nil
     end
 
-    Notification.create!(
+    # Log the audit event
+    AuditEventService.log(
+      action: 'medical_certification_requested_notification_sent',
+      actor: actor,
+      auditable: application,
+      metadata: {
+        recipient_id: recipient.id,
+        provider: application.medical_provider_name,
+        provider_email: application.medical_provider_email
+      }
+    )
+
+    # Send the notification
+    NotificationService.create_and_deliver!(
+      type: 'medical_certification_requested',
       recipient: recipient,
       actor: actor,
-      action: 'medical_certification_requested',
       notifiable: application,
       metadata: {
         timestamp: timestamp,
         provider: application.medical_provider_name,
         provider_email: application.medical_provider_email
-      }
+      },
+      channel: :email
     )
   end
 end

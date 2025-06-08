@@ -192,19 +192,19 @@ module ConstituentPortal
         Thread.current[:resubmitting_proof] = is_resubmitting
 
         begin
-          result = ProofAttachmentService.attach_proof(
+          result = ProofAttachmentService.attach_proof({
             application: @application,
             proof_type: params[:proof_type],
             blob_or_file: params[:"#{params[:proof_type]}_proof"],
             status: :not_reviewed,
-            admin: nil,
+            admin: current_user,
             submission_method: :web,
             metadata: {
               ip_address: request.remote_ip,
               user_agent: request.user_agent || 'Rails Testing',
               resubmitting: is_resubmitting # Pass resubmission flag in metadata
             }
-          )
+          })
         ensure
           # Always reset thread local, even if an exception occurs
           Thread.current[:resubmitting_proof] = nil
@@ -218,29 +218,17 @@ module ConstituentPortal
 
       def track_submission
         # Create Event for application audit log
-        event = Event.create!(
-          user: current_user,
+        AuditEventService.log(
           action: 'proof_submitted',
+          actor: current_user,
+          auditable: @application,
           metadata: {
-            application_id: @application.id,
-            proof_type: params[:proof_type]
+            proof_type: params[:proof_type],
+            submission_method: 'web',
+            ip_address: request.remote_ip,
+            user_agent: request.user_agent
           }
         )
-        Rails.logger.debug { "EVENT CREATED: #{event.inspect}" }
-
-        # Create ProofSubmissionAudit for policy audit log
-        audit = ProofSubmissionAudit.create!(
-          application: @application,
-          user: current_user,
-          proof_type: params[:proof_type],
-          submission_method: :web,
-          ip_address: request.remote_ip,
-          metadata: {
-            user_agent: request.user_agent,
-            submission_method: 'web'
-          }
-        )
-        Rails.logger.debug { "AUDIT CREATED: #{audit.inspect}" }
       end
 
       def valid_proof_type?

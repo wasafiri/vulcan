@@ -80,14 +80,40 @@ class W9Review < ApplicationRecord
   end
 
   def send_notification(action)
-    if action == 'w9_rejected'
-      VendorNotificationsMailer.w9_rejected(vendor, self).deliver_later
-    else
-      VendorNotificationsMailer.w9_approved(vendor).deliver_later
-    end
+    metadata = if action == 'w9_rejected'
+                 {
+                   w9_review_id: id,
+                   rejection_reason: rejection_reason,
+                   rejection_reason_code: rejection_reason_code,
+                   timestamp: Time.current.iso8601
+                 }
+               else
+                 {
+                   w9_review_id: id,
+                   timestamp: Time.current.iso8601
+                 }
+               end
+
+    # Log the audit event first
+    AuditEventService.log(
+      action: action,
+      actor: admin,
+      auditable: vendor,
+      metadata: metadata
+    )
+
+    # Then, send the notification without the audit flag
+    NotificationService.create_and_deliver!(
+      type: action,
+      recipient: vendor,
+      actor: admin,
+      notifiable: vendor, # W9 review is about the vendor
+      metadata: metadata,
+      channel: :email
+    )
   rescue StandardError => e
-    Rails.logger.error "Failed to send #{action} email: #{e.message}\n#{e.backtrace.join("\n")}"
-    raise
+    Rails.logger.error "Failed to send #{action} notification via NotificationService: #{e.message}"
+    # Don't re-raise - notification errors shouldn't fail the whole W9 review process
   end
 
   def increment_rejections_if_rejected
@@ -102,11 +128,21 @@ class W9Review < ApplicationRecord
   def check_max_rejections
     vendor.with_lock do
       if vendor.w9_rejections_count >= 8
-        Notification.create!(
+        # Log the audit event first
+        AuditEventService.log(
+          action: 'vendor_max_w9_rejections_warning',
+          actor: admin,
+          auditable: vendor,
+          metadata: { recipient_id: User.admins.first.id }
+        )
+
+        # Then, send the notification without the audit flag
+        NotificationService.create_and_deliver!(
+          type: 'vendor_max_w9_rejections_warning',
           recipient: User.admins.first,
           actor: admin,
-          action: 'vendor_max_w9_rejections_warning',
-          notifiable: vendor
+          notifiable: vendor,
+          channel: :email
         )
       end
     end

@@ -102,8 +102,6 @@ module VendorPortal
       # Fill in redemption details - partial amount of the voucher
       find('#redemption-amount').set('50.0')
       check "product_#{@product1.id}"
-      find("#quantity_#{@product1.id}").set('1')
-
       click_button 'Process Redemption'
       assert_text 'Successfully processed voucher'
 
@@ -145,18 +143,15 @@ module VendorPortal
       # Verify we're on the redemption page
       assert_text 'Voucher Redemption'
 
-      # Select products with quantities
+      # Select products
       check "product_#{@product1.id}"
-      find("#quantity_#{@product1.id}").set('2')
-
       check "product_#{@product2.id}"
-      find("#quantity_#{@product2.id}").set('1')
 
-      # Calculate expected total: 2 x $20 + 1 x $35 = $75
-      expected_total = (2 * @product1.price) + (1 * @product2.price)
+      # Calculate expected total: $20 + $35 = $55 (assuming quantity of 1 for each selected product)
+      expected_total = @product1.price + @product2.price
 
       # Enter the redemption amount to match product total
-      find('#redemption-amount').set(expected_total.to_s)
+      find_by_id('redemption-amount').set(expected_total.to_s)
 
       click_button 'Process Redemption'
       assert_text 'Successfully processed voucher'

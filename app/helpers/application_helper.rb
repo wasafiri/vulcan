@@ -112,10 +112,10 @@ module ApplicationHelper
   # Fetches the latest proof review and submission audit for a given proof type
   # @param application [Application] The application instance
   # @param type [String] The proof type ('income' or 'residency')
-  # @return [Array<ProofReview, ProofSubmissionAudit>] An array containing the latest review and audit, or nils
+  # @return [Array<ProofReview, Event>] An array containing the latest review and audit, or nils
   def latest_review_and_audit(application, type)
     latest_review = application.proof_reviews.where(proof_type: type).order(created_at: :desc).first
-    latest_audit = application.proof_submission_audits.where(proof_type: type).order(created_at: :desc).first
+    latest_audit = application.events.where(action: 'proof_submitted').where("metadata->>'proof_type' = ?", type).order(created_at: :desc).first
     [latest_review, latest_audit]
   end
 end

@@ -2,6 +2,7 @@
 
 module Admin
   class UsersController < ApplicationController
+    include ParamCasting
     before_action :authenticate_user!
     before_action :require_admin!
 
@@ -333,7 +334,7 @@ module Admin
     def update_capabilities
       @user = User.find(params[:id])
       capability = params[:capability]
-      enabled = ActiveModel::Type::Boolean.new.cast(params[:enabled])
+      enabled = to_boolean(params[:enabled])
 
       if enabled
         result = @user.add_capability(capability)

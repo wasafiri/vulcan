@@ -10,23 +10,22 @@ module ConstituentPortal
 
     # Factory method to create activities from various sources
     def self.from_events(application)
-      activities = []
-
       # Get review activities
       proof_reviews = application.proof_reviews.to_a
 
       # Process each proof review
-      proof_reviews.each do |review|
-        activities << from_proof_review(review)
+      activities = proof_reviews.map do |review|
+        from_proof_review(review)
       end
 
       # Get submission activities and deduplicate
-      deduplicated_submissions = deduplicate_submissions(application.proof_submission_audits.to_a)
+      submission_events = application.events.where("action LIKE '%_proof_submitted'").to_a
+      deduplicated_submissions = deduplicate_submissions(submission_events)
 
       # Process each deduplicated submission audit
-      deduplicated_submissions.each do |audit|
-        is_initial = is_initial_submission?(application, audit)
-        activities << from_submission_audit(audit, is_initial)
+      deduplicated_submissions.each do |event|
+        is_initial = is_initial_submission?(application, event)
+        activities << from_submission_event(event, is_initial)
       end
 
       # Sort by creation time (oldest first) and return
@@ -44,8 +43,8 @@ module ConstituentPortal
         # and the timestamp rounded to the minute
         rounded_time = submission.created_at.beginning_of_minute
         [
-          submission.proof_type,
-          submission.submission_method,
+          submission.metadata['proof_type'],
+          submission.metadata['submission_method'],
           rounded_time
         ]
       end
@@ -56,14 +55,16 @@ module ConstituentPortal
       end
     end
 
-    # Create an activity from a proof submission audit
-    def self.from_submission_audit(audit, is_initial = false)
+    # Create an activity from a proof submission event
+    def self.from_submission_event(event, is_initial = false)
+      proof_type = event.metadata['proof_type']
+      submission_method = event.metadata['submission_method'] || 'web'
       new(
-        source: audit,
-        created_at: audit.created_at,
+        source: event,
+        created_at: event.created_at,
         activity_type: is_initial ? :submission : :resubmission,
-        proof_type: audit.proof_type.to_sym,
-        description: "#{audit.proof_type.to_s.humanize} proof #{is_initial ? 'submitted' : 'resubmitted'} via #{audit.submission_method}"
+        proof_type: proof_type.to_sym,
+        description: "#{proof_type.to_s.humanize} proof #{is_initial ? 'submitted' : 'resubmitted'} via #{submission_method}"
       )
     end
 
@@ -86,14 +87,16 @@ module ConstituentPortal
     end
 
     # Determine if a submission is the initial one for its proof type
-    def self.is_initial_submission?(application, audit)
+    def self.is_initial_submission?(application, event)
+      proof_type = event.metadata['proof_type']
+      action_name = "#{proof_type}_proof_submitted"
       # Find all submissions of this type
-      same_type_audits = application.proof_submission_audits
-                                    .where(proof_type: audit.proof_type)
+      same_type_events = application.events
+                                    .where(action: action_name)
                                     .order(created_at: :asc)
 
       # Is this the first one?
-      same_type_audits.first.id == audit.id
+      same_type_events.first.id == event.id
     end
 
     # Initialize a new activity

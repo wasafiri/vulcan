@@ -55,7 +55,8 @@ module Applications
       @event = Event.create!(
         user: @admin,
         action: 'application_created',
-        metadata: { application_id: @application.id }
+        auditable: @application, # Add auditable for consistency
+        metadata: { application_id: @application.id, initial_status: 'approved' } # Add more realistic metadata
       )
     end
 

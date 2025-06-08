@@ -2,7 +2,8 @@
 
 module Admin
   class PaperApplicationsController < Admin::BaseController
-    before_action :cast_boolean_params, only: %i[create update]
+    include ParamCasting
+    before_action :cast_complex_boolean_params, only: %i[create update]
 
     USER_BASE_FIELDS = %i[
       first_name last_name email phone phone_type
@@ -238,7 +239,7 @@ module Admin
 
       # For dependent applications, check the "use guardian's email" checkbox
       if params[:applicant_type] == 'dependent' || inferred_dependent_application?
-        use_guardian_email = ActiveModel::Type::Boolean.new.cast(params[:use_guardian_email])
+        use_guardian_email = to_boolean(params[:use_guardian_email])
         return use_guardian_email ? 'guardian' : 'dependent'
       end
 
@@ -253,7 +254,7 @@ module Admin
 
       # For dependent applications, check the "use guardian's phone" checkbox
       if params[:applicant_type] == 'dependent' || inferred_dependent_application?
-        use_guardian_phone = ActiveModel::Type::Boolean.new.cast(params[:use_guardian_phone])
+        use_guardian_phone = to_boolean(params[:use_guardian_phone])
         return use_guardian_phone ? 'guardian' : 'dependent'
       end
 
@@ -268,7 +269,7 @@ module Admin
 
       # For dependent applications, check the "same as guardian's address" checkbox
       if params[:applicant_type] == 'dependent' || inferred_dependent_application?
-        use_guardian_address = ActiveModel::Type::Boolean.new.cast(params[:use_guardian_address])
+        use_guardian_address = to_boolean(params[:use_guardian_address])
         return use_guardian_address ? 'guardian' : 'dependent'
       end
 
@@ -335,37 +336,7 @@ module Admin
       params.permit(:household_size, :annual_income, :communication_preference, :additional_notes).to_h
     end
 
-    def cast_boolean_params
-      # Cast for application attributes
-      if params[:application].present?
-        cast_boolean_for(params[:application], APPLICATION_FIELDS.select do |f|
-          f.to_s.match?(/disability$|resident$|accepted$|verified$|authorized$/)
-        end)
-      end
-
-      # Cast for disability attributes within nested structures
-      cast_boolean_for(params[:applicant_attributes], USER_DISABILITY_FIELDS) if params[:applicant_attributes].present?
-      cast_boolean_for(params[:guardian_attributes], USER_DISABILITY_FIELDS) if params[:guardian_attributes].present?
-      cast_boolean_for(params[:constituent], USER_DISABILITY_FIELDS) if params[:constituent].present?
-
-      # Cast contact strategy checkboxes
-      %w[use_guardian_email use_guardian_phone use_guardian_address].each do |checkbox_param|
-        params[checkbox_param] = ActiveModel::Type::Boolean.new.cast(params[checkbox_param]) if params[checkbox_param].present?
-      end
-    end
-
-    def cast_boolean_for(hash, fields)
-      return unless hash.is_a?(ActionController::Parameters) || hash.is_a?(Hash)
-
-      fields.each do |field|
-        field_sym = field.to_sym
-        next unless hash.key?(field_sym)
-
-        value = hash[field_sym]
-        # Handle array_to_hidden_checkboxes_workaround if it's still in use
-        value = value.last if value.is_a?(Array) && value.size == 2 && value.first.blank?
-        hash[field_sym] = ActiveModel::Type::Boolean.new.cast(value)
-      end
-    end
+    # NOTE: cast_boolean_params and cast_boolean_for are now provided by the ParamCasting concern
+    # The complex parameter casting is handled by cast_complex_boolean_params
   end
 end

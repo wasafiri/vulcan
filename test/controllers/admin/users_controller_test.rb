@@ -5,7 +5,7 @@ require 'test_helper'
 module Admin
   class UsersControllerTest < ActionDispatch::IntegrationTest
     setup do
-      @admin = users(:admin)
+      @admin = create(:admin) # Use FactoryBot to create an admin user
       sign_in @admin
     end
 
@@ -56,7 +56,7 @@ module Admin
     end
 
     test 'should detect potential duplicate guardians' do
-      existing_user = users(:constituent)
+      existing_user = create(:constituent) # Use FactoryBot to create a constituent user
 
       assert_difference('Users::Constituent.count') do
         post admin_users_path, params: {

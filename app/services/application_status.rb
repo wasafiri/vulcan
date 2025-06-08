@@ -7,12 +7,23 @@ class ApplicationStatus
 
   def send_back!(actor: nil)
     @application.update(status: :needs_information)
-    Notification.create!(
+
+    # Log the audit event
+    AuditEventService.log(
+      action: 'application_sent_back',
+      actor: actor,
+      auditable: @application,
+      metadata: { reason: 'Additional information required.' }
+    )
+
+    # Send the notification
+    NotificationService.create_and_deliver!(
+      type: 'application_sent_back',
       recipient: @application.user,
       actor: actor,
-      action: 'application_sent_back',
+      notifiable: @application,
       metadata: { reason: 'Additional information required.' },
-      notifiable: @application
+      channel: :email
     )
   end
 end

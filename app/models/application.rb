@@ -31,18 +31,18 @@ class Application < ApplicationRecord
              optional: true,
              inverse_of: :income_verified_applications
 
-  belongs_to :managing_guardian, # NEW ASSOCIATION
+  belongs_to :managing_guardian,
              class_name: 'User',
              optional: true,
-             inverse_of: :managed_applications # User model will need has_many :managed_applications
+             inverse_of: :managed_applications
 
-  has_many :training_sessions, class_name: 'TrainingSession'
+  has_many :training_sessions, class_name: 'TrainingSession', dependent: :destroy
   has_many :trainers, through: :training_sessions
   has_many :evaluations, dependent: :destroy
   has_many :notifications, as: :notifiable, dependent: :destroy
   has_many :proof_reviews, dependent: :destroy
   has_many :status_changes, class_name: 'ApplicationStatusChange', dependent: :destroy
-  has_many :proof_submission_audits, dependent: :destroy
+  has_many :events, as: :auditable, dependent: :destroy # Added for audit trail
   has_many :vouchers, dependent: :restrict_with_error
   has_many :application_notes, dependent: :destroy
   has_and_belongs_to_many :products
@@ -93,16 +93,12 @@ class Application < ApplicationRecord
             presence: true, unless: :status_draft?
   validates :household_size, :annual_income, presence: true, unless: :status_draft?
   validates :self_certify_disability, inclusion: { in: [true, false] }, unless: :status_draft?
-  # REMOVED VALIDATION: validates :guardian_relationship, presence: true, if: :is_guardian?
-  # The old :is_guardian? method on Application is also being replaced/repurposed.
-
   validate :waiting_period_completed, on: :create
   validate :constituent_must_have_disability, if: :validate_disability?
-
-  after_create :ensure_managing_guardian_set
+  before_save :ensure_managing_guardian_set, if: :user_id_changed?
+  before_create :ensure_managing_guardian_set
   # Callbacks
   after_update :log_status_change, if: :saved_change_to_status?
-  after_save :ensure_managing_guardian_set, if: :user_id_previously_changed?
   after_save :log_alternate_contact_changes, if: :saved_change_to_alternate_contact?
 
   # Scopes
@@ -211,7 +207,8 @@ class Application < ApplicationRecord
   # @return [Array] A two-element array containing the latest review and audit
   def latest_review_and_audit(proof_type)
     latest_review = proof_reviews.where(proof_type: proof_type).order(created_at: :desc).first
-    latest_audit = proof_submission_audits.where(proof_type: proof_type).order(created_at: :desc).first
+    action_name = "#{proof_type}_proof_submitted"
+    latest_audit = events.where(action: action_name).order(created_at: :desc).first
 
     [latest_review, latest_audit]
   end
@@ -294,17 +291,16 @@ class Application < ApplicationRecord
     end
 
     # Only log if there were actual changes to alternate contact fields
-    return unless changed_attributes.present?
+    return if changed_attributes.blank?
 
     # Use Event model to log the changes
-    Event.create!(
-      user: Current.user || user, # Use Current.user if available, otherwise fall back to the application's user
+    AuditEventService.log(
       action: 'alternate_contact_updated',
+      actor: Current.user || user, # Use Current.user if available, otherwise fall back to the application's user
+      auditable: self,
       metadata: {
-        application_id: id,
         changes: changed_attributes,
-        changed_by: Current.user&.id,
-        timestamp: Time.current.iso8601
+        changed_by: Current.user&.id
       }
     )
   rescue StandardError => e
@@ -317,21 +313,20 @@ class Application < ApplicationRecord
     # Guard clause to prevent infinite recursion
     return if @logging_status_change
 
-    acting_user = Current.user || user
-    return unless acting_user
+    acting_user = Current.user || self.user # Ensure a user is always present
+    return if acting_user.blank?
 
     @logging_status_change = true
 
     begin
-      Event.create!(
-        user: acting_user,
+      AuditEventService.log(
         action: 'application_status_changed',
+        actor: acting_user,
+        auditable: self,
         metadata: {
-          application_id: id,
           old_status: status_before_last_save,
           new_status: status,
-          submission_method: submission_method,
-          timestamp: Time.current.iso8601
+          submission_method: submission_method
         }
       )
     rescue StandardError => e
@@ -364,21 +359,23 @@ class Application < ApplicationRecord
   def notify_admins_of_new_proofs
     return unless user
 
-    admin_ids = User.where(type: 'Users::Administrator').pluck(:id)
-    return if admin_ids.empty?
+    admins = User.where(type: 'Users::Administrator')
+    return if admins.empty?
 
-    notifications = admin_ids.map do |admin_id|
-      {
-        recipient_id: admin_id,
-        actor_id: user.id,
-        action: 'proof_submitted',
-        notifiable_type: self.class.name,
-        notifiable_id: id,
-        metadata: { proof_types: pending_proof_types }
-      }
+    # Use NotificationService for each admin to ensure proper audit trails and delivery
+    admins.each do |admin|
+      NotificationService.create_and_deliver!(
+        type: 'proof_submitted',
+        recipient: admin,
+        actor: user,
+        notifiable: self,
+        metadata: { proof_types: pending_proof_types },
+        channel: :email
+      )
+    rescue StandardError => e
+      Rails.logger.error "Failed to notify admin #{admin.id} of new proofs for application #{id}: #{e.message}"
+      # Continue with other admins even if one fails
     end
-
-    Notification.insert_all!(notifications)
   end
 
   def pending_proof_types
@@ -404,24 +401,21 @@ class Application < ApplicationRecord
     false
   end
 
-  # Ensures the managing_guardian_id is set when the application is for a dependent
-  # This is called after create and when user_id changes
+  # Ensures the managing_guardian_id is set when the application is for a dependent.
+  # This is called before create and when user_id changes to automatically
+  # associate the application with a guardian if a relationship exists.
   def ensure_managing_guardian_set
-    # Skip if the application already has a managing guardian
-    return if managing_guardian_id.present?
+    # Skip if the application already has a managing guardian or if user_id is not set.
+    return if managing_guardian_id.present? || user_id.blank?
 
-    # Skip if there's no user set yet
-    return if user_id.blank?
+    # Find if there's any guardian relationship for this user (dependent).
+    # Using find_by to get a single record or nil.
+    guardian_relationship = GuardianRelationship.find_by(dependent_id: user_id)
 
-    # Find if there's any guardian relationship for this user (dependent)
-    guardian_relationship = GuardianRelationship.where(dependent_id: user_id).first
-
-    # If there is a guardian relationship, set the managing_guardian_id to the guardian_id
-    return unless guardian_relationship.present?
+    # If there is a guardian relationship, set the managing_guardian_id.
+    return unless guardian_relationship
 
     Rails.logger.info "Setting managing_guardian_id to #{guardian_relationship.guardian_id} for application #{id}"
-
-    # Use update_column to avoid callbacks and validations
-    update_column(:managing_guardian_id, guardian_relationship.guardian_id)
+    self.managing_guardian_id = guardian_relationship.guardian_id
   end
 end

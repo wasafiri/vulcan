@@ -13,6 +13,7 @@ class ProofManageableTest < ActiveSupport::TestCase
     # Replace fixture references with factory calls
     @application = create(:application, :in_progress_with_pending_proofs)
     @user = create(:constituent)
+    @admin = create(:admin) # Needed for audit events
 
     @valid_pdf = fixture_file_upload('test/fixtures/files/residency_proof.pdf', 'application/pdf')
     @large_pdf = fixture_file_upload('test/fixtures/files/large.pdf', 'application/pdf')
@@ -31,14 +32,12 @@ class ProofManageableTest < ActiveSupport::TestCase
   end
 
   test 'validates file size' do
-    # SKIPPED: File validation is affected by paper_application_context
-    # Hard to test reliably in isolation
+    # SKIPPED: File validation affected by paper_application_context; hard to test reliably in isolation
     skip('Skipping file size validation test')
   end
 
   test 'validates mime types' do
-    # SKIPPED: File validation is affected by paper_application_context
-    # Hard to test reliably in isolation
+    # SKIPPED: File validation is affected by paper_application_context; hard to test reliably in isolation
     skip('Skipping mime type validation test')
   end
 
@@ -50,15 +49,23 @@ class ProofManageableTest < ActiveSupport::TestCase
   end
 
   test 'creates audit trail on proof submission' do
-    assert_difference 'ProofSubmissionAudit.count' do
+    assert_difference('Event.count', 1) do
       @application.income_proof.attach(@valid_pdf)
       @application.save!
     end
+
+    # Verify the event was created correctly
+    event = Event.last
+    assert_equal 'income_proof_submitted', event.action
+    assert_equal @application.id, event.auditable_id
+    assert_equal 'Application', event.auditable_type
+    assert_equal @user.id, event.user_id # User who submitted the proof
+    assert_equal 'income', event.metadata['proof_type']
+    assert_not_nil event.metadata['blob_id']
   end
 
   test 'notifies admins of new proofs' do
-    # SKIPPED: Direct testing of notify_admins_of_new_proofs is unreliable
-    # The job notification is better tested in an integration test
+    # SKIPPED: Direct testing of notify_admins_of_new_proofs is unreliable; the job notification is better tested in an integration test
     skip('Skipping admin notification test')
   end
 
@@ -66,35 +73,21 @@ class ProofManageableTest < ActiveSupport::TestCase
     @application.income_proof.attach(@valid_pdf)
     admin = create(:admin)
 
-    # ONLY mock the proof_reviews association
-    proof_review = mock('proof_review')
-    proof_reviews_association = mock('proof_reviews_association')
-    proof_reviews_association.expects(:create!).with(
-      has_entries(
-        admin: admin,
-        status: 'purged',
-        proof_type: 'system'
-      )
-    ).returns(proof_review)
-    @application.stubs(:proof_reviews).returns(proof_reviews_association)
+    # We are not testing the notification creation here, so we can stub it.
+    NotificationService.stubs(:create_and_deliver!)
+    AuditEventService.stubs(:log)
 
-    # Mock purge methods on the attachments
-    @application.income_proof.expects(:purge).once
-    @application.residency_proof.stubs(:attached?).returns(false)
+    assert_difference('Event.count', 1) do
+      @application.purge_proofs(admin)
+    end
 
-    # Mock update_columns to avoid database interaction
-    @application.expects(:update_columns).with(
-      has_entries(
-        income_proof_status: :not_reviewed,
-        residency_proof_status: :not_reviewed
-      )
-    ).once
+    @application.reload
+    assert_not @application.income_proof.attached?
+    assert_equal 'not_reviewed', @application.income_proof_status
+    assert_nil @application.needs_review_since
 
-    # Mock create_system_notification to avoid errors
-    @application.stubs(:create_system_notification!)
-
-    # Execute the method
-    @application.purge_proofs(admin)
+    # Check that a system proof review was created
+    assert @application.proof_reviews.where(status: 'purged', proof_type: 'system').exists?
   end
 
   test 'validates both income and residency proofs independently' do
@@ -124,9 +117,21 @@ class ProofManageableTest < ActiveSupport::TestCase
 
   test 'sets needs_review_since on new proof submission' do
     freeze_time do
-      @application.income_proof.attach(@valid_pdf)
-      @application.save!
-      assert_equal Time.current, @application.needs_review_since
+      assert_difference('Event.count', 1) do
+        @application.income_proof.attach(@valid_pdf)
+        @application.save!
+      end
+
+      @application.reload # Reload to get the updated value from the database
+      assert_in_delta Time.current, @application.needs_review_since, 1.second
+
+      # Verify the audit event was created for this submission
+      event = Event.last
+      assert_equal 'income_proof_submitted', event.action
+      assert_equal @application.id, event.auditable_id
+      assert_equal 'Application', event.auditable_type
+      assert_equal @user.id, event.user_id
+      assert_equal 'income', event.metadata['proof_type']
     end
   end
 end

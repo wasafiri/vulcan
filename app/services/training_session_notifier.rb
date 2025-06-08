@@ -11,8 +11,7 @@ class TrainingSessionNotifier
     return unless should_send_notification?
 
     ActiveRecord::Base.transaction do
-      send_email_notifications
-      create_in_app_notifications
+      create_consolidated_notification
     end
   end
 
@@ -24,27 +23,27 @@ class TrainingSessionNotifier
       training_session.saved_change_to_completed_at?
   end
 
-  def send_email_notifications
-    case training_session.status
-    when 'scheduled', 'confirmed'
-      TrainingSessionNotificationsMailer.training_scheduled(training_session).deliver_later
-    when 'completed'
-      TrainingSessionNotificationsMailer.training_completed(training_session).deliver_later
-    when 'cancelled'
-      TrainingSessionNotificationsMailer.training_cancelled(training_session).deliver_later
-    when 'no_show'
-      TrainingSessionNotificationsMailer.no_show_notification(training_session).deliver_later
-    end
-  end
-
-  def create_in_app_notifications
-    Notification.create!(
-      recipient: training_session.constituent,
-      actor: training_session.trainer,
+  def create_consolidated_notification
+    # Log the audit event first
+    AuditEventService.log(
       action: notification_action,
-      notifiable: training_session,
+      actor: training_session.trainer,
+      auditable: training_session,
       metadata: notification_metadata
     )
+
+    # Then, send the notification without the audit flag
+    NotificationService.create_and_deliver!(
+      type: notification_action,
+      recipient: training_session.constituent,
+      actor: training_session.trainer,
+      notifiable: training_session,
+      metadata: notification_metadata,
+      channel: :email
+    )
+  rescue StandardError => e
+    Rails.logger.error "Failed to send training session notification via NotificationService: #{e.message}"
+    # Don't re-raise - notification errors shouldn't fail the training session update
   end
 
   def notification_action

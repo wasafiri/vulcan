@@ -10,10 +10,10 @@ class ProofAttachmentFallbackTest < ActiveSupport::TestCase
     @application = applications(:draft_application)
     @admin = create(:admin)
     # Clear out any existing audit records to ensure our tests are isolated
-    ProofSubmissionAudit.delete_all
+    Event.where(action: 'proof_attachment_failed').delete_all
   end
 
-  test 'record_failure handles missing submission_method gracefully' do
+  test 'record_failure logs event with missing submission_method gracefully' do
     # Generate a test-specific proof type to avoid conflicts
     proof_type = "income_#{Time.now.to_i}"
 
@@ -33,14 +33,18 @@ class ProofAttachmentFallbackTest < ActiveSupport::TestCase
       )
     end
 
-    # Verify audit record was created with fallback submission method
-    audit = ProofSubmissionAudit.last
-    assert_not_nil audit.submission_method
-    assert_equal proof_type, audit.proof_type
-    assert_equal false, audit.metadata['success']
+    # Verify audit event was created with fallback submission method
+    event = Event.last
+    assert_equal 'proof_attachment_failed', event.action
+    assert_equal @application.id, event.auditable_id
+    assert_equal 'Application', event.auditable_type
+    assert_equal @admin.id, event.user_id
+    assert_equal 'Test error', event.metadata['error_message']
+    assert_equal 'StandardError', event.metadata['error_class']
+    assert_equal 'unknown', event.metadata['submission_method'] # Default fallback
   end
 
-  test 'record_failure handles invalid submission_method gracefully' do
+  test 'record_failure logs event with invalid submission_method gracefully' do
     # Generate a test-specific proof type to avoid conflicts
     proof_type = "residency_#{Time.now.to_i}"
 
@@ -60,10 +64,14 @@ class ProofAttachmentFallbackTest < ActiveSupport::TestCase
       )
     end
 
-    # Verify audit record was created with fallback submission method
-    audit = ProofSubmissionAudit.last
-    assert_not_nil audit.submission_method
-    assert_equal proof_type, audit.proof_type
-    assert_equal false, audit.metadata['success']
+    # Verify audit event was created with fallback submission method
+    event = Event.last
+    assert_equal 'proof_attachment_failed', event.action
+    assert_equal @application.id, event.auditable_id
+    assert_equal 'Application', event.auditable_type
+    assert_equal @admin.id, event.user_id
+    assert_equal 'Test error', event.metadata['error_message']
+    assert_equal 'StandardError', event.metadata['error_class']
+    assert_equal 'invalid_method', event.metadata['submission_method'] # Should use the provided invalid method
   end
 end

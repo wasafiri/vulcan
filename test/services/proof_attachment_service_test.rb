@@ -31,24 +31,28 @@ class ProofAttachmentServiceTest < ActiveSupport::TestCase
       filename: 'income_proof.txt',
       type: 'text/plain'
     )
+  end
 
-    # Mock ProofSubmissionAudit validations to avoid issues in tests
-    @original_validations = ProofSubmissionAudit._validators.deep_dup
-    ProofSubmissionAudit.clear_validators!
-    ProofSubmissionAudit.validates :application, presence: true
-    ProofSubmissionAudit.validates :proof_type, presence: true
+  teardown do
+    # Clean up the test file
+    @test_file.close
+    @test_file.unlink
   end
 
   test 'attach_proof successfully attaches a proof and updates status' do
-    result = ProofAttachmentService.attach_proof(
-      application: @application,
-      proof_type: 'income',
-      blob_or_file: @test_file_upload,
-      status: :approved,
-      admin: @admin,
-      submission_method: :paper,
-      metadata: { ip_address: '127.0.0.1' }
-    )
+    # Clear events before the test to ensure we only count events from this test
+    Event.delete_all
+    AuditEventService.stubs(:recent_duplicate_exists?).returns(false)
+
+    result = ProofAttachmentService.attach_proof({
+                                                   application: @application,
+                                                   proof_type: 'income',
+                                                   blob_or_file: @test_file_upload,
+                                                   status: :approved,
+                                                   admin: @admin,
+                                                   submission_method: :paper,
+                                                   metadata: { ip_address: '127.0.0.1' }
+    })
 
     assert result[:success], 'Expected attach_proof to succeed'
     assert_not_nil result[:duration_ms], 'Expected duration to be tracked'
@@ -59,60 +63,66 @@ class ProofAttachmentServiceTest < ActiveSupport::TestCase
     assert @application.income_proof.attached?, 'Expected income proof to be attached'
     assert @application.income_proof_status_approved?, 'Expected income proof status to be approved'
 
-    # Verify audit was created
-    audit = ProofSubmissionAudit.last
-    assert_equal @application, audit.application
-    assert_equal @admin, audit.user
-    assert_equal 'income', audit.proof_type
-    assert_equal 'paper', audit.submission_method
-    assert_equal true, audit.metadata['success']
-    assert_equal 'approved', audit.metadata['status']
+    # Explicitly commit the transaction to ensure the event is persisted
+    ActiveRecord::Base.connection.commit_db_transaction if ActiveRecord::Base.connection.open_transactions.positive?
+
+    # Verify audit event was created
+    event = Event.last
+    assert_not_nil event, 'Expected an event to be created'
+    assert_equal 'income_proof_attached', event.action
+    assert_equal @application.id, event.auditable_id
+    assert_equal 'Application', event.auditable_type
+    assert_equal @admin.id, event.user_id
+    assert_equal 'income', event.metadata['proof_type']
+    assert_equal 'paper', event.metadata['submission_method']
+    assert_equal 'approved', event.metadata['status']
+    assert_not_nil event.metadata['blob_id']
   end
 
   test 'attach_proof handles errors gracefully' do
-    # Simulate an error occurring within the transaction block
-    # Removed: result = nil (useless assignment)
+    # Clear events before the test
+    Event.delete_all
 
     # Stub the transaction method itself to raise an error
     ActiveRecord::Base.stubs(:transaction).raises(StandardError, 'Test error during transaction')
 
     # Now call the service - the transaction block should raise the error
-    result = ProofAttachmentService.attach_proof(
-      application: @application,
-      proof_type: 'income',
-      blob_or_file: @test_file_upload,
-      status: :approved,
-      admin: @admin,
-      submission_method: :paper,
-      metadata: { ip_address: '127.0.0.1' }
-    )
+    result = ProofAttachmentService.attach_proof({
+                                                   application: @application,
+                                                   proof_type: 'income',
+                                                   blob_or_file: @test_file_upload,
+                                                   status: :approved,
+                                                   admin: @admin,
+                                                   submission_method: :paper,
+                                                   metadata: { ip_address: '127.0.0.1' }
+    })
 
     assert_not result[:success], 'Expected attach_proof to fail'
     assert_not_nil result[:error], 'Expected error to be captured'
     assert_not_nil result[:duration_ms], 'Expected duration to be tracked'
 
-    # Removed: assert_not @application.income_proof.attached?
-    # This assertion fails because the attachment happens *before* the stubbed update! error.
-    # The key checks are that result[:success] is false and the audit log reflects the error.
-
-    # Verify failure audit was created
-    audit = ProofSubmissionAudit.last
-    assert_equal @application.id, audit.application_id
-    assert_equal @admin, audit.user
-    assert_equal 'income', audit.proof_type
-    assert_equal 'paper', audit.submission_method
-    assert_equal false, audit.metadata['success']
-    assert_equal 'Test error during transaction', audit.metadata['error_message'] # Expect this error message
+    # Verify failure audit event was created
+    event = Event.last
+    assert_equal 'income_proof_attachment_failed', event.action
+    assert_equal @application.id, event.auditable_id
+    assert_equal 'Application', event.auditable_type
+    assert_equal @admin.id, event.user_id
+    assert_equal 'Test error during transaction', event.metadata['error_message']
+    assert_equal 'StandardError', event.metadata['error_class']
+    assert_equal 'paper', event.metadata['submission_method']
   end
 
   test 'reject_proof_without_attachment sets rejected status without attachment' do
+    # Clear events before the test
+    Event.delete_all
+
     result = ProofAttachmentService.reject_proof_without_attachment(
       application: @application,
       proof_type: 'income',
       admin: @admin,
+      submission_method: :paper,
       reason: 'invalid_document',
       notes: 'Document does not meet requirements',
-      submission_method: :paper,
       metadata: { ip_address: '127.0.0.1' }
     )
 
@@ -126,14 +136,14 @@ class ProofAttachmentServiceTest < ActiveSupport::TestCase
     assert_equal 'rejected', proof_review.status
     assert_equal 'invalid_document', proof_review.rejection_reason
 
-    # Verify audit was created
-    audit = ProofSubmissionAudit.last
-    assert_equal @application, audit.application
-    assert_equal @admin, audit.user
-    assert_equal 'income', audit.proof_type
-    assert_equal 'paper', audit.submission_method
-    assert_equal true, audit.metadata['success']
-    assert_equal false, audit.metadata['has_attachment']
+    # Verify audit event was created
+    event = Event.last
+    assert_equal 'income_proof_rejected', event.action # Action name from ProofReview
+    assert_equal @application.id, event.auditable_id
+    assert_equal 'Application', event.auditable_type
+    assert_equal @admin.id, event.user_id
+    assert_equal 'income', event.metadata['proof_type']
+    assert_equal 'invalid_document', event.metadata['rejection_reason']
   end
 
   test 'metrics recording handles exceptions gracefully' do
@@ -141,15 +151,15 @@ class ProofAttachmentServiceTest < ActiveSupport::TestCase
     # during normal execution but will still test exception handling
     ProofAttachmentService.stub :record_metrics, ->(*args) {} do
       # The overall operation should still succeed
-      result = ProofAttachmentService.attach_proof(
-        application: @application,
-        proof_type: 'income',
-        blob_or_file: @test_file_upload,
-        status: :approved,
-        admin: @admin,
-        submission_method: :paper,
-        metadata: { ip_address: '127.0.0.1' }
-      )
+      result = ProofAttachmentService.attach_proof({
+                                                     application: @application,
+                                                     proof_type: 'income',
+                                                     blob_or_file: @test_file_upload,
+                                                     status: :approved,
+                                                     admin: @admin,
+                                                     submission_method: :paper,
+                                                     metadata: { ip_address: '127.0.0.1' }
+                                                   })
 
       assert result[:success], 'Operation should succeed even with metrics mocked'
       assert @application.income_proof.attached?, 'Proof should be attached'

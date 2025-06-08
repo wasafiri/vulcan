@@ -18,7 +18,6 @@ class EmailEventHandler
     end
   rescue StandardError => e
     Rails.logger.error("Error processing email event: #{e.message}")
-    Honeybadger.notify(e) if defined?(Honeybadger)
     false
   end
 

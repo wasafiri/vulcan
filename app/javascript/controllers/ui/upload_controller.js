@@ -3,7 +3,6 @@ import { DirectUpload } from "@rails/activestorage"
 
 export default class extends Controller {
   static targets = ["input", "progress", "percentage", "cancel", "submit"]
-  static outlets = ["flash"] // Declare flash outlet
   static values = { directUploadUrl: String }
 
   connect() {
@@ -37,22 +36,14 @@ export default class extends Controller {
 
     if (!validFileTypes.includes(file.type)) {
       const errorMessage = "Invalid file type. Please upload a PDF or an image file (jpg, jpeg, png, tiff, bmp)."
-      if (this.hasFlashOutlet) {
-        this.flashOutlet.showError(errorMessage)
-      } else {
-        alert(errorMessage)
-      }
+      this.showNotification(errorMessage, 'error')
       this.inputTarget.value = ""
       return false
     }
 
     if (file.size > maxFileSize) {
       const errorMessage = "File is too large. Maximum size allowed is 5MB."
-      if (this.hasFlashOutlet) {
-        this.flashOutlet.showError(errorMessage)
-      } else {
-        alert(errorMessage)
-      }
+      this.showNotification(errorMessage, 'error')
       this.inputTarget.value = ""
       return false
     }
@@ -97,11 +88,7 @@ export default class extends Controller {
   handleUploadError(error) {
     console.error("Upload error:", error)
     const errorMessage = "There was an error uploading your file. Please try again."
-    if (this.hasFlashOutlet) {
-      this.flashOutlet.showError(errorMessage)
-    } else {
-      alert(errorMessage)
-    }
+    this.showNotification(errorMessage, 'error')
     this.resetUpload()
   }
 
@@ -142,5 +129,20 @@ export default class extends Controller {
     // Enable submit button
     this.submitTarget.disabled = false
     this.uploadInProgress = false
+  }
+
+  /**
+   * Safely show notification using AppNotifications service with fallback
+   * @param {string} message - The message to display
+   * @param {string} type - The notification type ('error', 'success', 'info', etc.)
+   */
+  showNotification(message, type = 'info') {
+    if (window['AppNotifications'] && typeof window['AppNotifications'].show === 'function') {
+      window['AppNotifications'].show(message, type)
+    } else {
+      // Fallback to alert for development or if AppNotifications isn't loaded
+      alert(message)
+      console.warn('AppNotifications service not available. Message:', message)
+    }
   }
 }

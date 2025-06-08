@@ -19,11 +19,21 @@ module Applications
     def call
       ApplicationRecord.transaction do
         application.update!(status: :awaiting_documents)
-        Notification.create!(
+
+        # Log the audit event
+        AuditEventService.log(
+          action: 'documents_requested',
+          actor: actor,
+          auditable: application
+        )
+
+        # Send the notification
+        NotificationService.create_and_deliver!(
+          type: 'documents_requested',
           recipient: application.user,
           actor: actor,
-          action: 'documents_requested',
-          notifiable: application
+          notifiable: application,
+          channel: :email
         )
         true # Indicate success
       end

@@ -21,161 +21,35 @@ class ProofAttachmentService
   # workflows to attach proof documents. It handles different input types, manages
   # transactions, and provides consistent logging and metrics.
   #
-  # @param application [Application] The application to attach the proof to
-  # @param proof_type [Symbol] The type of proof (:income or :residency)
-  # @param blob_or_file [ActiveStorage::Blob, String, ActionDispatch::Http::UploadedFile]
-  #        The file to attach - can be a direct blob, a signed_id string, or an uploaded file
-  # @param status [Symbol] The status to set for the proof (:not_reviewed, :approved, :rejected)
-  # @param admin [User] The admin user if this is an admin action (nil for constituent actions)
-  # @param submission_method [Symbol] The method of submission (:paper, :web, :email, etc.)
-  # @param metadata [Hash] Additional metadata to store with the attachment audit
+  # @param args [Hash] A hash containing the arguments for attachment:
+  #   - :application [Application] (required) The application to attach the proof to.
+  #   - :proof_type [Symbol] (required) The type of proof (:income or :residency).
+  #   - :blob_or_file [ActiveStorage::Blob, String, ActionDispatch::Http::UploadedFile] (required) The file to attach.
+  #   - :submission_method [Symbol] (required) The method of submission (:paper, :web, :email, etc.).
+  #   - :status [Symbol] (optional, default: :not_reviewed) The status to set for the proof.
+  #   - :admin [User] (optional) The admin user if this is an admin action.
+  #   - :metadata [Hash] (optional) Additional metadata to store with the attachment audit.
   #
   # @return [Hash] Result hash with :success, :error, and :duration_ms keys
-  def self.attach_proof(application:, proof_type:, blob_or_file:, submission_method:, status: :not_reviewed,
-                        admin: nil, metadata: {})
-    start_time = Time.current
-    result = { success: false, error: nil, duration_ms: 0 }
+  def self.attach_proof(args)
+    params = {
+      status: :not_reviewed,
+      admin: nil,
+      metadata: {}
+    }.merge(args)
 
-    # Calculate blob size for metrics if available
-    blob_size = blob_or_file.byte_size if blob_or_file.respond_to?(:byte_size)
+    context = {
+      application: params.fetch(:application),
+      proof_type: params.fetch(:proof_type),
+      admin: params.fetch(:admin),
+      submission_method: params.fetch(:submission_method),
+      metadata: params.fetch(:metadata),
+      status: params.fetch(:status)
+    }
 
-    begin
-      # Step 1: Process blob_or_file to ensure it's in the right format for attachment
-      # ActiveStorage attach requires a signed_id, IO object, Hash with keys, or ActionDispatch::Http::UploadedFile
-      attachment_param = blob_or_file
-
-      # ENHANCED LOGGING FOR ATTACHMENT DEBUGGING
-      Rails.logger.info "PROOF ATTACHMENT INPUT TYPE: #{blob_or_file.class.name}"
-      Rails.logger.info "PROOF ATTACHMENT ENVIRONMENT: #{Rails.env}"
-      Rails.logger.info "PROOF ATTACHMENT STORAGE SERVICE: #{ActiveStorage::Blob.service.class.name}"
-
-      # Proper handling of different input types
-      if blob_or_file.is_a?(ActiveStorage::Blob)
-        # Direct blob object - convert to signed_id
-        Rails.logger.info "Converting blob to signed_id for #{proof_type} proof attachment"
-        Rails.logger.info "BLOB INFO: ID=#{blob_or_file.id}, Key=#{blob_or_file.key}, Content-Type=#{blob_or_file.content_type}, Size=#{blob_or_file.byte_size}"
-        attachment_param = blob_or_file.signed_id
-        Rails.logger.info "Using signed_id: #{attachment_param || '[nil]'}"
-      elsif blob_or_file.is_a?(String) && blob_or_file.start_with?('eyJf')
-        # Already a signed_id string - use as is
-        Rails.logger.info "Input is already a signed_id, using directly: #{blob_or_file[0..20]}..."
-        attachment_param = blob_or_file
-      elsif blob_or_file.respond_to?(:tempfile) || blob_or_file.is_a?(ActionDispatch::Http::UploadedFile)
-        # ActionDispatch::Http::UploadedFile or similar - use as is
-        if blob_or_file.respond_to?(:original_filename)
-          Rails.logger.info "UPLOAD INFO: Filename=#{blob_or_file.original_filename}, Content-Type=#{blob_or_file.content_type}, Size=#{blob_or_file.size}"
-        end
-        Rails.logger.info "Using direct file upload attachment: #{blob_or_file.class.name}"
-        attachment_param = blob_or_file
-
-        # Create ActiveStorage blob directly for more reliable attachment
-        Rails.logger.info 'Creating blob from uploaded file'
-        begin
-          blob = ActiveStorage::Blob.create_and_upload!(
-            io: blob_or_file.tempfile,
-            filename: blob_or_file.original_filename,
-            content_type: blob_or_file.content_type
-          )
-          Rails.logger.info "Successfully created blob for #{proof_type}_proof: #{blob.id}"
-          attachment_param = blob.signed_id
-        rescue StandardError => e
-          Rails.logger.error "Failed to create blob from uploaded file: #{e.message}"
-          # Continue with original param as fallback
-        end
-      else
-        # Other types (IO, Hash, etc) - use as is
-        Rails.logger.info "ATTACHMENT PARAM TYPE: #{blob_or_file.class.name}"
-        begin
-          Rails.logger.info "ATTACHMENT PARAM DETAILS: #{blob_or_file.inspect[0..100]}"
-        rescue StandardError
-          'Could not inspect blob_or_file'
-        end
-        attachment_param = blob_or_file
-      end
-
-      # Log pre-attachment info
-      Rails.logger.info "PRE-ATTACHMENT CHECK: Application #{application.id}, #{proof_type}_proof attached? #{application.send("#{proof_type}_proof").attached?}"
-
-      # Step 2: Attach directly to the application instance
-      Rails.logger.info "EXECUTING ATTACHMENT: #{proof_type}_proof to application #{application.id}"
-      application.send("#{proof_type}_proof").attach(attachment_param)
-
-      # Force a reload of the application *before* the transaction to ensure attachment is recognized
-      application.reload
-
-      # Log details to help debug attachments
-      Rails.logger.debug do
-        "Attachment check - application_id: #{application.id}, #{proof_type}_proof attached? #{application.send("#{proof_type}_proof").attached?}"
-      end
-      if application.send("#{proof_type}_proof").attached?
-        attachment = application.send("#{proof_type}_proof").attachment
-        Rails.logger.info "Attachment confirmed - ID: #{attachment.id}, Blob ID: #{attachment.blob_id}"
-      end
-
-      # Verify attachment succeeded before proceeding within the transaction
-      Rails.logger.info "Successfully attached #{proof_type} proof for application #{application.id}, proceeding to update status."
-
-      # Step 3: Update status and create audit record in a single transaction
-      ActiveRecord::Base.transaction do
-        # Update status
-        status_attrs = { "#{proof_type}_proof_status" => status }
-        status_attrs[:needs_review_since] = Time.current if status == :not_reviewed
-
-        # Preserve the paper_application_context flag during update
-        # This ensures validations that check this flag work correctly
-        original_context = Thread.current[:paper_application_context]
-        begin
-          # If this is a paper application submission, ensure the flag is set
-          if submission_method.to_sym == :paper
-            Thread.current[:paper_application_context] = true
-            Rails.logger.debug { "ProofAttachmentService: Setting paper_application_context=true for #{proof_type} update" }
-          end
-
-          application.update!(status_attrs)
-        ensure
-          # Restore the original context value
-          Thread.current[:paper_application_context] = original_context
-          Rails.logger.debug { "ProofAttachmentService: Restored paper_application_context=#{original_context.inspect}" }
-        end
-
-        Rails.logger.info "Updated #{proof_type} proof status to #{status} for application #{application.id}"
-
-        # Create audit record
-        ProofSubmissionAudit.create!(
-          application: application,
-          user: admin || application.user,
-          proof_type: proof_type,
-          submission_method: submission_method,
-          ip_address: metadata[:ip_address] || '0.0.0.0',
-          metadata: metadata.merge(
-            success: true,
-            status: status,
-            has_attachment: true,
-            blob_id: blob_or_file.respond_to?(:id) ? blob_or_file.id : nil,
-            blob_size: blob_size
-          )
-        )
-      end
-
-      # Final verification after status update
-      application.reload
-      raise 'Critical error: Attachment disappeared after status update' unless application.send("#{proof_type}_proof").attached?
-
-      # Set blob size for metrics
-      result[:blob_size] = blob_size
-      result[:success] = true
-    rescue StandardError => e
-      # Explicitly set success to false on error
-      result[:success] = false
-      # Track failure with detailed information
-      record_failure(application, proof_type, e, admin, submission_method, metadata)
-      result[:error] = e
-    ensure
-      result[:duration_ms] = ((Time.current - start_time) * 1000).round
-      record_metrics(result, proof_type, status)
+    with_service_flow(context) do |result|
+      perform_attachment_flow(result, params)
     end
-
-    result
   end
 
   # Rejects a proof without requiring a file attachment
@@ -187,112 +61,36 @@ class ProofAttachmentService
   # @param application [Application] The application to reject the proof for
   # @param proof_type [Symbol] The type of proof (:income or :residency)
   # @param admin [User] The admin user performing the rejection (required)
-  # @param reason [String] The reason for rejection (e.g., 'unclear', 'incomplete', 'other')
-  # @param notes [String, nil] Optional notes explaining the rejection
   # @param submission_method [Symbol] The method of submission (:paper, :web, :email, etc.)
-  # @param metadata [Hash] Additional metadata to store with the rejection audit
+  # @param rejection_details [Hash] Details about the rejection, including:
+  #   - :reason [String] The reason for rejection (e.g., 'unclear', 'incomplete', 'other')
+  #   - :notes [String, nil] Optional notes explaining the rejection
+  #   - :metadata [Hash] Additional metadata to store with the rejection audit
   #
   # @return [Hash] Result hash with :success, :error, and :duration_ms keys
-  def self.reject_proof_without_attachment(application:, proof_type:, admin:, submission_method:, reason: 'other',
-                                           notes: nil, metadata: {})
-    start_time = Time.current
-    result = { success: false, error: nil, duration_ms: 0 }
+  def self.reject_proof_without_attachment(application:, proof_type:, admin:, submission_method:, **rejection_details)
+    context = {
+      application: application, proof_type: proof_type, admin: admin,
+      submission_method: submission_method, metadata: rejection_details.fetch(:metadata, {}),
+      status: :rejected
+    }
 
-    begin
-      # Preserve the paper_application_context flag during rejection
-      # This ensures validations that check this flag work correctly
-      original_context = Thread.current[:paper_application_context]
-      begin
-        # If this is a paper application submission, ensure the flag is set
-        if submission_method.to_sym == :paper
-          Thread.current[:paper_application_context] = true
-          Rails.logger.debug { "ProofAttachmentService: Setting paper_application_context=true for #{proof_type} rejection" }
-        end
-
-        # Use the existing method that's been verified to work
-        success = application.reject_proof_without_attachment!(
-          proof_type,
-          admin: admin,
-          reason: reason,
-          notes: notes || 'Rejected during paper application submission'
-        )
-      ensure
-        # Restore the original context value
-        Thread.current[:paper_application_context] = original_context
-        Rails.logger.debug { "ProofAttachmentService: Restored paper_application_context=#{original_context.inspect}" }
-      end
+    with_service_flow(context) do |result|
+      success = perform_rejection(application: application, proof_type: proof_type, admin: admin,
+                                  submission_method: submission_method, rejection_details: rejection_details)
 
       if success
-        # Create audit record for tracking and metrics
-        ProofSubmissionAudit.create!(
-          application: application,
-          user: admin,
-          proof_type: proof_type,
-          submission_method: submission_method,
-          ip_address: metadata[:ip_address] || '0.0.0.0',
-          metadata: metadata.merge(
-            success: true,
-            status: :rejected,
-            has_attachment: false,
-            rejection_reason: reason
-          )
-        )
+        log_rejection_events(application: application, proof_type: proof_type, admin: admin,
+                             submission_method: submission_method, rejection_details: rejection_details)
       end
 
       result[:success] = success
-    rescue StandardError => e
-      record_failure(application, proof_type, e, admin, submission_method, metadata)
-      result[:error] = e
-    ensure
-      result[:duration_ms] = ((Time.current - start_time) * 1000).round
-      record_metrics(result, proof_type, :rejected)
     end
-
-    result
   end
 
-  def self.record_failure(application, proof_type, error, admin, submission_method, metadata)
-    Rails.logger.error "Proof attachment error: #{error.message}"
-    Rails.logger.error error.backtrace.join("\n")
-
-    begin
-      # Get the application's submission method if available, otherwise use the parameter
-      app_submission_method = application.submission_method.to_sym if application.submission_method.present?
-
-      # Use application's submission method first, then fall back to parameter, then to validator
-      safe_submission_method = app_submission_method ||
-                               (submission_method.present? ? submission_method.to_sym : nil) ||
-                               SubmissionMethodValidator.validate(submission_method)
-
-      # Record the failure for metrics and monitoring
-      ProofSubmissionAudit.create!(
-        application: application,
-        user: admin || application.user,
-        proof_type: proof_type,
-        submission_method: safe_submission_method,
-        ip_address: metadata[:ip_address] || '0.0.0.0',
-        metadata: metadata.merge(
-          success: false,
-          error_class: error.class.name,
-          error_message: error.message,
-          error_backtrace: error.backtrace.first(5)
-        )
-      )
-    rescue StandardError => e
-      # Don't let audit failures affect the main flow
-      Rails.logger.error "Failed to record audit for failure: #{e.message}"
-    end
-
-    # Report to error tracking service if available
-    if defined?(Honeybadger)
-      Honeybadger.notify(error,
-                         context: {
-                           application_id: application.id,
-                           proof_type: proof_type,
-                           admin_id: admin&.id,
-                           metadata: metadata
-                         })
-    end
+  def self.record_failure(error, context)
+    log_error(error)
+    log_failure_audit_event(error, context)
   rescue StandardError => e
     # Last resort logging if even the failure tracking fails
     Rails.logger.error "Failed to record proof failure: #{e.message}"
@@ -348,5 +146,218 @@ class ProofAttachmentService
 
     Datadog.histogram('proof_attachments.size', result[:blob_size],
                       tags: tags)
+  end
+
+  # private class methods
+  class << self
+    private
+
+    def perform_attachment_flow(result, params)
+      application = params.fetch(:application)
+      proof_type = params.fetch(:proof_type)
+      blob_or_file = params.fetch(:blob_or_file)
+
+      blob_size = blob_or_file.byte_size if blob_or_file.respond_to?(:byte_size)
+      attachment_param = prepare_attachment_param(blob_or_file, proof_type)
+
+      attach_and_verify_initial_save(application, proof_type, attachment_param)
+
+      log_attachment_events(application, proof_type, params.fetch(:status), params.fetch(:submission_method),
+                            params.fetch(:admin), params.fetch(:metadata), blob_or_file, blob_size)
+
+      verify_attachment_persisted_after_update(application, proof_type)
+
+      result[:blob_size] = blob_size
+      result[:success] = true
+    end
+
+    def attach_and_verify_initial_save(application, proof_type, attachment_param)
+      application.send("#{proof_type}_proof").attach(attachment_param)
+      application.reload
+      raise 'Attachment failed to persist before transaction' unless application.send("#{proof_type}_proof").attached?
+    end
+
+    def verify_attachment_persisted_after_update(application, proof_type)
+      application.reload
+      raise 'Critical error: Attachment disappeared after status update' unless application.send("#{proof_type}_proof").attached?
+    end
+
+    def log_error(error)
+      Rails.logger.error "Proof attachment error: #{error.message}"
+      Rails.logger.error error.backtrace.join("\n")
+    end
+
+    def log_failure_audit_event(error, context)
+      application = context.fetch(:application)
+      proof_type = context.fetch(:proof_type)
+
+      # Reuse build_context to generate a consistent error payload
+      result_for_context = { success: false, error: error }
+      audit_metadata = build_context(result_for_context, proof_type, :attachment_failed)
+
+      # Add submission method, which is not part of the standard metrics context
+      safe_submission_method = determine_submission_method(application, context.fetch(:submission_method))
+      audit_metadata[:submission_method] = safe_submission_method
+
+      # Merge with original metadata from the call site
+      final_metadata = context.fetch(:metadata).merge(audit_metadata)
+
+      AuditEventService.log(
+        action: "#{proof_type}_proof_attachment_failed",
+        auditable: application,
+        actor: context.fetch(:admin) || application.user,
+        metadata: final_metadata
+      )
+    rescue StandardError => e
+      # Don't let audit failures affect the main flow
+      Rails.logger.error "Failed to record audit for failure: #{e.message}"
+    end
+
+    def determine_submission_method(application, submission_method)
+      method = application.submission_method.presence || submission_method.presence
+      method ? method.to_sym : SubmissionMethodValidator.validate(submission_method)
+    end
+
+    def with_service_flow(context)
+      start_time = Time.current
+      result = { success: false, error: nil, duration_ms: 0 }
+
+      begin
+        yield(result)
+      rescue StandardError => e
+        result[:success] = false
+        result[:error] = e
+        # The failure context for record_failure is the same as the main context
+        record_failure(e, context)
+      ensure
+        result[:duration_ms] = ((Time.current - start_time) * 1000).round
+        record_metrics(result, context.fetch(:proof_type), context.fetch(:status))
+      end
+
+      result
+    end
+
+    def prepare_attachment_param(blob_or_file, proof_type)
+      # ENHANCED LOGGING FOR ATTACHMENT DEBUGGING
+      Rails.logger.info "PROOF ATTACHMENT INPUT TYPE: #{blob_or_file.class.name}"
+
+      # Handle ActiveStorage::Blob
+      return blob_or_file.signed_id if blob_or_file.is_a?(ActiveStorage::Blob)
+
+      # Handle signed_id strings
+      return blob_or_file if blob_or_file.is_a?(String) && blob_or_file.start_with?('eyJf')
+
+      # Handle uploaded files
+      if blob_or_file.respond_to?(:tempfile) || blob_or_file.is_a?(ActionDispatch::Http::UploadedFile)
+        begin
+          blob = ActiveStorage::Blob.create_and_upload!(
+            io: blob_or_file.tempfile,
+            filename: blob_or_file.original_filename,
+            content_type: blob_or_file.content_type
+          )
+          Rails.logger.info "Successfully created blob for #{proof_type}_proof: #{blob.id}"
+          return blob.signed_id
+        rescue StandardError => e
+          Rails.logger.error "Failed to create blob from uploaded file: #{e.message}"
+          # Continue to default return
+        end
+      end
+
+      # Default case for all other types and fallback scenarios
+      Rails.logger.info "Using raw blob_or_file for #{proof_type}_proof"
+      blob_or_file
+    end
+
+    def log_attachment_events(application, proof_type, status, submission_method, admin, metadata, blob_or_file,
+                              blob_size)
+      # Create audit and notification record
+      event_metadata = metadata.merge(
+        proof_type: proof_type,
+        submission_method: submission_method,
+        status: status,
+        has_attachment: true,
+        blob_id: blob_or_file.respond_to?(:id) ? blob_or_file.id : nil,
+        blob_size: blob_size
+      )
+
+      AuditEventService.log(
+        action: "#{proof_type}_proof_attached",
+        auditable: application,
+        actor: admin || application.user,
+        metadata: event_metadata
+      )
+
+      ActiveRecord::Base.transaction do
+        # Update status
+        status_attrs = { "#{proof_type}_proof_status" => status }
+        status_attrs[:needs_review_since] = Time.current if status == :not_reviewed
+
+        with_paper_context(submission_method, proof_type) do
+          application.update!(status_attrs)
+        end
+      end
+
+      NotificationService.create_and_deliver!(
+        type: "#{proof_type}_proof_attached",
+        recipient: application.user,
+        actor: admin || application.user,
+        notifiable: application,
+        metadata: event_metadata
+      )
+    end
+
+    def perform_rejection(application:, proof_type:, admin:, submission_method:, rejection_details:)
+      reason = rejection_details.fetch(:reason, 'other')
+      notes = rejection_details.fetch(:notes, nil)
+
+      with_paper_context(submission_method, proof_type) do
+        application.reject_proof_without_attachment!(
+          proof_type,
+          admin: admin,
+          reason: reason,
+          notes: notes || 'Rejected during paper application submission'
+        )
+      end
+    end
+
+    def log_rejection_events(application:, proof_type:, admin:, submission_method:, rejection_details:)
+      reason = rejection_details.fetch(:reason, 'other')
+      metadata = rejection_details.fetch(:metadata, {})
+      audit_metadata = metadata.merge(
+        proof_type: proof_type,
+        submission_method: submission_method,
+        status: :rejected,
+        has_attachment: false,
+        rejection_reason: reason
+      )
+
+      AuditEventService.log(
+        action: "#{proof_type}_proof_rejected",
+        auditable: application,
+        actor: admin,
+        metadata: audit_metadata
+      )
+      NotificationService.create_and_deliver!(
+        type: "#{proof_type}_proof_rejected",
+        recipient: application.user,
+        actor: admin,
+        notifiable: application,
+        metadata: audit_metadata
+      )
+    end
+
+    def with_paper_context(submission_method, proof_type)
+      original_context = Thread.current[:paper_application_context]
+      begin
+        if submission_method.to_sym == :paper
+          Thread.current[:paper_application_context] = true
+          Rails.logger.debug { "ProofAttachmentService: Setting paper_application_context=true for #{proof_type} rejection" }
+        end
+        yield
+      ensure
+        Thread.current[:paper_application_context] = original_context
+        Rails.logger.debug { "ProofAttachmentService: Restored paper_application_context=#{original_context.inspect}" }
+      end
+    end
   end
 end

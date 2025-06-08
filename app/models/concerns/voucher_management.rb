@@ -13,24 +13,30 @@ module VoucherManagement
 
     with_lock do
       voucher = vouchers.create!
-      Event.create!(
-        user: assigned_by || Current.user,
+      # Log the audit event
+      AuditEventService.log(
         action: 'voucher_assigned',
+        actor: assigned_by || Current.user,
+        auditable: voucher, # The voucher is the auditable record
         metadata: {
           application_id: id,
-          voucher_id: voucher.id,
           voucher_code: voucher.code,
-          initial_value: voucher.initial_value,
-          timestamp: Time.current.iso8601
+          initial_value: voucher.initial_value
         }
       )
 
       # Notify constituent
-      create_system_notification!(
+      NotificationService.create_and_deliver!(
+        type: 'voucher_assigned',
         recipient: user,
         actor: assigned_by || Current.user,
-        action: 'voucher_assigned'
+        notifiable: voucher, # The voucher is the notifiable record
+        metadata: {
+          application_id: id
+        },
+        channel: :email
       )
+      VoucherNotificationsMailer.voucher_assigned(voucher).deliver_later
 
       voucher
     end
@@ -58,15 +64,16 @@ module VoucherManagement
   private
 
   def create_system_notification!(recipient:, actor:, action:)
-    Notification.create!(
+    # Use NotificationService for centralized notification creation
+    NotificationService.create_and_deliver!(
+      type: action,
       recipient: recipient,
       actor: actor,
-      action: action,
       notifiable: self,
       metadata: {
-        application_id: id,
-        timestamp: Time.current.iso8601
-      }
+        application_id: id
+      },
+      channel: :email
     )
   end
 end

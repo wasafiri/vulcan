@@ -9,12 +9,12 @@ module Applications
       @admin = create(:admin)
 
       # Create sample event data for testing
-      @notification = Notification.create!(
+      @notification = Notification.create!( # Keep this as Notification for now, as AuditLogBuilder still loads Notifications
         recipient: @application.user,
         actor: @admin,
         action: 'medical_certification_requested',
         notifiable: @application,
-        metadata: { timestamp: 1.day.ago.to_s, submission_method: 'email' }
+        metadata: { timestamp: 1.day.ago.iso8601, submission_method: 'email' }
       )
 
       @status_change = ApplicationStatusChange.create!(
@@ -25,21 +25,22 @@ module Applications
         metadata: { change_type: 'medical_certification' }
       )
 
-      @event = Event.create!(
-        user: @admin,
+      @event = AuditEventService.log( # Use AuditEventService.log for Event creation
         action: 'medical_certification_requested',
+        actor: @admin,
+        auditable: @application,
         metadata: {
-          application_id: @application.id,
           details: 'certification requested via admin',
           submission_method: 'fax'
         }
       )
 
       # Create a non-certification event to test filtering
-      @unrelated_event = Event.create!(
-        user: @admin,
+      @unrelated_event = AuditEventService.log( # Use AuditEventService.log for Event creation
         action: 'application_created',
-        metadata: { application_id: @application.id }
+        actor: @admin,
+        auditable: @application,
+        metadata: { initial_status: 'in_progress' }
       )
 
       # Initialize our service
@@ -81,11 +82,11 @@ module Applications
         assert event.key?(:submission_method)
 
         # Test deduplication - events with the same timestamp should be combined
-        Notification.create!(
-          recipient: @application.user,
-          actor: @admin,
+        # Create another event via AuditEventService.log for deduplication test
+        AuditEventService.log(
           action: 'medical_certification_requested',
-          notifiable: @application,
+          actor: @admin,
+          auditable: @application,
           metadata: { timestamp: @notification.metadata['timestamp'] } # Same timestamp
         )
 
@@ -103,19 +104,19 @@ module Applications
         # Create events with the same timestamp but one has submission method
         same_time = Time.current.iso8601
 
-        Notification.create!(
-          recipient: @application.user,
-          actor: @admin,
+        # Create an event without submission_method
+        AuditEventService.log(
           action: 'medical_certification_requested',
-          notifiable: @application,
+          actor: @admin,
+          auditable: @application,
           metadata: { timestamp: same_time }
         )
 
-        Notification.create!(
-          recipient: @application.user,
-          actor: @admin,
+        # Create an event with submission_method
+        AuditEventService.log(
           action: 'medical_certification_requested',
-          notifiable: @application,
+          actor: @admin,
+          auditable: @application,
           metadata: { timestamp: same_time, submission_method: 'portal' }
         )
 

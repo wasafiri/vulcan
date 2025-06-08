@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_06_05_180941) do
+ActiveRecord::Schema[8.0].define(version: 2025_06_08_123537) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -201,6 +201,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_06_05_180941) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.jsonb "metadata", default: {}, null: false
+    t.string "auditable_type"
+    t.bigint "auditable_id"
+    t.index ["auditable_type", "auditable_id"], name: "index_events_on_auditable"
     t.index ["metadata"], name: "index_events_on_metadata", using: :gin
     t.index ["user_id"], name: "index_events_on_user_id"
   end
@@ -264,7 +267,11 @@ ActiveRecord::Schema[8.0].define(version: 2025_06_05_180941) do
     t.string "delivery_status"
     t.datetime "delivered_at"
     t.datetime "opened_at"
+    t.boolean "created_by_service", default: false, null: false
+    t.boolean "audited", default: false, null: false
     t.index ["actor_id"], name: "index_notifications_on_actor_id"
+    t.index ["audited"], name: "index_notifications_on_audited"
+    t.index ["created_by_service"], name: "index_notifications_on_created_by_service"
     t.index ["message_id"], name: "index_notifications_on_message_id"
     t.index ["notifiable_type", "notifiable_id"], name: "index_notifications_on_notifiable"
     t.index ["recipient_id"], name: "index_notifications_on_recipient_id"
@@ -345,25 +352,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_06_05_180941) do
     t.index ["application_id"], name: "index_proof_reviews_on_application_id"
     t.index ["reviewed_at"], name: "index_proof_reviews_on_reviewed_at"
     t.index ["status"], name: "index_proof_reviews_on_status"
-  end
-
-  create_table "proof_submission_audits", force: :cascade do |t|
-    t.bigint "application_id", null: false
-    t.bigint "user_id", null: false
-    t.string "proof_type", null: false
-    t.string "ip_address"
-    t.jsonb "metadata", default: {}, null: false
-    t.integer "submission_method", default: 0, null: false
-    t.string "inbound_email_id"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["application_id", "created_at"], name: "idx_proof_audits_app_created"
-    t.index ["application_id"], name: "index_proof_submission_audits_on_application_id"
-    t.index ["created_at"], name: "index_proof_submission_audits_on_created_at"
-    t.index ["inbound_email_id"], name: "index_proof_submission_audits_on_inbound_email_id"
-    t.index ["submission_method"], name: "index_proof_submission_audits_on_submission_method"
-    t.index ["user_id", "created_at"], name: "idx_proof_audits_user_created"
-    t.index ["user_id"], name: "index_proof_submission_audits_on_user_id"
   end
 
   create_table "recovery_requests", force: :cascade do |t|
@@ -763,8 +751,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_06_05_180941) do
   add_foreign_key "print_queue_items", "users", column: "constituent_id"
   add_foreign_key "proof_reviews", "applications"
   add_foreign_key "proof_reviews", "users", column: "admin_id"
-  add_foreign_key "proof_submission_audits", "applications"
-  add_foreign_key "proof_submission_audits", "users"
   add_foreign_key "recovery_requests", "users"
   add_foreign_key "role_capabilities", "users"
   add_foreign_key "sessions", "users"

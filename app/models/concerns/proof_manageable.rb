@@ -26,7 +26,8 @@ module ProofManageable
 
   def proof_attachments_changed?
     # Use Rails' built-in ActiveStorage detection for attachment changes
-    if respond_to?(:attachment_changes) && attachment_changes.present? && (attachment_changes['income_proof'].present? || attachment_changes['residency_proof'].present?)
+    if respond_to?(:attachment_changes) && attachment_changes.present? &&
+       (attachment_changes['income_proof'].present? || attachment_changes['residency_proof'].present?)
       return true
     end
 
@@ -41,7 +42,7 @@ module ProofManageable
     end
 
     # Final fallback - use direct SQL detection
-    false # Just disable for tests if other methods aren't available
+    false # Disable for tests if other methods aren't available
   end
 
   def create_proof_submission_audit
@@ -57,7 +58,7 @@ module ProofManageable
       audit_specific_proof_change('income')
       audit_specific_proof_change('residency')
     ensure
-      # Always reset the flag, even if an exception occurs
+      # Reset the flag, even if an exception occurs
       @creating_proof_audit = false
     end
   end
@@ -75,8 +76,7 @@ module ProofManageable
   end
 
   def can_submit_proof?
-    # An application can submit proof if it's in a valid state
-    # This is a placeholder implementation - adjust based on your business logic
+    # An application can submit proof if it's in a valid state - adjust this placeholder based on your business logic
     true
   end
 
@@ -97,8 +97,7 @@ module ProofManageable
     false
   end
 
-  # Special method for updating to rejected status that bypasses validations
-  # This is needed for paper applications where we reject without attachment
+  # This is needed for paper applications where we reject without attachment to avoid uploading docs we know to be invalid
   def reject_proof_without_attachment!(proof_type, admin:, reason: 'other',
                                        notes: 'Rejected during application submission')
     attr_name = "#{proof_type}_proof_status"
@@ -116,8 +115,8 @@ module ProofManageable
           reviewed_at: Time.current
         )
 
-        # Then update the status directly in the database to bypass validations
-        update_column(attr_name, Application.public_send(attr_name.pluralize.to_s).fetch(:rejected))
+        # Update the status, relying on the calling context (e.g., paper application) to skip attachment validations.
+        update!(attr_name => :rejected)
       end
 
       reload
@@ -132,34 +131,39 @@ module ProofManageable
   def purge_proofs(admin_user)
     raise ArgumentError, 'Admin user required' unless admin_user&.admin?
 
-    transaction do
-      income_proof.purge if income_proof.attached?
-      residency_proof.purge if residency_proof.attached?
+    begin
+      Thread.current[:skip_proof_validation] = true
+      transaction do
+        income_proof.purge if income_proof.attached?
+        residency_proof.purge if residency_proof.attached?
 
-      update_columns(
-        income_proof_status: :not_reviewed,
-        residency_proof_status: :not_reviewed,
-        last_proof_submitted_at: nil,
-        needs_review_since: nil
-      )
+        update!(
+          income_proof_status: :not_reviewed,
+          residency_proof_status: :not_reviewed,
+          last_proof_submitted_at: nil,
+          needs_review_since: nil
+        )
 
-      proof_reviews.create!(
-        admin: admin_user,
-        proof_type: 'system',
-        status: 'purged',
-        reviewed_at: Time.current,
-        submission_method: 'system'
-      )
+        proof_reviews.create!(
+          admin: admin_user,
+          proof_type: 'system',
+          status: 'purged',
+          reviewed_at: Time.current,
+          submission_method: 'system'
+        )
 
-      create_system_notification!(
-        recipient: user,
-        actor: admin_user,
-        action: 'proofs_purged'
-      )
+        create_system_notification!(
+          recipient: user,
+          actor: admin_user,
+          action: 'proofs_purged'
+        )
+      end
+    rescue StandardError => e
+      Rails.logger.error "Failed to purge proofs for application #{id}: #{e.message}"
+      false
+    ensure
+      Thread.current[:skip_proof_validation] = false
     end
-  rescue StandardError => e
-    Rails.logger.error "Failed to purge proofs for application #{id}: #{e.message}"
-    false
   end
 
   # Method called explicitly by ProofReviewer to purge a proof after status is set to rejected
@@ -222,17 +226,20 @@ module ProofManageable
   def create_audit_record_for_proof(proof_type)
     attachment = public_send("#{proof_type}_proof")
     blob = attachment.blob
+    actor = Current.user || user
 
-    proof_submission_audits.create!(
-      proof_type: proof_type,
-      user: Current.user || user,
-      application: self,
-      ip_address: '0.0.0.0', # Required field but not relevant for audit trail
+    AuditEventService.log(
+      action: "#{proof_type}_proof_submitted",
+      actor: actor,
+      auditable: self,
       metadata: {
+        proof_type: proof_type,
         blob_id: blob&.id,
         content_type: blob&.content_type,
         byte_size: blob&.byte_size,
-        filename: blob&.filename.to_s
+        filename: blob&.filename.to_s,
+        ip_address: Current.ip_address,
+        user_agent: Current.user_agent
       }
     )
   end
@@ -241,12 +248,12 @@ module ProofManageable
 
   def correct_proof_mime_type
     # Check residency proof
-    if residency_proof.attached? && !ALLOWED_TYPES.include?(residency_proof.content_type)
+    if residency_proof.attached? && ALLOWED_TYPES.exclude?(residency_proof.content_type)
       errors.add(:residency_proof, 'must be a PDF or an image file (jpg, jpeg, png, tiff, bmp)')
     end
 
     # Check income proof independently
-    return unless income_proof.attached? && !ALLOWED_TYPES.include?(income_proof.content_type)
+    return unless income_proof.attached? && ALLOWED_TYPES.exclude?(income_proof.content_type)
 
     errors.add(:income_proof, 'must be a PDF or an image file (jpg, jpeg, png, tiff, bmp)')
   end
@@ -355,11 +362,12 @@ module ProofManageable
       # Set flag to prevent reentry
       @setting_proof_status = true
 
-      # Use update_column to avoid triggering callbacks again
-      update_column(:needs_review_since, Time.current)
+      # Use update! to run validations and trigger necessary callbacks.
+      # The `if` conditions on other callbacks and the `@setting_proof_status` guard prevent infinite loops.
+      update!(needs_review_since: Time.current)
 
       # Log success for debugging
-      Rails.logger.info "Successfully set needs_review_since to #{Time.current} for application #{id}"
+      Rails.logger.info "Successfully set needs_review_since to #{needs_review_since} for application #{id}"
     rescue StandardError => e
       # Log any errors for debugging
       Rails.logger.error "Error setting proof status to unreviewed: #{e.message}"
@@ -379,16 +387,17 @@ module ProofManageable
   end
 
   def create_system_notification!(recipient:, actor:, action:)
-    # Create a system-generated notification
-    Notification.create!(
+    # Use NotificationService for centralized notification creation
+    NotificationService.create_and_deliver!(
+      type: action,
       recipient: recipient,
       actor: actor,
-      action: action,
       notifiable: self,
       metadata: {
         application_id: id,
         timestamp: Time.current.iso8601
-      }
+      },
+      channel: :email
     )
   end
 
@@ -462,11 +471,12 @@ module ProofManageable
   end
 
   def require_proof_validations?
-    # --- DEBUG LOGGING ---
     Rails.logger.debug do
       "[ProofManageable] Checking require_proof_validations?. Paper context: #{Thread.current[:paper_application_context].inspect}"
     end
-    # --- END DEBUG ---
+
+    # Skip for administrative actions like purging proofs
+    return false if Thread.current[:skip_proof_validation]
 
     # Skip for paper applications processed by admins - CHECK THIS FIRST
     return false if Thread.current[:paper_application_context]

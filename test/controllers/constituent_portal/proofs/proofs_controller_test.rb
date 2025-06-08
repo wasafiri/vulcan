@@ -39,46 +39,44 @@ class ConstituentProofsSubmissionTest < ActionDispatch::IntegrationTest
   end
 
   test 'submits proof successfully when proof is rejected' do
+    # Clear events before the test to ensure we only count events from this test
+    Event.delete_all
+
     assert_changes '@application.reload.income_proof_status',
                    from: 'rejected',
                    to: 'not_reviewed' do
       # Instead of checking exact change in needs_review_since, just verify it gets set
       before_value = @application.needs_review_since
-      assert_difference 'ProofSubmissionAudit.count', 3 do
-        assert_difference 'Event.count' do
-          # Using the new namespace path directly
-          post "/constituent_portal/applications/#{@application.id}/proofs/resubmit",
-               params: { proof_type: 'income', income_proof: @valid_pdf }
+      assert_difference 'Event.count', 1 do # Only one event should be created by AuditEventService.log
+        # Using the new namespace path directly
+        post "/constituent_portal/applications/#{@application.id}/proofs/resubmit",
+             params: { proof_type: 'income', income_proof: @valid_pdf }
 
-          # Verify redirect
-          assert_redirected_to constituent_portal_application_path(@application)
-          # Verify flash
-          assert_equal 'Proof submitted successfully', flash[:notice]
+        # Verify redirect
+        assert_redirected_to constituent_portal_application_path(@application)
+        # Verify flash
+        assert_equal 'Proof submitted successfully', flash[:notice]
 
-          # Verify needs_review_since was updated
-          @application.reload
-          assert @application.needs_review_since != before_value, 'needs_review_since should be updated'
+        # Verify needs_review_since was updated
+        @application.reload
+        assert @application.needs_review_since != before_value, 'needs_review_since should be updated'
 
-          # Verify application updates
-          assert @application.income_proof.attached?, 'Income proof should be attached'
-          assert_equal 'not_reviewed', @application.income_proof_status
-          assert_not_nil @application.needs_review_since
+        # Verify application updates
+        assert @application.income_proof.attached?, 'Income proof should be attached'
+        assert_equal 'not_reviewed', @application.income_proof_status
+        assert_not_nil @application.needs_review_since
 
-          # Verify audit trail
-          audit = ProofSubmissionAudit.last
-          assert_equal @application, audit.application
-          assert_equal @user, audit.user
-          assert_equal 'income', audit.proof_type
-          assert_equal 'web', audit.submission_method
-          assert_equal '127.0.0.1', audit.ip_address
-          assert_equal({ 'user_agent' => 'Rails Testing', 'submission_method' => 'web' }, audit.metadata)
-
-          # Verify event was created
-          event = Event.last
-          assert_equal 'proof_submitted', event.action
-          assert_equal @application.id, event.metadata['application_id']
-          assert_equal 'income', event.metadata['proof_type']
-        end
+        # Verify audit event was created
+        event = Event.last
+        assert_equal 'proof_submitted', event.action
+        assert_equal @application.id, event.auditable_id
+        assert_equal 'Application', event.auditable_type
+        assert_equal @user.id, event.user_id
+        assert_equal 'income', event.metadata['proof_type']
+        assert_equal 'web', event.metadata['submission_method']
+        assert_equal '127.0.0.1', event.metadata['ip_address']
+        assert_equal 'Rails Testing', event.metadata['user_agent']
+        assert_equal true, event.metadata['resubmitting'] # Verify resubmitting flag
       end
     end
   end
@@ -105,8 +103,6 @@ class ConstituentProofsSubmissionTest < ActionDispatch::IntegrationTest
   # through the Application controller, which we've tested elsewhere
 
   test 'direct_upload creates blob for direct upload' do
-    # Unskipped - was failing due to authentication issues
-
     post "/constituent_portal/applications/#{@application.id}/proofs/direct_upload",
          params: {
            blob: {

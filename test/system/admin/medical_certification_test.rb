@@ -162,7 +162,8 @@ module AdminTests
 
     test 'certification history modal displays request history' do
       # Create some notifications for the medical certification requests
-      @notification1 = Notification.create!(
+      NotificationService.create_and_deliver!(
+        type: 'medical_certification_requested',
         notifiable: @application,
         action: 'medical_certification_requested',
         actor: @admin,
@@ -170,7 +171,8 @@ module AdminTests
         created_at: 2.days.ago
       )
 
-      @notification2 = Notification.create!(
+      NotificationService.create_and_deliver!(
+        type: 'medical_certification_requested',
         notifiable: @application,
         action: 'medical_certification_requested',
         actor: @admin,

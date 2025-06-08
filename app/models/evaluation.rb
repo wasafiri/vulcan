@@ -42,12 +42,23 @@ class Evaluation < ApplicationRecord
   # Define method used in controller
   def request_additional_info!
     update(status: :requested)
-    Notification.create!(
+
+    # Log the audit event
+    AuditEventService.log(
+      action: 'requested_additional_info',
+      actor: evaluator,
+      auditable: self,
+      metadata: { evaluation_id: id }
+    )
+
+    # Send the notification
+    NotificationService.create_and_deliver!(
+      type: 'requested_additional_info',
       recipient: constituent,
       actor: evaluator,
-      action: 'requested_additional_info',
+      notifiable: self,
       metadata: { evaluation_id: id },
-      notifiable: self
+      channel: :email
     )
   end
 

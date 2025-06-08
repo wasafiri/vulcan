@@ -109,23 +109,28 @@ class ProofReview < ApplicationRecord
     end
   end
 
-  # Creates a notification record and sends the email
+  # Creates a notification record and sends the email using the new NotificationService
   # Notification failures don't interrupt the proof review process
-  def send_notification(action_name, mail_method, metadata)
-    Notification.create!(
-      recipient: application.user,
-      actor: admin,
+  def send_notification(action_name, _mail_method, metadata)
+    # Log the audit event first
+    AuditEventService.log(
       action: action_name,
-      notifiable: application,
+      actor: admin,
+      auditable: application,
       metadata: metadata
     )
 
-    # Send the email notification
-    # Important: We call deliver_later directly with the method
-    # since ActionMailer only serializes arguments, not the mail object
-    ApplicationNotificationsMailer.send(mail_method, application, self).deliver_later
+    # Then, send the notification without the audit flag
+    NotificationService.create_and_deliver!(
+      type: action_name,
+      recipient: application.user,
+      actor: admin,
+      notifiable: application,
+      metadata: metadata,
+      channel: :email
+    )
   rescue StandardError => e
-    Rails.logger.error "Failed to send #{action_name} email: #{e.message}"
+    Rails.logger.error "Failed to send #{action_name} notification via NotificationService: #{e.message}"
     # Don't re-raise - notification errors shouldn't fail the whole operation
   end
 
@@ -141,11 +146,21 @@ class ProofReview < ApplicationRecord
   def check_max_rejections
     application.with_lock do
       if application.total_rejections >= 8
-        Notification.create!(
+        # Log the audit event first
+        AuditEventService.log(
+          action: 'max_rejections_warning',
+          actor: admin,
+          auditable: application,
+          metadata: { recipient_id: User.admins.first.id }
+        )
+
+        # Then, send the notification without the audit flag
+        NotificationService.create_and_deliver!(
+          type: 'max_rejections_warning',
           recipient: User.admins.first,
           actor: admin,
-          action: 'max_rejections_warning',
-          notifiable: application
+          notifiable: application,
+          channel: :email
         )
       end
       if application.total_rejections > 8

@@ -64,20 +64,20 @@ class ProofSubmissionMailbox < ApplicationMailbox
     )
 
     # Use the ProofAttachmentService to consistently handle attachments
-    result = ProofAttachmentService.attach_proof(
-      application: application,
-      proof_type: proof_type,
-      blob_or_file: blob,
-      status: :not_reviewed,
-      admin: nil,
-      submission_method: :email,
-      metadata: {
-        ip_address: '0.0.0.0',
-        email_subject: mail.subject,
-        email_from: mail.from.first,
-        inbound_email_id: inbound_email.id
+    result = ProofAttachmentService.attach_proof({
+                                                   application: application,
+                                                   proof_type: proof_type,
+                                                   blob_or_file: blob,
+                                                   status: :not_reviewed,
+                                                   admin: nil,
+                                                   submission_method: :email,
+                                                   metadata: {
+                                                     ip_address: '0.0.0.0',
+                                                     email_subject: mail.subject,
+                                                     email_from: mail.from.first,
+                                                     inbound_email_id: inbound_email.id
       }
-    )
+    })
 
     if result[:success]
       case proof_type
@@ -206,7 +206,7 @@ class ProofSubmissionMailbox < ApplicationMailbox
     from_email = mail.from&.first
 
     # Try to find the user by email first
-    @constituent = from_email.present? ? User.find_by_email(from_email) : nil
+    @constituent = from_email.present? ? User.find_by(email: from_email) : nil
 
     # If we can't find a constituent but can find an application via app_id_from_subject
     # and the from_email matches a provider's email in the app metadata, use the application's user

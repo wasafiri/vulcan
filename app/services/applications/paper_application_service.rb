@@ -100,19 +100,15 @@ module Applications
     end
 
     def log_proof_submission_audit
-      ProofSubmissionAudit.create!(
-        application_id: @application.id,
-        user_id: @admin.id,
-        proof_type: 'application',
-        ip_address: '0.0.0.0',
+      AuditEventService.log(
+        action: 'proof_submitted',
+        actor: @admin,
+        auditable: @application,
         metadata: {
+          proof_type: 'application',
           submission_method: 'paper',
-          timestamp: current_time.iso8601,
           action: 'submit'
-        },
-        submission_method: :paper,
-        created_at: current_time,
-        updated_at: current_time
+        }
       )
     end
 
@@ -155,7 +151,7 @@ module Applications
         # Scenario: Digital upload or paper application with a digital upload
         blob_or_file = params["#{type}_proof"].presence || params["#{type}_proof_signed_id"].presence
 
-        result = ProofAttachmentService.attach_proof(
+        result = ProofAttachmentService.attach_proof({
           application: @application,
           proof_type: type,
           blob_or_file: blob_or_file,
@@ -163,7 +159,7 @@ module Applications
           admin: @admin,
           submission_method: :paper,
           metadata: {}
-        )
+        })
 
         unless result[:success]
           add_error("Error processing #{type} proof: #{result[:error]&.message}")

@@ -75,18 +75,4 @@ class ProofConsistencyCheckJob < ApplicationJob
                         "#{attached_not_reviewed} attached but not reviewed)"
     end
   end
-
-  def notify_admins(inconsistencies)
-    # This could send an email to admins or create a notification
-    # using your application's notification system
-    return unless defined?(Honeybadger)
-
-    Honeybadger.notify(
-      'Proof attachment inconsistencies detected',
-      context: {
-        inconsistency_count: inconsistencies.size,
-        sample: inconsistencies.first(5)
-      }
-    )
-  end
 end

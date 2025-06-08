@@ -33,7 +33,7 @@ else
 
       # Then clear other models
       [
-        Evaluation, ProofReview, Notification, RoleCapability,
+        Invoice, ApplicationStatusChange, Evaluation, ProofReview, Notification, RoleCapability,
         PolicyChange, EmailTemplate, Product, Event, Policy, Application, User
       ].each do |model|
         seed_puts "  Clearing #{model.name} records..."

@@ -17,22 +17,26 @@ module TrainingManagement
       )
 
       # Create event for audit logging
-      Event.create!(
-        user: Current.user,
+      AuditEventService.log(
         action: 'trainer_assigned',
+        actor: Current.user,
+        auditable: self,
         metadata: {
-          application_id: id,
           trainer_id: trainer.id,
-          trainer_name: trainer.full_name,
-          timestamp: Time.current.iso8601
+          trainer_name: trainer.full_name
         }
       )
 
       # Create system notification for the constituent
-      create_system_notification!(
+      NotificationService.create_and_deliver!(
+        type: 'trainer_assigned',
         recipient: user,
         actor: Current.user,
-        action: 'trainer_assigned'
+        notifiable: self,
+        metadata: {
+          application_id: id
+        },
+        channel: :email
       )
 
       # Send email notification to the trainer with constituent contact info
@@ -66,15 +70,16 @@ module TrainingManagement
   private
 
   def create_system_notification!(recipient:, actor:, action:)
-    Notification.create!(
+    # Use NotificationService for centralized notification creation
+    NotificationService.create_and_deliver!(
+      type: action,
       recipient: recipient,
       actor: actor,
-      action: action,
       notifiable: self,
       metadata: {
-        application_id: id,
-        timestamp: Time.current.iso8601
-      }
+        application_id: id
+      },
+      channel: :email
     )
   end
 end

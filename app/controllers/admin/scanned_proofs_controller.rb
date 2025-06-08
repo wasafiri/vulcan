@@ -43,19 +43,19 @@ module Admin
       end
 
       # Only proceed with notification if the upload was successful
-      if success
-        begin
-          # Best practice: run notifications outside the transaction so a rollback
-          # doesn't prevent them. Consider using a background job if it's a heavier process.
-          notify_constituent
-        rescue StandardError => e
-          Rails.logger.error("Failed to send notification: #{e.message}")
-          # Don't fail the upload if just the notification fails
-        end
+      return unless success
 
-        redirect_to admin_application_path(@application),
-                    notice: 'Proof successfully uploaded and attached'
+      begin
+        # Best practice: run notifications outside the transaction so a rollback
+        # doesn't prevent them. Consider using a background job if it's a heavier process.
+        notify_constituent
+      rescue StandardError => e
+        Rails.logger.error("Failed to send notification: #{e.message}")
+        # Don't fail the upload if just the notification fails
       end
+
+      redirect_to admin_application_path(@application),
+                  notice: 'Proof successfully uploaded and attached'
     end
 
     private
@@ -95,22 +95,19 @@ module Admin
     end
 
     def attach_proof
-      case params[:proof_type]
-      when 'income'
-        @application.income_proof.attach(params[:file])
-        proof_type = :income_proof_status
-      when 'residency'
-        @application.residency_proof.attach(params[:file])
-        proof_type = :residency_proof_status
-      else
-        raise ArgumentError, 'Invalid proof type'
-      end
-
-      @application.update!(
-        proof_type => :not_reviewed,
-        needs_review_since: Time.current,
-        last_proof_submitted_at: Time.current
-      )
+      result = ProofAttachmentService.attach_proof({
+        application: @application,
+        proof_type: params[:proof_type].to_sym,
+        blob_or_file: params[:file],
+        status: :approved,
+        admin: current_user,
+        submission_method: :paper,
+        metadata: {
+          scanned_by: current_user.id,
+          scan_location: params[:scan_location] || 'central_office'
+        }
+      })
+      raise "Failed to attach proof: #{result[:error]&.message}" unless result[:success]
     end
 
     def create_audit_trail
@@ -121,13 +118,11 @@ module Admin
         file_size: params[:file].size,
         content_type: params[:file].content_type
       }
-      
-      ProofSubmissionAudit.create!(
-        application: @application,
-        user: current_user,
-        proof_type: params[:proof_type],
-        submission_method: :paper, # Use the correct enum value from ProofSubmissionAudit model
-        ip_address: request.remote_ip,
+
+      AuditEventService.log(
+        action: "#{params[:proof_type]}_proof_attached",
+        auditable: @application,
+        actor: current_user,
         metadata: metadata
       )
     end

@@ -66,11 +66,11 @@ class MedicalCertificationTest < ApplicationSystemTestCase
   # Test 3: A separate test for viewing as a constituent
   test 'constituent can view certification status' do
     # Setup - Create a notification without browser interaction
-    Notification.create!(
+    NotificationService.create_and_deliver!(
+      type: 'medical_certification_requested',
       notifiable: @application,
       recipient: @constituent,
       actor: @admin,
-      action: 'medical_certification_requested',
       created_at: 1.hour.ago,
       read_at: nil
     )

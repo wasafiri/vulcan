@@ -263,23 +263,20 @@ export class RailsRequestService {
   }
 
   /**
-   * Try to show flash message using global event system
+   * Try to show flash message using the new global AppNotifications service.
    * @param {string} message - Message to display
-   * @param {string} type - Message type (error, notice, alert)
+   * @param {string} type - Message type (success, error, warning, info)
    */
   tryShowFlash(message, type = 'error') {
-    try {
-      // Dispatch global event for flash controller to listen to
-      document.dispatchEvent(new CustomEvent('rails-request:flash', {
-        detail: { message, type }
-      }))
-      return true
-    } catch (error) {
-      // Silently fail - flash integration is optional
+    if (window.AppNotifications && typeof window.AppNotifications.show === 'function') {
+      window.AppNotifications.show(message, type);
+      return true;
+    } else {
+      // Fallback to console if AppNotifications is not available (e.g., during development or if not loaded)
       if (process.env.NODE_ENV !== 'production') {
-        console.debug('Flash event dispatch failed:', error)
+        console.warn('AppNotifications service not available to show flash message:', message, type);
       }
-      return false
+      return false;
     }
   }
 
@@ -318,4 +315,4 @@ export class RequestError extends Error {
 }
 
 // Export singleton instance
-export const railsRequest = new RailsRequestService() 
+export const railsRequest = new RailsRequestService()

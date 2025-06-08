@@ -122,8 +122,6 @@ module ConstituentPortal
           @dependent_user.email_confirmation = current_user.email if @dependent_user.respond_to?(:email_confirmation=)
         end
         @dependent_user.phone = current_user.phone if @dependent_user.phone.blank?
-        # Skip uniqueness validation for contact since using guardian's info
-        @dependent_user.skip_contact_uniqueness_validation = true
       rescue StandardError => e
         Rails.logger.error "Error initializing dependent user: #{e.message}"
         # Re-raise to be caught by the application error handler

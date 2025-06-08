@@ -177,16 +177,17 @@ class MedicalCertificationAttachmentService
           }
         )
 
-        # Create notification
-        Notification.create!(
+        # Create notification using centralized service
+        NotificationService.create_and_deliver!(
+          type: 'medical_certification_rejected',
           recipient: application.user,
           actor: admin,
-          action: 'medical_certification_rejected',
           notifiable: application,
           metadata: {
             'reason' => reason,
             'notes' => notes
-          }
+          },
+          channel: :email
         )
       end
 
@@ -304,7 +305,7 @@ class MedicalCertificationAttachmentService
         attachment_param = blob.signed_id
       rescue StandardError => e
         Rails.logger.error "Failed to create blob from uploaded file: #{e.message}"
-        Rails.logger.info "Falling back to direct file parameter"
+        Rails.logger.info 'Falling back to direct file parameter'
         # Continue with original param explicitly set above
       end
     # No more handling needed for the string case - it's covered at the top
@@ -338,9 +339,7 @@ class MedicalCertificationAttachmentService
       name: "medical_certification"
     ).exists?
 
-    unless attachment_exists
-      return false
-    end
+    return false unless attachment_exists
 
     Rails.logger.warn 'Attachment exists in DB but not detected in model - forcing reset'
     application.medical_certification.reset
@@ -374,19 +373,18 @@ class MedicalCertificationAttachmentService
       )
 
       # Create event for audit trail
-      Event.create!(
-        user: admin,
+      AuditEventService.log(
         action: 'medical_certification_status_changed',
+        actor: admin,
+        auditable: application,
         metadata: {
-          application_id: application.id,
           old_status: application.medical_certification_status_was || 'requested',
           new_status: status.to_s,
-          timestamp: Time.current.iso8601,
           change_type: 'medical_certification'
         }
       )
 
-      # Create notification if needed
+      # Create notification if needed using centralized service
       action_mapping = {
         approved: 'medical_certification_approved',
         rejected: 'medical_certification_rejected',
@@ -395,15 +393,16 @@ class MedicalCertificationAttachmentService
 
       # Get the notification action name based on the status
       notification_action = action_mapping[status.to_sym]
-      
+
       # Create notification if we have a valid action for this status
       if notification_action.present?
-        Notification.create!(
+        NotificationService.create_and_deliver!(
+          type: notification_action,
           recipient: application.user,
           actor: admin,
-          action: notification_action,
           notifiable: application,
-          metadata: metadata
+          metadata: metadata,
+          channel: :email
         )
       end
     end
@@ -411,36 +410,25 @@ class MedicalCertificationAttachmentService
 
   # Method removed since it was duplicated with update_certification_status_only
 
-  def self.record_failure(application, error, admin, submission_method, metadata)
+  def self.record_failure(application, error, admin, submission_method, _metadata)
     Rails.logger.error "Medical certification attachment error: #{error.message}"
     Rails.logger.error error.backtrace.join("\n")
 
     begin
       # Create an event to track the error
-      Event.create!(
-        user: admin,
+      AuditEventService.log(
         action: 'medical_certification_attachment_failed',
+        actor: admin,
+        auditable: application,
         metadata: {
-          application_id: application.id,
           error_class: error.class.name,
           error_message: error.message,
-          submission_method: submission_method.to_s,
-          timestamp: Time.current.iso8601
+          submission_method: submission_method.to_s
         }
       )
     rescue StandardError => e
       # Don't let audit failures affect the main flow
       Rails.logger.error "Failed to record audit for failure: #{e.message}"
-    end
-
-    # Report to error tracking service if available
-    if defined?(Honeybadger)
-      Honeybadger.notify(error,
-                         context: {
-                           application_id: application.id,
-                           admin_id: admin&.id,
-                           metadata: metadata
-                         })
     end
   rescue StandardError => e
     # Last resort logging if even the failure tracking fails

@@ -47,16 +47,34 @@ module Admin
     end
 
     def notify_user_of_approval
-      # Send email notification to the user
-      # You may want to implement a proper mailer for this
-      # For now, using the NotifyAdminsJob as an example of how you might queue a job
-      NotifyAdminsJob.perform_later(
-        subject: 'Security Key Recovery Request Approved',
-        message: "Your security key recovery request has been approved. You can now sign in with your password only and register a new security key.",
-        category: 'security_recovery',
-        resource_id: @recovery_request.user_id,
-        resource_type: 'User'
+      # Log the audit event first
+      AuditEventService.log(
+        action: 'security_key_recovery_approved',
+        actor: current_user,
+        auditable: @recovery_request,
+        metadata: {
+          recovery_request_id: @recovery_request.id,
+          approved_at: Time.current.iso8601,
+          approved_by: current_user.full_name
+        }
       )
+
+      # Then, send the notification without the audit flag
+      NotificationService.create_and_deliver!(
+        type: 'security_key_recovery_approved',
+        recipient: @recovery_request.user,
+        actor: current_user,
+        notifiable: @recovery_request,
+        metadata: {
+          recovery_request_id: @recovery_request.id,
+          approved_at: Time.current.iso8601,
+          approved_by: current_user.full_name
+        },
+        channel: :email
+      )
+    rescue StandardError => e
+      Rails.logger.error "Failed to notify user #{@recovery_request.user_id} of recovery approval: #{e.message}"
+      # Don't fail the whole operation if notification fails
     end
   end
 end

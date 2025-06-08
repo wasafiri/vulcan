@@ -10,53 +10,48 @@ module ConstituentPortal
     end
 
     test 'deduplicate_submissions removes duplicate submissions within the same minute' do
-      # Create multiple submissions with same proof type and very close timestamps
+      # Create multiple events with same proof type and very close timestamps using AuditEventService
       time_base = Time.current
 
-      submission1 = ProofSubmissionAudit.new(
-        application: @application,
-        user: @application.user, # Add user association
-        ip_address: '127.0.0.1', # Add dummy IP address
-        proof_type: 'income',
-        submission_method: 'web',
+      submission1 = AuditEventService.log(
+        action: 'proof_submitted',
+        actor: @application.user,
+        auditable: @application,
+        metadata: { proof_type: 'income', submission_method: 'web' },
         created_at: time_base
       )
 
-      submission2 = ProofSubmissionAudit.new(
-        application: @application,
-        user: @application.user, # Add user association
-        ip_address: '127.0.0.1', # Add dummy IP address
-        proof_type: 'income',
-        submission_method: 'web',
+      submission2 = AuditEventService.log(
+        action: 'proof_submitted',
+        actor: @application.user,
+        auditable: @application,
+        metadata: { proof_type: 'income', submission_method: 'web' },
         created_at: time_base + 5.seconds
       )
 
-      submission3 = ProofSubmissionAudit.new(
-        application: @application,
-        user: @application.user, # Add user association
-        ip_address: '127.0.0.1', # Add dummy IP address
-        proof_type: 'income',
-        submission_method: 'web',
+      submission3 = AuditEventService.log(
+        action: 'proof_submitted',
+        actor: @application.user,
+        auditable: @application,
+        metadata: { proof_type: 'income', submission_method: 'web' },
         created_at: time_base + 10.seconds
       )
 
       # Different proof type should not be deduplicated
-      submission4 = ProofSubmissionAudit.new(
-        application: @application,
-        user: @application.user, # Add user association
-        ip_address: '127.0.0.1', # Add dummy IP address
-        proof_type: 'residency',
-        submission_method: 'web',
+      submission4 = AuditEventService.log(
+        action: 'proof_submitted',
+        actor: @application.user,
+        auditable: @application,
+        metadata: { proof_type: 'residency', submission_method: 'web' },
         created_at: time_base + 8.seconds
       )
 
       # Different minute should not be deduplicated
-      submission5 = ProofSubmissionAudit.new(
-        application: @application,
-        user: @application.user, # Add user association
-        ip_address: '127.0.0.1', # Add dummy IP address
-        proof_type: 'income',
-        submission_method: 'web',
+      submission5 = AuditEventService.log(
+        action: 'proof_submitted',
+        actor: @application.user,
+        auditable: @application,
+        metadata: { proof_type: 'income', submission_method: 'web' },
         created_at: time_base + 1.minute + 5.seconds
       )
 
@@ -68,10 +63,9 @@ module ConstituentPortal
       assert_equal 3, result.size
 
       # The kept income proof from the first minute should be submission3 (the latest)
-      income_first_minute = result.find { |s| s.proof_type == 'income' && s.created_at < time_base + 1.minute }
+      income_first_minute = result.find { |s| s.metadata['proof_type'] == 'income' && s.created_at < time_base + 1.minute }
 
       # Check that we kept the latest submission (by comparing created_at times)
-      # Instead of comparing the whole objects which can be affected by microsecond differences
       assert_equal submission3.created_at.to_i, income_first_minute.created_at.to_i
 
       # The residency proof should still be there
@@ -82,21 +76,24 @@ module ConstituentPortal
     end
 
     test 'from_events returns activities in chronological order' do
+      # Clear events before the test
+      Event.delete_all
+
       # Create a proof submission and review
       time_base = Time.current
+      admin_user = create(:admin)
 
-      submission = ProofSubmissionAudit.create!(
-        application: @application,
-        user: @application.user, # Add user association
-        ip_address: '127.0.0.1', # Add dummy IP address
-        proof_type: 'income',
-        submission_method: 'web',
+      submission = AuditEventService.log(
+        action: 'proof_submitted',
+        actor: @application.user,
+        auditable: @application,
+        metadata: { proof_type: 'income', submission_method: 'web' },
         created_at: time_base - 2.hours
       )
 
       review = ProofReview.create!(
         application: @application,
-        admin: create(:admin), # Use factory instead of fixture
+        admin: admin_user,
         proof_type: 'income',
         status: 'rejected',
         rejection_reason: 'Test rejection reason',
@@ -104,19 +101,13 @@ module ConstituentPortal
         created_at: time_base - 1.hour
       )
 
-      resubmission = ProofSubmissionAudit.create!(
-        application: @application,
-        user: @application.user, # Add user association
-        ip_address: '127.0.0.1', # Add dummy IP address
-        proof_type: 'income',
-        submission_method: 'web',
+      resubmission = AuditEventService.log(
+        action: 'proof_submitted',
+        actor: @application.user,
+        auditable: @application,
+        metadata: { proof_type: 'income', submission_method: 'web' },
         created_at: time_base - 30.minutes
       )
-
-      # Add these to the application
-      @application.proof_submission_audits << submission
-      @application.proof_submission_audits << resubmission
-      @application.proof_reviews << review
 
       activities = Activity.from_events(@application)
 

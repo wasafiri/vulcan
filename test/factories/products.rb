@@ -5,7 +5,6 @@ FactoryBot.define do
     sequence(:name) { |n| "Test Product #{n}" }
     description { 'A detailed description of this assistive technology product.' }
     price { 299.99 }
-    quantity { 100 }
     manufacturer { 'Assistive Tech Inc.' }
     model_number { "AT-#{SecureRandom.hex(4).upcase}" }
     features { 'High quality, durable, user-friendly interface' }
@@ -15,10 +14,6 @@ FactoryBot.define do
 
     trait :archived do
       archived_at { 1.day.ago }
-    end
-
-    trait :low_stock do
-      quantity { 3 }
     end
 
     trait :mobile do

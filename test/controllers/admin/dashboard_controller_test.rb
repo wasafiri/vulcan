@@ -101,24 +101,12 @@ module Admin
       application_id = application.id
 
       # Create a notification explicitly relating to this application
-      notification = Notification.create!(
+      NotificationService.create_and_deliver!(
+        type: 'training_requested',
         recipient: @admin,
         actor: application.user,
-        action: 'training_requested',
         notifiable: application
       )
-
-      # Debug output
-      puts "Created notification #{notification.id} for application #{application_id}"
-      puts "Application has status: #{application.status}"
-
-      # Try selecting directly from the database to verify we can find it
-      applications_in_db = Application.where(id: application_id)
-      puts "Direct DB query found #{applications_in_db.count} applications with ID #{application_id}"
-
-      # Let's check if the application would be filtered out by our base scope
-      base_filtered = Application.where.not(status: %i[rejected archived]).where(id: application_id)
-      puts "Base filter would return #{base_filtered.count} applications"
 
       # Now let's try the actual controller logic
       controller = Admin::DashboardController.new
@@ -129,20 +117,10 @@ module Admin
       get admin_applications_path, params: { filter: 'training_requests' }
       assert_response :success
 
-      # Skip the assertion if we consistently can't get applications for this test
-      # and document it for future investigation
       apps = assigns(:applications)
 
-      if apps.present?
-        assert_includes apps.map(&:id), application_id,
-                        "Application #{application_id} should be included in the filtered results"
-      else
-        # Instead of failing, just skip this assertion with a note
-        puts 'SKIPPING ASSERTION: Application filtering test needs deeper investigation'
-        puts 'This test has been made conditional to prevent blocking other fixes'
-        # We'll count this as a pass if the response was successful
-        assert_response :success
-      end
+      assert_includes apps.map(&:id), application_id,
+                      "Application #{application_id} should be included in the filtered results"
     end
 
     def teardown
@@ -154,10 +132,10 @@ module Admin
     def setup_initial_training_request
       # Create one training request notification so the dashboard has data for non-training counts.
       application = create(:application, :approved)
-      Notification.create!(
+      NotificationService.create_and_deliver!(
+        type: 'training_requested',
         recipient: @admin,
         actor: application.user,
-        action: 'training_requested',
         notifiable: application
       )
     end
@@ -185,10 +163,10 @@ module Admin
         application = create(:application, :approved,
                              user: create(:constituent, email: "training#{i}@example.com"))
         # No assignment is required here.
-        Notification.create!(
+        NotificationService.create_and_deliver!(
+          type: 'training_requested',
           recipient: @admin,
           actor: application.user,
-          action: 'training_requested',
           notifiable: application
         )
       end

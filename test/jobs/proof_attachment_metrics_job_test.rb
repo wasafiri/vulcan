@@ -4,37 +4,38 @@ require 'test_helper'
 
 class ProofAttachmentMetricsJobTest < ActiveJob::TestCase
   setup do
-    # Clear all notifications
+    # Clear all notifications and events
     Notification.delete_all
+    Event.delete_all
 
     # Create test application and admin using factories instead of fixtures
     @application = create(:application, skip_proofs: true) # Skip default proof attachments
     @admin = create(:admin)
 
-    # Create some successful audits
+    # Create some successful events using AuditEventService
     8.times do |i|
-      ProofSubmissionAudit.create!(
-        application: @application,
-        user: @application.user,
-        proof_type: i < 4 ? 'income' : 'residency',
-        submission_method: i.even? ? 'web' : 'paper',
-        ip_address: '127.0.0.1',
+      AuditEventService.log(
+        action: 'proof_submitted',
+        actor: @application.user,
+        auditable: @application,
         metadata: {
+          proof_type: i < 4 ? 'income' : 'residency',
+          submission_method: i.even? ? 'web' : 'paper',
           success: true,
           timestamp: Time.current.iso8601
         }
       )
     end
 
-    # Create some failure audits
+    # Create some failure events using AuditEventService
     2.times do |i|
-      ProofSubmissionAudit.create!(
-        application: @application,
-        user: @application.user,
-        proof_type: 'income',
-        submission_method: 'web',
-        ip_address: '127.0.0.1',
+      AuditEventService.log(
+        action: 'proof_submitted',
+        actor: @application.user,
+        auditable: @application,
         metadata: {
+          proof_type: 'income',
+          submission_method: 'web',
           success: false,
           error_message: "Test error #{i}",
           timestamp: Time.current.iso8601
@@ -42,25 +43,25 @@ class ProofAttachmentMetricsJobTest < ActiveJob::TestCase
       )
     end
 
-    # Ensure we have old audits that shouldn't be counted
-    ProofSubmissionAudit.create!(
-      application: @application,
-      user: @application.user,
-      proof_type: 'income',
-      submission_method: 'web',
-      ip_address: '127.0.0.1',
+    # Ensure we have old events that shouldn't be counted
+    AuditEventService.log(
+      action: 'proof_submitted',
+      actor: @application.user,
+      auditable: @application,
       metadata: {
+        proof_type: 'income',
+        submission_method: 'web',
         success: false,
         error_message: 'Old error',
         timestamp: 2.days.ago.iso8601
       },
-      created_at: 2.days.ago
+      created_at: 2.days.ago # Manually set created_at for old event
     )
   end
 
   test 'processes metrics correctly' do
-    assert_equal 10, ProofSubmissionAudit.where('created_at > ?', 24.hours.ago).count
-    assert_equal 2, ProofSubmissionAudit.where('created_at > ?', 24.hours.ago)
+    assert_equal 10, Event.where(action: 'proof_submitted').where('created_at > ?', 24.hours.ago).count
+    assert_equal 2, Event.where(action: 'proof_submitted').where('created_at > ?', 24.hours.ago)
                                         .where("metadata->>'success' = ?", 'false').count
 
     # Make sure no notifications exist yet
@@ -82,8 +83,8 @@ class ProofAttachmentMetricsJobTest < ActiveJob::TestCase
   end
 
   test "doesn't create notifications when success rate is good" do
-    # Delete the failure audits
-    ProofSubmissionAudit.where("metadata->>'success' = ?", 'false').delete_all
+    # Delete the failure events
+    Event.where(action: 'proof_submitted').where("metadata->>'success' = ?", 'false').delete_all
 
     # Run the job
     ProofAttachmentMetricsJob.perform_now
@@ -94,7 +95,7 @@ class ProofAttachmentMetricsJobTest < ActiveJob::TestCase
 
   test "doesn't create notifications with too few failures" do
     # Delete one failure to get below threshold of 5
-    ProofSubmissionAudit.where("metadata->>'success' = ?", 'false').first.destroy
+    Event.where(action: 'proof_submitted').where("metadata->>'success' = ?", 'false').first.destroy
 
     # Run the job
     ProofAttachmentMetricsJob.perform_now
@@ -104,8 +105,8 @@ class ProofAttachmentMetricsJobTest < ActiveJob::TestCase
   end
 
   test 'handles empty audit data' do
-    # Delete all audits
-    ProofSubmissionAudit.delete_all
+    # Delete all events
+    Event.delete_all
 
     # Run the job - should not raise any errors
     assert_nothing_raised do

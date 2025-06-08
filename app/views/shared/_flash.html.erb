@@ -1,28 +1,43 @@
-<% flash.each do |type, message| %>
+<% if flash.any? %>
+  <%# Primary method: JSON data in script tag for new NotificationService %>
+  <script type="application/json" id="rails-flash-messages">
+    <%= raw [
+      flash.map do |type, message|
+        {
+          message: message,
+          type: case type.to_s
+                when 'notice' then 'success'
+                when 'alert' then 'warning'  
+                when 'info' then 'info'
+                else 'error'
+                end
+        }
+      end
+    ].flatten.to_json %>
+  </script>
+
+  <%# Fallback method: Legacy window._queuedFlashMessages for smooth transition %>
   <script type="module">
-    // Secure message handling with proper JSON encoding and event queueing
-    const eventData = {
-      message: <%= message.to_json %>,
-      type: "<%= j case type.to_s
-                   when 'notice' then 'success'
-                   when 'alert' then 'warning'  
-                   when 'info' then 'info'
-                   else 'error'
-                   end %>"
-    };
-    
-    // Try immediate dispatch, queue if no flash controller available
-    const event = new CustomEvent('rails-request:flash', { detail: eventData });
-    const dispatched = document.dispatchEvent(event);
-    
-    // If no controller handled the event, queue it for when controller connects
-    if (!dispatched || !document.querySelector('[data-controller*="flash"]')) {
-      window._queuedFlashMessages = window._queuedFlashMessages || [];
-      window._queuedFlashMessages.push(eventData);
-      
-      if (window._queuedFlashMessages.length > 10) {
-        window._queuedFlashMessages = window._queuedFlashMessages.slice(-10); // Keep last 10
-      }
+    // Fallback support for legacy flash controllers during transition
+    if (!window.AppNotifications) {
+      <% flash.each do |type, message| %>
+        const legacyEventData = {
+          message: <%= message.to_json %>,
+          type: "<%= j case type.to_s
+                       when 'notice' then 'success'
+                       when 'alert' then 'warning'  
+                       when 'info' then 'info'
+                       else 'error'
+                       end %>"
+        };
+        
+        window._queuedFlashMessages = window._queuedFlashMessages || [];
+        window._queuedFlashMessages.push(legacyEventData);
+        
+        if (window._queuedFlashMessages.length > 10) {
+          window._queuedFlashMessages = window._queuedFlashMessages.slice(-10);
+        }
+      <% end %>
     }
   </script>
 <% end %>

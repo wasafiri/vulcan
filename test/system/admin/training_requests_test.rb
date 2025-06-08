@@ -16,10 +16,10 @@ module AdminNamespace
       Current.reset
 
       # Create a training request notification
-      Notification.create!(
+      NotificationService.create_and_deliver!(
+        type: 'training_requested',
         recipient: @admin,
         actor: @constituent,
-        action: 'training_requested',
         notifiable: @application,
         metadata: {
           application_id: @application.id,

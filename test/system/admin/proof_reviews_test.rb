@@ -40,10 +40,10 @@ module Admin
         raise 'Failed to attach residency proof' unless @application.residency_proof.attached?
 
         # Create notification and proof review
-        Notification.create!(
+        NotificationService.create_and_deliver!(
+          type: 'proof_submitted',
           recipient: @admin,
           actor: @application.user,
-          action: 'proof_submitted',
           notifiable: @application,
           metadata: { proof_types: %w[income residency] }
         )

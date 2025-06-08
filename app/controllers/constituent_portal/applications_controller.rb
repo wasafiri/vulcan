@@ -5,6 +5,7 @@ module ConstituentPortal
   # for constituents. This controller has been refactored to follow the
   # Single Responsibility Principle with smaller, focused methods.
   class ApplicationsController < ApplicationController
+    include ParamCasting # Contains boolean fields found throughout the application
     # Define Structs for data objects at the class level to avoid recreation on each request
 
     # Represents medical provider contact information
@@ -83,12 +84,10 @@ module ConstituentPortal
     # Common Utility Methods
     #----------------------------------------------------------------------
 
-    # Safely cast a value to boolean
+    # Safely cast a value to boolean - now provided by ParamCasting concern
     # @param value [Object] The value to cast
     # @return [Boolean] The safely cast boolean value
-    def safe_boolean_cast(value)
-      ActiveModel::Type::Boolean.new.cast(value)
-    end
+    # NOTE: This method is now provided by the ParamCasting concern
 
     # Log a debug message in development or test environment
     # @param message [String] The message to log
@@ -348,14 +347,13 @@ module ConstituentPortal
       @application.save!
 
       # Log the initial application creation event
-      Event.create!(
-        user: current_user,
+      AuditEventService.log(
         action: 'application_created',
+        actor: current_user,
+        auditable: @application,
         metadata: {
-          application_id: @application.id,
           submission_method: 'online',
-          initial_status: @application.status,
-          timestamp: Time.current.iso8601
+          initial_status: @application.status
         }
       )
 
@@ -635,7 +633,7 @@ module ConstituentPortal
     # @param file [ActionDispatch::Http::UploadedFile] The file to attach
     # @return [ProofResult] Result with success, type, and optional message
     def attach_proof_document(proof_type, file)
-      result = ProofAttachmentService.attach_proof(
+      result = ProofAttachmentService.attach_proof({
         application: @application,
         proof_type: proof_type,
         blob_or_file: file,
@@ -643,7 +641,7 @@ module ConstituentPortal
         admin: nil, # No admin for constituent uploads
         submission_method: :web,
         metadata: { ip_address: request.remote_ip }
-      )
+      })
 
       ProofResult.new(
         success: result[:success],
@@ -679,11 +677,23 @@ module ConstituentPortal
       @application = current_user.applications.find(params[:id])
       if @application.update(needs_review_since: Time.current)
         User.where(type: 'Administrator').find_each do |admin|
-          Notification.create!(
+          # Log the audit event
+          AuditEventService.log(
+            action: 'review_requested',
+            actor: current_user,
+            auditable: @application,
+            metadata: {
+              recipient_id: admin.id
+            }
+          )
+
+          # Send the notification
+          NotificationService.create_and_deliver!(
+            type: 'review_requested',
             recipient: admin,
             actor: current_user,
-            action: 'review_requested',
-            notifiable: @application
+            notifiable: @application,
+            channel: :email
           )
         end
         redirect_to constituent_portal_application_path(@application),
@@ -775,17 +785,30 @@ module ConstituentPortal
     # @return [void]
     def create_training_request_notifications
       User.where(type: 'Administrator').find_each do |admin|
-        Notification.create!(
+        # Log the audit event
+        AuditEventService.log(
+          action: 'training_requested',
+          actor: current_user,
+          auditable: @application,
+          metadata: {
+            recipient_id: admin.id,
+            constituent_id: current_user.id,
+            constituent_name: current_user.full_name
+          }
+        )
+
+        # Send the notification
+        NotificationService.create_and_deliver!(
+          type: 'training_requested',
           recipient: admin,
           actor: current_user,
-          action: 'training_requested',
           notifiable: @application,
           metadata: {
             application_id: @application.id,
             constituent_id: current_user.id,
-            constituent_name: current_user.full_name,
-            timestamp: Time.current.iso8601
-          }
+            constituent_name: current_user.full_name
+          },
+          channel: :email
         )
       end
     end
@@ -793,14 +816,13 @@ module ConstituentPortal
     # Log the training request activity if the Activity class is available
     # @return [void]
     def log_training_request
-      return unless defined?(Activity)
-
-      Activity.create!(
-        user: current_user,
-        description: 'Requested training session',
+      # Log as an audit event
+      AuditEventService.log(
+        action: 'training_session_requested',
+        actor: current_user,
+        auditable: @application,
         metadata: {
-          application_id: @application.id,
-          timestamp: Time.current.iso8601
+          constituent_id: current_user.id
         }
       )
     end
@@ -919,7 +941,7 @@ module ConstituentPortal
       # Cast value if it's a boolean field
       if %w[hearing_disability vision_disability speech_disability mobility_disability
             cognition_disability].include?(attribute) # Removed is_guardian
-        value = safe_boolean_cast(value)
+        value = to_boolean(value)
       end
 
       # Removed special validation for guardian_relationship as it's deprecated
@@ -962,7 +984,7 @@ module ConstituentPortal
       end
 
       # Cast value if it's a boolean field
-      value = safe_boolean_cast(value) if %w[maryland_resident self_certify_disability].include?(attribute)
+      value = to_boolean(value) if %w[maryland_resident self_certify_disability].include?(attribute)
 
       begin
         # Assign the value for validation
@@ -1266,7 +1288,7 @@ module ConstituentPortal
     def user_params
       params.expect(application: %i[hearing_disability vision_disability
                                     speech_disability mobility_disability
-                                    cognition_disability]).transform_values { |v| ActiveModel::Type::Boolean.new.cast(v) }
+                                    cognition_disability]).transform_values { |v| to_boolean(v) }
     end
 
     # Strong params for the verify step
@@ -1318,7 +1340,7 @@ module ConstituentPortal
     def process_disability_attributes(attrs, processed_attrs)
       %i[hearing_disability vision_disability speech_disability
          mobility_disability cognition_disability].each do |attr|
-        processed_attrs[attr] = safe_boolean_cast(attrs[attr])
+        processed_attrs[attr] = to_boolean(attrs[attr])
       end
     end
 
@@ -1374,29 +1396,7 @@ module ConstituentPortal
       log_debug("User has_disability_selected? returns: #{current_user.has_disability_selected?}")
     end
 
-    def cast_boolean_params
-      return unless params[:application]
-
-      boolean_fields = %i[
-        self_certify_disability
-        hearing_disability
-        vision_disability
-        speech_disability
-        mobility_disability
-        cognition_disability
-        maryland_resident
-        terms_accepted
-        information_verified
-        medical_release_authorized
-      ]
-      boolean_fields.each do |field|
-        next unless params[:application][field]
-
-        value = params[:application][field]
-        value = value.last if value.is_a?(Array)
-        params[:application][field] = ActiveModel::Type::Boolean.new.cast(value)
-      end
-    end
+    # NOTE: cast_boolean_params is now provided by the ParamCasting concern
 
     def initialize_address
       # Use dig with both potential key formats to handle inconsistency

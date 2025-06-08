@@ -240,13 +240,13 @@ module Admin
       new_guardian = User.find_by(email: guardian_email)
       # For dependents using guardian's email, find by dependent_email matching guardian's email
       new_dependent = User.find_by(dependent_email: guardian_email)
-      
+
       assert new_guardian, "New guardian should have been created with email #{guardian_email}"
       assert new_dependent, "New dependent should have been created with dependent_email matching guardian's email"
-      
+
       # Verify the dependent uses guardian's email but has system-generated primary email
-      assert_match /dependent-.*@system\.matvulcan\.local/, new_dependent.email,
-                   'Dependent should have system-generated email to avoid uniqueness conflicts'
+      assert_match(/dependent-.*@system\.matvulcan\.local/, new_dependent.email,
+                   'Dependent should have system-generated email to avoid uniqueness conflicts')
       assert_equal guardian_email, new_dependent.dependent_email,
                    'Dependent should have guardian email in dependent_email field'
       assert_equal guardian_email, new_dependent.effective_email,
@@ -322,6 +322,9 @@ module Admin
     # test 'should create paper application with rejected proofs and ensure ProofReview records are created' do # Original test name
     # Refactored test based on user feedback:
     test 'creates application, approves income proof, rejects residency proof' do
+      # Clear events before the test to ensure we only count events from this test
+      Event.delete_all
+
       # Setup specific to this test, using instance variables defined in the main setup or here
       # The file 'test_income_proof.pdf' is expected to be directly in 'test/fixtures/files/'
       # by the fixture_file_upload helper.
@@ -334,9 +337,11 @@ module Admin
       assert_difference 'User.count', 1, 'User.count should increase by 1' do
         assert_difference 'Application.count', 1, 'Application.count should increase by 1' do
           assert_difference 'ProofReview.count', 1, 'ProofReview.count should increase by 1' do
-            post admin_paper_applications_path,
-                 headers: default_headers,
-                 params: paper_application_params # Call helper for params
+            assert_difference 'Event.count', 3 do # 1 for application_created, 1 for income proof_submitted, 1 for residency proof_rejected
+              post admin_paper_applications_path,
+                   headers: default_headers,
+                   params: paper_application_params # Call helper for params
+            end
           end
         end
       end
@@ -349,6 +354,14 @@ module Admin
       residency_review = app.proof_reviews.find_by!(proof_type: :residency, status: :rejected)
       assert_equal 'address_mismatch', residency_review.rejection_reason
       assert_equal "The address on the document doesn't match for residency.", residency_review.notes
+
+      # Verify events
+      events = Event.order(:created_at).last(3)
+      assert_equal 'application_created', events[0].action
+      assert_equal 'proof_submitted', events[1].action
+      assert_equal 'proof_rejected', events[2].action
+      assert_equal 'income', events[1].metadata['proof_type']
+      assert_equal 'residency', events[2].metadata['proof_type']
     end
 
     #
@@ -402,20 +415,21 @@ module Admin
     end
 
     def stub_proof_services
-      # Stubbing Event and ProofSubmissionAudit to prevent them from causing rollbacks
+      # Stubbing Event creation to prevent them from causing rollbacks
       # if they have validation issues or other errors during the test.
+      # AuditEventService.log will create an Event, so we stub Event.create!
       Event.stubs(:create!).returns(true) # Or mock specific attributes if needed
-      ProofSubmissionAudit.stubs(:create!).returns(true) # Or mock specific attributes
 
       ProofAttachmentService
         .stubs(:attach_proof)
         .with(has_entry(proof_type: :income))
         .returns(success: true) do |args|
-          # In the refactored test, this block needs to correctly simulate the service's action
-          # The service updates the application's proof status.
+          # Simulate the service's action: update application's proof status.
           args[:application].income_proof_status = :approved
-          # The service itself returns { success: true, ... }
-          # For the stub, just ensuring the status is set and returning success is enough.
+          # Simulate AuditEventService.log being called by ProofAttachmentService.
+          # This event is created by PaperApplicationService itself, not ProofAttachmentService.
+          # So, we don't need to create it here.
+          { success: true } # Return success for the service call
         end
 
       ProofAttachmentService
@@ -432,6 +446,10 @@ module Admin
             submission_method: :paper,
             reviewed_at: Time.current
           )
+          # Simulate AuditEventService.log being called by ProofAttachmentService.
+          # This event is created by ProofReview's send_notification, not ProofAttachmentService.
+          # So, we don't need to create it here.
+          { success: true } # Return success for the service call
         end
     end
 
@@ -562,6 +580,8 @@ module Admin
       constituent = create(:constituent,
                            email: unique_email,
                            phone: unique_phone,
+                           first_name: 'Test',
+                           last_name: 'User',
                            hearing_disability: true)
 
       # Mock the service to fail due to active application

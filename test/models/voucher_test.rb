@@ -3,7 +3,10 @@
 require 'test_helper'
 
 class VoucherTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+
   setup do
+    Current.user = create(:admin)
     # Create a constituent with a unique email for each test to avoid email conflicts
     constituent = create(:constituent, email: "unique_setup_#{Time.now.to_i}_#{rand(1000)}@example.com")
     @application = create(:application, user: constituent)
@@ -137,14 +140,14 @@ class VoucherTest < ActiveSupport::TestCase
     constituent = create(:constituent, email: "unique_#{Time.now.to_i}@example.com")
     application = create(:application, user: constituent)
 
-    assert_enqueued_email_with VoucherNotificationsMailer, :voucher_assigned do
+    perform_enqueued_jobs do
       create(:voucher, application: application)
     end
+
+    assert_equal 1, ActionMailer::Base.deliveries.size
   end
 
   test 'creates event when assigned' do
-    Current.user = create(:admin)
-
     # Create a constituent with a unique email
     constituent = create(:constituent, email: "unique_event_test_#{Time.now.to_i}_#{rand(1000)}@example.com")
     application = create(:application, status: :approved, user: constituent)
@@ -230,9 +233,11 @@ class VoucherTest < ActiveSupport::TestCase
       remaining_value: 100
     )
 
-    assert_enqueued_email_with VoucherNotificationsMailer, :voucher_redeemed do
+    perform_enqueued_jobs do
       @voucher.redeem!(100, vendor)
     end
+
+    assert_equal 1, ActionMailer::Base.deliveries.size
   end
 
   test 'can be cancelled when issued' do
@@ -262,8 +267,10 @@ class VoucherTest < ActiveSupport::TestCase
   end
 
   test 'sends notification when expired' do
-    assert_enqueued_email_with VoucherNotificationsMailer, :voucher_expired do
+    perform_enqueued_jobs do
       @voucher.update!(status: :expired)
     end
+
+    assert_equal 1, ActionMailer::Base.deliveries.size
   end
 end

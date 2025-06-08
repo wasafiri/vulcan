@@ -5,6 +5,8 @@ module Admin
   # Handles application listing, viewing, editing, status updates, proof review,
   # voucher assignments, and other application-related administrative operations
   class ApplicationsController < BaseController
+    WANTED_ATTACHMENT_NAMES = %w[income_proof residency_proof medical_certification].freeze
+
     include ActionView::Helpers::TagHelper
     include ActionView::Helpers::JavaScriptHelper
     include RedirectHelper
@@ -314,12 +316,8 @@ module Admin
     end
 
     # Handles successful status updates
-    # Auto-approval is now handled by the Application model's after_save callback
-    # @param status [Symbol] The normalized certification status (unused here, but kept for potential future use)
     def handle_successful_status_update(_status)
       # The model's after_save :auto_approve_if_eligible callback handles the approval logic
-      # We just need to redirect with a generic success message here.
-      # The application object might have been reloaded and status changed by the callback.
       @application.reload # Ensure we have the latest status after callbacks
       if @application.status_approved?
         # If the callback auto-approved it, show that message
@@ -368,8 +366,7 @@ module Admin
     end
 
     # Handles uploading and processing medical certification documents
-    # This action can either accept and attach a certification document
-    # or reject it with a reason, notifying the medical provider
+    # This action can either accept and attach a certification document or reject it with a reason, notifying the medical provider
     def upload_medical_certification
       status = params[:medical_certification_status]
 
@@ -501,7 +498,6 @@ module Admin
 
       # Add status information for consistent messaging
       result[:status] = 'rejected'
-
       handle_certification_result(result)
     end
 
@@ -521,8 +517,6 @@ module Admin
     # Builds the array of turbo stream objects for the success response
     def build_turbo_streams_for_success
       streams = []
-      streams << append_cleanup_js # Cleanup JS first
-
       # Update necessary content sections (excluding #modals)
       streams << turbo_stream.update('flash', partial: 'shared/flash')
       streams << turbo_stream.update('attachments-section', partial: 'attachments')
@@ -534,16 +528,6 @@ module Admin
     end
 
     # --- Other Private Helpers ---
-
-    def handle_html_error(error)
-      flash[:error] = "Failed to update proof status: #{error.message}"
-      render :show, status: :unprocessable_entity
-    end
-
-    def handle_turbo_stream_error(error)
-      flash.now[:error] = "Failed to update proof status: #{error.message}"
-      render turbo_stream: turbo_stream.update('flash', partial: 'shared/flash')
-    end
 
     def reload_application_and_associations
       @application = load_base_application
@@ -599,87 +583,10 @@ module Admin
       ]
     end
 
-    def update_content_streams
-      [
-        turbo_stream.update('flash', partial: 'shared/flash'),
-        turbo_stream.update('attachments-section', partial: 'attachments'),
-        turbo_stream.update('audit-logs', partial: 'audit_logs'),
-        turbo_stream.update('modals', partial: 'modals')
-      ]
-    end
-
-    def append_cleanup_js
-      turbo_stream.append_all('body',
-                              view_context.tag.script(cleanup_js, type: 'text/javascript'))
-    end
-
-    def cleanup_js
-      <<-JS.html_safe.strip_heredoc
-        (function() {
-          console.log('Executing immediate modal cleanup - IMPROVED VERSION');
-
-          // First and most importantly - remove overflow-hidden from body
-          document.body.classList.remove('overflow-hidden');
-
-          // Clear any inline styles that might affect scrolling
-          document.body.style.overflow = '';
-          document.body.style.position = '';
-          document.documentElement.style.overflow = '';
-          document.documentElement.style.position = '';
-
-          // Force page scrollability via inline style as a failsafe
-          document.body.style.overflow = 'auto';
-          document.body.style.height = 'auto';
-
-          console.log('Scroll has been immediately restored');
-
-          // THEN handle the modals, even if they might be removed soon
-          document.querySelectorAll('[data-modal-target="container"]').forEach(function(modal) {
-            modal.classList.add('hidden');
-            console.log('Hidden modal:', modal.id || 'unnamed modal');
-          });
-
-          // Trigger cleanup on any modal controllers
-          document.querySelectorAll("[data-controller~='modal']").forEach(function(element) {
-            try {
-              var controller = window.Stimulus.getControllerForElementAndIdentifier(element, 'modal');
-              if (controller && typeof controller.cleanup === 'function') {
-                controller.cleanup();
-                console.log('Modal cleanup triggered immediately after proof review');
-              }
-            } catch(e) {
-              console.error('Error cleaning up modal:', e);
-            }
-          });
-
-          // Set up a double-safety timer that will forcibly restore scroll
-          // regardless of what other JavaScript might do
-          setTimeout(function() {
-            document.body.classList.remove('overflow-hidden');
-            document.body.style.overflow = 'auto';
-            console.log('Extra safety timeout executed for scroll restoration');
-          }, 100);
-        })();
-
-        // Add our visibility change listener as a tertiary fallback
-        document.addEventListener('visibilitychange', function() {
-          if (!document.hidden) {
-            console.log('Page became visible again - cleaning up modals');
-            document.querySelectorAll('[data-modal-target="container"]').forEach(function(modal) {
-              modal.classList.add('hidden');
-            });
-            document.body.classList.remove('overflow-hidden');
-            document.body.style.overflow = 'auto';
-            console.log('Visibility change scroll restoration completed');
-          }
-        }, { once: true });
-      JS
-    end
-
     def load_proof_history(type)
       {
         reviews: filter_and_sort(@application.proof_reviews, type, :reviewed_at),
-        audits: filter_and_sort(@application.proof_submission_audits, type, :created_at)
+        audits: filter_and_sort(@application.events.where(action: 'proof_submitted', metadata: { proof_type: type }), type, :created_at)
       }
     rescue StandardError => e
       Rails.logger.error "Failed to load #{type} proof history: #{e.message}"
@@ -709,8 +616,7 @@ module Admin
       %w[asc desc].include?(params[:direction]) ? params[:direction] : 'desc'
     end
 
-    # Loads an application with only the essential attachments
-    # Each specific controller action will load the additional associations it needs
+    # Loads an application with only the essential attachments; each specific controller action will load the additional associations it needs
     def set_application
       @application = load_base_application
     rescue ActiveRecord::RecordNotFound
@@ -729,12 +635,11 @@ module Admin
                        .pluck(:id)
 
       # Make sure blobs are accessible with all required attributes.
-      # This avoids the variant_records and preview_image_attachment eager loading,
-      # but includes service_name and other necessary attributes.
+      # This avoids the variant_records and preview_image_attachment eager loading, but includes service_name and other necessary attributes
       if attachment_ids.any?
         ActiveStorage::Blob
           .joins('INNER JOIN active_storage_attachments ON active_storage_blobs.id = active_storage_attachments.blob_id')
-          .where('active_storage_attachments.id IN (?)', attachment_ids)
+          .where(active_storage_attachments: { id: attachment_ids })
           .select('active_storage_blobs.id, active_storage_blobs.filename, ' \
                   'active_storage_blobs.content_type, active_storage_blobs.byte_size, ' \
                   'active_storage_blobs.checksum, active_storage_blobs.created_at, ' \
@@ -746,19 +651,19 @@ module Admin
     end
 
     def application_params
-      params.require(:application).permit(
-        :status,
-        :household_size,
-        :annual_income,
-        :application_type,
-        :submission_method,
-        :medical_provider_name,
-        :medical_provider_phone,
-        :medical_provider_fax,
-        :medical_provider_email,
-        :alternate_contact_name,
-        :alternate_contact_phone,
-        :alternate_contact_email
+      params.expect(
+        application: %i[status
+                        household_size
+                        annual_income
+                        application_type
+                        submission_method
+                        medical_provider_name
+                        medical_provider_phone
+                        medical_provider_fax
+                        medical_provider_email
+                        alternate_contact_name
+                        alternate_contact_phone
+                        alternate_contact_email]
       )
     end
 
@@ -872,10 +777,7 @@ module Admin
         {}
       end
     end
-
     ### decoration -----------------------------------------------------------------
-
-    WANTED_ATTACHMENT_NAMES = %w[income_proof residency_proof medical_certification].freeze
 
     def decorate_apps(apps, attachment_index)
       apps.map do |app|

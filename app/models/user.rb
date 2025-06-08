@@ -100,6 +100,7 @@ class User < ApplicationRecord
 
   # Associations
   has_many :sessions, dependent: :destroy
+  has_many :events, dependent: :destroy # Added for audit trail
   has_many :received_notifications,
            class_name: 'Notification',
            foreign_key: :recipient_id,
@@ -376,7 +377,7 @@ class User < ApplicationRecord
   # Helper methods for dependent contact information
   # These methods determine the effective contact information for a dependent
   # using dependent-specific contact info if available, otherwise falling back to guardian
-  
+
   def effective_email
     if is_dependent? && dependent_email.present?
       dependent_email
@@ -386,7 +387,7 @@ class User < ApplicationRecord
       email
     end
   end
-  
+
   def effective_phone
     if is_dependent? && dependent_phone.present?
       dependent_phone
@@ -396,17 +397,17 @@ class User < ApplicationRecord
       phone
     end
   end
-  
+
   def effective_phone_type
     if is_dependent? && dependent_phone.present?
       phone_type # Use dependent's preferred phone type
     elsif is_dependent? && guardian_for_contact
       guardian_for_contact.phone_type
-    else
-      phone_type
     end
+
+    phone_type
   end
-  
+
   def effective_communication_preference
     if is_dependent? && guardian_for_contact
       guardian_for_contact.communication_preference

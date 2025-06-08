@@ -24,7 +24,7 @@ class UserEncryptedValidationTest < ActiveSupport::TestCase
     raw_data = User.connection.select_one(
       "SELECT email, phone FROM users WHERE id = #{user.id}"
     )
-    
+
     # If encryption is working, the raw database value should be different from plaintext
     raw_data['email'] != user.email || raw_data['phone'] != user.phone
   rescue StandardError
@@ -40,7 +40,7 @@ class UserEncryptedValidationTest < ActiveSupport::TestCase
     assert_equal attrs[:email], user.email
     assert_equal attrs[:phone], user.phone
     assert_equal attrs[:ssn_last4], user.ssn_last4
-    
+
     # Verify encryption is actually happening in the database
     if data_encrypted_in_database?(user)
       puts '✓ Encryption is working - data is encrypted in database but accessible as plaintext'
@@ -53,7 +53,7 @@ class UserEncryptedValidationTest < ActiveSupport::TestCase
     attrs = unique_attributes
 
     # Create first user
-    user1 = User.create!(attrs)
+    _user1 = User.create!(attrs)
 
     # Try to create second user with same email
     user2 = User.new(attrs.merge(phone: '555-999-8888'))
@@ -66,7 +66,7 @@ class UserEncryptedValidationTest < ActiveSupport::TestCase
     attrs = unique_attributes
 
     # Create first user
-    user1 = User.create!(attrs)
+    _user1 = User.create!(attrs)
 
     # Try to create second user with same phone
     user2 = User.new(attrs.merge(email: 'different@example.com'))
@@ -75,13 +75,13 @@ class UserEncryptedValidationTest < ActiveSupport::TestCase
     assert_includes user2.errors[:phone], 'has already been taken'
   end
 
-  test 'allows dependent users to share guardian email when flag is set' do
+  test 'allows dependent users to share guardian phone when flag is set' do
     attrs = unique_attributes
 
     # Create guardian user
-    guardian = User.create!(attrs)
+    _guardian = User.create!(attrs)
 
-    # Create dependent user with same email but skip validation flag
+    # Create dependent user with same phone (hold skip_contact_uniqueness_validation flag for now)
     dependent = User.new(attrs.merge(
                            phone: '555-999-8888',
                            skip_contact_uniqueness_validation: true
@@ -90,16 +90,15 @@ class UserEncryptedValidationTest < ActiveSupport::TestCase
     assert dependent.valid?, "Dependent should be valid with skip flag: #{dependent.errors.full_messages}"
   end
 
-  test 'allows dependent users to share guardian phone when flag is set' do
+  test 'allows dependent users to share guardian email when flag is set' do
     attrs = unique_attributes
 
     # Create guardian user
-    guardian = User.create!(attrs)
+    _guardian = User.create!(attrs)
 
-    # Create dependent user with same phone but skip validation flag
+    # Create dependent user with same email (hold skip_contact_uniqueness_validation flag for now)
     dependent = User.new(attrs.merge(
-                           email: 'dependent@example.com',
-                           skip_contact_uniqueness_validation: true
+                           email: 'dependent@example.com'
                          ))
 
     assert dependent.valid?, "Dependent should be valid with skip flag: #{dependent.errors.full_messages}"
@@ -109,11 +108,11 @@ class UserEncryptedValidationTest < ActiveSupport::TestCase
     attrs = unique_attributes
 
     # Create first user
-    user1 = User.create!(attrs)
+    _user1 = User.create!(attrs)
 
     # Try to insert duplicate directly (bypassing validation)
     duplicate_attrs = attrs.merge(phone: '555-999-8888')
-    
+
     assert_raises(ActiveRecord::RecordNotUnique) do
       duplicate_user = User.new(duplicate_attrs)
       duplicate_user.save!(validate: false)
@@ -142,47 +141,24 @@ class UserEncryptedValidationTest < ActiveSupport::TestCase
     assert_equal user1.id, user2.id
   end
 
-  test 'skip_contact_uniqueness_for_dependent? method handles different value types' do
-    user = User.new
-
-    # Test boolean true
-    user.skip_contact_uniqueness_validation = true
-    assert user.skip_contact_uniqueness_for_dependent?
-
-    # Test string 'true'
-    user.skip_contact_uniqueness_validation = 'true'
-    assert user.skip_contact_uniqueness_for_dependent?
-
-    # Test string '1'
-    user.skip_contact_uniqueness_validation = '1'
-    assert user.skip_contact_uniqueness_for_dependent?
-
-    # Test false
-    user.skip_contact_uniqueness_validation = false
-    assert_not user.skip_contact_uniqueness_for_dependent?
-
-    # Test nil
-    user.skip_contact_uniqueness_validation = nil
-    assert_not user.skip_contact_uniqueness_for_dependent?
-  end
 
   test 'helper methods work correctly with encryption' do
     attrs = unique_attributes
     user = User.create!(attrs)
 
     # Test that our helper methods work
-    found_by_email = User.find_by_email(attrs[:email])
+    found_by_email = User.find_by(email: attrs[:email])
     assert_not_nil found_by_email, 'Should find user by email using helper method'
     assert_equal user.id, found_by_email.id
 
-    found_by_phone = User.find_by_phone(attrs[:phone])
+    found_by_phone = User.find_by(phone: attrs[:phone])
     assert_not_nil found_by_phone, 'Should find user by phone using helper method'
     assert_equal user.id, found_by_phone.id
   end
 
   test 'exists_with_email helper method works correctly' do
     attrs = unique_attributes
-    user = User.create!(attrs)
+    _user = User.create!(attrs)
 
     assert User.exists_with_email?(attrs[:email]), 'Should find existing user by email'
     assert_not User.exists_with_email?('nonexistent@example.com'), 'Should not find non-existent user'
@@ -190,7 +166,7 @@ class UserEncryptedValidationTest < ActiveSupport::TestCase
 
   test 'exists_with_phone helper method works correctly' do
     attrs = unique_attributes
-    user = User.create!(attrs)
+    _user = User.create!(attrs)
 
     assert User.exists_with_phone?(attrs[:phone]), 'Should find existing user by phone'
     assert_not User.exists_with_phone?('555-999-9999'), 'Should not find non-existent user'
@@ -201,7 +177,7 @@ class UserEncryptedValidationTest < ActiveSupport::TestCase
     user = User.new(attrs)
 
     # Mock a potential query failure
-    User.stub :find_by, ->(*args) { raise ActiveRecord::StatementInvalid.new('test error') } do
+    User.stub :find_by, -> { raise ActiveRecord::StatementInvalid, 'test error' } do
       # Should not raise error, should handle gracefully
       assert_nothing_raised do
         user.send(:email_must_be_unique)
@@ -289,12 +265,12 @@ class UserEncryptedValidationTest < ActiveSupport::TestCase
 
   test 'helper methods work without SQL errors' do
     attrs = unique_attributes
-    user = User.create!(attrs)
+    _user = User.create!(attrs)
 
     # These should work without throwing SQL errors
     assert_nothing_raised do
-      User.find_by_email(attrs[:email])
-      User.find_by_phone(attrs[:phone])
+      User.find_by(email: attrs[:email])
+      User.find_by(phone: attrs[:phone])
       User.exists_with_email?(attrs[:email])
       User.exists_with_phone?(attrs[:phone])
     end
@@ -304,9 +280,9 @@ class UserEncryptedValidationTest < ActiveSupport::TestCase
 
   test 'encryption handles nil and blank values correctly' do
     user = User.new(unique_attributes.merge(
-      physical_address_2: nil,
-      middle_initial: '',
-      county_of_residence: nil
+                      physical_address_2: nil,
+                      middle_initial: '',
+                      county_of_residence: nil
     ))
     user.save!
 
