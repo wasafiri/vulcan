@@ -183,90 +183,57 @@ module ConstituentPortal
 
     def edit; end
 
-    # Create a new application with comprehensive validation and error handling
-    # This is the most complex action, broken down into smaller, focused steps
-    # with clear responsibilities for each component.
+    # Create a new application using clean service layer architecture
+    # Form handles validation, ApplicationCreator handles persistence
     # @return [void] Redirects to application path or renders form with errors
     def create
-      is_submission = params[:submit_application].present?
-      user_disability_attrs = extract_user_attributes(params) # Now only disability flags
-      user_address_attrs = extract_address_attributes(params) # Extract address fields
-
-      applicant_user_id = params.dig(:application, :user_id)
-      applicant_user = current_user # Default to current_user applying for self
-      managing_guardian_for_app = nil
-
-      if applicant_user_id.present? && applicant_user_id.to_i != current_user.id
-        # Application is for a dependent
-        selected_dependent = current_user.dependents.find_by(id: applicant_user_id)
-        if selected_dependent
-          applicant_user = selected_dependent
-          managing_guardian_for_app = current_user
-        else
-          # Invalid dependent ID selected, handle error
-          @application = Application.new(filtered_application_params) # Build for form errors
-          @application.errors.add(:user_id, 'is not a valid dependent.')
-          initialize_address_and_provider_for_form
-          return render :new, status: :unprocessable_entity
-        end
-      end
-
-      # Update disability and address attributes on the actual applicant_user
-      begin
-        # Ensure type is set correctly if applicant_user is a new record (should not happen here)
-        # or if it's being updated.
-        applicant_user.type ||= 'Users::Constituent' if applicant_user.type.blank?
-        
-        # If this is a dependent user, skip contact uniqueness validation
-        # since they may share email/phone with their guardian
-        if managing_guardian_for_app.present?
-          applicant_user.skip_contact_uniqueness_validation = true
+      @form = ApplicationForm.new(
+        current_user: current_user,
+        params: params
+      )
+      
+      return render_form_errors unless @form.valid?
+      
+      result = Applications::ApplicationCreator.call(@form)
+      
+      if result.success?
+        redirect_to_app(result.application)
+      else
+        # Handle service layer errors
+        @application = result.application || Application.new(filtered_application_params)
+        result.error_messages.each do |message|
+          @application.errors.add(:base, message)
         end
         
-        # Combine disability and address attributes for user update
-        user_attrs = user_disability_attrs.merge(user_address_attrs)
-        applicant_user.update!(user_attrs)
-      rescue ActiveRecord::RecordInvalid => e
-        log_error("Applicant user (ID: #{applicant_user.id}) attribute update failed: #{e.message}", e)
-        @application = Application.new(filtered_application_params)
-        @application.user = applicant_user # Associate with applicant for error display
-        @application.errors.merge!(applicant_user.errors)
         initialize_address_and_provider_for_form
-        return render :new, status: :unprocessable_entity
+        render :new, status: :unprocessable_entity
       end
-
-      @application = Application.new(filtered_application_params)
-      @application.user = applicant_user
-      @application.managing_guardian = managing_guardian_for_app
-
-      success = ActiveRecord::Base.transaction do
-        # Disability check now on applicant_user
-        if is_submission && !applicant_user.disability_selected?
-          @application.errors.add(:base, 'At least one disability must be selected for the applicant before submitting an application.')
-          raise ActiveRecord::Rollback
-        end
-
-        # Old set_guardian_status is removed. The managing_guardian_id handles this.
-        set_initial_application_attributes(@application, is_submission)
-        set_medical_provider_details(@application)
-        @application.assign_attributes(submission_params) if is_submission
-
-        begin
-          save_application_with_event_log! # This will save @application
-        rescue ActiveRecord::RecordInvalid => e
-          log_error("Application save failed: #{@application.errors.full_messages.join(', ')}", e)
-          # Errors are already on @application from save!
-          raise ActiveRecord::Rollback
-        end
-        true
-      end
-
-      handle_application_creation_result(success)
     end
 
     # REMOVED: guardian_relationship_missing? - logic is now part of dependent selection
     # REMOVED: render_guardian_validation_error - handled by standard validation flow
     # REMOVED: set_guardian_status - managing_guardian_id now handles this
+
+    def render_form_errors
+      # Transfer form errors to application for view compatibility
+      @application = Application.new(filtered_application_params)
+      @form.errors.each do |error|
+        @application.errors.add(error.attribute, error.message)
+      end
+      
+      initialize_address_and_provider_for_form
+      render :new, status: :unprocessable_entity
+    end
+    
+    def render_update_form_errors
+      # Transfer form errors to existing application for view compatibility
+      @form.errors.each do |error|
+        @application.errors.add(error.attribute, error.message)
+      end
+      
+      prepare_medical_provider_for_edit
+      render :edit, status: :unprocessable_entity
+    end
 
     def initialize_address_and_provider_for_form
       initialize_address
@@ -379,92 +346,35 @@ module ConstituentPortal
       end
     end
 
-    # Update an existing application with proper error handling
-    # Similar to create but for updating an existing record
+    # Update an existing application using clean service layer architecture
+    # Form handles validation, ApplicationCreator handles persistence
     # @return [void] Redirects to application path or renders form with errors
     def update
-      # Store original status for comparison later
       original_status = @application.status
-      log_debug "Update params: #{params.inspect}"
-      log_debug "Submit application param: #{params[:submit_application].inspect}"
-
-      # Extract attributes for both application and user
-      application_attrs = prepare_application_attributes
-      user_attrs = prepare_user_attributes_for_update
-      log_update_debug_info(user_attrs)
-
-      # Process the application update within a transaction
-      is_submission = params[:submit_application].present?
-      success = ActiveRecord::Base.transaction do
-        # Special handling for guardian managing dependent applications
-        if params[:application][:managing_guardian_id].present?
-          guardian_id = params[:application][:managing_guardian_id].to_i
-
-          # Verify this is a valid relationship
-          if guardian_id == current_user.id
-            relationship = GuardianRelationship.find_by(
-              guardian_id: current_user.id,
-              dependent_id: @application.user_id
-            )
-
-            if relationship.present?
-              log_debug "Setting managing_guardian_id to #{current_user.id} for application #{@application.id}"
-              @application.managing_guardian_id = current_user.id
-              @is_guardian_managed_update = true
-            else
-              log_error "No guardian relationship found between user #{current_user.id} and dependent #{@application.user_id}"
-              @application.errors.add(:managing_guardian_id, 'Invalid guardian relationship')
-              raise ActiveRecord::Rollback
-            end
-          end
+      
+      @form = ApplicationForm.new(
+        current_user: current_user,
+        application: @application,
+        params: params
+      )
+      
+      return render_update_form_errors unless @form.valid?
+      
+      result = Applications::ApplicationCreator.call(@form)
+      
+      if result.success?
+        notice = determine_update_notice(original_status)
+        redirect_to constituent_portal_application_path(result.application), notice: notice
+      else
+        # Handle service layer errors
+        @application = result.application
+        result.error_messages.each do |message|
+          @application.errors.add(:base, message)
         end
-
-        # Determine the user whose attributes (like disabilities) should be updated.
-        # This is always the actual applicant associated with the application.
-        applicant_user_to_update = @application.user
-
-        # Update disability attributes on the applicant_user_to_update
-        # The user_attrs now only contain disability flags.
-        begin
-          applicant_user_to_update.type ||= 'Users::Constituent' if applicant_user_to_update.type.blank?
-          applicant_user_to_update.update!(user_attrs) # user_attrs contains disability flags
-        rescue ActiveRecord::RecordInvalid => e
-          log_error("Applicant user (ID: #{applicant_user_to_update.id}) attribute update failed during application update: #{e.message}",
-                    e)
-          @application.errors.merge!(applicant_user_to_update.errors)
-          raise ActiveRecord::Rollback # Rollback transaction
-        end
-
-        # Validate disability ONLY if submitting from draft, now checking the applicant_user_to_update
-        if is_submission && original_status == 'draft' && !applicant_user_to_update.disability_selected? # Check on the actual applicant
-          log_error("Applicant user (ID: #{applicant_user_to_update.id}) does not have any disability selected during update submission.")
-          @application.errors.add(:base, 'At least one disability must be selected for the applicant before submitting.')
-          raise ActiveRecord::Rollback # Rollback transaction
-        end
-
-        # Assign application attributes (excluding user/disability which are handled above)
-        @application.assign_attributes(application_attrs)
-        set_medical_provider_details(@application)
-
-        # Save application with potential status change (raises error on failure)
-        save_application_with_status_update!(is_submission) # Use bang method
-
-        # Log debug information about the state after save
-        log_debug "Application was saved successfully. User ID: #{@application.user_id}, Managing Guardian ID: #{@application.managing_guardian_id}"
-
-        true # Transaction successful
-      rescue ActiveRecord::RecordInvalid => e # Catch validation errors
-        log_error("Application update failed validation: #{e.message}", e)
-        # Merge errors onto the @application instance AFTER transaction
-        @application.errors.merge!(current_user.errors) if current_user.errors.any? && @application.errors.empty?
-        false # Transaction failed
-      rescue StandardError => e # Catch other potential errors
-        handle_transaction_failure(e, 'application update')
-        false # Transaction failed
+        
+        prepare_medical_provider_for_edit
+        render :edit, status: :unprocessable_entity
       end
-
-      # Handle the result of the update
-      handle_application_update_result(success, original_status)
     end
 
     # Prepare application attributes with proper formatting

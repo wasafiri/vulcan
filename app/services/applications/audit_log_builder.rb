@@ -93,10 +93,10 @@ module Applications
     def load_application_events
       # For events, use a plpgsql-optimized JSONB query with minimal includes
       Event
-        .select('id, user_id, action, created_at, metadata')
+        .select('id, user_id, action, created_at, metadata, auditable_type, auditable_id')
         .includes(:user) # Include just the user without role_capabilities
         .where(
-          "action IN (?) AND (metadata->>'application_id' = ? OR metadata @> ?)",
+          "action IN (?) AND (metadata->>'application_id' = ? OR metadata @> ? OR (auditable_type = 'Application' AND auditable_id = ?))",
           %w[
             voucher_assigned voucher_redeemed voucher_expired voucher_cancelled
             application_created evaluator_assigned trainer_assigned application_auto_approved
@@ -104,7 +104,8 @@ module Applications
             alternate_contact_updated # Added to include alternate contact change events
           ],
           application.id.to_s,
-          { application_id: application.id }.to_json
+          { application_id: application.id }.to_json,
+          application.id
         )
         .order(created_at: :desc)
         .to_a

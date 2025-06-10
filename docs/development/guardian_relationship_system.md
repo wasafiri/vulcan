@@ -108,22 +108,22 @@ scope :related_to_guardian, ->(guardian_user) { managed_by OR for_dependents_of 
 
 ### Paper Applications
 - Admin can create guardian/dependent relationships during paper application process
-- Uses `Applications::PaperApplicationService` with proper thread-local context
+- Uses `Applications::PaperApplicationService` with proper Current attributes context
 - Handles both existing and new guardian scenarios
 
-## Thread-Local Context
+## Current Attributes Context
 
-Uses `Thread.current[:paper_application_context]` to bypass certain validations during admin paper application processing:
+Uses `Current.paper_context` to bypass certain validations during admin paper application processing:
 - `ProofConsistencyValidation#skip_proof_validation?` 
 - `ProofManageable#require_proof_validations?`
 
 Always wrap paper application logic:
 ```ruby
-Thread.current[:paper_application_context] = true
+Current.paper_context = true
 begin
   # Paper application logic
 ensure
-  Thread.current[:paper_application_context] = nil
+  Current.reset
 end
 ```
 
@@ -149,7 +149,7 @@ create(:application, :for_dependent)  # Creates application with managing_guardi
 ### Common Test Patterns
 - Always create GuardianRelationship before dependent applications
 - Use proper factory traits to avoid manual relationship setup
-- Set thread-local context for paper application tests
+- Set Current attributes context for paper application tests
 - Verify both `user_id` (applicant) and `managing_guardian_id` are correct
 
 ## Migration Notes

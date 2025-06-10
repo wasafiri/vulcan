@@ -32,6 +32,55 @@ end
 
 ## Core Services
 
+### Applications::EventDeduplicationService
+
+**NEW - Consolidated December 2025**
+
+Provides centralized, robust event deduplication across the entire application. This service replaced multiple competing deduplication systems that previously caused conflicts.
+
+```ruby
+service = Applications::EventDeduplicationService.new
+deduplicated_events = service.deduplicate([notification, event, status_change])
+```
+
+**Key Features**:
+- **Single Source of Truth**: Eliminates conflicts between multiple deduplication systems
+- **Flexible Fingerprinting**: Handles Notification, Event, and ApplicationStatusChange objects
+- **Time-Window Grouping**: 1-minute deduplication windows using proper bucketing
+- **Priority-Based Selection**: ApplicationStatusChange > Event > Notification
+- **Medical Certification Aware**: Special handling for medical certification events
+
+**Fingerprinting Algorithm**:
+```ruby
+def event_fingerprint(event)
+  action = generic_action(event)
+  details = case event
+            when ApplicationStatusChange
+              if medical_certification_event?(event)
+                nil # Group medical cert events together
+              else
+                "#{event.from_status}-#{event.to_status}"
+              end
+            when ->(e) { e.action&.include?('proof_submitted') }
+              "#{event.metadata['proof_type']}-#{event.metadata['submission_method']}"
+            else
+              nil
+            end
+  [action, details].compact.join('_')
+end
+```
+
+**Time Bucketing**:
+```ruby
+# Groups events into 1-minute windows
+time_bucket = (event.created_at.to_i / DEDUPLICATION_WINDOW) * DEDUPLICATION_WINDOW
+```
+
+**Priority Selection**:
+- ApplicationStatusChange: Priority 3 (highest)
+- Event: Priority 2 (medium)  
+- Notification: Priority 1 (lowest)
+
 ### Applications::MedicalCertificationService
 
 Handles medical certification requests safely, avoiding validation conflicts:
@@ -58,7 +107,7 @@ end
 
 ### Applications::PaperApplicationService
 
-Handles paper application submissions by administrators with proper thread-local context:
+Handles paper application submissions by administrators with proper Current attributes context:
 
 ```ruby
 service = Applications::PaperApplicationService.new(
@@ -74,7 +123,7 @@ end
 ```
 
 **Key Features**:
-- Sets `Thread.current[:paper_application_context]` to bypass online validations
+- Sets `Current.paper_context` to bypass online validations
 - Handles both self-applicant and guardian/dependent scenarios
 - Processes proof uploads and rejections
 - Creates proper audit trails and notifications
@@ -131,25 +180,41 @@ end
 
 ## Service Patterns
 
-### Thread-Local Context Management
+### Current Attributes Context Management
 
-Services that need to bypass validations use thread-local context:
+**UPDATED - December 2025**: Migrated from Thread-local variables to Rails CurrentAttributes
+
+Services that need to bypass validations use Current attributes for better isolation and testability:
 
 ```ruby
 def process_paper_application
-  Thread.current[:paper_application_context] = true
+  Current.paper_context = true
   begin
     # Service logic that bypasses online validations
     process_application
   ensure
-    Thread.current[:paper_application_context] = nil
+    Current.reset
   end
 end
 ```
 
+**Current Attributes Available**:
+- `Current.paper_context` - Bypasses proof validations for paper applications
+- `Current.skip_proof_validation` - General proof validation bypass
+- `Current.resubmitting_proof` - Indicates proof resubmission context
+- `Current.reviewing_single_proof` - Single proof review mode
+- `Current.force_notifications` - Forces notification delivery in tests
+
 **Used by**:
 - `ProofConsistencyValidation#skip_proof_validation?`
+- `ProofManageable#verify_proof_attachments`
 - `ProofManageable#require_proof_validations?`
+
+**Benefits over Thread-local**:
+- Automatic cleanup between requests
+- Better test isolation
+- Rails-native approach
+- Consistent state management
 
 ### Error Handling Pattern
 

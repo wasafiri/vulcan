@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require 'ostruct'
-
 # Service to orchestrate the proof review process for an application.
 # It handles parameter validation, calls the core ProofReviewer service,
 # logs errors, and returns a structured result.
@@ -22,7 +20,7 @@ class ProofReviewService < BaseService
   end
 
   # Executes the proof review process.
-  # @return [OpenStruct] An object with `success?` (boolean) and `message` (string).
+  # @return [BaseService::Result] Result object with success?, message, and data
   def call
     validation_result = validate_params
     return validation_result unless validation_result.success?
@@ -33,7 +31,7 @@ class ProofReviewService < BaseService
   private
 
   # Validates the necessary parameters for the proof review.
-  # @return [OpenStruct] Success or failure result.
+  # @return [BaseService::Result] Success or failure result.
   def validate_params
     return failure('Proof type and status are required') if proof_type.blank? || status.blank?
 
@@ -46,7 +44,7 @@ class ProofReviewService < BaseService
 
   # Executes the core proof review logic by calling the ProofReviewer service.
   # Handles potential errors and returns a structured result.
-  # @return [OpenStruct] Success or failure result.
+  # @return [BaseService::Result] Success or failure result.
   def execute_review
     Rails.logger.info "ProofReviewService: Starting review for Application ##{application.id}, Proof: #{proof_type}, Status: #{status}"
     begin
@@ -73,17 +71,5 @@ class ProofReviewService < BaseService
     # Consider sending to an error tracking service like Honeybadger here
   end
 
-  # Helper to create a success result object.
-  # @param message [String] The success message.
-  # @return [OpenStruct] Success result.
-  def success(message)
-    OpenStruct.new(success?: true, message: message)
-  end
 
-  # Helper to create a failure result object.
-  # @param message [String] The failure message.
-  # @return [OpenStruct] Failure result.
-  def failure(message)
-    OpenStruct.new(success?: false, message: message)
-  end
 end

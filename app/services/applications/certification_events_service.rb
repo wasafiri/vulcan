@@ -45,7 +45,7 @@ module Applications
            event.metadata.to_s.include?('certification requested'))
       end
 
-      # Process these events for display
+      # Process these events for display (admin views expect hash objects)
       process_request_events_for_display(request_events)
     end
 

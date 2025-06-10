@@ -20,7 +20,7 @@ module ConstituentPortal
 
       # Get submission activities and deduplicate
       submission_events = application.events.where("action LIKE '%_proof_submitted'").to_a
-      deduplicated_submissions = deduplicate_submissions(submission_events)
+      deduplicated_submissions = Applications::EventDeduplicationService.new.deduplicate(submission_events)
 
       # Process each deduplicated submission audit
       deduplicated_submissions.each do |event|
@@ -30,29 +30,6 @@ module ConstituentPortal
 
       # Sort by creation time (oldest first) and return
       activities.sort_by(&:created_at)
-    end
-
-    # Deduplicate submission audits by grouping closely timed submissions
-    # that have the same proof type and submission method
-    def self.deduplicate_submissions(submissions)
-      return [] if submissions.blank?
-
-      # Group submissions by a fingerprint to identify duplicates
-      grouped_submissions = submissions.group_by do |submission|
-        # Create a fingerprint using proof type, submission method,
-        # and the timestamp rounded to the minute
-        rounded_time = submission.created_at.beginning_of_minute
-        [
-          submission.metadata['proof_type'],
-          submission.metadata['submission_method'],
-          rounded_time
-        ]
-      end
-
-      # For each group of matching submissions, take only the latest one
-      grouped_submissions.map do |_, group|
-        group.max_by(&:created_at)
-      end
     end
 
     # Create an activity from a proof submission event

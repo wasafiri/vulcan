@@ -1,102 +1,111 @@
 # frozen_string_literal: true
 
 module Applications
+  # Consolidates event deduplication logic from multiple sources into a single, reliable service through
+  # a flexible fingerprinting approach to identify and merge duplicate events based on their type, content, and timing.
   class EventDeduplicationService < BaseService
-    # Time threshold in seconds for considering events as potential duplicates
-    # Events within this window will be considered for deduplication
-    TIMESTAMP_THRESHOLD = 30
+    # Time window for grouping events. Events within this window with the same fingerprint are considered duplicates.
+    DEDUPLICATION_WINDOW = 1.minute
 
-    # Deduplicate a collection of events from different sources
-    # @param events [Array] Collection of events (Notification, ApplicationStatusChange, Event)
-    # @return [Array] Deduplicated list of events
+    # Deduplicates a collection of events from various sources.
+    # @param events [Array<Notification, ApplicationStatusChange, Event>] The events to deduplicate.
+    # @return [Array] A sorted, unique list of events.
     def deduplicate(events)
       return [] if events.blank?
 
-      events_by_key = {}
-
-      events.each do |event|
-        timestamp = extract_timestamp(event)
-        timestamp_key = timestamp.strftime('%Y-%m-%d %H:%M:%S') # Include seconds for granularity
-        event_type = extract_event_type(event)
-        provider_name = extract_provider_name(event)
-        uniq_key = "#{timestamp_key}||#{event_type}||#{provider_name}"
-
-        next if event_type.blank?
-
-        events_by_key[uniq_key] = event if should_replace_existing_event?(events_by_key, uniq_key, event)
+      # Group events by a generated fingerprint and a time bucket.
+      grouped_events = events.group_by do |event|
+        [
+          event_fingerprint(event),
+          (event.created_at.to_i / DEDUPLICATION_WINDOW) * DEDUPLICATION_WINDOW
+        ]
       end
 
-      events_by_key.values.sort_by(&:created_at).reverse
+      # From each group of duplicates, select the most representative event.
+      grouped_events.values.map do |group|
+        select_best_event(group)
+      end.sort_by(&:created_at).reverse
     end
 
     private
 
-    def extract_timestamp(event)
-      if event.respond_to?(:metadata) && event.metadata.is_a?(Hash) && event.metadata['timestamp'].present?
-        begin
-          Time.parse(event.metadata['timestamp'])
-        rescue StandardError
-          event.created_at
-        end
-      else
-        event.created_at
+    # Generates a consistent, descriptive fingerprint for an event to identify duplicates.
+    # The fingerprint includes the event's primary action and relevant metadata.
+    #
+    # @param event [Object] The event to fingerprint.
+    # @return [String] A unique fingerprint string.
+    def event_fingerprint(event)
+      action = generic_action(event)
+      details = fingerprint_details(event)
+      [action, details].compact.join('_').presence || "default_fingerprint_#{event.class.name.underscore}_#{event.id || event.created_at.to_i}"
+    end
+
+    def fingerprint_details(event)
+      case event
+      when ApplicationStatusChange
+        fingerprint_for_status_change(event)
+      when ->(e) { e.action&.include?('proof_submitted') }
+        fingerprint_for_proof_submission(event)
       end
     end
 
-    def extract_event_type(event)
+    def fingerprint_for_status_change(event)
+      if event.metadata&.[](:change_type) == 'medical_certification' ||
+         event.metadata&.[]('change_type') == 'medical_certification'
+        nil
+      else
+        "#{event.from_status}-#{event.to_status}"
+      end
+    end
+
+    def fingerprint_for_proof_submission(event)
+      "#{event.metadata['proof_type']}-#{event.metadata['submission_method']}"
+    end
+
+    # Normalizes the action name across different event types.
+    #
+    # @param event [Object] The event record.
+    # @return [String] The normalized action name.
+    def generic_action(event)
       case event
       when Notification, Event
-        event.action
+        event.action.to_s.gsub(/_proof_submitted$/, '_submission')
       when ApplicationStatusChange
-        if event.metadata&.[](:change_type) == 'medical_certification' # Use safe navigation &.
-          "status_change_medical_certification_#{event.to_status}" # Make type unique
+        if event.metadata&.[](:change_type) == 'medical_certification' || 
+           event.metadata&.[]('change_type') == 'medical_certification'
+          "medical_certification_#{event.to_status}"
         else
-          event.to_status
+          "status_change_#{event.to_status}"
         end
       else
-        "#{event.class.name.underscore}_#{event.id}"
+        event.class.name.underscore
       end
     end
 
-    def extract_provider_name(event)
-      return unless event.respond_to?(:metadata) && event.metadata.is_a?(Hash)
-
-      event.metadata['provider_name'] || event.metadata['doctor_name']
+    # Selects the best event from a group of duplicates based on a priority system. The priority is:
+    # ApplicationStatusChange > Event > Notification. If types are the same, the most recent event is chosen.
+    #
+    # @param group [Array] A group of duplicate events. @return [Object] The highest-priority event from the group.
+    def select_best_event(group)
+      group.max_by do |event|
+        [priority_score(event), event.created_at]
+      end
     end
 
-    def extract_actor_name(event)
-      if event.is_a?(Notification)
-        event.actor&.full_name || 'System'
-      elsif event.is_a?(ApplicationStatusChange) || event.is_a?(Event)
-        event.user&.full_name || 'System'
+    # Assigns a priority score to an event type to help select the best representation of a duplicate event. Higher scores are preferred.
+    #
+    # @param event [Object] The event to score. @return [Integer] The priority score.
+    def priority_score(event)
+      case event
+      when ApplicationStatusChange
+        3
+      when Event
+        2
+      when Notification
+        1
       else
-        'System'
+        0
       end
-    end
-
-    def should_replace_existing_event?(events_by_key, key, event)
-      return true unless events_by_key.key?(key)
-
-      existing = events_by_key[key]
-
-      # Simplified fallback logic: Prefer event with any metadata, then prefer newer event if > 30s apart
-      metadata_priority?(event, existing) ||
-        newer_event_priority?(event, existing)
-    end
-
-    def metadata_priority?(event, existing)
-      return false unless event.respond_to?(:metadata) && existing.respond_to?(:metadata)
-
-      event.metadata.present? && !existing.metadata.present?
-    end
-
-    def event_type_priority?(event, existing)
-      (event.is_a?(ApplicationStatusChange) && !existing.is_a?(ApplicationStatusChange)) ||
-        (event.is_a?(Event) && existing.is_a?(Notification))
-    end
-
-    def newer_event_priority?(event, existing)
-      (event.created_at - existing.created_at) > TIMESTAMP_THRESHOLD
     end
   end
 end

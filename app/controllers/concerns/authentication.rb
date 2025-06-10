@@ -25,6 +25,11 @@ module Authentication
 
     # Return the already loaded user from the session if possible
     @current_user = @current_session&.user
+    
+    # Set Current.user for the request context - needed for verify_authentication_state
+    Current.user = @current_user if @current_user.present?
+    
+    @current_user
   end
 
   # Load and cache the current session
@@ -56,6 +61,16 @@ module Authentication
   end
 
   def find_test_session
+    # Check for test user header FIRST
+    test_user_id = request.headers['X-Test-User-Id'] || request.headers['HTTP_X_TEST_USER_ID']
+    if test_user_id.present?
+      test_user = User.find_by(id: test_user_id)
+      if test_user
+        puts "TEST AUTH: Using X-Test-User-Id header: #{test_user.email}" if ENV['DEBUG_AUTH'] == 'true'
+        return Session.new(user: test_user)
+      end
+    end
+
     session_record = nil
 
     # Try signed cookies first
@@ -70,17 +85,6 @@ module Authentication
       session_record = Session.includes(:user)
                               .find_by(session_token: cookies[:session_token])
       return session_record if session_record
-    end
-
-    # Use direct test user override as last resort
-    if ENV['TEST_USER_ID'].present?
-      test_user = User.find_by(id: ENV['TEST_USER_ID'])
-      if test_user
-        puts "TEST AUTH: Using test user override: #{test_user.email}" if ENV['DEBUG_AUTH'] == 'true'
-        # Create a temporary session object to hold the user
-        session_record = Session.new(user: test_user)
-        return session_record
-      end
     end
 
     # Debug logging for authentication issues

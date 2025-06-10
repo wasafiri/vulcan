@@ -2,6 +2,35 @@
 
 This document provides a comprehensive overview of the major features currently implemented in the MAT Vulcan application.
 
+## 🎯 Recent Major Updates (December 2025)
+
+### Application Test Suite Consolidation & EventDeduplicationService
+
+**Status: ✅ Complete - 100% Test Success Rate**
+
+A comprehensive consolidation of Application-related tests and architectural improvement to event deduplication services:
+
+- **76 application tests now passing** (319 assertions, 0 failures)
+- **EventDeduplicationService consolidation** - Replaced 3 competing deduplication systems with a single, robust service
+- **Thread-local to Current attributes migration** - Better test isolation and Rails-native patterns
+- **Comprehensive test patterns** - Established patterns for unique test data and Current attributes usage
+
+**Key Benefits:**
+- **Reliability**: Single source of truth for event deduplication eliminates conflicts
+- **Maintainability**: Centralized service with clear fingerprinting and priority logic
+- **Testing**: Robust patterns for paper application context and data isolation
+- **Performance**: Efficient time-window grouping and priority-based selection
+
+**Technical Highlights:**
+- Proper time bucketing using integer division instead of `Time#floor`
+- Medical certification event grouping with priority handling
+- Flexible fingerprinting across Notification, Event, and ApplicationStatusChange objects
+- Consistent Current attributes usage: `Current.paper_context`, `Current.skip_proof_validation`
+
+See: [`development/service_architecture.md`](development/service_architecture.md) and [`development/testing_and_debugging_guide.md`](development/testing_and_debugging_guide.md) for technical details.
+
+---
+
 ## Table of Contents
 1. [Medical Certification System](#medical-certification-system)
 2. [Proof Attachment System](#proof-attachment-system)

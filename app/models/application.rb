@@ -324,6 +324,7 @@ class Application < ApplicationRecord
         actor: acting_user,
         auditable: self,
         metadata: {
+          application_id: id,
           old_status: status_before_last_save,
           new_status: status,
           submission_method: submission_method

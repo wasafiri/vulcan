@@ -101,9 +101,9 @@ class Evaluation < ApplicationRecord
   end
 
   def scheduled_time_must_be_future
-    return unless evaluation_datetime.present? && evaluation_datetime <= Time.current
+    return unless evaluation_date.present? && evaluation_date <= Time.current
 
-    errors.add(:evaluation_datetime, 'must be in the future')
+    errors.add(:evaluation_date, 'must be in the future')
   end
 
   def cannot_complete_without_notes
@@ -121,17 +121,17 @@ class Evaluation < ApplicationRecord
   end
 
   def should_deliver_notifications?
-    status_changed? || saved_change_to_evaluation_datetime?
+    status_changed? || saved_change_to_evaluation_date?
   end
 
   def ensure_status_schedule_consistency
     # If setting a schedule date but still in requested status, update status
-    self.status = :scheduled if evaluation_datetime_changed? && evaluation_datetime.present? && status_requested?
+    self.status = :scheduled if evaluation_date_changed? && evaluation_date.present? && status_requested?
 
     # If removing a schedule date but still in scheduled/confirmed status, prevent it
-    return unless evaluation_datetime_changed? && evaluation_datetime.blank? && (status_scheduled? || status_confirmed?)
+    return unless evaluation_date_changed? && evaluation_date.blank? && (status_scheduled? || status_confirmed?)
 
-    errors.add(:evaluation_datetime, "cannot be removed while status is #{status}")
+    errors.add(:evaluation_date, "cannot be removed while status is #{status}")
     throw(:abort)
   end
 end

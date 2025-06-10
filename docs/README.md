@@ -2,10 +2,19 @@
 
 This folder contains all documentation for the MAT Vulcan application, organized by purpose and audience.
 
+## 🎯 Recent Updates (December 2025)
+
+**✅ Application Test Suite Consolidation Complete**
+- **76 application tests now passing** (100% success rate)
+- **EventDeduplicationService architectural consolidation** 
+- **Thread-local to Current attributes migration**
+- See: `development/application_tests_consolidation.md`
+
 ## Quick Start
 
 - **[CURRENT_FEATURES.md](CURRENT_FEATURES.md)** - High-level overview of major implemented features
-- **[development/testing_guide.md](development/testing_guide.md)** - Essential testing guide for developers
+- **[development/testing_and_debugging_guide.md](development/testing_and_debugging_guide.md)** - Essential testing guide for developers
+- **[development/application_tests_consolidation.md](development/application_tests_consolidation.md)** - Recent test consolidation work
 
 ## Folder Structure
 
@@ -13,8 +22,9 @@ This folder contains all documentation for the MAT Vulcan application, organized
 Development guides, testing documentation, and technical implementation details for developers working on the codebase.
 
 **Key Files:**
-- `testing_and_debugging_guide.md` - Comprehensive testing guide with debugging strategies and authentication patterns
-- `service_architecture.md` - Service objects pattern documentation and architecture
+
+- `testing_and_debugging_guide.md` - Comprehensive testing guide with new Current attributes patterns
+- `service_architecture.md` - **UPDATED**: Service objects including new EventDeduplicationService
 - `guardian_relationship_system.md` - Guardian/dependent relationship system implementation
 - `javascript_architecture.md` - JavaScript controller architecture and utility patterns
 - `paper_application_architecture.md` - Paper application form architecture and service patterns

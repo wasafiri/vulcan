@@ -11,8 +11,9 @@ class AuditEventService < BaseService
   # @param actor [User] The user performing the action.
   # @param auditable [ApplicationRecord] The primary record being acted upon.
   # @param metadata [Hash] Additional context for the event.
+  # @param created_at [Time] (Optional) The timestamp for the event, for testing purposes.
   # @return [Event, nil] The created Event record or nil if deduplicated.
-  def self.log(action:, actor:, auditable:, metadata: {})
+  def self.log(action:, actor:, auditable:, metadata: {}, created_at: nil)
     # This code-level deduplication can still have race conditions under high concurrency.
     # A more robust solution would be a partial unique index in the database on
     # (action, auditable_type, auditable_id) for recent events.
@@ -27,12 +28,17 @@ class AuditEventService < BaseService
       __service_generated: true
     )
 
-    Event.create!(
+    event_attributes = {
       user: actor,
       action: action.to_s,
       auditable: auditable,
       metadata: final_metadata
-    )
+    }
+
+    # Only set created_at if it's provided, primarily for testing
+    event_attributes[:created_at] = created_at if created_at.present?
+
+    Event.create!(event_attributes)
   rescue ActiveRecord::RecordInvalid => e
     Rails.logger.error "AuditEventService: Failed to log event: #{e.message}"
     raise # Re-raise the exception to make it visible in tests

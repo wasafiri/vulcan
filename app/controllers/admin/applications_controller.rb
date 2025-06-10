@@ -273,10 +273,10 @@ module Admin
         notes: params[:notes]
       )
 
-      if result[:success]
+      if result.success?
         redirect_with_notice('Medical certification rejected and provider notified.')
       else
-        redirect_with_alert("Failed to reject certification: #{result[:error]}")
+        redirect_with_alert("Failed to reject certification: #{result.message}")
       end
     end
 

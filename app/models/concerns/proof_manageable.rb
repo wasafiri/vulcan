@@ -5,6 +5,7 @@ module ProofManageable
 
   ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/tiff', 'image/bmp'].freeze
   MAX_FILE_SIZE = 5.megabytes
+  PROOF_TYPES = %w[income residency].freeze
 
   included do
     has_one_attached :income_proof
@@ -31,7 +32,6 @@ module ProofManageable
       return true
     end
 
-    # For testing and older Rails versions
     return false if new_record?
 
     # Check if we recently attached these proofs
@@ -41,7 +41,6 @@ module ProofManageable
       return true
     end
 
-    # Final fallback - use direct SQL detection
     false # Disable for tests if other methods aren't available
   end
 
@@ -131,39 +130,11 @@ module ProofManageable
   def purge_proofs(admin_user)
     raise ArgumentError, 'Admin user required' unless admin_user&.admin?
 
-    begin
-      Thread.current[:skip_proof_validation] = true
-      transaction do
-        income_proof.purge if income_proof.attached?
-        residency_proof.purge if residency_proof.attached?
-
-        update!(
-          income_proof_status: :not_reviewed,
-          residency_proof_status: :not_reviewed,
-          last_proof_submitted_at: nil,
-          needs_review_since: nil
-        )
-
-        proof_reviews.create!(
-          admin: admin_user,
-          proof_type: 'system',
-          status: 'purged',
-          reviewed_at: Time.current,
-          submission_method: 'system'
-        )
-
-        create_system_notification!(
-          recipient: user,
-          actor: admin_user,
-          action: 'proofs_purged'
-        )
-      end
-    rescue StandardError => e
-      Rails.logger.error "Failed to purge proofs for application #{id}: #{e.message}"
-      false
-    ensure
-      Thread.current[:skip_proof_validation] = false
-    end
+    run_purge_operation(admin_user)
+    true
+  rescue StandardError => e
+    log_purge_error(e)
+    false
   end
 
   # Method called explicitly by ProofReviewer to purge a proof after status is set to rejected
@@ -183,26 +154,88 @@ module ProofManageable
   # Uses saved_change_to_attribute? which checks the most recent save operation.
   # NOTE: This callback might still be useful for other save operations, but not for ProofReviewer updates.
   def purge_proof_if_rejected
-    # Purge income proof if it was just saved as rejected
-    if saved_change_to_income_proof_status? && income_proof_status_rejected? && income_proof.attached?
-      Rails.logger.info "[ProofManageable][purge] Purging income proof for App ##{id} due to status saved as rejected."
-      income_proof.purge_later
-    else
-      Rails.logger.info "[ProofManageable][purge] Skipping income proof purge for App ##{id}. Saved change? #{saved_change_to_income_proof_status?}, Rejected? #{income_proof_status_rejected?}, Attached? #{income_proof.attached?}"
-    end
-
-    # Purge residency proof if it was just saved as rejected
-    if saved_change_to_residency_proof_status? && residency_proof_status_rejected? && residency_proof.attached?
-      Rails.logger.info "[ProofManageable][purge] Purging residency proof for App ##{id} due to status saved as rejected."
-      residency_proof.purge_later
-    else
-      Rails.logger.info "[ProofManageable][purge] Skipping residency proof purge for App ##{id}. Saved change? #{saved_change_to_residency_proof_status?}, Rejected? #{residency_proof_status_rejected?}, Attached? #{residency_proof.attached?}"
+    PROOF_TYPES.each do |proof_type|
+      purge_specific_proof_if_rejected(proof_type)
     end
   end
 
   private
 
-  # --- Refactored Audit Logic ---
+  # --- Purge Proofs Logic ---
+
+  def run_purge_operation(admin_user)
+    with_validation_skipped do
+      transaction do
+        purge_attached_proofs
+        reset_proof_attributes
+        record_purge_in_review_history(admin_user)
+        notify_user_of_purge(admin_user)
+      end
+    end
+  end
+
+  def with_validation_skipped
+    Current.skip_proof_validation = true
+    yield
+  ensure
+    Current.skip_proof_validation = false
+  end
+
+  def purge_attached_proofs
+    income_proof.purge if income_proof.attached?
+    residency_proof.purge if residency_proof.attached?
+  end
+
+  def reset_proof_attributes
+    update!(
+      income_proof_status: :not_reviewed,
+      residency_proof_status: :not_reviewed,
+      last_proof_submitted_at: nil,
+      needs_review_since: nil
+    )
+  end
+
+  def record_purge_in_review_history(admin_user)
+    proof_reviews.create!(
+      admin: admin_user,
+      proof_type: 'income', # System-wide action logged against one type
+      status: 'rejected', # Represents a system rejection/purge
+      rejection_reason: 'Proofs purged by admin',
+      reviewed_at: Time.current,
+      submission_method: 'paper' # Default for system actions
+    )
+  end
+
+  def notify_user_of_purge(admin_user)
+    create_system_notification!(
+      recipient: user,
+      actor: admin_user,
+      action: 'proofs_purged'
+    )
+  end
+
+  def log_purge_error(error)
+    Rails.logger.error "Failed to purge proofs for application #{id}: #{error.message}"
+  end
+
+  def purge_specific_proof_if_rejected(proof_type)
+    status_changed_method = "saved_change_to_#{proof_type}_proof_status?"
+    status_rejected_method = "#{proof_type}_proof_status_rejected?"
+    attachment_method = "#{proof_type}_proof"
+
+    return unless send(status_changed_method) && send(status_rejected_method)
+
+    attachment = send(attachment_method)
+    if attachment.attached?
+      Rails.logger.info "[ProofManageable][purge] Purging #{proof_type} proof for App ##{id} due to status saved as rejected."
+      attachment.purge_later
+    else
+      Rails.logger.info "[ProofManageable][purge] Skipping #{proof_type} proof purge for App ##{id}. Saved change? #{send(status_changed_method)}, Rejected? #{send(status_rejected_method)}, Attached? #{attachment.attached?}"
+    end
+    
+  end
+
+  # --- Audit Logic ---
 
   def audit_specific_proof_change(proof_type)
     return unless specific_proof_changed?(proof_type)
@@ -244,23 +277,20 @@ module ProofManageable
     )
   end
 
-  # --- Original Private Methods ---
-
   def correct_proof_mime_type
-    # Check residency proof
-    if residency_proof.attached? && ALLOWED_TYPES.exclude?(residency_proof.content_type)
-      errors.add(:residency_proof, 'must be a PDF or an image file (jpg, jpeg, png, tiff, bmp)')
+    PROOF_TYPES.each do |proof_type|
+      attachment = send("#{proof_type}_proof")
+      if attachment.attached? && ALLOWED_TYPES.exclude?(attachment.content_type)
+        errors.add(:"#{proof_type}_proof", 'must be a PDF or an image file (jpg, jpeg, png, tiff, bmp)')
+      end
     end
-
-    # Check income proof independently
-    return unless income_proof.attached? && ALLOWED_TYPES.exclude?(income_proof.content_type)
-
-    errors.add(:income_proof, 'must be a PDF or an image file (jpg, jpeg, png, tiff, bmp)')
   end
 
   def proof_size_within_limit
-    check_proof_size(:residency_proof, residency_proof)
-    check_proof_size(:income_proof, income_proof)
+    PROOF_TYPES.each do |proof_type|
+      attachment = send("#{proof_type}_proof")
+      check_proof_size(:"#{proof_type}_proof", attachment)
+    end
   end
 
   def check_proof_size(attribute, proof)
@@ -271,11 +301,9 @@ module ProofManageable
 
   # Verifies that proofs have the right attachment state based on status
   def verify_proof_attachments
-    # --- DEBUG LOGGING ---
     Rails.logger.debug do
       "[ProofManageable] Checking verify_proof_attachments. Paper context: #{Current.paper_context.inspect}"
     end
-    # --- END DEBUG ---
 
     # Skip for new records, explicit skips, OR during paper application processing
     if new_record? || Current.skip_proof_validation? || Current.paper_context?
@@ -476,7 +504,7 @@ module ProofManageable
     end
 
     # Skip for administrative actions like purging proofs
-    return false if Thread.current[:skip_proof_validation]
+    return false if Current.skip_proof_validation
 
     # Skip for paper applications processed by admins - CHECK THIS FIRST
     return false if Current.paper_context?

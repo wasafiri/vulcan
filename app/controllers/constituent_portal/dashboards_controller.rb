@@ -3,7 +3,7 @@
 module ConstituentPortal
   class DashboardsController < ApplicationController
     before_action :authenticate_user!
-    before_action :require_constitu
+    before_action :require_constituent!
     # Make these methods available as helper methods in views
     helper_method :get_latest_rejection_reason, :get_latest_rejection_date, :can_resubmit_proof?
 
