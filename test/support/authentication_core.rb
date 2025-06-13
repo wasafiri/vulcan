@@ -83,7 +83,7 @@ module AuthenticationCore
     Current.reset if defined?(Current)
 
     # Use Thread-local variable for test user ID - standardize on this approach
-    Thread.current[:test_user_id] = nil
+    Current.test_user_id = nil
 
     # For backward compatibility, also clear ENV variable
     ENV['TEST_USER_ID'] = nil if ENV['TEST_USER_ID'].present?
@@ -115,6 +115,6 @@ module AuthenticationCore
 
   # Stores the test user ID in a consistent way
   def store_test_user_id(user_id)
-    Thread.current[:test_user_id] = user_id
+    Current.test_user_id = user_id
   end
 end

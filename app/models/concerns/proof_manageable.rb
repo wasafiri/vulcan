@@ -48,6 +48,10 @@ module ProofManageable
     # Guard clause to prevent infinite recursion
     return if @creating_proof_audit
     return unless proof_attachments_changed?
+    
+    # Skip if ProofAttachmentService is handling the audit (paper context or service context)
+    # This prevents duplicate events when using the centralized service
+    return if Current.paper_context? || Current.proof_attachment_service_context?
 
     # Set flag to prevent reentry
     @creating_proof_audit = true

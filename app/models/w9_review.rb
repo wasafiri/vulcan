@@ -76,7 +76,7 @@ class W9Review < ApplicationRecord
   end
 
   def update_vendor_status(new_status)
-    vendor.update!(w9_status: new_status)
+    vendor.update_column(:w9_status, new_status)
   end
 
   def send_notification(action)

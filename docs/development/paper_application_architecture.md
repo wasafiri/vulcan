@@ -1,339 +1,238 @@
-# Paper Application Architecture
+# Paper Application Architecture (Rails)
 
-## Overview
+A concise reference for how the admin-only “paper” application path works and how to extend or test it safely.
 
-The paper application system allows administrators to create applications on behalf of constituents. It uses a service-based architecture with proper thread-local context to bypass online validation requirements.
+---
 
-## Core Components
+## 1 · High-Level Flow
 
-### Applications::PaperApplicationService
+```
+Admin → Admin::PaperApplicationsController → PaperApplicationService
+            ↘ proofs (accept/reject) ↙
+                     Audits / Notifications
+```
 
-The main service handling paper application creation and updates:
+* **Why a separate path?** Paper apps bypass online-only validations (proof uploads, attachment checks) while still preserving audit trails.
+
+---
+
+## 2 · Key Components
+
+### 2.1 · Applications::PaperApplicationService
 
 ```ruby
 service = Applications::PaperApplicationService.new(
   params: paper_application_params,
-  admin: current_user
+  admin:  current_user
 )
-
-if service.create
-  redirect_to admin_application_path(service.application)
-else
-  handle_errors(service.errors)
-end
+service.create  # returns true/false
 ```
 
-**Key Responsibilities**:
-- Process constituent creation/lookup (both guardian and dependent scenarios)
-- Create GuardianRelationship records for dependent applications
-- Handle proof uploads and rejections
-- Set proper thread-local context for validation bypassing
-- Create audit trails and notifications
+| Responsibility | Notes |
+|----------------|-------|
+| Constituent lookup / create | Handles self vs dependent applicants |
+| GuardianRelationship | Creates & links guardian ↔ dependent |
+| Proof processing | Upload, accept w/o file, reject |
+| Thread-local context | `Current.paper_context = true` |
+| Audits & notifications | Standardised event logging |
 
-### Admin::PaperApplicationsController
+---
 
-Handles the web interface for paper applications:
+### 2.2 · Admin::PaperApplicationsController
 
 ```ruby
 def create
-  service_params = paper_application_processing_params
-  service = Applications::PaperApplicationService.new(
-    params: service_params,
-    admin: current_user
-  )
+  service = Applications::PaperApplicationService
+              .new(params: processed_params, admin: current_user)
 
   if service.create
     redirect_to admin_application_path(service.application),
-                notice: generate_success_message(service.application)
+                notice: "Paper application created."
   else
-    handle_service_failure(service)
+    render :new, status: :unprocessable_entity
   end
 end
 ```
 
-**Features**:
-- Handles both self-applicant and guardian/dependent scenarios
-- Processes proof acceptance/rejection
-- Manages guardian search and creation
-- Provides FPL threshold validation
+Handles web UI, guardian search/creation, proof buttons, and FPL checks.
 
-## Thread-Local Context
+---
 
-### Purpose
-Paper applications need to bypass certain validations that apply to online submissions:
-- `ProofConsistencyValidation` - Requires proof attachments for approved/rejected status
-- `ProofManageable` - Validates proof attachments on save
+## 3 · Thread-Local Context
 
-### Implementation
 ```ruby
-def process_paper_application
-  Thread.current[:paper_application_context] = true
-  begin
-    # Paper application logic that bypasses online validations
-    create_application
-    process_proofs
-  ensure
-    Thread.current[:paper_application_context] = nil
-  end
+Current.paper_context = true
+begin
+  # create application, process proofs, etc.
+ensure
+  Current.reset
 end
 ```
 
-### Validation Checks
+* Skips **ProofConsistencyValidation** and **ProofManageable**.
+* Always reset in `ensure` or test teardown.
+
+---
+
+## 4 · Guardian / Dependent Logic
+
+| Flow | Key Points |
+|------|------------|
+| **Self-applicant** | `managing_guardian_id` is `nil`. |
+| **Dependent** | Guardian selected/created → `GuardianRelationship` made → app’s `managing_guardian_id` set. |
+
+Guardian creation snippet:
+
 ```ruby
-# In ProofConsistencyValidation
-def skip_proof_validation?
-  Thread.current[:paper_application_context].present?
-end
+guardian = params[:guardian_id] ?
+             User.find(params[:guardian_id]) :
+             create_new_user(guardian_attrs, is_managing_adult: true)
 
-# In ProofManageable  
-def require_proof_validations?
-  return false if Thread.current[:paper_application_context]
-  # ... other validation logic
-end
-```
-
-## Guardian/Dependent Handling
-
-### Self-Applicant Flow
-1. Admin fills out application form for adult constituent
-2. Service creates/finds User record
-3. Application created with `user_id` set to constituent
-4. `managing_guardian_id` remains nil
-
-### Dependent Application Flow
-1. Admin selects "dependent" applicant type
-2. Admin either selects existing guardian or creates new one
-3. Admin fills out dependent information
-4. Service creates GuardianRelationship linking guardian and dependent
-5. Application created with:
-   - `user_id` set to dependent (the actual applicant)
-   - `managing_guardian_id` set to guardian
-
-### Guardian Search and Creation
-```ruby
-# Existing guardian selection
-guardian_id = params[:guardian_id]
-@guardian_user_for_app = User.find(guardian_id)
-
-# New guardian creation
-guardian_attrs = params[:guardian_attributes]
-@guardian_user_for_app = create_new_user(guardian_attrs, is_managing_adult: true)
-
-# Create relationship
 GuardianRelationship.create!(
-  guardian_user: @guardian_user_for_app,
-  dependent_user: @constituent,
+  guardian_user:  guardian,
+  dependent_user: constituent,
   relationship_type: params[:relationship_type]
 )
 ```
 
-## Proof Processing
+---
 
-### Proof Acceptance
+## 5 · Proof Processing
+
 ```ruby
-def process_accept_proof(type)
-  if file_present?
-    # Upload file and set status to approved
-    result = ProofAttachmentService.attach_proof(
-      application: @application,
-      proof_type: type,
-      blob_or_file: file_or_signed_id,
-      status: :approved,
-      admin: @admin,
-      submission_method: :paper
-    )
-  else
-    # Paper context: Mark as approved without file
-    @application.update_column(
-      "#{type}_proof_status",
-      Application.public_send("#{type}_proof_statuses")['approved']
-    )
-  end
-end
+# Accept (paper context allows no file)
+@application.update_column(
+  "#{type}_proof_status",
+  Application.public_send("#{type}_proof_statuses")['approved']
+)
 ```
 
-### Proof Rejection
 ```ruby
-def process_reject_proof(type)
-  result = ProofAttachmentService.reject_proof_without_attachment(
-    application: @application,
-    proof_type: type,
-    admin: @admin,
-    reason: params["#{type}_proof_rejection_reason"],
-    notes: params["#{type}_proof_rejection_notes"],
-    submission_method: :paper
-  )
-end
+# Reject
+ProofAttachmentService.reject_proof_without_attachment(
+  application: @application,
+  proof_type:  type,
+  admin:       @admin,
+  reason:      params["#{type}_proof_rejection_reason"],
+  notes:       params["#{type}_proof_rejection_notes"],
+  submission_method: :paper
+)
 ```
 
-## Form Architecture
+---
 
-### JavaScript Controllers
-- **`paper_application_controller.js`** - Main form coordinator, income validation
-- **`applicant_type_controller.js`** - Handles adult vs dependent views
-- **`dependent_fields_controller.js`** - Manages dependent-specific fields
-- **`guardian_picker_controller.js`** - Coordinates guardian search/selection
-- **`document_proof_handler_controller.js`** - Manages proof acceptance/rejection
+## 6 · Form Front-End
 
-### Form Sections
-1. **Applicant Type Selection** - Self vs dependent radio buttons
-2. **Guardian Information** - Search existing or create new guardian
-3. **Applicant Information** - Constituent details and disabilities
-4. **Application Details** - Household size, income, medical provider
-5. **Proof Documents** - Accept/reject income and residency proofs
+| Stimulus Controller | Role |
+|---------------------|------|
+| `paper_application_controller` | Overall coordination / income check |
+| `applicant_type_controller`    | Adult vs dependent toggle |
+| `dependent_fields_controller`  | Dependent-only inputs |
+| `guardian_picker_controller`   | Search & select/create guardian |
+| `document_proof_handler_controller` | Accept / reject buttons |
 
-## Data Flow
+Form sections (in order):
 
-### Parameter Structure
+1. Applicant type  
+2. Guardian info (if dependent)  
+3. Applicant info  
+4. Application details (household size, income, provider)  
+5. Proof documents  
+
+---
+
+## 7 · Parameter Shape
+
 ```ruby
 {
-  applicant_type: 'dependent', # Auto-inferred when guardian_attributes present
-  relationship_type: 'Parent',
-  guardian_id: 123, # OR guardian_attributes for new guardian
-  guardian_attributes: {
-    first_name: 'Guardian',
-    last_name: 'Name',
-    email: 'guardian@example.com',
-    # ... other guardian fields
-  },
-  constituent: { # Unified parameter for applicant info
-    first_name: 'Child',
-    last_name: 'Doe',
-    date_of_birth: '2010-01-01',
-    dependent_email: 'child@example.com', # Optional - dependent's own email
-    dependent_phone: '555-1234', # Optional - dependent's own phone
-    # ... other constituent fields
-  },
-  email_strategy: 'dependent', # 'guardian' or 'dependent'
-  phone_strategy: 'guardian', # 'guardian' or 'dependent' 
-  address_strategy: 'guardian', # 'guardian' or 'dependent'
-  application: {
-    household_size: 3,
-    annual_income: 25000,
-    # ... other application fields
-  },
-  income_proof_action: 'accept',
-  income_proof: uploaded_file, # OR income_proof_signed_id
-  residency_proof_action: 'reject',
-  residency_proof_rejection_reason: 'insufficient_documentation'
+  applicant_type:   "dependent",
+  relationship_type:"Parent",
+  guardian_id:      123,           # or guardian_attributes
+  guardian_attributes: { ... },
+  constituent: { ... },            # applicant
+  email_strategy:  "dependent",    # or "guardian"
+  phone_strategy:  "guardian",
+  address_strategy:"guardian",
+  application: { household_size:3, annual_income:25_000 },
+  income_proof_action:    "accept",
+  residency_proof_action: "reject",
+  # proof files or signed IDs may be included
 }
 ```
 
-### Processing Flow
-1. **Validate Parameters** - Check required fields and FPL thresholds
-2. **Process Guardian** - Create/find guardian user if dependent application
-3. **Process Applicant** - Create/find the actual applicant user
-4. **Apply Contact Strategies** - Set dependent contact info based on strategies:
-   - **Email Strategy 'guardian'**: Store guardian's email in `dependent_email`, generate system email for uniqueness
-   - **Email Strategy 'dependent'**: Use provided `dependent_email` or fall back to guardian's if blank
-   - **Phone Strategy**: Similar logic for `dependent_phone` field
-   - **Address Strategy**: Handle dependent address fields similarly
-5. **Create Relationship** - Link guardian and dependent if applicable
-6. **Create Application** - Build application with proper user associations
-7. **Process Proofs** - Handle proof uploads/rejections
-8. **Create Audits** - Log events and proof submissions
-9. **Send Notifications** - Notify relevant parties
+Processing steps:
 
-## Testing Considerations
+1. Validate & cast → **FPL threshold check**.  
+2. Process guardian (if dependent).  
+3. Process applicant.  
+4. Apply contact strategies.  
+5. Create GuardianRelationship.  
+6. Build Application.  
+7. Handle proofs.  
+8. Audit & notify.
 
-### Thread-Local Context
-Always set context in paper application tests:
+---
+
+## 8 · Testing Guide
+
+### 8.1 · Context Setup
+
 ```ruby
-setup do
-  Thread.current[:paper_application_context] = true
-end
+setup    { Current.paper_context = true }
+teardown { Current.reset }
+```
 
-teardown do
-  Thread.current[:paper_application_context] = nil
+### 8.2 · Guardian Relationship
+
+```ruby
+assert_difference ['GuardianRelationship.count', 'Application.count'] do
+  service = Applications::PaperApplicationService
+              .new(params: dependent_params, admin: @admin)
+  assert service.create
 end
 ```
 
-### Guardian Relationship Testing
+### 8.3 · Proof Acceptance w/o File
+
 ```ruby
-test 'creates guardian relationship for dependent application' do
-  params = {
-    applicant_type: 'dependent',
-    relationship_type: 'Parent',
-    guardian_attributes: guardian_attrs,
-    dependent_attributes: dependent_attrs,
-    application: application_attrs
-  }
-  
-  assert_difference ['GuardianRelationship.count', 'Application.count'] do
-    service = Applications::PaperApplicationService.new(params: params, admin: @admin)
-    assert service.create
-  end
-  
-  application = service.application
-  assert application.for_dependent?
-  assert_equal service.guardian_user_for_app.id, application.managing_guardian_id
-end
+service = Applications::PaperApplicationService
+            .new(params: { income_proof_action: 'accept' }, admin: @admin)
+assert service.update(@application)
+assert @application.reload.income_proof_status_approved?
 ```
 
-### Proof Processing Testing
-```ruby
-test 'accepts proof without file in paper context' do
-  params = {
-    income_proof_action: 'accept',
-    # No income_proof file provided
-  }
-  
-  service = Applications::PaperApplicationService.new(params: params, admin: @admin)
-  assert service.update(@application)
-  
-  @application.reload
-  assert @application.income_proof_status_approved?
-  assert_not @application.income_proof.attached?
-end
-```
+---
 
-## Error Handling
+## 9 · Error Handling
 
-### Service Errors
 ```ruby
-def handle_service_failure(service, existing_application = nil)
-  if service.errors.any?
-    error_message = service.errors.join('; ')
-    flash.now[:alert] = error_message
-  end
-  
-  # Repopulate form data for re-rendering
+def handle_service_failure(service, existing_app = nil)
+  flash.now[:alert] = service.errors.join('; ')
   @paper_application = {
-    application: service.application || existing_application || Application.new,
-    constituent: service.constituent || Constituent.new,
-    guardian_user_for_app: service.guardian_user_for_app,
-    submitted_params: params.to_unsafe_h.slice(...)
+    application:            service.application || existing_app || Application.new,
+    constituent:            service.constituent || Constituent.new,
+    guardian_user_for_app:  service.guardian_user_for_app,
+    submitted_params:       params.to_unsafe_h.slice(...)
   }
-  
-  render (existing_application ? :edit : :new), status: :unprocessable_entity
+  render(existing_app ? :edit : :new, status: :unprocessable_entity)
 end
 ```
 
-### Common Error Scenarios
-- Invalid FPL thresholds
-- Missing required fields for guardian/dependent
-- Proof processing failures
-- Guardian relationship creation errors
-- User creation/validation failures
+Typical failures: FPL too high, missing guardian data, proof issues, user validation errors.
 
-## Future Enhancements
+---
 
-### Planned Improvements
-- **Form Object Pattern** - Extract form logic into dedicated form objects
-- **Command Object Pattern** - Separate creation/update commands
-- **Server-Side Validation** - Move validation logic from JavaScript to Rails
-- **ViewComponents** - Extract repetitive form sections into components
+## 10 · Roadmap & Limitations
 
-### Current Limitations
-- JavaScript handles some validation that should be server-side
-- Form state management could be more robust
-- Error handling could be more granular
-- Some validation bypassing is manual rather than systematic 
+| Planned | Current Gap |
+|---------|-------------|
+| Extract **Form Objects** | JS still holds some validation |
+| Command pattern for create/update | Controller does heavy lifting |
+| Move more validation server-side | Reliance on client JS |
+| ViewComponents for form slices | Repetition in ERB/partial logic |
 
-**Controller Changes**:
-- Removed `dependent_attributes` mapping cruft from `paper_application_processing_params`
-- Changed parameters to accept unified `constituent` attributes for both self and dependent applications
-- Added support for contact strategy parameters: `email_strategy`, `phone_strategy`, `address_strategy`
-- Fixed applicant type inference to detect dependents when `guardian_attributes` are present (not just `guardian_id`)
-- Unified `permitted_constituent_attributes` method for both application types
-- Added new strategy parameters to boolean casting and error handling 
+Controller tweaks already made:
+
+* Unified `constituent` params.  
+* Added `email_strategy`, `phone_strategy`, `address_strategy`.  
+* Dependent inference when `guardian_attributes` present.

@@ -22,7 +22,7 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
     @application = create(:application, user: @constituent, status: :in_progress)
 
     # Set thread-local variable to bypass proof validations
-    Thread.current[:paper_application_context] = true
+    setup_paper_application_context
 
     # Update application status and proof statuses
     @application.update_columns(
@@ -48,7 +48,7 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
 
   teardown do
     # Clear thread-local variables after test
-    Thread.current[:paper_application_context] = nil
+    teardown_paper_application_context
   end
 
   # Helper method for time tracking

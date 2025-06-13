@@ -4,7 +4,7 @@ class NotifyAdminsJob < ApplicationJob
   queue_as :default
 
   def perform(application)
-    User.where(type: 'Administrator').find_each do |admin|
+    User.where(type: 'Users::Administrator').find_each do |admin|
       # Log the audit event
       AuditEventService.log(
         action: 'proof_needs_review_notification_sent',

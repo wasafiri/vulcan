@@ -3,19 +3,68 @@
 require 'test_helper'
 
 class ApplicationMailboxTest < ActionMailbox::TestCase
-  test 'routes emails to Postmark inbound address to proof submission mailbox' do
-    assert_routing MatVulcan::InboundEmailConfig.inbound_email_address => 'proof_submission'
+  test 'routes emails to Postmark inbound address to ProofSubmissionMailbox' do
+    # Create mock inbound email that will be routed but not processed
+    inbound_email = create_inbound_email_from_source(
+      Mail.new(
+        to: MatVulcan::InboundEmailConfig.inbound_email_address,
+        from: 'test@example.com',
+        subject: 'Proof submission',
+        body: 'Test email body'
+      ).to_s
+    )
+    
+    # Check that the routing resolves to the correct mailbox class
+    mailbox_class = ApplicationMailbox.mailbox_for(inbound_email)
+    assert_equal ProofSubmissionMailbox, mailbox_class
   end
 
-  test 'routes proof@example.com emails to proof submission mailbox' do
-    assert_routing 'proof@example.com' => 'proof_submission'
+  test 'routes proof@example.com emails to ProofSubmissionMailbox' do
+    inbound_email = create_inbound_email_from_source(
+      Mail.new(
+        to: 'proof@example.com',
+        from: 'test@example.com',
+        subject: 'Proof submission',
+        body: 'Test email body'
+      ).to_s
+    )
+    
+    mailbox_class = ApplicationMailbox.mailbox_for(inbound_email)
+    assert_equal ProofSubmissionMailbox, mailbox_class
   end
 
-  test 'routes medical-cert@mdmat.org emails to medical certification mailbox' do
-    assert_routing 'medical-cert@mdmat.org' => 'medical_certification'
+  test 'routes medical-cert@mdmat.org emails to MedicalCertificationMailbox' do
+    inbound_email = create_inbound_email_from_source(
+      Mail.new(
+        to: 'medical-cert@mdmat.org',
+        from: 'doctor@example.com',
+        subject: 'Medical certification',
+        body: 'Medical certification document'
+      ).to_s
+    )
+    
+    mailbox_class = ApplicationMailbox.mailbox_for(inbound_email)
+    assert_equal MedicalCertificationMailbox, mailbox_class
   end
 
-  test 'routes unmatched emails to default mailbox' do
-    assert_routing 'unknown@example.com' => 'application'
+  test 'routes unmatched emails to DefaultMailbox' do
+    inbound_email = create_inbound_email_from_source(
+      Mail.new(
+        to: 'unknown@example.com',
+        from: 'test@example.com',
+        subject: 'Unknown email',
+        body: 'Unknown email body'
+      ).to_s
+    )
+    
+    mailbox_class = ApplicationMailbox.mailbox_for(inbound_email)
+    assert_equal DefaultMailbox, mailbox_class
+  end
+
+  private
+
+  # Helper to create an InboundEmail without processing it
+  def create_inbound_email_from_source(source)
+    ActionMailbox::InboundEmail.create_and_extract_message_id!(source)
   end
 end

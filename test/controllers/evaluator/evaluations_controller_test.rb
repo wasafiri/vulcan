@@ -6,7 +6,7 @@ require 'test_helper'
 class EvaluationsControllerTest < ActionDispatch::IntegrationTest
   def setup
     @evaluator = create(:evaluator)
-    sign_in(@evaluator)
+    sign_in_for_controller_test(@evaluator)
     @product = create(:product, name: 'iPad Air')
     @evaluation = create(:evaluation, evaluator: @evaluator, status: :scheduled)
   end

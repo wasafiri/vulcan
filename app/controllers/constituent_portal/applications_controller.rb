@@ -586,7 +586,7 @@ module ConstituentPortal
     def request_review
       @application = current_user.applications.find(params[:id])
       if @application.update(needs_review_since: Time.current)
-        User.where(type: 'Administrator').find_each do |admin|
+        User.where(type: 'Users::Administrator').find_each do |admin|
           # Log the audit event
           AuditEventService.log(
             action: 'review_requested',
@@ -694,7 +694,7 @@ module ConstituentPortal
     # Create notifications for all administrators about the training request
     # @return [void]
     def create_training_request_notifications
-      User.where(type: 'Administrator').find_each do |admin|
+      User.where(type: 'Users::Administrator').find_each do |admin|
         # Log the audit event
         AuditEventService.log(
           action: 'training_requested',

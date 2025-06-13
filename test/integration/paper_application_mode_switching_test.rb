@@ -5,7 +5,7 @@ require 'test_helper'
 class PaperApplicationModeSwitchingTest < ActionDispatch::IntegrationTest
   setup do
     @admin = create(:admin) # Use factory instead of fixture
-    sign_in(@admin)
+    sign_in_for_integration_test(@admin)
 
     # Ensure necessary policies exist for income threshold check
     # Using find_or_create_by! to prevent errors if policies already exist from previous test runs or setup.

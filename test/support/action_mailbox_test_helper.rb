@@ -1,19 +1,23 @@
 # frozen_string_literal: true
 
 module ActionMailboxTestHelper
+  def self.included(base)
+    base.class_eval do
+      require 'action_mailbox/test_helper'
+      include ActionMailbox::TestHelper
+    end
+  end
+
   # Assert that an email would be routed to the expected mailbox
   #
   # @param mailbox_class [Class] The mailbox you expect to match
   # @param kwargs        Mail attributes (:to, :from, :subject, etc.)
   #
   def assert_mailbox_routed(mailbox_class, **kwargs)
-    require 'action_mailbox/test_helper'
-    include ActionMailbox::TestHelper
-
     mail = Mail.new({ to: 'nobody@example.com',
                       from: 'test@example.com' }.merge(kwargs))
 
-    inbound_email = create_inbound_email_from_mail(mail, status: :pending)
+    inbound_email = create_inbound_email_from_source(mail.to_s)
 
     routed_mailbox = ApplicationMailbox.router.mailbox_for(inbound_email)
 
@@ -23,7 +27,7 @@ module ActionMailboxTestHelper
   end
 
   # Helper to create an inbound email without attachments
-  def create_inbound_email_from_mail(to:, from:, subject: 'Test Email', body: 'Test Body')
+  def create_inbound_email_from_attributes(to:, from:, subject: 'Test Email', body: 'Test Body')
     mail = Mail.new do
       to to
       from from

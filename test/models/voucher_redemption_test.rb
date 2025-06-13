@@ -41,35 +41,20 @@ class VoucherRedemptionTest < ActiveSupport::TestCase
   end
 
   test 'voucher redemption creates event record' do
-    # Since there might be issues with the Event association in our test setup,
-    # we'll mock the event creation instead of expecting it to work natively
-
-    # Create a mock event that will be returned
-    mock_event = mock('event')
-    mock_event.stubs(:action).returns('voucher_redeemed')
-    mock_event.stubs(:user).returns(@vendor)
-    mock_event.stubs(:metadata).returns({
-                                          'application_id' => @application.id,
-                                          'voucher_code' => @voucher.code,
-                                          'amount' => 100,
-                                          'vendor_name' => @vendor.business_name,
-                                          'transaction_id' => '123',
-                                          'remaining_value' => 400
-                                        })
-
-    # Mock the events association and create method
-    events_association = mock('events_association')
-    events_association.expects(:create!).returns(mock_event)
-    @voucher.stubs(:events).returns(events_association)
+    # Test that AuditEventService.log is called during redemption
+    # We'll be flexible about which exact calls since there might be multiple
+    # (redemption event + status change event)
+    
+    # Simply verify that AuditEventService.log gets called
+    AuditEventService.expects(:log).at_least_once.returns(nil)
 
     # Call the redeem method
     @voucher.redeem!(100, @vendor)
 
-    # Assertions on the mock (these will pass since we set up the mock this way)
-    assert_equal 'voucher_redeemed', mock_event.action
-    assert_equal @vendor, mock_event.user
-    assert_equal @application.id, mock_event.metadata['application_id']
-    assert_equal @voucher.code, mock_event.metadata['voucher_code']
+    # Verify the voucher was updated correctly
+    @voucher.reload
+    assert_equal 400, @voucher.remaining_value
+    assert_equal @vendor, @voucher.vendor
   end
 
   test 'voucher redemption sends email notification' do
@@ -108,12 +93,11 @@ class VoucherRedemptionTest < ActiveSupport::TestCase
   end
 
   test "fault-tolerant event logging doesn't prevent redemption" do
-    # Mock the events association to raise an error
-    events_association = mock('events_association')
-    events_association.expects(:create!).raises(StandardError, 'Simulated error')
-    @voucher.stubs(:events).returns(events_association)
+    # We'll test that redemption works even when logging fails
+    # by stubbing AuditEventService.log to raise an error for ANY call
+    AuditEventService.stubs(:log).raises(StandardError, 'Simulated audit error')
 
-    # Redemption should still succeed
+    # Redemption should still succeed despite audit failure
     assert_difference -> { VoucherTransaction.count }, 1 do
       @voucher.redeem!(100, @vendor)
     end

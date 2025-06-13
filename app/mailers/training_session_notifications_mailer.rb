@@ -32,6 +32,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     footer_contact_email = Policy.get('support_email') || 'support@example.com'
     footer_website_url = root_url(host: default_url_options[:host])
     footer_show_automated_message = true
+    organization_name = Policy.get('organization_name') || 'MAT-Vulcan'
     header_logo_url = begin
       ActionController::Base.helpers.asset_path('logo.png', host: default_url_options[:host])
     rescue StandardError
@@ -45,7 +46,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
       # Shared partial variables (rendered content - text only for non-multipart emails)
       header_text: header_text(title: header_title, logo_url: header_logo_url),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
-                               show_automated_message: footer_show_automated_message),
+                               organization_name: organization_name, show_automated_message: footer_show_automated_message),
       header_logo_url: header_logo_url, # Optional, passed for potential use in template body
       header_subtitle: nil # Optional
     }.compact
@@ -105,6 +106,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     footer_contact_email = Policy.get('support_email') || 'support@example.com'
     footer_website_url = root_url(host: default_url_options[:host])
     footer_show_automated_message = true
+    organization_name = Policy.get('organization_name') || 'MAT-Vulcan'
     header_logo_url = begin
       ActionController::Base.helpers.asset_path('logo.png', host: default_url_options[:host])
     rescue StandardError
@@ -120,7 +122,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
       # Shared partial variables (text only for non-multipart emails)
       header_text: header_text(title: header_title, logo_url: header_logo_url),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
-                               show_automated_message: footer_show_automated_message),
+                               organization_name: organization_name, show_automated_message: footer_show_automated_message),
       header_logo_url: header_logo_url, # Optional
       header_subtitle: nil # Optional
     }.compact
@@ -180,6 +182,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     footer_contact_email = Policy.get('support_email') || 'support@example.com'
     footer_website_url = root_url(host: default_url_options[:host])
     footer_show_automated_message = true
+    organization_name = Policy.get('organization_name') || 'MAT-Vulcan'
     header_logo_url = begin
       ActionController::Base.helpers.asset_path('logo.png', host: default_url_options[:host])
     rescue StandardError
@@ -194,7 +197,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
       # Shared partial variables (text only for non-multipart emails)
       header_text: header_text(title: header_title, logo_url: header_logo_url),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
-                               show_automated_message: footer_show_automated_message),
+                               organization_name: organization_name, show_automated_message: footer_show_automated_message),
       header_logo_url: header_logo_url, # Optional
       header_subtitle: nil # Optional
     }.compact
@@ -252,6 +255,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     footer_contact_email = Policy.get('support_email') || 'support@example.com'
     footer_website_url = root_url(host: default_url_options[:host])
     footer_show_automated_message = true
+    organization_name = Policy.get('organization_name') || 'MAT-Vulcan'
     header_logo_url = begin
       ActionController::Base.helpers.asset_path('logo.png', host: default_url_options[:host])
     rescue StandardError
@@ -267,7 +271,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
       # Shared partial variables (text only for non-multipart emails)
       header_text: header_text(title: header_title, logo_url: header_logo_url),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
-                               show_automated_message: footer_show_automated_message),
+                               organization_name: organization_name, show_automated_message: footer_show_automated_message),
       header_logo_url: header_logo_url, # Optional
       header_subtitle: nil # Optional
     }.compact
@@ -326,6 +330,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
     footer_contact_email = Policy.get('support_email') || 'support@example.com'
     footer_website_url = root_url(host: default_url_options[:host])
     footer_show_automated_message = true
+    organization_name = Policy.get('organization_name') || 'MAT-Vulcan'
     header_logo_url = begin
       ActionController::Base.helpers.asset_path('logo.png', host: default_url_options[:host])
     rescue StandardError
@@ -341,7 +346,7 @@ class TrainingSessionNotificationsMailer < ApplicationMailer
       # Shared partial variables (text only for non-multipart emails)
       header_text: header_text(title: header_title, logo_url: header_logo_url),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
-                               show_automated_message: footer_show_automated_message),
+                               organization_name: organization_name, show_automated_message: footer_show_automated_message),
       header_logo_url: header_logo_url, # Optional
       header_subtitle: nil # Optional
     }.compact

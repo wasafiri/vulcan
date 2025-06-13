@@ -35,7 +35,8 @@ class ProofAttachmentService
     params = {
       status: :not_reviewed,
       admin: nil,
-      metadata: {}
+      metadata: {},
+      skip_audit_events: false
     }.merge(args)
 
     context = {
@@ -155,20 +156,23 @@ class ProofAttachmentService
     def perform_attachment_flow(result, params)
       application = params.fetch(:application)
       proof_type = params.fetch(:proof_type)
-      blob_or_file = params.fetch(:blob_or_file)
+      attachment_param = prepare_attachment_param(params.fetch(:blob_or_file), proof_type)
+      blob_size = calculate_blob_size(params.fetch(:blob_or_file))
+      submission_method = params.fetch(:submission_method)
 
-      blob_size = blob_or_file.byte_size if blob_or_file.respond_to?(:byte_size)
-      attachment_param = prepare_attachment_param(blob_or_file, proof_type)
+      # Set paper context for the entire flow if this is a paper submission
+      with_paper_context(submission_method, proof_type) do
+        attach_and_verify_initial_save(application, proof_type, attachment_param)
 
-      attach_and_verify_initial_save(application, proof_type, attachment_param)
+        log_attachment_events(application, proof_type, params.fetch(:status), submission_method,
+                              params.fetch(:admin), params.fetch(:metadata), params.fetch(:blob_or_file), blob_size,
+                              skip_audit_events: params.fetch(:skip_audit_events))
 
-      log_attachment_events(application, proof_type, params.fetch(:status), params.fetch(:submission_method),
-                            params.fetch(:admin), params.fetch(:metadata), blob_or_file, blob_size)
+        verify_attachment_persisted_after_update(application, proof_type)
 
-      verify_attachment_persisted_after_update(application, proof_type)
-
-      result[:blob_size] = blob_size
-      result[:success] = true
+        result[:blob_size] = blob_size
+        result[:success] = true
+      end
     end
 
     def attach_and_verify_initial_save(application, proof_type, attachment_param)
@@ -184,7 +188,7 @@ class ProofAttachmentService
 
     def log_error(error)
       Rails.logger.error "Proof attachment error: #{error.message}"
-      Rails.logger.error error.backtrace.join("\n")
+      Rails.logger.error error.backtrace&.join("\n") || 'No backtrace available'
     end
 
     def log_failure_audit_event(error, context)
@@ -237,12 +241,19 @@ class ProofAttachmentService
       result
     end
 
+    def calculate_blob_size(blob_or_file)
+      return blob_or_file.byte_size if blob_or_file.respond_to?(:byte_size)
+      return blob_or_file.size if blob_or_file.respond_to?(:size)
+      0
+    end
+
     def prepare_attachment_param(blob_or_file, proof_type)
       # ENHANCED LOGGING FOR ATTACHMENT DEBUGGING
       Rails.logger.info "PROOF ATTACHMENT INPUT TYPE: #{blob_or_file.class.name}"
 
-      # Handle ActiveStorage::Blob
-      return blob_or_file.signed_id if blob_or_file.is_a?(ActiveStorage::Blob)
+      # Handle ActiveStorage::Blob - return blob directly instead of signed_id
+      # This fixes attachment persistence issues in some test environments
+      return blob_or_file if blob_or_file.is_a?(ActiveStorage::Blob)
 
       # Handle signed_id strings
       return blob_or_file if blob_or_file.is_a?(String) && blob_or_file.start_with?('eyJf')
@@ -269,32 +280,39 @@ class ProofAttachmentService
     end
 
     def log_attachment_events(application, proof_type, status, submission_method, admin, metadata, blob_or_file,
-                              blob_size)
+                              blob_size, skip_audit_events: false)
+      # Get the blob ID from the actually attached blob
+      attached_blob = application.send("#{proof_type}_proof").blob
+      blob_id = attached_blob&.id
+
       # Create audit and notification record
       event_metadata = metadata.merge(
         proof_type: proof_type,
         submission_method: submission_method,
         status: status,
         has_attachment: true,
-        blob_id: blob_or_file.respond_to?(:id) ? blob_or_file.id : nil,
-        blob_size: blob_size
+        blob_id: blob_id,
+        blob_size: blob_size,
+        success: true,
+        filename: attached_blob&.filename.to_s
       )
 
-      AuditEventService.log(
-        action: "#{proof_type}_proof_attached",
-        auditable: application,
-        actor: admin || application.user,
-        metadata: event_metadata
-      )
+      # Only create audit event if not skipped (allows controllers to handle their own audit events)
+      unless skip_audit_events
+        AuditEventService.log(
+          action: "#{proof_type}_proof_attached",
+          auditable: application,
+          actor: admin || application.user,
+          metadata: event_metadata
+        )
+      end
 
       ActiveRecord::Base.transaction do
         # Update status
         status_attrs = { "#{proof_type}_proof_status" => status }
         status_attrs[:needs_review_since] = Time.current if status == :not_reviewed
 
-        with_paper_context(submission_method, proof_type) do
-          application.update!(status_attrs)
-        end
+        application.update!(status_attrs)
       end
 
       NotificationService.create_and_deliver!(
@@ -348,14 +366,18 @@ class ProofAttachmentService
 
     def with_paper_context(submission_method, proof_type)
       original_context = Current.paper_context
+      original_service_context = Current.proof_attachment_service_context
       begin
         if submission_method.to_sym == :paper
           Current.paper_context = true
           Rails.logger.debug { "ProofAttachmentService: Setting paper_application_context=true for #{proof_type} rejection" }
         end
+        # Always set service context to prevent duplicate events from ProofManageable
+        Current.proof_attachment_service_context = true
         yield
       ensure
         Current.paper_context = original_context
+        Current.proof_attachment_service_context = original_service_context
         Rails.logger.debug { "ProofAttachmentService: Restored paper_application_context=#{original_context.inspect}" }
       end
     end

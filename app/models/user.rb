@@ -95,7 +95,6 @@ class User < ApplicationRecord
   # Format phone numbers before validation to ensure uniqueness check uses the correct format
   before_validation :format_phone_number
   before_save :format_phone_number, if: :phone_changed?
-  after_update :log_profile_changes, if: :saved_changes_to_profile_fields?
   after_save :reset_all_caches
 
   # Associations
@@ -152,14 +151,12 @@ class User < ApplicationRecord
 
   # Non-deterministic encryption for non-queryable fields
   encrypts :password_digest
-  encrypts :date_of_birth
+  encrypts :date_of_birth, deterministic: true
   encrypts :physical_address_1
   encrypts :physical_address_2
   encrypts :city
   encrypts :state
   encrypts :zip_code
-
-
 
   # Validations
   validates :password, length: { minimum: 8 }, if: -> { password.present? }

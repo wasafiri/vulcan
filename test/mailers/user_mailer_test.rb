@@ -43,22 +43,21 @@ class UserMailerTest < ActionMailer::TestCase
     EmailTemplate.stubs(:find_by!).with(name: 'user_mailer_email_verification', format: :text)
                  .returns(email_verification_template)
 
-    @user = create(:user)
-    # Stub token generation to return predictable values for testing
-    # This is needed because the application might not have explicitly set up
-    # generates_token_for with these specific purposes
-    @user.stubs(:generate_token_for).with(:password_reset).returns('test-password-reset-token')
-    @user.stubs(:generate_token_for).with(:email_verification).returns('test-email-verification-token')
-
     # Stub the URL helpers that our mailer uses
     UserMailer.any_instance.stubs(:edit_password_url).returns('http://example.com/password/edit?token=test-password-reset-token')
     UserMailer.any_instance.stubs(:verify_constituent_portal_application_url).returns('http://example.com/constituent_portal/applications/verify?token=test-email-verification-token')
   end
 
   test 'password_reset' do
+    # Create unique user for this test
+    user = create(:user)
+    # Stub token generation to return predictable values for testing
+    user.stubs(:generate_token_for).with(:password_reset).returns('test-password-reset-token')
+    user.stubs(:generate_token_for).with(:email_verification).returns('test-email-verification-token')
+
     # Using Rails 7.1.0+ capture_emails helper
     emails = capture_emails do
-      UserMailer.with(user: @user).password_reset.deliver_now
+      UserMailer.with(user: user).password_reset.deliver_now
     end
 
     # Verify we captured an email
@@ -66,7 +65,7 @@ class UserMailerTest < ActionMailer::TestCase
     email = emails.first
 
     assert_equal ['no_reply@mdmat.org'], email.from
-    assert_equal [@user.email], email.to
+    assert_equal [user.email], email.to
     assert_equal 'Password reset', email.subject # Assert subject matches the mock template subject
 
     # For non-multipart emails, we check the body directly
@@ -79,9 +78,15 @@ class UserMailerTest < ActionMailer::TestCase
   end
 
   test 'email_verification' do
+    # Create unique user for this test
+    user = create(:user)
+    # Stub token generation to return predictable values for testing
+    user.stubs(:generate_token_for).with(:password_reset).returns('test-password-reset-token')
+    user.stubs(:generate_token_for).with(:email_verification).returns('test-email-verification-token')
+
     # Using Rails 7.1.0+ capture_emails helper
     emails = capture_emails do
-      UserMailer.with(user: @user).email_verification.deliver_now
+      UserMailer.with(user: user).email_verification.deliver_now
     end
 
     # Verify we captured an email
@@ -89,7 +94,7 @@ class UserMailerTest < ActionMailer::TestCase
     email = emails.first
 
     assert_equal ['no_reply@mdmat.org'], email.from
-    assert_equal [@user.email], email.to
+    assert_equal [user.email], email.to
     assert_equal 'Email verification', email.subject # Assert subject matches the mock template subject
 
     # For non-multipart emails, we check the body directly

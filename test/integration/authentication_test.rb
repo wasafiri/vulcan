@@ -19,15 +19,6 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
 
   # Test successful authentication
   test 'should authenticate user with valid credentials' do
-    # Set up stubs for authentication flow
-    test_session = mock('session')
-    test_session.stubs(:session_token).returns('test_token')
-    test_session.stubs(:user).returns(@user)
-    test_session.stubs(:expired?).returns(false)
-
-    # Stub the session creation
-    Session.stubs(:create!).returns(test_session)
-
     # Sign in the user
     post sign_in_path, params: {
       email: @user.email,
@@ -149,7 +140,7 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
   # Test sign out - simplified to focus on core behavior
   test 'should sign out user' do
     # First sign in normally without mocking
-    sign_in(@user)
+    sign_in_for_integration_test(@user)
 
     # Verify we're authenticated
     get root_path
@@ -164,7 +155,8 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
     assert_response :redirect
 
     # Follow redirect
-    follow_redirect!
+    # Pass headers explicitly since follow_redirect! doesn't inherit default_headers
+    follow_redirect!(headers: { 'X-Test-User-Id' => @user.id.to_s })
 
     # Verify that the cookie is deleted or emptied after sign out - this is the key assertion
     new_token = cookies[:session_token]
@@ -189,8 +181,8 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
 
   # Test sign_in method
   test 'should authenticate with sign_in' do
-    # Use the new method
-    sign_in(@user)
+    # Use the explicit integration method
+    sign_in_for_integration_test(@user)
 
     # Verify we're authenticated
     get constituent_portal_applications_path
@@ -203,7 +195,7 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
   # Test authentication persistence across requests
   test 'should maintain authentication across requests' do
     # Sign in the user
-    sign_in(@user)
+    sign_in_for_integration_test(@user)
 
     # Make multiple requests
     get constituent_portal_applications_path
@@ -222,7 +214,7 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
   # Test role-based access control
   test 'should enforce role-based access control' do
     # Sign in as regular user
-    sign_in(@user)
+    sign_in_for_integration_test(@user)
 
     # Try to access admin page
     get admin_applications_path
@@ -231,7 +223,7 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
     assert_not_authorized
 
     # Sign in as admin
-    sign_in(@admin)
+    sign_in_for_integration_test(@admin)
 
     # Try to access admin page again
     get admin_applications_path
@@ -243,7 +235,7 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
   # Test the automatic header inclusion
   test 'should automatically include headers in requests' do
     # Sign in the user
-    sign_in(@user)
+    sign_in_for_integration_test(@user)
 
     # Make a request without explicitly including headers
     get constituent_portal_applications_path

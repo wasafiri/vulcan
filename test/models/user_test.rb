@@ -173,9 +173,10 @@ class UserTest < ActiveSupport::TestCase
   test 'logs profile update when guardian updates dependent profile' do
     # Set Current.user to guardian to simulate guardian update
     Current.user = @guardian_user
+    unique_phone = "555-#{rand(100..999)}-#{rand(1000..9999)}"
     
     assert_difference('Event.count', 1) do
-      @dependent_user1.update!(first_name: 'Updated Dependent', phone: '555-999-8888')
+      @dependent_user1.update!(first_name: 'Updated Dependent', phone: unique_phone)
     end
 
     event = Event.last
@@ -187,7 +188,7 @@ class UserTest < ActiveSupport::TestCase
     # Check that changes are recorded
     changes = event.metadata['changes']
     assert_equal 'Updated Dependent', changes['first_name']['new']
-    assert_equal '555-999-8888', changes['phone']['new']
+    assert_equal unique_phone, changes['phone']['new']
   end
 
   test 'does not log event when no profile fields change' do

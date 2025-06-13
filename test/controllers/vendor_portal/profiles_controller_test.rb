@@ -9,7 +9,7 @@ module VendorPortal
 
     setup do
       @vendor_user = create(:vendor_user, status: :pending) # Use FactoryBot to create a vendor user with pending status
-      sign_in_with_headers(@vendor_user) # Sign in the vendor user
+      sign_in_for_integration_test(@vendor_user) # Sign in the vendor user
       assert_authenticated(@vendor_user) # Verify authentication
     end
 
@@ -30,7 +30,8 @@ module VendorPortal
         }
       }
       assert_redirected_to vendor_dashboard_url # Expect redirect on success
-      follow_redirect! # Follow the redirect
+      # Pass headers explicitly since follow_redirect! doesn't inherit default_headers
+      follow_redirect!(headers: { 'X-Test-User-Id' => @vendor_user.id.to_s })
       assert_equal 'Profile updated successfully', flash[:notice] # Check for flash notice on the redirected page
       @vendor_user.reload # Reload the user to check updated attributes
       assert_equal 'New Name', @vendor_user.business_name

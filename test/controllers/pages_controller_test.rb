@@ -20,11 +20,11 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
     end
 
     # Check that routes are defined properly
-    assert_routing '/help', controller: 'pages', action: 'help'
-    assert_routing '/how_it_works', controller: 'pages', action: 'how_it_works'
-    assert_routing '/eligibility', controller: 'pages', action: 'eligibility'
-    assert_routing '/apply', controller: 'pages', action: 'apply'
-    assert_routing '/contact', controller: 'pages', action: 'contact'
+    assert_recognizes({ controller: 'pages', action: 'help' }, '/help')
+    assert_recognizes({ controller: 'pages', action: 'how_it_works' }, '/how_it_works')
+    assert_recognizes({ controller: 'pages', action: 'eligibility' }, '/eligibility')
+    assert_recognizes({ controller: 'pages', action: 'apply' }, '/apply')
+    assert_recognizes({ controller: 'pages', action: 'contact' }, '/contact')
 
     # Check that view files exist
     %w[help how_it_works eligibility apply contact].each do |view|

@@ -6,7 +6,7 @@ module Admin
   class PoliciesControllerTest < ActionDispatch::IntegrationTest
     def setup
       @admin = create(:admin)
-      @policy = Policy.create!(key: 'max_training_sessions', value: 3)
+      @policy = Policy.find_or_create_by!(key: 'max_training_sessions') { |p| p.value = 3 }
       sign_in_as(@admin) # Use standard helper
     end
 

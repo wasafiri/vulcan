@@ -10,8 +10,8 @@ class PasswordsControllerTest < ActionDispatch::IntegrationTest
     @user = create(:constituent, password: 'password123', password_confirmation: 'password123')
     @original_password_digest = @user.password_digest
 
-    # Standard sign-in for controller tests
-    sign_in(@user)
+    # Standard sign-in for integration tests
+    sign_in_for_integration_test(@user)
   end
 
   def teardown

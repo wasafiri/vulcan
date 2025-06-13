@@ -80,14 +80,8 @@ class ProofSubmissionMailbox < ApplicationMailbox
     })
 
     if result[:success]
-      case proof_type
-      when :medical, :medical_certification
-        application.medical_certification.attach(blob) if application.respond_to?(:medical_certification)
-      when :residency
-        application.residency_proof.attach(blob) if application.respond_to?(:residency_proof)
-      else # This now handles :income and any other types
-        application.income_proof.attach(blob) if application.respond_to?(:income_proof)
-      end
+      # ProofAttachmentService already handled the attachment, audit events, and notifications
+      # No need to attach again - just return successfully
       return
     end
 

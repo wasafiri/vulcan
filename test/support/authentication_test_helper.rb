@@ -3,36 +3,20 @@
 # AuthenticationTestHelper
 #
 # Standardised helpers for signing users in/out across non-system tests.
-# – Controller tests → sign_in_as
-# – Integration tests → sign_in_with_headers
-# – Unit/other        → update_current_user
+# – Controller tests → sign_in_for_controller_test
+# – Integration tests → sign_in_for_integration_test  
+# – Unit/other        → sign_in_for_unit_test
 #
 # For system tests, see SystemTestAuthentication module.
-# Add ENV['DEBUG_AUTH']='true' to see verbose output while debugging.
 #
 module AuthenticationTestHelper
   # Include shared authentication core functionality
   include AuthenticationCore
-  # Unified entry-point -------------------------------------------------------
-
-  # Signs a user in using the best strategy for the current test context.
-  #
-  # @param user [User]
-  # @return [User] the same user, for chaining in tests
-  def sign_in(user)
-    if defined?(@controller) && @controller.is_a?(ActionController::Base)
-      sign_in_as(user) # controller helper
-    elsif is_integration_test?
-      sign_in_with_headers(user) # integration helper
-    else
-      update_current_user(user) # fallback for unit/unknown
-    end
-  end
-
-  #-------------------------------------------------------------------------
+  
+  # Explicit methods for different test contexts --------------------------------
 
   # Controller-level cookie sign-in.
-  def sign_in_as(user)
+  def sign_in_for_controller_test(user)
     session = create_test_session(user)
 
     # Mirror what Rails would do from the cookie, so authenticate! sees it
@@ -57,54 +41,68 @@ module AuthenticationTestHelper
   end
 
   # Integration-level header sign-in.
-  def sign_in_with_headers(user)
+  def sign_in_for_integration_test(user)
     session = create_test_session(user)
-    raw_cookie = "session_token=#{session.session_token}"
+    @session_token = session.session_token
+    @test_user_id = user.id # Store in instance variable
+    store_test_user_id(user.id) # Set test-user context for post-request restore logic
 
-    # Seed the rack mock session cookie (IntegrationTest)
-    if respond_to?(:rack_mock_session) && rack_mock_session.respond_to?(:cookie_jar)
-      rack_mock_session.cookie_jar[:session_token] = session.session_token
-    end
-
-    # `default_headers` is defined by Rails::TestRequest; fall back gracefully.
-    default_headers.merge!('Cookie' => raw_cookie) if respond_to?(:default_headers, true)
-
-    # Set cookies anyway, because some helpers still read them.
+    # Set up cookies so find_test_session can find the session
     if respond_to?(:cookies) && cookies.respond_to?(:signed)
-      cookies.signed[:session_token] = session.session_token
+      cookies.signed[:session_token] = { value: session.session_token, httponly: true }
     elsif respond_to?(:cookies)
       cookies[:session_token] = session.session_token
     end
 
+    # Set up headers for subsequent requests - this is what find_test_session checks first
+    @headers ||= {}
+    @headers['X-Test-User-Id'] = user.id.to_s
+
     # Make Current.user available immediately
     update_current_user(user)
 
-    # Store test user ID in thread local variable
-    store_test_user_id(user.id)
+    debug_auth "INTEGRATION AUTH: cookies, headers, and test user ID set for #{user.email}"
 
-    debug_auth "INTEGRATION AUTH: rack_mock_session, cookies & headers set for #{user.email}"
+    # Store user reference for post-request verification
+    @authenticated_user = user
+
     user
   end
 
   # Pure unit-test fallback: just update Current.user.
-  def update_current_user(user)
+  def sign_in_for_unit_test(user)
     Current.user = user if defined?(Current)
     @current_user ||= user
     debug_auth "UNIT AUTH: Current.user set for #{user.email}"
     user
   end
 
+  # Convenience aliases for backward compatibility ---------------------------
+  alias sign_in_as sign_in_for_controller_test
+  alias sign_in_with_headers sign_in_for_integration_test
+  alias update_current_user sign_in_for_unit_test
+
   # Optional convenience helper: simulate a form-based sign-in (slow!).
   def sign_in_user(user, password: 'password123')
     post sign_in_path, params: { email: user.email, password: password }
     assert_response :redirect
     assert_redirected_to root_path, 'Sign in failed to redirect properly'
-    update_current_user(user)
+    sign_in_for_unit_test(user)
     user
   end
 
-  # Sign out regardless of context.
   def sign_out
+    # Clear integration test headers first (before clearing other state)
+    if @headers.is_a?(Hash)
+      @headers.delete('X-Test-User-Id')
+      @headers.delete('HTTP_X_TEST_USER_ID')
+    end
+
+    # Clear instance variables set by sign_in_for_integration_test
+    @session_token = nil
+    @test_user_id = nil
+    @authenticated_user = nil
+
     # Use the shared cookie deletion logic that handles all driver types
     delete_session_cookie
 
@@ -128,6 +126,12 @@ module AuthenticationTestHelper
     assert_redirected_to sign_in_path
   end
 
+  def assert_not_authorized
+    assert_response :redirect
+    assert_redirected_to root_path
+    assert_match(/not authorized/i, flash[:alert])
+  end
+
   # Skip spec if auth system clearly broken, to avoid cascading failures.
   def skip_unless_authentication_working
     begin
@@ -144,5 +148,37 @@ module AuthenticationTestHelper
 
   def is_integration_test?
     defined?(post) && respond_to?(:post) && self.class < ActionDispatch::IntegrationTest
+  end
+
+  # Helper methods to ensure authentication headers are included in integration test requests
+
+  def default_headers
+    @headers ||= {}
+  end
+
+  # Override HTTP methods to include authentication headers for integration tests
+  def get(path, **args)
+    args[:headers] = default_headers.merge(args[:headers] || {}) if is_integration_test?
+    super(path, **args)
+  end
+
+  def post(path, **args)
+    args[:headers] = default_headers.merge(args[:headers] || {}) if is_integration_test?
+    super(path, **args)
+  end
+
+  def patch(path, **args)
+    args[:headers] = default_headers.merge(args[:headers] || {}) if is_integration_test?
+    super(path, **args)
+  end
+
+  def put(path, **args)
+    args[:headers] = default_headers.merge(args[:headers] || {}) if is_integration_test?
+    super(path, **args)
+  end
+
+  def delete(path, **args)
+    args[:headers] = default_headers.merge(args[:headers] || {}) if is_integration_test?
+    super(path, **args)
   end
 end

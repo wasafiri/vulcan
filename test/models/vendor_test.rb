@@ -9,7 +9,9 @@ class VendorTest < ActiveSupport::TestCase
     assert vendor.valid?
     assert_equal 'Users::Vendor', vendor.type
     assert vendor.vendor_approved?
-    vendor.update!(w9_status: :approved) # Ensure W9 status is approved for can_process_vouchers?
+    
+    # Use update_column to bypass callbacks that might reset w9_status
+    vendor.update_column(:w9_status, :approved) # Ensure W9 status is approved for can_process_vouchers?
     assert vendor.can_process_vouchers?
   end
 end

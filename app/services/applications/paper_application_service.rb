@@ -83,7 +83,6 @@ module Applications
     def handle_successful_application
       send_notifications
       log_application_creation
-      log_proof_submission_audit
     end
 
     def log_application_creation
@@ -95,19 +94,6 @@ module Applications
           submission_method: 'paper',
           initial_status: (@application.status || 'in_progress').to_s,
           timestamp: current_time.iso8601
-        }
-      )
-    end
-
-    def log_proof_submission_audit
-      AuditEventService.log(
-        action: 'proof_submitted',
-        actor: @admin,
-        auditable: @application,
-        metadata: {
-          proof_type: 'application',
-          submission_method: 'paper',
-          action: 'submit'
         }
       )
     end
@@ -145,6 +131,20 @@ module Applications
         @application.update!(
           "#{type}_proof_status" => Application.public_send("#{type}_proof_statuses")['approved']
         )
+        
+        # Create audit event for the proof submission in paper context
+        AuditEventService.log(
+          action: 'proof_submitted',
+          actor: @admin,
+          auditable: @application,
+          metadata: {
+            proof_type: type.to_s,
+            submission_method: 'paper',
+            status: 'approved',
+            has_attachment: false
+          }
+        )
+        
         true
       elsif file_present
         # Scenario: Digital upload or paper application with a digital upload
@@ -583,7 +583,7 @@ module Applications
         # Send account creation email for new constituents
         # Handle multiple new users (guardian and/or dependent)
         [@guardian_user_for_app, @constituent].compact.uniq.each do |user_account|
-          next unless user_account.created_at >= 5.minutes.ago && @temp_password_for_new_user&.key?(user_account.id)
+          next unless user_account.present? && user_account.created_at >= 5.minutes.ago && @temp_password_for_new_user&.key?(user_account.id)
 
           temp_password = @temp_password_for_new_user[user_account.id]
           # User might have been created without password if found by email/phone, ensure it's set if new
@@ -593,7 +593,7 @@ module Applications
       else
         # Generate letters for printing instead
         [@guardian_user_for_app, @constituent].compact.uniq.each do |user_account|
-          next unless user_account.created_at >= 5.minutes.ago && @temp_password_for_new_user&.key?(user_account.id)
+          next unless user_account.present? && user_account.created_at >= 5.minutes.ago && @temp_password_for_new_user&.key?(user_account.id)
 
           temp_password = @temp_password_for_new_user[user_account.id]
           user_account.update(password: temp_password, password_confirmation: temp_password) if user_account.password_digest.blank?

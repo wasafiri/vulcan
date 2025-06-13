@@ -19,15 +19,17 @@ class InboundEmailFlowTest < ActionDispatch::IntegrationTest
 
   setup do
     # Set up a constituent with an active application using FactoryBot
-    @constituent = create(:constituent, email: 'john.doe@example.com')
-    @application = create(:application, user: @constituent, status: :in_progress)
+    unique_email = "inbound_test_#{SecureRandom.hex(4)}@example.com"
+    @constituent = create(:constituent, email: unique_email)
+    @application = create(:application, user: @constituent, status: :in_progress, skip_proofs: true)
     @application.update_columns(
       income_proof_status: :not_reviewed,
       residency_proof_status: :not_reviewed
     )
 
-    # Set thread-local variable to bypass proof validations
-    Thread.current[:paper_application_context] = true
+    # Set proper Current attributes to bypass proof validations
+    Current.paper_context = true
+    Current.skip_proof_validation = true
 
     # Ensure the system user exists for bounce event logging
     @system_user = User.system_user
@@ -95,6 +97,9 @@ class InboundEmailFlowTest < ActionDispatch::IntegrationTest
   teardown do
     # Restore original environment variables
     ENV['RAILS_INBOUND_EMAIL_PASSWORD'] = @original_password
+    
+    # Clean up Current attributes
+    Current.reset
   end
 
   test 'processes inbound email from raw email' do

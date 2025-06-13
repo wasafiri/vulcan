@@ -179,7 +179,7 @@ class ProofReview < ApplicationRecord
     application.reload
 
     # Check if all proofs are approved and certification not already requested
-    if application.all_proofs_approved? && !application.medical_certification_status_requested?
+    if application.all_proofs_approved? && application.medical_certification_status_not_requested?
       Rails.logger.info "All proofs approved for Application ID: #{application.id}, sending medical provider email"
 
       # Update certification status and send email

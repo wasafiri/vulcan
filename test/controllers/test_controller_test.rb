@@ -16,7 +16,7 @@ class TestControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'auth_status should return authenticated when signed in' do
-    sign_in @admin
+    sign_in_for_integration_test @admin
     get test_auth_status_url
     assert_response :success
     json_response = JSON.parse(response.body)

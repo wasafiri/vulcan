@@ -28,6 +28,9 @@ class Current < ActiveSupport::CurrentAttributes
   # Test user ID for testing scenarios (replaces Thread.current[:test_user_id])
   attribute :test_user_id
 
+  # ProofAttachmentService context - used to prevent duplicate events from ProofManageable concern
+  attribute :proof_attachment_service_context
+
   # Convenience methods for boolean checks
 
   def paper_context?
@@ -48,6 +51,10 @@ class Current < ActiveSupport::CurrentAttributes
 
   def force_notifications?
     force_notifications.present?
+  end
+
+  def proof_attachment_service_context?
+    proof_attachment_service_context.present?
   end
 
   # Reset callback to ensure clean state between requests

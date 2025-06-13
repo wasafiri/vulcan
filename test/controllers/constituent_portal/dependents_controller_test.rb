@@ -12,7 +12,7 @@ module ConstituentPortal
         dependent_user: @dependent,
         relationship_type: 'Parent'
       )
-      sign_in(@guardian)
+      sign_in_for_controller_test(@guardian)
     end
 
     test 'should get new dependent page' do
@@ -199,7 +199,7 @@ module ConstituentPortal
     test 'should not allow non-guardian to access dependent' do
       other_user = create(:constituent)
       sign_out
-      sign_in(other_user)
+      sign_in_for_controller_test(other_user)
 
       get constituent_portal_dependent_path(@dependent)
       assert_redirected_to constituent_portal_dashboard_path
@@ -209,7 +209,7 @@ module ConstituentPortal
     test 'should not allow non-guardian to update dependent' do
       other_user = create(:constituent)
       sign_out
-      sign_in(other_user)
+      sign_in_for_controller_test(other_user)
 
       assert_no_difference('Event.count') do
         patch constituent_portal_dependent_path(@dependent), params: {
@@ -273,7 +273,7 @@ module ConstituentPortal
     test 'should require constituent user' do
       admin = create(:admin)
       sign_out
-      sign_in(admin)
+      sign_in_for_controller_test(admin)
 
       get constituent_portal_dependent_path(@dependent)
       assert_redirected_to root_path

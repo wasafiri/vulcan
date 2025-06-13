@@ -1,225 +1,136 @@
 # User Management Features
 
-## User Signup Deduplication
+---
 
-### Strategy Overview
-A two-pronged approach prevents duplicate user accounts during registration:
+## 1 · Signup Deduplication
 
-1. **Strict Uniqueness on Phone Number**
-2. **Soft Check for Name + Date of Birth Duplicates**
+### 1.1 · Phone Uniqueness (Hard)
 
-### Phone Number Uniqueness
-- **Database Constraint**: Unique index on `users.phone` column
-- **Model Validation**: `validates :phone, uniqueness: true`
-- **Normalization**: Phone numbers normalized before validation
-  - Stripped of non-digits
-  - Leading '1' removed
-  - Formatted to XXX-XXX-XXXX
+* **DB index** on `users.phone`.
+* `validates :phone, uniqueness: true`.
+* Normalisation before validation:
 
 ```ruby
-# In User model
 before_validation :format_phone_number
 
 def format_phone_number
   return if phone.blank?
-  
-  # Remove all non-digits
   cleaned = phone.gsub(/\D/, '')
-  
-  # Remove leading 1 if present
   cleaned = cleaned.sub(/^1/, '') if cleaned.length == 11
-  
-  # Format as XXX-XXX-XXXX
-  if cleaned.length == 10
-    self.phone = "#{cleaned[0..2]}-#{cleaned[3..5]}-#{cleaned[6..9]}"
-  end
+  self.phone = "#{cleaned[0..2]}-#{cleaned[3..5]}-#{cleaned[6..9]}" if cleaned.length == 10
 end
 ```
 
-### Name + DOB Soft Check
-Users with matching first name, last name (case-insensitive), and date of birth are flagged for administrative review:
-
-- **Flag Field**: `needs_duplicate_review` boolean column (defaults to false)
-- **Check Logic**: Performed in `RegistrationsController#create` before saving
-- **User Experience**: Registration proceeds normally, flag is invisible to user
+### 1.2 · Name + DOB Flag (Soft)
 
 ```ruby
-# In RegistrationsController
-def create
-  @user = User.new(registration_params)
-  
-  # Check for potential duplicates before saving
-  if potential_duplicate_found?(@user)
-    @user.needs_duplicate_review = true
-  end
-  
-  if @user.save
-    # Normal registration flow
-  else
-    # Handle validation errors
-  end
-end
+# RegistrationsController#create
+@user.needs_duplicate_review = true if potential_duplicate_found?(@user)
+```
 
-private
-
-def potential_duplicate_found?(user)
-  return false unless user.first_name.present? && user.last_name.present? && user.date_of_birth.present?
-
-  User.exists?(['LOWER(first_name) = ? AND LOWER(last_name) = ? AND date_of_birth = ?',
-                user.first_name.downcase,
-                user.last_name.downcase,
-                user.date_of_birth])
+```ruby
+def potential_duplicate_found?(u)
+  return false unless u.first_name && u.last_name && u.date_of_birth
+  User.exists?(["LOWER(first_name)=? AND LOWER(last_name)=? AND date_of_birth=?",
+               u.first_name.downcase, u.last_name.downcase, u.date_of_birth])
 end
 ```
 
-### User Experience
+*Flag is invisible to the end user; admins review later.*
 
-**Duplicate Email/Phone**: User receives standard validation error and cannot complete registration.
-
-**Duplicate Name+DOB**: User's registration completes successfully with no indication of the duplicate flag.
-
-### Admin Interface
-The admin user index shows flagged users for review:
+### 1.3 · Admin “Needs Review” Badge
 
 ```erb
 <% if user.needs_duplicate_review? %>
-  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-    Needs Review
-  </span>
+  <span class="rounded-full bg-yellow-100 text-yellow-800 px-2.5 py-0.5 text-xs">Needs Review</span>
 <% end %>
 ```
 
-## Test Selectors and Stability
+---
 
-### Data Test ID Strategy
-Use `data-testid` attributes for stable test selectors that won't change for styling or content reasons:
+## 2 · Test Selectors (`data-testid`)
+
+| Element | Pattern | Example |
+|---------|---------|---------|
+| Form | `{feature}-form` | `sign-in-form` |
+| Input | `{name}-input` | `email-input` |
+| Button | `{action}-button` | `submit-button` |
+| Modal | `{feature}-modal` | `confirmation-modal` |
+| List / item | `{thing}-list` / `{thing}-item` | `users-list` |
 
 ```erb
 <form data-testid="sign-in-form">
-  <input type="email" data-testid="email-input">
+  <input type="email"    data-testid="email-input">
   <input type="password" data-testid="password-input">
-  <button type="submit" data-testid="sign-in-button">Sign In</button>
+  <button data-testid="sign-in-button">Sign In</button>
 </form>
 ```
 
-### Naming Convention
-Use hierarchical structure: `feature-component-element`
+Test usage:
 
-| Element Type | Pattern | Example |
-|--------------|---------|---------|
-| Forms | `{feature}-form` | `sign-in-form` |
-| Inputs | `{name}-input` | `email-input` |
-| Buttons | `{action}-button` | `submit-button` |
-| Modals/Dialogs | `{feature}-modal` | `confirmation-modal` |
-| Lists | `{item-type}-list` | `users-list` |
-| List Items | `{item-type}-item` | `user-item` |
-
-### Test Usage
 ```ruby
-# Robust test selectors
 within '[data-testid="sign-in-form"]' do
-  fill_in '[data-testid="email-input"]', with: 'user@example.com'  
-  fill_in '[data-testid="password-input"]', with: 'password'
+  fill_in  '[data-testid="email-input"]',    with: 'user@example.com'
+  fill_in  '[data-testid="password-input"]', with: 'password'
   click_button '[data-testid="sign-in-button"]'
 end
 ```
 
-### Priority Areas for Implementation
-1. **Authentication Forms** - Sign-in, sign-up, password reset
-2. **Navigation Elements** - Key navigation components
-3. **User Profile Components** - Profile edit forms
-4. **Application Forms** - Application creation/editing
-5. **Admin Panels** - Admin interface components
+Priority areas: **Auth forms → Nav → Profile → Application forms → Admin panels**.
 
-## User Factory Patterns
+---
 
-### Basic User Creation
+## 3 · Factory Patterns
+
 ```ruby
-# Standard user
-user = create(:user)
+# Basic
+create(:user)
+create(:constituent, :verified)
 
-# User with specific traits
-user = create(:user, :with_disabilities)
-user = create(:constituent, :verified)
-```
-
-### Guardian/Dependent Relationships
-```ruby
-# User with dependents
-guardian = create(:user, :with_dependent)
-guardian = create(:user, :with_dependents) # Multiple dependents
-
-# User with guardian
+# Guardian / dependent
+guardian  = create(:user, :with_dependents)   # many
 dependent = create(:user, :with_guardian)
 
-# Explicit relationship creation
-guardian = create(:user)
-dependent = create(:user)
-create(:guardian_relationship, guardian_user: guardian, dependent_user: dependent, relationship_type: 'Parent')
+# Explicit relationship
+create(:guardian_relationship,
+       guardian_user: guardian,
+       dependent_user: dependent,
+       relationship_type: 'Parent')
+
+# Avoid uniqueness clashes
+create(:user, email: generate(:email), phone: generate(:phone))
 ```
 
-### Avoiding Uniqueness Conflicts
+---
+
+## 4 · Model Test Examples
+
 ```ruby
-# Generate unique values
-user = create(:user, 
-  email: generate(:email),
-  phone: generate(:phone)
-)
+# Validation
+test 'phone uniqueness' do
+  create(:user, phone: '555-123-4567')
+  dup = build(:user, phone: '555-123-4567')
+  assert_not dup.valid?
+end
 
-# Use timestamp-based uniqueness
-timestamp = Time.current.to_i
-user = create(:user,
-  email: "user.#{timestamp}@example.com",
-  phone: "555-#{timestamp.to_s[-4..]}"
-)
-```
+# Callback
+test 'phone formatted' do
+  u = create(:user, phone: '(555) 123-4567')
+  assert_equal '555-123-4567', u.phone
+end
 
-## User Model Testing Patterns
-
-### Testing Private Methods
-```ruby
-test 'private method behavior' do
-  user = create(:user)
-  result = user.send(:private_method_name, arguments)
-  assert_equal expected_result, result
+# Private helper
+test 'private helper' do
+  u = build(:user)
+  assert u.send(:some_private_helper)
 end
 ```
 
-### Testing Validations
-```ruby
-test 'phone uniqueness validation' do
-  existing_user = create(:user, phone: '555-1234')
-  duplicate_user = build(:user, phone: '555-1234')
-  
-  assert_not duplicate_user.valid?
-  assert_includes duplicate_user.errors[:phone], 'has already been taken'
-end
-```
+---
 
-### Testing Callbacks
-```ruby
-test 'phone formatting callback' do
-  user = create(:user, phone: '(555) 123-4567')
-  assert_equal '555-123-4567', user.phone
-end
-```
+## 5 · Future Work
 
-## Future Considerations
-
-### Duplicate Review Process
-- Develop admin interface for reviewing flagged users
-- Implement account merging functionality
-- Add resolution tracking for duplicate flags
-- Consider automated duplicate detection improvements
-
-### Enhanced Deduplication
-- Add similar soft checks for address information
-- Implement fuzzy matching for name variations
-- Consider machine learning approaches for duplicate detection
-- Add bulk duplicate detection for existing data
-
-### Test Selector Expansion
-- Add `data-testid` to all interactive elements
-- Implement automated test selector validation
-- Create style guide for consistent naming
-- Consider tooling to strip test attributes from production builds 
+* **Duplicate review UI**: merge accounts, track resolutions.  
+* **Enhanced dedup**: fuzzy address match, ML scoring.  
+* **Bulk scanning**: legacy data cleanup.  
+* **`data-testid` expansion** & tooling to strip in production builds.

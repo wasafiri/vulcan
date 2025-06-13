@@ -38,6 +38,7 @@ class EvaluatorMailer < ApplicationMailer
     footer_contact_email = Policy.get('support_email') || 'support@example.com'
     footer_website_url = root_url(host: default_url_options[:host])
     footer_show_automated_message = true
+    footer_organization_name = Policy.get('organization_name') || 'MAT Program'
     header_logo_url = begin
       ActionController::Base.helpers.asset_path('logo.png', host: default_url_options[:host])
     rescue StandardError
@@ -67,7 +68,7 @@ class EvaluatorMailer < ApplicationMailer
       # Shared partial variables (rendered content)
       header_text: header_text(title: header_title, logo_url: header_logo_url),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
-                               show_automated_message: footer_show_automated_message),
+                               show_automated_message: footer_show_automated_message, organization_name: footer_organization_name),
       header_logo_url: header_logo_url, # Optional, passed for potential use in template body
       header_subtitle: nil # Optional
     }.compact
@@ -129,6 +130,7 @@ class EvaluatorMailer < ApplicationMailer
     footer_contact_email = Policy.get('support_email') || 'support@example.com'
     footer_website_url = root_url(host: default_url_options[:host])
     footer_show_automated_message = true
+    footer_organization_name = Policy.get('organization_name') || 'MAT Program'
     header_logo_url = begin
       ActionController::Base.helpers.asset_path('logo.png', host: default_url_options[:host])
     rescue StandardError
@@ -143,7 +145,7 @@ class EvaluatorMailer < ApplicationMailer
       # Shared partial variables (rendered content)
       header_text: header_text(title: header_title, logo_url: header_logo_url),
       footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
-                               show_automated_message: footer_show_automated_message),
+                               show_automated_message: footer_show_automated_message, organization_name: footer_organization_name),
       header_logo_url: header_logo_url, # Optional, passed for potential use in template body
       header_subtitle: nil # Optional
     }.compact
@@ -154,7 +156,8 @@ class EvaluatorMailer < ApplicationMailer
     rendered_text_body = format(rendered_text_body, **variables)
 
     # Create a letter if the constituent prefers print communications
-    if (constituent.communication_preference == 'letter') && !@letter_queued
+    # Use a more robust guard that checks if letter already exists in queue
+    if (constituent.communication_preference == 'letter') && !letter_already_queued?(evaluation, 'evaluation_submission_confirmation')
       Letters::TextTemplateToPdfService.new(
         template_name: 'evaluator_mailer_evaluation_submission_confirmation',
         recipient: constituent,
@@ -165,7 +168,6 @@ class EvaluatorMailer < ApplicationMailer
           submission_date_formatted: submission_date_formatted
         }
       ).queue_for_printing
-      @letter_queued = true
     end
 
     # Send email as non-multipart text-only
@@ -185,5 +187,23 @@ class EvaluatorMailer < ApplicationMailer
     raise e
   end
 
-  # Private helper methods were removed as they are now included via Mailers::SharedPartialHelpers
+  # Class method to manage queued letters using class instance variable
+  def self.queued_letters
+    @queued_letters ||= Set.new
+  end
+
+  # Check if a letter has already been queued for this evaluation and letter type
+  def letter_already_queued?(evaluation, letter_type)
+    # Use a class instance variable to track queued letters across instances
+    key = "#{evaluation.id}_#{letter_type}"
+
+    if self.class.queued_letters.include?(key)
+      true
+    else
+      self.class.queued_letters.add(key)
+      # Clean up old entries periodically to prevent memory leaks
+      self.class.queued_letters.clear if self.class.queued_letters.size > 1000
+      false
+    end
+  end
 end

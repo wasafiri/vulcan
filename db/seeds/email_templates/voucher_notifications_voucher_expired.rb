@@ -1,8 +1,7 @@
 # Seed File for "voucher_notifications_voucher_expired"
 # EmailTemplate.find_by(name: 'voucher_notifications_voucher_expired').deliver(user: user, voucher: voucher)
-# (Suggest saving as db/seeds/email_templates/constituent_notifications_voucher_expired.rb)
 # --------------------------------------------------
-EmailTemplate.create_or_find_by!(name: 'constituent_notifications_voucher_expired', format: :text) do |template|
+EmailTemplate.create_or_find_by!(name: 'voucher_notifications_voucher_expired', format: :text) do |template|
   template.subject = 'Your Voucher Has Expired'
   template.description = 'Sent to the constituent when their assigned voucher has expired.'
   template.body = <<~TEXT
@@ -34,4 +33,4 @@ EmailTemplate.create_or_find_by!(name: 'constituent_notifications_voucher_expire
   TEXT
   template.version = 1
 end
-puts 'Seeded constituent_notifications_voucher_expired (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?
+puts 'Seeded voucher_notifications_voucher_expired (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

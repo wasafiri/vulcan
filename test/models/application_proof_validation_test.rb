@@ -45,12 +45,12 @@ class ApplicationProofValidationTest < ActiveSupport::TestCase
 
     # Thread variable to bypass some of the validations for testing
     # as implemented in the real application code
-    Thread.current[:paper_application_context] = true
+    setup_paper_application_context
   end
 
   teardown do
     # Cleanup thread variables
-    Thread.current[:paper_application_context] = nil
+    teardown_paper_application_context
   end
 
   test 'accepts valid file types for income proof' do
@@ -74,7 +74,7 @@ class ApplicationProofValidationTest < ActiveSupport::TestCase
     application = create(:application, :in_progress)
 
     # Use the test context to skip validations that would interfere
-    Thread.current[:paper_application_context] = true
+    setup_paper_application_context
 
     # Create and attach a test text file (which should be rejected)
     file = Tempfile.new(['test', '.txt'])
@@ -100,7 +100,7 @@ class ApplicationProofValidationTest < ActiveSupport::TestCase
     ensure
       file.close
       file.unlink
-      Thread.current[:paper_application_context] = nil
+      teardown_paper_application_context
     end
   end
 

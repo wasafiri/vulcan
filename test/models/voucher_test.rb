@@ -6,6 +6,9 @@ class VoucherTest < ActiveSupport::TestCase
   include ActiveJob::TestHelper
 
   setup do
+    # Clear email deliveries to prevent test pollution
+    ActionMailer::Base.deliveries.clear
+    
     Current.user = create(:admin)
     # Create a constituent with a unique email for each test to avoid email conflicts
     constituent = create(:constituent, email: "unique_setup_#{Time.now.to_i}_#{rand(1000)}@example.com")
@@ -101,34 +104,8 @@ class VoucherTest < ActiveSupport::TestCase
                          cognition_disability: false) # 0
     application = create(:application, user: constituent)
 
-    # Debug disability values
-    puts "Hearing: #{constituent.hearing_disability.inspect}, #{constituent.hearing_disability.class}, #{Policy.voucher_value_for_disability('hearing')}"
-    puts "Vision: #{constituent.vision_disability.inspect}, #{constituent.vision_disability.class}, #{Policy.voucher_value_for_disability('vision')}"
-    puts "Mobility: #{constituent.mobility_disability.inspect}, #{constituent.mobility_disability.class}, #{Policy.voucher_value_for_disability('mobility')}"
-    puts "Speech: #{constituent.speech_disability.inspect}, #{constituent.speech_disability.class}, #{Policy.voucher_value_for_disability('speech')}"
-    puts "Cognition: #{constituent.cognition_disability.inspect}, #{constituent.cognition_disability.class}, #{Policy.voucher_value_for_disability('cognition')}"
-
-    # Debug the calculation
-    puts 'Calculation:'
-    total = 0
-    Constituent::DISABILITY_TYPES.each do |disability_type|
-      value = constituent.send("#{disability_type}_disability")
-      disability_value = value == true ? Policy.voucher_value_for_disability(disability_type) : 0
-      total += disability_value
-      puts "  #{disability_type}: #{value.inspect}, #{disability_value}"
-    end
-    puts "  Total: #{total}"
-
-    # Debug the model's calculation
-    model_total = Voucher.calculate_value_for_constituent(constituent)
-    puts "  Model total: #{model_total}"
-
     voucher = build(:voucher, application: application, initial_value: nil, remaining_value: nil)
     assert voucher.save
-
-    # Debug calculated value
-    puts "Initial value: #{voucher.initial_value.inspect}"
-    puts "Initial value class: #{voucher.initial_value.class}"
 
     assert_equal 300, voucher.initial_value # 100 + 200
     assert_equal voucher.initial_value, voucher.remaining_value
@@ -138,10 +115,11 @@ class VoucherTest < ActiveSupport::TestCase
   test 'sends notification when assigned' do
     # Create a new constituent with a unique email to avoid validation errors
     constituent = create(:constituent, email: "unique_#{Time.now.to_i}@example.com")
-    application = create(:application, user: constituent)
+    application = create(:application, status: :approved, user: constituent)
+    application.update!(medical_certification_status: :approved)
 
     perform_enqueued_jobs do
-      create(:voucher, application: application)
+      application.assign_voucher!
     end
 
     assert_equal 1, ActionMailer::Base.deliveries.size

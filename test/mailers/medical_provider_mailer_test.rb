@@ -13,18 +13,18 @@ class MedicalProviderMailerTest < ActionMailer::TestCase
     # Stub EmailTemplate.find_by! to return mocks with render methods
     request_cert_template_mock = mock('request_cert_template')
     # Stub render to accept the variables hash and return the expected subject and body strings
-    request_cert_template_mock.stubs(:render).returns(['Mock Request Cert Subject for Test User',
-                                                       'Mock Request Cert Body for Test User'])
+    request_cert_template_mock.stubs(:render).returns(["Mock Request Cert Subject for #{@constituent.full_name}",
+                                                       "Mock Request Cert Body for #{@constituent.full_name}"])
     EmailTemplate.stubs(:find_by!).with(name: 'medical_provider_request_certification', format: :text).returns(request_cert_template_mock)
 
     rejected_template_mock = mock('rejected_template')
-    rejected_template_mock.stubs(:render).returns(['Certification Rejected: Test User',
+    rejected_template_mock.stubs(:render).returns(["Certification Rejected: #{@constituent.full_name}",
                                                    'Text Rejection Reason: Incomplete documentation, Expired license'])
     EmailTemplate.stubs(:find_by!).with(name: 'medical_provider_certification_rejected', format: :text).returns(rejected_template_mock)
 
     submission_error_template_mock = mock('submission_error_template')
     submission_error_template_mock.stubs(:render).returns(['Submission Error: error_test@example.com',
-                                                           "Error: Invalid document format\nConstituent: Test User"])
+                                                           "Error: Invalid document format\nConstituent: #{@constituent.full_name}"])
     EmailTemplate.stubs(:find_by!).with(name: 'medical_provider_certification_submission_error',
                                         format: :text).returns(submission_error_template_mock)
   end

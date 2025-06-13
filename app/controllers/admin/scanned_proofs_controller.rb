@@ -25,7 +25,7 @@ module Admin
         # domain logic near your ApplicationRecord base class if needed.
         ApplicationRecord.transaction do
           attach_proof
-          create_audit_trail
+          # Note: audit trail is handled by ProofAttachmentService.attach_proof
         end
 
         success = true
@@ -102,12 +102,35 @@ module Admin
         status: :approved,
         admin: current_user,
         submission_method: :paper,
+        skip_audit_events: true, # Admin controller handles its own audit events
         metadata: {
           scanned_by: current_user.id,
           scan_location: params[:scan_location] || 'central_office'
         }
       })
       raise "Failed to attach proof: #{result[:error]&.message}" unless result[:success]
+      
+      # Create tracking event for audit trail (similar to constituent portal)
+      track_submission
+    end
+
+    def track_submission
+      # Get the blob ID from the actually attached blob for consistency with ProofAttachmentService
+      attached_blob = @application.send("#{params[:proof_type]}_proof").blob
+      
+      # Create Event for application audit log (matches constituent portal pattern)
+      AuditEventService.log(
+        action: 'proof_submitted',
+        actor: current_user,
+        auditable: @application,
+        metadata: {
+          proof_type: params[:proof_type],
+          submission_method: 'paper',
+          success: true,
+          blob_id: attached_blob&.id,
+          filename: params[:file].original_filename
+        }
+      )
     end
 
     def create_audit_trail

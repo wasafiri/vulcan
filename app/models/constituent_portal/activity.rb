@@ -32,6 +32,11 @@ module ConstituentPortal
       activities.sort_by(&:created_at)
     end
 
+    # Deduplicate submission events within the same minute for the same proof type
+    def self.deduplicate_submissions(submissions)
+      Applications::EventDeduplicationService.new.deduplicate(submissions)
+    end
+
     # Create an activity from a proof submission event
     def self.from_submission_event(event, is_initial = false)
       proof_type = event.metadata['proof_type']

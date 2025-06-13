@@ -6,7 +6,7 @@ FactoryBot.define do
     association :evaluator, type: 'Users::Evaluator'
     constituent
     application
-    evaluation_date { Time.current }
+    evaluation_date { 1.day.from_now }
     evaluation_type { :initial }
     status { :requested }
     notes { 'Default evaluation notes' }
@@ -42,7 +42,7 @@ FactoryBot.define do
       status { :completed }
       notes { 'Evaluation completed successfully.' }
       report_submitted { true }
-      evaluation_date { Time.current } # Use evaluation_date instead of submitted_at
+      evaluation_date { 1.day.from_now } # Use evaluation_date instead of submitted_at
     end
 
     trait :pending do
@@ -59,15 +59,35 @@ FactoryBot.define do
     end
 
     trait :with_mobile_devices do
-      after(:build) do |evaluation|
-        iphone = create(:product, name: 'iPhone')
-        pixel = create(:product, name: 'Pixel')
+      # Override default products after creation
+      after(:create) do |evaluation|
+        iphone = Product.find_or_create_by(name: 'iPhone') do |product|
+          product.description = 'Smartphone with comprehensive accessibility features'
+          product.manufacturer = 'Apple'
+          product.model_number = 'iPhone-16'
+          product.features = 'VoiceOver, Zoom, Switch Control, AssistiveTouch'
+          product.compatibility_notes = 'Compatible with all iOS accessibility features'
+          product.documentation_url = 'https://support.apple.com/guide/iphone'
+          product.device_types = ['Smartphone']
+        end
+        
+        pixel = Product.find_or_create_by(name: 'Pixel') do |product|
+          product.description = 'Android smartphone with accessibility features'
+          product.manufacturer = 'Google'
+          product.model_number = 'Pixel-8'
+          product.features = 'TalkBack, Magnification, Voice Access'
+          product.compatibility_notes = 'Compatible with Android accessibility services'
+          product.documentation_url = 'https://support.google.com/pixel'
+          product.device_types = ['Smartphone']
+        end
 
-        evaluation.products_tried = [
-          { 'product_id' => iphone.id, 'reaction' => 'Very Satisfied' },
-          { 'product_id' => pixel.id, 'reaction' => 'Satisfied' }
-        ]
-        evaluation.recommended_product_ids = [iphone.id, pixel.id]
+        evaluation.update!(
+          products_tried: [
+            { 'product_id' => iphone.id, 'reaction' => 'Very Satisfied' },
+            { 'product_id' => pixel.id, 'reaction' => 'Satisfied' }
+          ],
+          recommended_product_ids: [iphone.id, pixel.id]
+        )
       end
     end
 

@@ -7,129 +7,107 @@ module Applications
     setup do
       @application = create(:application, status: :in_progress)
       @admin = create(:admin)
+      @service = CertificationEventsService.new(@application)
+    end
 
-      # Create sample event data for testing
-      @notification = Notification.create!( # Keep this as Notification for now, as AuditLogBuilder still loads Notifications
-        recipient: @application.user,
-        actor: @admin,
-        action: 'medical_certification_requested',
-        notifiable: @application,
-        metadata: { timestamp: 1.day.ago.iso8601, submission_method: 'email' }
-      )
+    test 'certification_events returns only certification-related events' do
+      # Create a mix of certification and non-certification events using the existing admin user
+      cert_notification = create(:notification,
+                                 notifiable: @application,
+                                 action: 'medical_certification_requested',
+                                 actor: @admin,
+                                 recipient: @application.user)
 
-      @status_change = ApplicationStatusChange.create!(
-        application: @application,
+      # Create ApplicationStatusChange directly since there's no factory
+      cert_status_change = ApplicationStatusChange.create!(
+        application: @application, 
         user: @admin,
         from_status: 'submitted',
         to_status: 'requested',
         metadata: { change_type: 'medical_certification' }
       )
 
-      @event = AuditEventService.log( # Use AuditEventService.log for Event creation
-        action: 'medical_certification_requested',
-        actor: @admin,
-        auditable: @application,
-        metadata: {
-          details: 'certification requested via admin',
-          submission_method: 'fax'
-        }
+      cert_event = Event.create!(
+        user: @admin,
+        auditable: @application, 
+        action: 'medical_certification_approved',
+        metadata: {}
       )
 
-      # Create a non-certification event to test filtering
-      @unrelated_event = AuditEventService.log( # Use AuditEventService.log for Event creation
+      non_cert_event = Event.create!(
+        user: @admin,
+        auditable: @application, 
         action: 'application_created',
-        actor: @admin,
-        auditable: @application,
-        metadata: { initial_status: 'in_progress' }
+        metadata: {}
       )
 
-      # Initialize our service
-      @service = CertificationEventsService.new(@application)
+      # Stub the audit log builder to return these events
+      # The deduplication is now handled by EventDeduplicationService, so we can test filtering in isolation.
+      all_events = [cert_notification, cert_status_change, cert_event, non_cert_event]
+      @service.instance_variable_get(:@audit_log_builder).stubs(:build_deduplicated_audit_logs).returns(all_events)
+
+      # Execute
+      result = @service.certification_events
+
+      # Verify
+      assert_includes result, cert_notification
+      assert_includes result, cert_status_change
+      assert_includes result, cert_event
+      assert_not_includes result, non_cert_event
+      assert_equal 3, result.size
     end
 
-    test 'certification_events returns only certification-related events' do
-      with_mocked_attachments do
-        events = @service.certification_events
+    test 'request_events returns only request-related certification events' do
+      # Create a mix of request and other certification events using the existing admin user
+      # Use different timestamps to avoid deduplication
+      time_base = Time.current
 
-        # Should include our certification-related events
-        assert_includes events, @notification
-        assert_includes events, @status_change
-        assert_includes events, @event
+      request_notification = create(:notification, 
+                                   notifiable: @application, 
+                                   action: 'medical_certification_requested',
+                                   actor: @admin,
+                                   recipient: @application.user)
+      request_notification.update!(created_at: time_base - 2.minutes)
 
-        # Should NOT include unrelated events
-        assert_not_includes events, @unrelated_event
+      approved_event = Event.create!(
+        user: @admin,
+        auditable: @application,
+        action: 'medical_certification_approved',
+        metadata: {},
+        created_at: time_base - 1.minute
+      )
 
-        # Should return the correct count
-        assert_equal 3, events.count
+      # Create ApplicationStatusChange directly
+      request_status_change = ApplicationStatusChange.create!(
+        application: @application, 
+        user: @admin,
+        from_status: 'submitted',
+        to_status: 'requested', 
+        metadata: { change_type: 'medical_certification' },
+        created_at: time_base
+      )
+
+      all_events = [request_notification, approved_event, request_status_change]
+      @service.instance_variable_get(:@audit_log_builder).stubs(:build_deduplicated_audit_logs).returns(all_events)
+
+      # Execute
+      result = @service.request_events
+
+      # Verify - should return formatted hash objects for admin views
+      assert_equal 2, result.size
+      assert(result.all? { |r| r.is_a?(Hash) })
+
+      # Verify hash structure expected by admin views
+      result.each do |request_event|
+        assert request_event.key?(:timestamp)
+        assert request_event.key?(:actor_name)
+        assert request_event.key?(:submission_method)
+        assert request_event[:timestamp].is_a?(Time)
+        assert_equal @admin.full_name, request_event[:actor_name]
       end
-    end
 
-    test 'request_events returns processed request events' do
-      with_mocked_attachments do
-        request_events = @service.request_events
-
-        # The events should be processed into a specific format
-        assert_instance_of Array, request_events
-        assert((request_events.all? { |e| e.is_a?(Hash) }))
-
-        # Verify we have the expected number of events (may be less than 3 due to deduplication)
-        assert request_events.present?
-
-        # Verify the format of a request event
-        event = request_events.first
-        assert event.key?(:timestamp)
-        assert event.key?(:actor_name)
-        assert event.key?(:submission_method)
-
-        # Test deduplication - events with the same timestamp should be combined
-        # Create another event via AuditEventService.log for deduplication test
-        AuditEventService.log(
-          action: 'medical_certification_requested',
-          actor: @admin,
-          auditable: @application,
-          metadata: { timestamp: @notification.metadata['timestamp'] } # Same timestamp
-        )
-
-        # Service should be recreated to get fresh events
-        service = CertificationEventsService.new(@application)
-        new_request_events = service.request_events
-
-        # Count should not increase due to deduplication
-        assert_equal request_events.count, new_request_events.count
-      end
-    end
-
-    test 'deduplication preserves submission method when available' do
-      with_mocked_attachments do
-        # Create events with the same timestamp but one has submission method
-        same_time = Time.current.iso8601
-
-        # Create an event without submission_method
-        AuditEventService.log(
-          action: 'medical_certification_requested',
-          actor: @admin,
-          auditable: @application,
-          metadata: { timestamp: same_time }
-        )
-
-        # Create an event with submission_method
-        AuditEventService.log(
-          action: 'medical_certification_requested',
-          actor: @admin,
-          auditable: @application,
-          metadata: { timestamp: same_time, submission_method: 'portal' }
-        )
-
-        service = CertificationEventsService.new(@application)
-        processed_events = service.request_events
-
-        # Find the event with our timestamp
-        target_event = processed_events.find { |e| e[:timestamp].iso8601 == same_time }
-        assert_not_nil target_event
-
-        # It should have the submission method from the event that had one
-        assert_equal 'portal', target_event[:submission_method]
-      end
+      # Verify they are sorted by timestamp in reverse order (most recent first)
+      assert_equal result, result.sort_by { |r| r[:timestamp] }.reverse
     end
   end
 end

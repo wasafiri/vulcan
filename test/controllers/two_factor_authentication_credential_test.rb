@@ -37,7 +37,7 @@ class TwoFactorAuthenticationCredentialTest < ActionDispatch::IntegrationTest
 
     # Authenticate user using standardized method from AuthenticationTestHelper
     # This replaces the custom sign_in_user method in the original test
-    sign_in_user(@user)
+    sign_in_for_integration_test(@user)
   end
 
   test 'should get new credential form' do
@@ -109,24 +109,24 @@ class TwoFactorAuthenticationCredentialTest < ActionDispatch::IntegrationTest
 
   test 'should require authentication' do
     # Step 1: Sign out the previously authenticated user
-    sign_out_user
+    sign_out
 
     # Step 2: Verify security enforcement - each credential management endpoint
     # should redirect unauthenticated users to the sign-in page
 
     # Try accessing the credential creation form
     get new_credential_two_factor_authentication_path(type: 'webauthn')
-    assert_redirected_to sign_in_path, 'Unauthenticated users should be redirected to sign in'
+    assert_redirected_to sign_in_path, "Expected redirect to sign_in_path, but got status #{response.status}. Location: #{response.location}. Body starts with: #{response.body[0..100]}"
 
     # Try accessing the WebAuthn options endpoint
     post webauthn_creation_options_two_factor_authentication_path, xhr: true
-    assert_redirected_to sign_in_path, 'Options endpoint should require authentication'
+    assert_redirected_to sign_in_path, "Options endpoint should require authentication, but got status #{response.status}"
 
     # Try creating a credential directly
     post create_credential_two_factor_authentication_path(type: 'webauthn'),
          params: { id: 'test-id' },
          as: :json
-    assert_redirected_to sign_in_path, 'Credential creation should require authentication'
+    assert_redirected_to sign_in_path, "Credential creation should require authentication, but got status #{response.status}"
   end
 
   test 'should destroy credential' do
@@ -177,9 +177,4 @@ class TwoFactorAuthenticationCredentialTest < ActionDispatch::IntegrationTest
   end
 
   private
-
-  # We can use the standardized sign_out method from AuthenticationTestHelper
-  def sign_out_user
-    delete sign_out_path
-  end
 end

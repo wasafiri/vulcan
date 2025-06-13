@@ -61,7 +61,7 @@ module MatVulcan
       ENV['INBOUND_EMAIL_PROVIDER'] = 'mailgun'
 
       # Force reloading of the module
-      load Rails.root.join('config/initializers/inbound_email_config.rb')
+      load Rails.root.join('config/initializers/01_inbound_email_config.rb')
 
       # Test values
       assert_equal 'env-test@example.com', MatVulcan::InboundEmailConfig.inbound_email_address

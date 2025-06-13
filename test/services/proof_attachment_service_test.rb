@@ -76,7 +76,7 @@ class ProofAttachmentServiceTest < ActiveSupport::TestCase
     assert_equal 'income', event.metadata['proof_type']
     assert_equal 'paper', event.metadata['submission_method']
     assert_equal 'approved', event.metadata['status']
-    assert_not_nil event.metadata['blob_id']
+    assert_not_nil event.metadata['blob_id'], 'Expected blob_id in metadata to not be nil'
   end
 
   test 'attach_proof handles errors gracefully' do

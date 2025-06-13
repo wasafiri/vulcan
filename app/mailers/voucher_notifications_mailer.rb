@@ -3,6 +3,7 @@
 class VoucherNotificationsMailer < ApplicationMailer
   include Rails.application.routes.url_helpers
   include ActionView::Helpers::NumberHelper # For number_to_currency
+  include Mailers::SharedPartialHelpers # Include the shared helpers for header_text and footer_text
 
   def self.default_url_options
     Rails.application.config.action_mailer.default_url_options
@@ -10,7 +11,8 @@ class VoucherNotificationsMailer < ApplicationMailer
 
   # Removed prepare_email helper
 
-  def voucher_assigned(voucher)
+  def voucher_assigned
+    voucher = params[:voucher]
     user = voucher.application.user
     template_name = 'voucher_notifications_voucher_assigned'
 
@@ -136,7 +138,18 @@ class VoucherNotificationsMailer < ApplicationMailer
       raise "Email template (text format) not found for #{template_name}"
     end
 
-    # Prepare variables
+    # Common elements for shared partials
+    header_title = 'Important: Your Voucher Has Expired'
+    footer_contact_email = Policy.get('support_email') || 'support@example.com'
+    footer_website_url = root_url(host: default_url_options[:host])
+    footer_show_automated_message = true
+    organization_name = Policy.get('organization_name') || 'Maryland Accessible Telecommunications Program'
+    header_logo_url = begin
+      ActionController::Base.helpers.asset_path('logo.png', host: default_url_options[:host])
+    rescue StandardError
+      nil
+    end
+
     # Optional: Render transaction history if needed for the template (text only)
     transaction_history_text = ''
     if voucher.transactions.any?
@@ -149,13 +162,19 @@ class VoucherNotificationsMailer < ApplicationMailer
       user_first_name: user.first_name,
       voucher_code: voucher.code,
       initial_value_formatted: number_to_currency(voucher.initial_value),
-      unused_value_formatted: number_to_currency(voucher.remaining_value), # Assuming remaining_value is correct
+      unused_value_formatted: number_to_currency(voucher.remaining_value),
       # Use Policy.get for configuration values
       expiration_date_formatted: (voucher.issued_at + (Policy.get('voucher_validity_period_months') || 6).months).strftime('%B %d, %Y'),
-      validity_period_months: Policy.get('voucher_validity_period_months') || 6,
-      minimum_redemption_amount_formatted: number_to_currency(Policy.get('minimum_voucher_redemption_amount') || 0),
+      # Required header and footer text
+      header_text: header_text(title: header_title, logo_url: header_logo_url),
+      footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
+                               organization_name: organization_name, show_automated_message: footer_show_automated_message),
       # Optional variables
-      transaction_history_text: transaction_history_text
+      transaction_history_text: transaction_history_text,
+      title: header_title, # Optional
+      logo: header_logo_url, # Optional
+      subtitle: nil, # Optional
+      show_automated_message: footer_show_automated_message # Optional
     }.compact
 
     # Render subject and body from the text template

@@ -95,7 +95,7 @@ class Voucher < ApplicationRecord
     # Ensure the voucher meets basic redemption criteria (active, not expired, sufficient funds)
     return false unless can_redeem?(amount)
 
-    transaction do
+    transaction(requires_new: true) do
       # Create the transaction record
       txn = create_redemption_transaction(amount, vendor, generate_reference_number)
 
@@ -247,9 +247,27 @@ class Voucher < ApplicationRecord
   end
 
   def log_status_change
+    # Determine the actor safely - if both Current.user and system_user fail, 
+    # we'll skip logging rather than break the voucher operation
+    actor = Current.user
+    if actor.nil?
+      begin
+        actor = User.system_user
+      rescue StandardError => e
+        Rails.logger.error("Failed to get system user for voucher status change logging: #{e.message}")
+        return # Skip logging if we can't determine an actor
+      end
+    end
+
+    # Verify the actor actually exists in the database to prevent foreign key constraint violations
+    unless actor&.persisted? && User.exists?(actor.id)
+      Rails.logger.warn("Skipping voucher status change audit - actor user (ID: #{actor&.id}) does not exist in database")
+      return
+    end
+
     AuditEventService.log(
       action: "status_changed_to_#{status}",
-      actor: Current.user,
+      actor: actor,
       auditable: self,
       metadata: {
         previous_status: status_before_last_save,
@@ -257,6 +275,12 @@ class Voucher < ApplicationRecord
         timestamp: Time.current
       }
     )
+  rescue StandardError => e
+    # Log the error but don't raise - this ensures the voucher operation still completes
+    Rails.logger.error("Failed to log voucher status change: #{e.message}")
+    Rails.logger.error(e.backtrace.join("\n")) if e.backtrace
+    # Return nil but don't raise exception
+    nil
   end
 
   def remaining_value_cannot_exceed_initial_value

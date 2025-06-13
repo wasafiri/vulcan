@@ -44,8 +44,10 @@ module Applications
       case event
       when ApplicationStatusChange
         fingerprint_for_status_change(event)
-      when ->(e) { e.action&.include?('proof_submitted') }
+      when ->(e) { e.respond_to?(:action) && e.action&.include?('proof_submitted') }
         fingerprint_for_proof_submission(event)
+      when ProofReview
+        fingerprint_for_proof_review(event)
       end
     end
 
@@ -60,6 +62,10 @@ module Applications
 
     def fingerprint_for_proof_submission(event)
       "#{event.metadata['proof_type']}-#{event.metadata['submission_method']}"
+    end
+
+    def fingerprint_for_proof_review(event)
+      "#{event.proof_type}-#{event.status}"
     end
 
     # Normalizes the action name across different event types.
@@ -77,6 +83,8 @@ module Applications
         else
           "status_change_#{event.to_status}"
         end
+      when ProofReview
+        "proof_#{event.status}"
       else
         event.class.name.underscore
       end
@@ -99,6 +107,8 @@ module Applications
       case event
       when ApplicationStatusChange
         3
+      when ProofReview
+        2
       when Event
         2
       when Notification

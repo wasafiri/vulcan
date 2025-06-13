@@ -8,32 +8,13 @@ class PaperApplicationDirectUploadTest < ActionDispatch::IntegrationTest
   setup do
     # Use factory bot instead of fixture
     @admin = create(:admin)
-    sign_in(@admin)
+    sign_in_for_integration_test(@admin)
 
     # Set up FPL policies for income threshold validation
     setup_fpl_policies
   end
 
-  # Set up the necessary FPL policies for income threshold checking
-  def setup_fpl_policies
-    # Stub the log_change method to avoid validation errors
-    Policy.class_eval do
-      def log_change
-        # No-op in test environment
-      end
-    end
 
-    # Create basic FPL policies needed for application creation
-    Policy.find_or_create_by(key: 'fpl_1_person').update(value: 15_000)
-    Policy.find_or_create_by(key: 'fpl_2_person').update(value: 20_000)
-    Policy.find_or_create_by(key: 'fpl_3_person').update(value: 25_000)
-    Policy.find_or_create_by(key: 'fpl_4_person').update(value: 30_000)
-    Policy.find_or_create_by(key: 'fpl_5_person').update(value: 35_000)
-    Policy.find_or_create_by(key: 'fpl_6_person').update(value: 40_000)
-    Policy.find_or_create_by(key: 'fpl_7_person').update(value: 45_000)
-    Policy.find_or_create_by(key: 'fpl_8_person').update(value: 50_000)
-    Policy.find_or_create_by(key: 'fpl_modifier_percentage').update(value: 400)
-  end
 
   test 'direct upload for paper applications should work with signed_ids' do
     # Set up sample proof files using existing fixtures in test/fixtures/files/

@@ -3,7 +3,10 @@
 # app/services/audit_event_service.rb
 class AuditEventService < BaseService
   # Time window for preventing duplicate event creation.
-  DEDUP_WINDOW = 5.seconds
+  # Reduced to 2 seconds to prevent only accidental duplicates (double-clicks)
+  # while allowing legitimate events. EventDeduplicationService handles 
+  # sophisticated business-logic deduplication for display purposes.
+  DEDUP_WINDOW = 2.seconds
 
   # Logs a distinct system event and prevents duplicates within the DEDUP_WINDOW.
   #
@@ -17,7 +20,7 @@ class AuditEventService < BaseService
     # This code-level deduplication can still have race conditions under high concurrency.
     # A more robust solution would be a partial unique index in the database on
     # (action, auditable_type, auditable_id) for recent events.
-    if recent_duplicate_exists?(action: action, auditable: auditable)
+    if recent_duplicate_exists?(action: action, auditable: auditable, metadata: metadata)
       Rails.logger.info "AuditEventService: Duplicate event '#{action}' for #{auditable.class.name} ##{auditable.id} suppressed."
       return nil
     end
@@ -45,9 +48,30 @@ class AuditEventService < BaseService
   end
 
   # Checks if a similar event for the same record was created within the DEDUP_WINDOW.
-  # A composite index on (auditable_type, auditable_id, action, created_at) is recommended for performance.
-  def self.recent_duplicate_exists?(action:, auditable:)
+  # Enhanced to consider metadata differences to allow legitimate different events.
+  def self.recent_duplicate_exists?(action:, auditable:, metadata: {})
+    # Create a fingerprint that includes meaningful metadata differences
+    fingerprint = create_event_fingerprint(action, metadata)
+    
     Event.where(action: action.to_s, auditable: auditable)
-         .exists?(['created_at >= ?', DEDUP_WINDOW.ago])
+         .where('created_at >= ?', DEDUP_WINDOW.ago)
+         .any? { |event| create_event_fingerprint(event.action, event.metadata) == fingerprint }
+  end
+
+  private
+
+  # Create a fingerprint that distinguishes between meaningfully different events
+  def self.create_event_fingerprint(action, metadata)
+    base = action.to_s
+    
+    # For proof submission events, include proof_type and submission_method
+    if action.to_s.include?('proof_submitted') || action.to_s.include?('proof_attached')
+      proof_type = metadata['proof_type'] || metadata[:proof_type]
+      submission_method = metadata['submission_method'] || metadata[:submission_method]
+      return "#{base}_#{proof_type}_#{submission_method}" if proof_type && submission_method
+    end
+    
+    # For other events, use just the base action
+    base
   end
 end

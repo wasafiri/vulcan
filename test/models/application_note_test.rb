@@ -5,7 +5,7 @@ require 'test_helper'
 class ApplicationNoteTest < ActiveSupport::TestCase
   setup do
     @application = create(:application)
-    @admin = create(:user, type: 'Admin')
+    @admin = create(:admin)
   end
 
   test 'should create a valid application note' do

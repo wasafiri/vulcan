@@ -8,7 +8,19 @@ module Admin
 
     setup do
       @admin = create(:admin, email: generate(:email))
-      sign_in_with_headers(@admin) # Use helper for integration tests
+      
+      # Clear any previous authentication state
+      cookies.delete(:session_token) if respond_to?(:cookies)
+      Current.reset if defined?(Current)
+      
+      # Debug database state due to truncation strategy
+      if ENV['DEBUG_AUTH'] == 'true'
+        puts "SETUP DEBUG: Created admin with ID=#{@admin.id}, email=#{@admin.email}"
+        puts "SETUP DEBUG: All users in DB: #{User.pluck(:id, :email, :type)}"
+        puts "SETUP DEBUG: DatabaseCleaner info available"
+      end
+      
+      sign_in_for_integration_test(@admin) # Use helper for integration tests
       @application = create(:application, user: create(:constituent, email: generate(:email)))
       # Ensure the application status is correct for the tests that rely on it
       @application.update!(medical_certification_status: 'requested')
@@ -25,6 +37,15 @@ module Admin
     end
 
     test 'should upload medical certification document' do
+      # Debug authentication state
+      puts "DEBUG: Current user in test: #{Current.user.inspect}"
+      puts "DEBUG: @admin: #{@admin.inspect}"
+      puts "DEBUG: @admin.admin?: #{@admin.admin?}"
+      puts "DEBUG: @admin.type: #{@admin.type}"
+      puts "DEBUG: @test_user_id: #{@test_user_id}"
+      puts "DEBUG: @session_token: #{@session_token}"
+      puts "DEBUG: User.find_by(id: #{@test_user_id}): #{User.find_by(id: @test_user_id).inspect}"
+      
       assert_equal 'requested', @application.medical_certification_status
       assert_not @application.medical_certification.attached?
 
@@ -57,7 +78,8 @@ module Admin
 
         # Verify the results
         assert_redirected_to admin_application_path(@application)
-        follow_redirect!
+        # Pass headers explicitly since follow_redirect! doesn't inherit default_headers
+        follow_redirect!(headers: { 'X-Test-User-Id' => @test_user_id.to_s })
         assert_response :success
         assert_match(/Medical certification successfully uploaded and approved/, flash[:notice])
       end
@@ -80,7 +102,8 @@ module Admin
             params: { medical_certification: nil, medical_certification_status: 'approved' }
 
       assert_redirected_to admin_application_path(@application)
-      follow_redirect!
+      # Pass headers explicitly since follow_redirect! doesn't inherit default_headers
+      follow_redirect!(headers: { 'X-Test-User-Id' => @test_user_id.to_s })
       assert_response :success
       assert_match(/Please select a file to upload/, flash[:alert])
 
@@ -97,7 +120,8 @@ module Admin
             params: { medical_certification: file }
 
       assert_redirected_to admin_application_path(@application)
-      follow_redirect!
+      # Pass headers explicitly since follow_redirect! doesn't inherit default_headers
+      follow_redirect!(headers: { 'X-Test-User-Id' => @test_user_id.to_s })
       assert_response :success
       assert_match(/Please select whether to accept or reject the certification/, flash[:alert])
 

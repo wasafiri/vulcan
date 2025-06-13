@@ -13,7 +13,6 @@ module Admin
       sign_in_as(@admin)
 
       # Additional verification that authentication worked
-      debug_auth_state('After setup authentication')
     end
 
     def test_should_get_index
@@ -97,7 +96,7 @@ module Admin
     def test_non_admin_cannot_access
       # Sign in as a non-admin user (using factory instead of fixture)
       @user = create(:constituent)
-      sign_in(@user)
+      sign_in_for_integration_test(@user)
 
       # Try to access admin functionality
       get admin_products_path

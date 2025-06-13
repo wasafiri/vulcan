@@ -8,7 +8,7 @@ module ConstituentPortal
 
     setup do
       @user = create(:constituent, :with_disabilities) # Use the :constituent factory
-      sign_in_with_headers(@user) # Use helper for integration tests
+      sign_in_for_integration_test(@user) # Use helper for integration tests
     end
 
     test 'should get show' do

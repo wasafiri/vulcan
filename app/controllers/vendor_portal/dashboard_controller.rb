@@ -2,6 +2,9 @@
 
 module VendorPortal
   class DashboardController < VendorPortal::BaseController
+    # Authenticate_vendor! is inherited from BaseController, but let's be explicit for clarity
+    before_action :authenticate_vendor!
+
     def show
       @recent_transactions = current_user.latest_transactions
                                          .includes(:voucher, voucher_transaction_products: :product)

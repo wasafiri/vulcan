@@ -7,9 +7,10 @@ module Applications
     include ActionDispatch::TestProcess::FixtureFile
     setup do
       @admin = create(:admin)
+      @timestamp = Time.current.to_f.to_s.gsub('.', '')
 
-      # Set thread local context to skip proof validations in tests
-      Thread.current[:paper_application_context] = true
+      # Set Current context to skip proof validations in tests
+      Current.paper_context = true
       @income_proof = fixture_file_upload('test/fixtures/files/income_proof.pdf', 'application/pdf')
       @residency_proof = fixture_file_upload('test/fixtures/files/residency_proof.pdf', 'application/pdf')
     end
@@ -105,8 +106,8 @@ module Applications
         constituent: {
           first_name: 'Jane',
           last_name: 'Doe',
-          email: 'jane.doe@example.com',
-          phone: '301-555-1212',
+          email: "jane.doe.#{@timestamp}@example.com",
+          phone: "301555#{@timestamp[-4..-1]}",
           physical_address_1: '123 Main St',
           city: 'Baltimore',
           state: 'MD',
@@ -134,8 +135,8 @@ module Applications
         constituent: {
           first_name: 'John',
           last_name: 'Smith',
-          email: 'john.smith@example.com',
-          phone: '301-555-1212',
+          email: "john.smith.#{@timestamp}@example.com",
+          phone: "301555#{@timestamp[-4..-1]}",
           physical_address_1: '456 Oak St',
           city: 'Baltimore',
           state: 'MD',
@@ -173,8 +174,8 @@ module Applications
     end
 
     teardown do
-      # Clean up thread local context after the test
-      Thread.current[:paper_application_context] = nil
+      # Clean up Current context after the test
+      Current.reset
     end
   end
 end

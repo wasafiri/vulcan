@@ -7,6 +7,80 @@ class MedicalProviderMailer < ApplicationMailer
     Rails.application.config.action_mailer.default_url_options
   end
 
+  # Proxy methods for NotificationService compatibility
+  # These delegate to the existing methods with proper parameter mapping
+  
+  def requested(notifiable, notification)
+    # Map to request_certification method
+    self.class.with(
+      application: notifiable,
+      timestamp: notification.metadata['timestamp'],
+      notification_id: notification.id
+    ).request_certification
+  end
+
+  def approved(notifiable, notification)
+    # For now, delegate to a simple approval method
+    # This can be expanded later if needed
+    self.class.with(
+      application: notifiable,
+      notification: notification
+    ).certification_approved
+  end
+
+  def rejected(notifiable, notification)
+    # Map to certification_rejected method
+    self.class.with(
+      application: notifiable,
+      rejection_reason: notification.metadata['rejection_reason'] || 'Not specified',
+      admin: notification.actor
+    ).certification_rejected
+  end
+
+  # New method for approved certifications
+  def certification_approved
+    template_name = 'medical_provider_certification_approved'
+    puts "DEBUG: certification_approved - Looking for template: #{template_name}" # Debug line
+    begin
+      text_template = EmailTemplate.find_by!(name: template_name, format: :text)
+      puts "DEBUG: certification_approved - Found template: #{text_template.inspect}" # Debug line
+    rescue ActiveRecord::RecordNotFound => e
+      Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
+      raise "Email template (text format) not found for #{template_name}"
+    end
+
+    # Prepare variables
+    application = params[:application]
+    notification = params[:notification]
+    constituent = application.user
+
+    variables = {
+      constituent_full_name: constituent.full_name,
+      application_id: application.id
+    }.compact
+    puts "DEBUG: certification_approved - Variables: #{variables.inspect}" # Debug line
+
+    # Render subject and body
+    rendered_subject, rendered_text_body = text_template.render(**variables)
+    puts "DEBUG: certification_approved - Rendered Subject: #{rendered_subject.inspect}" # Debug line
+    puts "DEBUG: certification_approved - Rendered Body: #{rendered_text_body.inspect}" # Debug line
+
+    # Send email
+    mail(
+      to: application.medical_provider_email,
+      from: 'info@mdmat.org',
+      reply_to: 'medical-certification@maryland.gov',
+      subject: rendered_subject,
+      message_stream: 'outbound'
+    ) do |format|
+      format.text { render plain: rendered_text_body.to_s }
+    end
+  rescue StandardError => e
+    Rails.logger.error("Failed to send certification approved email for application #{params[:application]&.id}: #{e.message}")
+    Rails.logger.error(e.backtrace.join("\n"))
+    raise e
+  end
+
   # Notify a medical provider that a certification has been rejected
   # @param application [Application] The application with the rejected certification
   # @param rejection_reason [String] The reason for rejection

@@ -52,9 +52,12 @@ module AttachmentTestHelper
   # @return [Mocha::Mock] A mock object simulating an ActiveStorage::Attached::One instance.
   def mock_attached_file(filename: 'test.pdf', content_type: 'application/pdf', byte_size: 100.kilobytes, created_at: Time.current,
                          attached: true)
+    # Create a proper ActiveStorage::Filename object instead of mocking it
+    filename_obj = ActiveStorage::Filename.new(filename)
+    
     # Mock the Blob
     blob_mock = mock("ActiveStorage::Blob #{filename}")
-    blob_mock.stubs(:filename).returns(ActiveStorage::Filename.new(filename))
+    blob_mock.stubs(:filename).returns(filename_obj)
     blob_mock.stubs(:content_type).returns(content_type)
     blob_mock.stubs(:byte_size).returns(byte_size)
     blob_mock.stubs(:created_at).returns(created_at)

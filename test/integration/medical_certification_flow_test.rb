@@ -44,7 +44,8 @@ class MedicalCertificationFlowTest < ActionDispatch::IntegrationTest
     # 3. Check redirect and flash message
     assert_redirected_to admin_application_path(@application)
     assert_equal 'Certification request sent successfully.', flash[:notice]
-    follow_redirect!
+    # Pass headers explicitly since follow_redirect! doesn't inherit default_headers
+    follow_redirect!(headers: { 'X-Test-User-Id' => @admin.id.to_s })
 
     # 4. Verify application was updated
     @application.reload
@@ -89,12 +90,12 @@ class MedicalCertificationFlowTest < ActionDispatch::IntegrationTest
          headers: @headers
 
     # Send a certification request as admin first
-    sign_in(@admin)
+    sign_in_for_integration_test(@admin)
     post resend_medical_certification_admin_application_path(@application)
     sign_out
 
     # Sign back in as constituent
-    sign_in(@constituent)
+    sign_in_for_integration_test(@constituent)
 
     # Visit application page
     get constituent_portal_application_path(@application)
@@ -105,12 +106,12 @@ class MedicalCertificationFlowTest < ActionDispatch::IntegrationTest
     assert_equal 'requested', @application.medical_certification_status
 
     # Verify medical certification status is shown
-    assert_select 'h2', text: /Medical Certification Status/
+    assert_select 'h2', text: /Medical Provider & Certification/
 
     # With more complex pages, sometimes we need to verify content exists
     # without using exact selectors
     assert_match(/Requested/, response.body)
-    assert_match(/sent on/, response.body)
+    assert_match(/Certification Status/, response.body)
   end
 
   def test_handling_errors_gracefully

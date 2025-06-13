@@ -24,7 +24,7 @@ module VendorPortal
       }
 
       # Use the sign_in helper from test_helper.rb
-      sign_in(@vendor)
+      sign_in_for_integration_test(@vendor)
 
       # Stub the Policy class
       Policy.stubs(:voucher_minimum_redemption_amount).returns(10.0)

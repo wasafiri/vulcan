@@ -1,78 +1,73 @@
-# MAT Vulcan Documentation
+# MAT Vulcan Documentation Hub
 
-This folder contains all documentation for the MAT Vulcan application, organized by purpose and audience.
+A roadmap to **every doc, guide, and reference** in the repository—so devs and AI helpers can jump straight to what they need.
 
-## 🎯 Recent Updates (December 2025)
+---
 
-**✅ Application Test Suite Consolidation Complete**
-- **76 application tests now passing** (100% success rate)
-- **EventDeduplicationService architectural consolidation** 
-- **Thread-local to Current attributes migration**
-- See: `development/application_tests_consolidation.md`
+## 1 · Quick Start
 
-## Quick Start
+| Step | Where to look | Why |
+|------|---------------|-----|
+| **1. Feature Overview** | `current_application_features.md` | Know what the app does right now. |
+| **2. Test & Debug** | `development/testing_and_debugging_guide.md` | Local setup, CurrentAttributes patterns, debugger tips. |
+| **3. Service Patterns** | `development/service_architecture.md` | Understand how business logic is encapsulated. |
 
-- **[CURRENT_FEATURES.md](CURRENT_FEATURES.md)** - High-level overview of major implemented features
-- **[development/testing_and_debugging_guide.md](development/testing_and_debugging_guide.md)** - Essential testing guide for developers
-- **[development/application_tests_consolidation.md](development/application_tests_consolidation.md)** - Recent test consolidation work
+> **Tip:** Search the **development/** folder first for any "how do I…?" question -— most implementation guides live there.
 
-## Folder Structure
+---
 
-### 📁 development/
-Development guides, testing documentation, and technical implementation details for developers working on the codebase.
+## 2 · Folder Map
 
-**Key Files:**
+### 📂 development/
 
-- `testing_and_debugging_guide.md` - Comprehensive testing guide with new Current attributes patterns
-- `service_architecture.md` - **UPDATED**: Service objects including new EventDeduplicationService
-- `guardian_relationship_system.md` - Guardian/dependent relationship system implementation
-- `javascript_architecture.md` - JavaScript controller architecture and utility patterns
-- `paper_application_architecture.md` - Paper application form architecture and service patterns
-- `user_management_features.md` - User deduplication, test selectors, and factory patterns
+Deep-dive, code-facing docs for contributors.
 
-### 📁 features/
-Documentation for specific application features, including implementation details and user workflows.
+| File | Highlights |
+|------|------------|
+| `testing_and_debugging_guide.md` | Mini-plan workflow, one-tool-call practice, Current attributes in tests. |
+| `service_architecture.md` | All service objects, including **EventDeduplicationService** logic. |
+| `guardian_relationship_system.md` | Model graph, contact-strategy helpers. |
+| `javascript_architecture.md` | Stimulus target-first pattern, `rails_request` service, base controllers. |
+| `paper_application_architecture.md` | Admin paper-form flow, bypass validations with `Current.paper_context`. |
+| `user_management_features.md` | Phone/email dedup, `data-testid` naming scheme, factory recipes. |
 
-**Files:**
-- `add_alternate_contact_feature.md` - Alternate contact feature specification
-- `application_pain_point_tracking.md` - Pain point tracking feature
-- `email_uniqueness_for_dependents.md` - Email uniqueness handling for dependents
+### 📂 features/
 
-### 📁 infrastructure/
-System architecture, email systems, and infrastructure-related documentation.
+Spec-level docs for discrete user stories.
 
-**Files:**
-- `EMAIL_SYSTEM.md` - Email system architecture and configuration
+* `add_alternate_contact_feature.md`  
+* `application_pain_point_tracking.md`  
+* `email_uniqueness_for_dependents.md`
 
-### 📁 future_work/
-Planned improvements, todos, and future development tasks.
+### 📂 infrastructure/
 
-**Files:**
-- `mat_vulcan_todos.md` - Comprehensive list of planned improvements and tasks
+Ops-level references.
 
-### 📁 compliance/
-Compliance-related documentation (if any).
+* `email_system.md` – template DB workflow, inbound Action Mailbox, Postmark streams.
 
-### 📁 security/
-Security-related documentation (if any).
+### 📂 future_work/
 
-### 📁 ui_components/
-UI component documentation (if any).
+Living backlog and architectural Big-Think.
 
-### 📁 guides/
-User guides and operational documentation (if any).
+* `mat_vulcan_todos.md`
 
-## For Developers
+### Optional folders (present if needed)
 
-Start with:
-1. `CURRENT_FEATURES.md` for system overview
-2. `development/testing_and_debugging_guide.md` for testing practices
-3. `development/service_architecture.md` for architecture patterns
+* **compliance/** – regulatory docs  
+* **security/** – threat models, key-rotation SOPs  
+* **ui_components/** – design-system snippets  
+* **guides/** – user-facing manuals
 
-## For AI Assistants
+---
 
-The documentation is organized to help AI assistants quickly find relevant information:
-- Use `CURRENT_FEATURES.md` for high-level system understanding
-- Reference `development/` folder for implementation details
-- Check `features/` for specific feature documentation
-- Look in `infrastructure/` for system architecture details 
+## 3 · Doc-Hunting Tips for AI Assistants
+
+| Need | Where to search |
+|------|-----------------|
+| "How does X feature work?" | `current_application_features.md`, then specific file in **features/** |
+| "Which service owns Y?" | `development/service_architecture.md` |
+| "What JS pattern should I follow?" | `development/javascript_architecture.md` |
+| "Where's the email config?" | `infrastructure/email_system.md` |
+| "Upcoming tasks?" | `future_work/mat_vulcan_todos.md` |
+
+Naming is grep-friendly: *feature names* mirror folder/file names, so `"guardian_relationship_system"` appears exactly once per folder.

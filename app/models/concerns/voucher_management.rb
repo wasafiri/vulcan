@@ -13,7 +13,8 @@ module VoucherManagement
 
     with_lock do
       voucher = vouchers.create!
-      # Log the audit event
+      
+      # Step 1: Log the auditable business event
       AuditEventService.log(
         action: 'voucher_assigned',
         actor: assigned_by || Current.user,
@@ -21,22 +22,13 @@ module VoucherManagement
         metadata: {
           application_id: id,
           voucher_code: voucher.code,
-          initial_value: voucher.initial_value
+          initial_value: voucher.initial_value,
+          timestamp: Time.current.iso8601
         }
       )
 
-      # Notify constituent
-      NotificationService.create_and_deliver!(
-        type: 'voucher_assigned',
-        recipient: user,
-        actor: assigned_by || Current.user,
-        notifiable: voucher, # The voucher is the notifiable record
-        metadata: {
-          application_id: id
-        },
-        channel: :email
-      )
-      VoucherNotificationsMailer.voucher_assigned(voucher).deliver_later
+      # Step 2: Send the user-facing notification directly via mailer
+      VoucherNotificationsMailer.with(voucher: voucher).voucher_assigned.deliver_later
 
       voucher
     end

@@ -38,8 +38,15 @@ module Applications
                                email: 'draft_user@example.com',
                                cognition_disability: true)
 
+      # Create another user for the active app (no guardian relationship)
+      @active_app_user = create(:user,
+                                first_name: 'Active',
+                                last_name: 'User',
+                                email: 'active_user@example.com',
+                                speech_disability: true)
+
       # Use factories to create applications with disabilities
-      @active_app = create(:application, status: :in_progress, income_proof_status: :not_reviewed, user: @dependent)
+      @active_app = create(:application, status: :in_progress, income_proof_status: :not_reviewed, user: @active_app_user)
       @approved_app = create(:application, :completed, user: @completed_app_user) # :completed trait sets status and proofs to approved
       @draft_app = create(:application, status: :draft, user: @draft_app_user)
 
@@ -121,8 +128,9 @@ module Applications
         @rejected_app = create(:application,
                                user: @rejected_app_user,
                                status: :rejected,
-                               income_proof_status: :approved, # Set proof statuses to pass validation
-                               residency_proof_status: :approved)
+                               income_proof_status: :not_reviewed, # Set to not_reviewed since we're not actually creating attachments
+                               residency_proof_status: :not_reviewed,
+                               skip_proofs: true) # Skip file attachments since we're mocking them
 
         # Mock both income and residency proof attachments for validation
         income_proof_mock = mock_attached_file(
@@ -139,6 +147,12 @@ module Applications
         @rejected_app.stubs(:income_proof_attached?).returns(true)
         @rejected_app.stubs(:residency_proof).returns(residency_proof_mock)
         @rejected_app.stubs(:residency_proof_attached?).returns(true)
+        
+        # Update status after mocking attachments to avoid validation errors
+        @rejected_app.update_columns(
+          income_proof_status: :approved,
+          residency_proof_status: :approved
+        )
 
         # Mock the medical certification as well
         medical_cert_mock = mock_attached_file(
@@ -254,11 +268,9 @@ module Applications
 
     test 'filters by applications for dependents of guardian' do
       with_mocked_attachments do
-        # The @active_app and @dependent_app should both be for the @dependent user
+        # The @dependent_app should be for the @dependent user
         # And the @dependent user should have a guardian relationship with @guardian
-
-        # Make sure the @active_app is also linked to the dependent
-        @active_app.update!(user: @dependent)
+        # But @active_app should stay with its original user (no guardian relationship)
 
         # Verify the guardian relationship exists
         assert @guardian.dependents.include?(@dependent),
@@ -278,8 +290,9 @@ module Applications
         puts "Active app ID: #{@active_app.id}, user_id: #{@active_app.user_id}"
         puts "Dependent app ID: #{@dependent_app.id}, user_id: #{@dependent_app.user_id}"
 
-        # Both applications with the dependent user should be included since they're for dependents of this guardian
-        assert_includes result_data, @active_app
+        # Only the dependent_app should be included since it's for a dependent of this guardian
+        # @active_app has a different user with no guardian relationship, so it should be excluded
+        assert_not_includes result_data, @active_app
         assert_includes result_data, @dependent_app
         assert_not_includes result_data, @approved_app
       end

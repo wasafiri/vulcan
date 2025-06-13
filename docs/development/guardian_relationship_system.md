@@ -1,162 +1,149 @@
 # Guardian Relationship System
 
-## Overview
+Explicit `GuardianRelationship` records replace the old boolean flags, allowing each guardian to manage many dependents and vice-versa while preserving data integrity.
 
-The application uses an explicit `GuardianRelationship` model to manage relationships between guardian users and their dependents. This replaced the previous boolean-based system and enables robust tracking of multiple dependents per guardian.
+---
 
-## Data Model
+## 1 · Data Model
 
-### Core Models
+| Table | Key Columns | Notes |
+|-------|-------------|-------|
+| **guardian_relationships** | `guardian_id`, `dependent_id`, `relationship_type` | Unique index on `[guardian_id, dependent_id]`. |
+| **applications** | `user_id`, `managing_guardian_id` | `user_id` = applicant; `managing_guardian_id` set only for dependents. |
+| **users** (associations) | see below | |
 
-**GuardianRelationship**
-- `guardian_id` (foreign key to users.id) - The guardian user
-- `dependent_id` (foreign key to users.id) - The dependent user  
-- `relationship_type` (string) - e.g., "Parent", "Legal Guardian"
-- Unique constraint on `[guardian_id, dependent_id]`
-
-**Application**
-- `user_id` - Always the actual applicant (the dependent if it's a minor's application)
-- `managing_guardian_id` - Set when application is for a dependent, points to guardian
-
-**User Associations**
 ```ruby
-# Guardian relationships
-has_many :guardian_relationships_as_guardian, foreign_key: 'guardian_id'
-has_many :dependents, through: :guardian_relationships_as_guardian, source: :dependent_user
+# user.rb
+has_many :guardian_relationships_as_guardian,  foreign_key: :guardian_id
+has_many :dependents, through: :guardian_relationships_as_guardian
 
-has_many :guardian_relationships_as_dependent, foreign_key: 'dependent_id'  
-has_many :guardians, through: :guardian_relationships_as_dependent, source: :guardian_user
+has_many :guardian_relationships_as_dependent, foreign_key: :dependent_id
+has_many :guardians, through: :guardian_relationships_as_dependent
 
-# Application management
-has_many :managed_applications, foreign_key: 'managing_guardian_id'
+has_many :managed_applications, foreign_key: :managing_guardian_id
 ```
 
-## Dependent Contact Information
+---
 
-The system includes dedicated fields for dependent contact information to avoid database uniqueness constraint conflicts:
+## 2 · Dependent Contact Strategy
 
-### Database Fields
-- `dependent_email` (encrypted) - Optional email specific to dependent
-- `dependent_phone` (encrypted) - Optional phone specific to dependent
+| Field | Purpose |
+|-------|---------|
+| `dependent_email` | Encrypted, optional e-mail for dependent |
+| `dependent_phone` | Encrypted, optional phone |
 
-### Contact Information Strategy
+**Own contact info**
 
-**Option 1: Dependent has own contact info**
 ```ruby
 dependent = User.create!(
-  email: "child@example.com",        # Dependent's own email
-  phone: "555-0001",                 # Dependent's own phone
-  dependent_email: "child@example.com",  # Same as primary
-  dependent_phone: "555-0001"           # Same as primary
+  email:            'child@example.com',
+  phone:            '555-0001',
+  dependent_email:  'child@example.com',
+  dependent_phone:  '555-0001'
 )
 ```
 
-**Option 2: Dependent shares guardian's contact info**
+**Shared contact info**
+
 ```ruby
 dependent = User.create!(
-  email: "dependent-abc123@system.matvulcan.local",  # System-generated unique email
-  phone: "000-000-1234",                             # System-generated unique phone
-  dependent_email: "guardian@example.com",           # Guardian's actual email
-  dependent_phone: "555-0002"                        # Guardian's actual phone
+  email:            'dependent-abc123@system.local', # system-generated unique
+  phone:            '000-000-1234',
+  dependent_email:  'guardian@example.com',
+  dependent_phone:  '555-0002'
 )
 ```
 
-### Helper Methods
-```ruby
-# Get the effective contact information for communications
-dependent.effective_email  # Returns dependent_email if present, otherwise email
-dependent.effective_phone  # Returns dependent_phone if present, otherwise phone
+Helper methods:
 
-# Determine contact strategy
-dependent.has_own_contact_info?      # True if dependent has own email/phone
-dependent.uses_guardian_contact_info?  # True if dependent shares guardian's contact
+```ruby
+dependent.effective_email  # prefers dependent_email
+dependent.effective_phone  # prefers dependent_phone
+dependent.has_own_contact_info?
+dependent.uses_guardian_contact_info?
 ```
 
-This approach ensures:
-- No database uniqueness violations when dependents share guardian contact info
-- Clean separation between system-required unique identifiers and communication preferences
-- Flexibility for real-world family contact scenarios
+*Avoids uniqueness violations and supports real-world family setups.*
 
-## Key Methods
+---
 
-### User Model
-- `is_guardian?` - Checks if user has any dependents
-- `is_dependent?` - Checks if user has any guardians
-- `dependent_applications` - Applications for user's dependents
-- `relationship_types_for_dependent(user)` - Get relationship types with specific dependent
+## 3 · Key Methods & Scopes
 
-### Application Model
-- `for_dependent?` - Returns true if `managing_guardian_id` is present
-- `guardian_relationship_type` - Looks up relationship type from GuardianRelationship table
-- `ensure_managing_guardian_set` - Callback to set managing_guardian_id when needed
+| Model | Method | Purpose |
+|-------|--------|---------|
+| **User** | `is_guardian?`, `is_dependent?` | Quick role checks |
+|  | `dependent_applications` | All apps for dependents |
+|  | `relationship_types_for_dependent(user)` | Returns relationship strings |
+| **Application** | `for_dependent?` | bool |
+|  | `guardian_relationship_type` | Returns relationship_type from link |
+|  | `ensure_managing_guardian_set` | Callback for safety |
 
-### Scopes
 ```ruby
-# Application scopes
-scope :managed_by, ->(guardian_user) { where(managing_guardian_id: guardian_user.id) }
-scope :for_dependents_of, ->(guardian_user) { joins guardian_relationships, filters by guardian }
-scope :related_to_guardian, ->(guardian_user) { managed_by OR for_dependents_of }
+# application scopes
+scope :managed_by,            ->(g) { where(managing_guardian_id: g.id) }
+scope :for_dependents_of,     ->(g) { joins(:guardian_relationships_as_guardian).where(guardian_relationships: { guardian_id: g.id }) }
+scope :related_to_guardian,   ->(g) { managed_by(g).or(for_dependents_of(g)) }
 ```
 
-## User Flows
+---
 
-### Creating Dependent Applications
-1. Guardian creates dependent user via "Add New Dependent" 
-2. GuardianRelationship record created linking guardian and dependent
-3. When creating application, set `user_id` to dependent, `managing_guardian_id` to guardian
-4. `ensure_managing_guardian_set` callback handles edge cases
+## 4 · User Flows
 
-### Paper Applications
-- Admin can create guardian/dependent relationships during paper application process
-- Uses `Applications::PaperApplicationService` with proper Current attributes context
-- Handles both existing and new guardian scenarios
+### 4.1 · Web-Created Dependent
 
-## Current Attributes Context
+1. Guardian uses **“Add New Dependent”**.  
+2. `GuardianRelationship` row created.  
+3. Application: `user_id = dependent`, `managing_guardian_id = guardian`.  
+4. Callback `ensure_managing_guardian_set` handles edge cases.
 
-Uses `Current.paper_context` to bypass certain validations during admin paper application processing:
-- `ProofConsistencyValidation#skip_proof_validation?` 
-- `ProofManageable#require_proof_validations?`
+### 4.2 · Admin Paper Application
 
-Always wrap paper application logic:
+Handled by `Applications::PaperApplicationService`:
+
 ```ruby
 Current.paper_context = true
 begin
-  # Paper application logic
+  # Service builds users, link, application
 ensure
   Current.reset
 end
 ```
 
-## Database Constraints
+Supports both new & existing guardians.
 
-- Unique index on `guardian_relationships(guardian_id, dependent_id)`
-- Foreign key constraints to users table
-- `managing_guardian_id` nullable (only set for dependent applications)
+---
 
-## Testing Considerations
+## 5 · Database Constraints
 
-### Factory Traits
+* Unique composite index on `(guardian_id, dependent_id)`.  
+* FK constraints on both IDs.  
+* `managing_guardian_id` nullable.
+
+---
+
+## 6 · Testing Patterns
+
 ```ruby
-# User factories
-create(:user, :with_dependent)     # Creates user with one dependent
-create(:user, :with_dependents)    # Creates user with multiple dependents  
-create(:user, :with_guardian)      # Creates user with a guardian
-
-# Application factories
-create(:application, :for_dependent)  # Creates application with managing_guardian_id set
+create(:user, :with_dependents)       # Guardian with many dependents
+create(:application, :for_dependent)  # Factory sets managing_guardian_id
 ```
 
-### Common Test Patterns
-- Always create GuardianRelationship before dependent applications
-- Use proper factory traits to avoid manual relationship setup
-- Set Current attributes context for paper application tests
-- Verify both `user_id` (applicant) and `managing_guardian_id` are correct
+*Always*:
 
-## Migration Notes
+1. Build `GuardianRelationship` before dependent apps.  
+2. Set `Current.paper_context` in paper-flow tests.  
+3. Assert both `user_id` and `managing_guardian_id`.
 
-The system migrated from deprecated fields:
-- ~~`users.is_guardian`~~ (removed)
-- ~~`users.guardian_relationship`~~ (removed)  
-- ~~`users.guardian_id`~~ (removed)
+Example:
 
-All functionality now uses the explicit GuardianRelationship model and Application.managing_guardian_id. 
+```ruby
+test 'dependent app sets guardian' do
+  service = PaperApplicationService.new(params:, admin: @admin)
+  assert_difference ['GuardianRelationship.count', 'Application.count'] do
+    assert service.create
+  end
+  app = service.application
+  assert app.for_dependent?
+  assert_equal service.guardian_user_for_app.id, app.managing_guardian_id
+end
+```

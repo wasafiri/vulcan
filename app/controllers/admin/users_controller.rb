@@ -147,26 +147,26 @@ module Admin
 
     # Create action for creating a new guardian from the paper application form
     def create
-      @user = Users::Constituent.new(user_create_params)
-      @user.password = @user.password_confirmation = SecureRandom.hex(8)
-      @user.force_password_change = true
-      @user.verified = true
+    @user = Users::Constituent.new(user_create_params)
+    @user.password = @user.password_confirmation = SecureRandom.hex(8)
+    @user.force_password_change = true
+    @user.verified = true
 
-      # Check for potential duplicates based on Name + DOB
-      @user.needs_duplicate_review = true if potential_duplicate_found?(@user)
+    # Check for duplicates and set flag
+    @user.needs_duplicate_review = true if potential_duplicate_found?(@user)
 
-      if @user.save
-        render json: {
-          success: true,
-          user: @user.as_json(only: %i[id first_name last_name email phone
-                                       physical_address_1 physical_address_2 city state zip_code])
-        }
-      else
-        render json: {
-          success: false,
-          errors: @user.errors.full_messages
-        }, status: :unprocessable_entity
-      end
+    if @user.save
+      render json: {
+        success: true,
+        user: @user.as_json(only: %i[id first_name last_name email phone
+                                     physical_address_1 physical_address_2 city state zip_code])
+      }
+    else
+      render json: {
+        success: false,
+        errors: @user.errors.full_messages
+      }, status: :unprocessable_entity
+    end
     end
 
     # New dedicated search endpoint for user search
@@ -441,7 +441,7 @@ module Admin
           user: %i[first_name last_name email phone phone_type
                    physical_address_1 physical_address_2
                    city state zip_code date_of_birth
-                   communication_preference locale]
+                   communication_preference locale needs_duplicate_review]
         )
       else
         # Handle direct params from paper application form's guardian_attributes
@@ -449,7 +449,7 @@ module Admin
           :first_name, :last_name, :email, :phone, :phone_type,
           :physical_address_1, :physical_address_2,
           :city, :state, :zip_code, :date_of_birth,
-          :communication_preference, :locale
+          :communication_preference, :locale, :needs_duplicate_review
         )
       end
     end
@@ -459,10 +459,15 @@ module Admin
     def potential_duplicate_found?(user)
       return false unless user.first_name.present? && user.last_name.present? && user.date_of_birth.present?
 
-      User.exists?(['LOWER(first_name) = ? AND LOWER(last_name) = ? AND date_of_birth = ?',
-                    user.first_name.downcase,
-                    user.last_name.downcase,
-                    user.date_of_birth])
+      query = User.where('LOWER(first_name) = ? AND LOWER(last_name) = ? AND date_of_birth = ?',
+                         user.first_name.downcase,
+                         user.last_name.downcase,
+                         user.date_of_birth)
+      
+      # Exclude the current user if it has been persisted to avoid self-matching
+      query = query.where.not(id: user.id) if user.persisted?
+      
+      query.exists?
     end
   end
 end

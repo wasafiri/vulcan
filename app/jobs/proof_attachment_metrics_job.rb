@@ -1,82 +1,81 @@
 # frozen_string_literal: true
 
-# Generates daily metrics on proof attachment success/failure rates
-# Scheduled via config/recurring.yml to run at midnight every day
+# Monitors proof submission failure rates and alerts administrators
+# when failure rates exceed acceptable thresholds
+# Scheduled via config/recurring.yml to run periodically  
 class ProofAttachmentMetricsJob < ApplicationJob
   queue_as :low
 
+  # Thresholds for alerting
+  SUCCESS_RATE_THRESHOLD = 95.0 # Alert if success rate falls below 95%
+  MINIMUM_FAILURES_THRESHOLD = 5 # Only alert if we have at least 5 failures
+
   def perform
-    # Calculate success rate for last 24 hours
-    # Query events with action ending in '_proof_submitted'
-    recent_proof_submissions = Event.where("action LIKE '%_proof_submitted'")
-                                    .where('created_at > ?', 24.hours.ago)
+    Rails.logger.info 'Analyzing Proof Submission Failure Rates'
 
-    total = recent_proof_submissions.count
-    failed = recent_proof_submissions.where("metadata->>'success' = ?", 'false').count
+    # Define the relevant actions for attachment success and failure
+    attachment_actions = %w[
+      income_proof_attached residency_proof_attached
+      income_proof_attachment_failed residency_proof_attachment_failed
+    ]
 
-    if total.positive?
-      success_rate = ((total - failed) / total.to_f) * 100
+    # Get recent proof attachment events (last 24 hours)
+    recent_events = Event.where(action: attachment_actions)
+                         .where('created_at > ?', 24.hours.ago)
 
-      # Log metrics
-      Rails.logger.info "Proof attachment 24h metrics: #{success_rate.round(2)}% success rate (#{failed}/#{total} failed)"
+    total_submissions = recent_events.count
+    failed_submissions = recent_events.where("action LIKE '%_failed'").count
+    successful_submissions = total_submissions - failed_submissions
 
-      # Alert if success rate drops below threshold
-      if success_rate < 95 && failed > 5
-        admins = User.where(type: 'Administrator')
-        admins.each do |admin|
-          # Log the audit event for the warning
-          AuditEventService.log(
-            action: 'attachment_failure_warning',
-            actor: User.system_user, # System-generated event
-            auditable: nil, # Not tied to a specific record
-            metadata: {
-              success_rate: success_rate.round(2),
-              total: total,
-              failed: failed,
-              period: '24h'
-            }
-          )
+    # Calculate success rate
+    success_rate = if total_submissions > 0
+                     (successful_submissions.to_f / total_submissions * 100).round(1)
+                   else
+                     100.0
+                   end
 
-          # Send the notification
-          NotificationService.create_and_deliver!(
-            type: 'attachment_failure_warning',
-            recipient: admin,
-            actor: User.system_user, # System-generated notification
-            notifiable: nil, # Not tied to a specific record
-            metadata: {
-              success_rate: success_rate.round(2),
-              total: total,
-              failed: failed,
-              period: '24h'
-            },
-            channel: :email
-          )
-        end
-      end
+    Rails.logger.info "Proof Submission Analysis (Last 24 Hours): " \
+                      "Total: #{total_submissions}, " \
+                      "Successful: #{successful_submissions}, " \
+                      "Failed: #{failed_submissions}, " \
+                      "Success Rate: #{success_rate}%"
+
+    # Alert administrators if failure rate is too high
+    if success_rate < SUCCESS_RATE_THRESHOLD && failed_submissions >= MINIMUM_FAILURES_THRESHOLD
+      alert_administrators(success_rate, total_submissions, failed_submissions)
     end
 
-    # Calculate metrics by proof type
-    %w[income residency].each do |proof_type|
-      type_total = recent_proof_submissions.where("metadata->>'proof_type' = ?", proof_type).count
-      type_failed = recent_proof_submissions.where("metadata->>'proof_type' = ?", proof_type)
-                                            .where("metadata->>'success' = ?", 'false').count
+    Rails.logger.info 'Proof submission failure rate analysis completed'
+  end
 
-      if type_total.positive?
-        type_success_rate = ((type_total - type_failed) / type_total.to_f) * 100
-        Rails.logger.info "#{proof_type.capitalize} proof 24h metrics: #{type_success_rate.round(2)}% success rate (#{type_failed}/#{type_total} failed)"
-      end
+  private
+
+  def alert_administrators(success_rate, total, failed)
+    Rails.logger.warn "High proof submission failure rate detected: #{success_rate}% (#{failed}/#{total})"
+
+    admins = User.where(type: 'Users::Administrator')
+
+    system_user = User.system_user
+
+    admins.find_each do |admin|
+      # Create notification through the proper system with system user as actor and notifiable
+      Notification.create!(
+        recipient: admin,
+        actor: system_user,
+        notifiable: system_user,
+        action: 'attachment_failure_warning',
+        metadata: {
+          success_rate: success_rate,
+          total: total,
+          failed: failed,
+          threshold: SUCCESS_RATE_THRESHOLD,
+          analysis_period: '24_hours'
+        }
+      )
+    rescue StandardError => e
+      Rails.logger.error "Failed to create failure warning notification for admin #{admin.id}: #{e.message}"
     end
 
-    # Calculate metrics by submission method
-    %w[paper web].each do |method|
-      method_total = recent_proof_submissions.where("metadata->>'submission_method' = ?", method).count
-      method_failed = recent_proof_submissions.where("metadata->>'submission_method' = ?", method)
-                                              .where("metadata->>'success' = ?", 'false').count
-
-      if method_total.positive?
-        method_success_rate = ((method_total - method_failed) / method_total.to_f) * 100
-        Rails.logger.info "#{method.capitalize} submission 24h metrics: #{method_success_rate.round(2)}% success rate (#{method_failed}/#{method_total} failed)"
-      end
-    end
+    Rails.logger.info "Created failure rate warnings for #{admins.count} administrators"
   end
 end

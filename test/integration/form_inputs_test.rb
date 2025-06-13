@@ -14,7 +14,7 @@ class FormInputsTest < ActionDispatch::IntegrationTest
     @application = create(:application, user: @user)
 
     # Sign in the user for all tests
-    sign_in(@user)
+    sign_in_for_integration_test(@user)
   end
 
   # Test the checkbox_params helper

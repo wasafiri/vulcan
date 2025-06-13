@@ -3,7 +3,7 @@
 FactoryBot.define do
   unless FactoryBot.factories.registered?(:user)
     factory :user do
-      sequence(:email) { |n| "user#{n}@example.com" }
+      sequence(:email) { |n| "testuser#{n}@example.com" }
       password { 'password123' }
       first_name { 'Test' }
       last_name { 'User' }
@@ -154,7 +154,7 @@ FactoryBot.define do
           city { 'Silver Spring' }
           state { 'MD' }
           zip_code { '20901' }
-          phone { '111-222-3333' }
+          sequence(:phone) { |n| "111-#{format('%03d', (n % 900) + 100)}-#{format('%04d', (n % 9000) + 1000)}" }
           phone_type { 'voice' }
         end
 
@@ -172,17 +172,17 @@ FactoryBot.define do
         end
 
         trait :with_voice_phone do
-          phone { '301-555-0001' }
+          sequence(:phone) { |n| "301-555-#{format('%04d', (n % 9000) + 1000)}" }
           phone_type { 'voice' }
         end
 
         trait :with_videophone do
-          phone { '301-555-0002' }
+          sequence(:phone) { |n| "301-556-#{format('%04d', (n % 9000) + 1000)}" }
           phone_type { 'videophone' }
         end
 
         trait :with_text_phone do
-          phone { '301-555-0003' }
+          sequence(:phone) { |n| "301-557-#{format('%04d', (n % 9000) + 1000)}" }
           phone_type { 'text' }
         end
 

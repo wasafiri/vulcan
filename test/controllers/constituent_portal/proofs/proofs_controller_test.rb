@@ -21,7 +21,7 @@ class ConstituentProofsSubmissionTest < ActionDispatch::IntegrationTest
     @valid_pdf = fixture_file_upload('test/fixtures/files/medical_certification_valid.pdf', 'application/pdf')
 
     # Use the sign_in helper from test_helper.rb
-    sign_in(@user)
+    sign_in_for_integration_test(@user)
 
     # Set up rate limit policies using Policy.set as seen in system tests
     Policy.set('proof_submission_rate_limit_web', 5)
@@ -47,10 +47,10 @@ class ConstituentProofsSubmissionTest < ActionDispatch::IntegrationTest
                    to: 'not_reviewed' do
       # Instead of checking exact change in needs_review_since, just verify it gets set
       before_value = @application.needs_review_since
-      assert_difference 'Event.count', 1 do # Only one event should be created by AuditEventService.log
+      assert_difference 'Event.count', 2 do # ProofAttachmentService creates income_proof_attached, tracking creates proof_submitted
         # Using the new namespace path directly
         post "/constituent_portal/applications/#{@application.id}/proofs/resubmit",
-             params: { proof_type: 'income', income_proof: @valid_pdf }
+             params: { proof_type: 'income', income_proof_upload: @valid_pdf }
 
         # Verify redirect
         assert_redirected_to constituent_portal_application_path(@application)
@@ -66,17 +66,30 @@ class ConstituentProofsSubmissionTest < ActionDispatch::IntegrationTest
         assert_equal 'not_reviewed', @application.income_proof_status
         assert_not_nil @application.needs_review_since
 
-        # Verify audit event was created
-        event = Event.last
-        assert_equal 'proof_submitted', event.action
-        assert_equal @application.id, event.auditable_id
-        assert_equal 'Application', event.auditable_type
-        assert_equal @user.id, event.user_id
-        assert_equal 'income', event.metadata['proof_type']
-        assert_equal 'web', event.metadata['submission_method']
-        assert_equal '127.0.0.1', event.metadata['ip_address']
-        assert_equal 'Rails Testing', event.metadata['user_agent']
-        assert_equal true, event.metadata['resubmitting'] # Verify resubmitting flag
+        # Verify both events were created (similar to integration test)
+        attachment_events = Event.where(action: 'income_proof_attached').order(created_at: :desc)
+        tracking_events = Event.where(action: 'proof_submitted').order(created_at: :desc)
+        
+        assert_equal 1, attachment_events.count, 'Expected 1 income_proof_attached event'
+        assert_equal 1, tracking_events.count, 'Expected 1 proof_submitted event'
+
+        # Check the tracking event (from controller)
+        tracking_event = tracking_events.first
+        assert_equal 'proof_submitted', tracking_event.action
+        assert_equal @application.id, tracking_event.auditable_id
+        assert_equal 'Application', tracking_event.auditable_type
+        assert_equal @user.id, tracking_event.user_id
+        assert_equal 'income', tracking_event.metadata['proof_type']
+        assert_equal 'web', tracking_event.metadata['submission_method']
+        assert_equal '127.0.0.1', tracking_event.metadata['ip_address']
+        assert_equal 'Rails Testing', tracking_event.metadata['user_agent']
+
+        # Check the attachment event (from ProofAttachmentService)
+        attachment_event = attachment_events.first
+        assert_equal 'income_proof_attached', attachment_event.action
+        assert_equal @user.id, attachment_event.user_id
+        assert_equal @application.id, attachment_event.auditable_id
+        assert_equal 'income', attachment_event.metadata['proof_type']
       end
     end
   end
@@ -142,7 +155,7 @@ class ConstituentProofsSubmissionTest < ActionDispatch::IntegrationTest
 
     # The request should not raise an exception because the controller handles it
     post "/constituent_portal/applications/#{@application.id}/proofs/resubmit",
-         params: { proof_type: 'income', income_proof: @valid_pdf }
+         params: { proof_type: 'income', income_proof_upload: @valid_pdf }
 
     # The controller redirects to the application path with an alert
     assert_redirected_to constituent_portal_application_path(@application)
@@ -158,7 +171,7 @@ class ConstituentProofsSubmissionTest < ActionDispatch::IntegrationTest
     # This should raise an exception because we're purposely testing error handling
     assert_raises StandardError do
       post "/constituent_portal/applications/#{@application.id}/proofs/resubmit",
-           params: { proof_type: 'income', income_proof: @valid_pdf }
+           params: { proof_type: 'income', income_proof_upload: @valid_pdf }
     end
   end
 end

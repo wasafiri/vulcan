@@ -22,7 +22,7 @@ module ConstituentPortal
       Policy.find_or_create_by(key: 'max_training_sessions').update(value: 3)
 
       # Set up authentication using sign_in helper
-      sign_in(@constituent)
+      sign_in_for_integration_test(@constituent)
 
       # Set Current.user for the controller actions
       Current.user = @constituent

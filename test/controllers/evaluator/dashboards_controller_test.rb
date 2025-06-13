@@ -7,13 +7,8 @@ module Evaluators
     def setup
       @evaluator = create(:evaluator) # Using factory
 
-      # Use the authentication helper from test_helper.rb
-      post sign_in_path,
-           params: { email: @evaluator.email, password: 'password123' },
-           headers: { 'HTTP_USER_AGENT' => 'Rails Testing', 'REMOTE_ADDR' => '127.0.0.1' }
-
-      assert_response :redirect
-      follow_redirect!
+      # Use the correct sign-in helper for integration tests
+      sign_in_for_integration_test(@evaluator)
     end
 
     def test_should_get_show

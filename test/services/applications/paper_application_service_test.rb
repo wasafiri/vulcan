@@ -20,7 +20,7 @@ module Applications
       setup_active_storage_test
 
       # Set thread context for paper applications
-      Thread.current[:paper_application_context] = true
+      setup_paper_application_context
 
       # Use factory for admin user
       @admin = create(:admin)
@@ -28,12 +28,13 @@ module Applications
       # Set up FPL policies for testing to match our test values
       setup_fpl_policies
 
-      # Test constituent parameters
+      # Test constituent parameters - use timestamp for unique phone numbers
+      @timestamp = Time.now.to_i
       @constituent_params = {
         first_name: 'Test',
         last_name: 'User',
-        email: "test-#{Time.now.to_i}@example.com",
-        phone: '2025551234',
+        email: "test-#{@timestamp}@example.com",
+        phone: "202555#{@timestamp.to_s[-4..]}", # Use last 4 digits of timestamp for uniqueness
         physical_address_1: '123 Test St',
         city: 'Baltimore',
         state: 'MD',
@@ -69,26 +70,10 @@ module Applications
     end
 
     teardown do
-      Thread.current[:paper_application_context] = nil
+      teardown_paper_application_context
     end
 
-    # Helper method to set up policies for FPL threshold testing
-    def setup_fpl_policies
-      # Stub the log_change method to avoid validation errors in test
-      Policy.class_eval do
-        def log_change
-          # No-op in test environment to bypass the user requirement
-        end
-      end
 
-      # Set up standard FPL values for testing purposes
-      Policy.find_or_create_by(key: 'fpl_1_person').update(value: 15_000)
-      Policy.find_or_create_by(key: 'fpl_2_person').update(value: 20_000)
-      Policy.find_or_create_by(key: 'fpl_3_person').update(value: 25_000)
-      Policy.find_or_create_by(key: 'fpl_4_person').update(value: 30_000)
-      Policy.find_or_create_by(key: 'fpl_5_person').update(value: 35_000)
-      Policy.find_or_create_by(key: 'fpl_modifier_percentage').update(value: 400)
-    end
 
     # Helper method to create a test constituent directly
     def create_test_constituent(email)
@@ -99,9 +84,11 @@ module Applications
       # We'll focus only on testing the service approach for simplicity
 
       # Now test the service approach
-      service_email = "test-service-#{Time.now.to_i}@example.com"
+      test_timestamp = Time.now.to_i
+      service_email = "test-service-#{test_timestamp}@example.com"
+      service_phone = "202556#{test_timestamp.to_s[-4..]}"
       service_params = {
-        constituent: @constituent_params.merge(email: service_email),
+        constituent: @constituent_params.merge(email: service_email, phone: service_phone),
         application: @application_params,
         income_proof_action: 'accept',
         income_proof: @pdf_file
@@ -135,10 +122,12 @@ module Applications
 
     test 'creates application with rejected income proof' do
       # Test the rejection functionality
-      unique_email = "test-rejected-#{Time.now.to_i}@example.com"
+      test_timestamp = Time.now.to_i
+      unique_email = "test-rejected-#{test_timestamp}@example.com"
+      unique_phone = "202557#{test_timestamp.to_s[-4..]}"
 
       service_params = {
-        constituent: @constituent_params.merge(email: unique_email),
+        constituent: @constituent_params.merge(email: unique_email, phone: unique_phone),
         application: @application_params,
         income_proof_action: 'reject',
         income_proof_rejection_reason: 'other',
@@ -194,10 +183,12 @@ module Applications
 
     test 'application creation fails when income exceeds threshold' do
       # Test with excessive income - We set this very high to ensure it will exceed the threshold
-      unique_email = "test-high-income-#{Time.now.to_i}@example.com"
+      test_timestamp = Time.now.to_i
+      unique_email = "test-high-income-#{test_timestamp}@example.com"
+      unique_phone = "202558#{test_timestamp.to_s[-4..]}"
 
       service_params = {
-        constituent: @constituent_params.merge(email: unique_email),
+        constituent: @constituent_params.merge(email: unique_email, phone: unique_phone),
         application: @application_params.merge(annual_income: '200000'),
         income_proof_action: 'accept',
         income_proof: @pdf_file
@@ -221,10 +212,12 @@ module Applications
 
     test 'handles multiple proof types together' do
       # Test with multiple proof types
-      unique_email = "test-multiple-#{Time.now.to_i}@example.com"
+      test_timestamp = Time.now.to_i
+      unique_email = "test-multiple-#{test_timestamp}@example.com"
+      unique_phone = "202559#{test_timestamp.to_s[-4..]}"
 
       service_params = {
-        constituent: @constituent_params.merge(email: unique_email),
+        constituent: @constituent_params.merge(email: unique_email, phone: unique_phone),
         application: @application_params,
         income_proof_action: 'accept',
         income_proof: @pdf_file,

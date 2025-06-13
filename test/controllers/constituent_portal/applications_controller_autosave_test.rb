@@ -4,21 +4,22 @@ require 'test_helper'
 
 module ConstituentPortal
   class ApplicationsControllerAutosaveTest < ActionDispatch::IntegrationTest
+    include AuthenticationTestHelper
     setup do
       # Set up test data using factories
       @user = create(:constituent, :with_disabilities)
       @draft_application = create(:application, user: @user, status: :draft)
 
       # Sign in the user for all tests
-      sign_in(@user)
+      sign_in_for_integration_test(@user)
 
       # Set thread local context to skip proof validations in tests
-      Thread.current[:paper_application_context] = true
+      setup_paper_application_context
     end
 
     teardown do
       # Clean up thread local context after each test
-      Thread.current[:paper_application_context] = nil
+      teardown_paper_application_context
     end
 
     #------------------------------------------

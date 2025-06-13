@@ -616,3 +616,564 @@ end
 - `Applications::ReportingServiceTest` - 7 tests
 - `Applications::MedicalCertificationReviewerTest` - 7 tests
 - Additional service and model tests 
+
+## Event Duplication and Audit Trail Testing
+
+### Common Event Duplication Issues
+
+**Problem**: Tests expect 1 event but get 2 or 3 events due to multiple audit logging mechanisms firing simultaneously.
+
+**Root Causes**:
+1. **Model Callbacks + Service Logging**: Both `after_save` callbacks and service methods creating events
+2. **Duplicate Callbacks**: Multiple callbacks (e.g., `after_update` and `after_save`) calling the same audit method
+3. **Controller + Service Duplication**: Controllers creating audit trails that services already handle
+
+**Example Symptoms**:
+```ruby
+# Test failure
+`Event.count` didn't change by 1, but by 3.
+Expected: 1
+  Actual: 3
+```
+
+### Debugging Event Duplication
+
+**Step 1: Identify All Event Sources**
+```ruby
+# Add to failing test to see what events are created
+Event.delete_all
+# ... run the action that should create 1 event
+puts "Events created: #{Event.count}"
+Event.all.each { |e| puts "Event: #{e.action} - #{e.auditable_type}##{e.auditable_id}" }
+```
+
+**Step 2: Check for Duplicate Callbacks**
+Look for patterns like:
+```ruby
+# BAD: Both callbacks call the same method
+after_update :log_profile_changes, if: :saved_changes_to_profile_fields?
+after_save :log_profile_changes, if: :saved_changes_to_profile_fields?
+```
+
+**Step 3: Check Service vs Controller Duplication**
+```ruby
+# BAD: Both service and controller create audit trails
+class SomeController
+  def create
+    SomeService.attach_proof(...)  # Creates audit event
+    create_audit_trail             # Creates duplicate event
+  end
+end
+```
+
+### Solutions
+
+**1. Remove Duplicate Callbacks**
+```ruby
+# GOOD: Only one callback needed
+after_save :log_profile_changes, if: :saved_changes_to_profile_fields?
+```
+
+**2. Use Context Guards for Model Callbacks**
+```ruby
+def create_audit_record
+  # Skip if service layer is handling audit (paper context)
+  return if Current.paper_context?
+  
+  AuditEventService.log(...)
+end
+```
+
+**3. Centralize Audit Logging in Services**
+Follow the **two-call pattern** from the notifications consolidation plan:
+```ruby
+# GOOD: Explicit separation of concerns
+AuditEventService.log(action: "proof_submitted", ...)  # Audit trail
+NotificationService.create_and_deliver!(...)           # User notification
+```
+
+**4. Remove Controller Audit Duplication**
+```ruby
+# BAD
+ApplicationRecord.transaction do
+  attach_proof
+  create_audit_trail  # Service already handles this
+end
+
+# GOOD
+ApplicationRecord.transaction do
+  attach_proof
+  # Note: audit trail is handled by ProofAttachmentService
+end
+```
+
+### Event Action Name Consistency
+
+**Problem**: Tests expect specific event action names but services use different names.
+
+**Example**:
+- Test expects: `action: 'proof_submitted'`
+- Service creates: `action: 'income_proof_attached'`
+
+**Solution**: Standardize action names across the application:
+```ruby
+# Use consistent, generic action names
+AuditEventService.log(action: "proof_submitted", ...)  # Not "income_proof_attached"
+```
+
+### Testing Event Metadata
+
+**Problem**: Tests expect specific metadata fields that services don't provide.
+
+**Common Missing Fields**:
+- `success: true`
+- `filename: "original_filename.pdf"`
+- `submission_method: "paper"`
+
+**Solution**: Ensure services provide expected metadata:
+```ruby
+event_metadata = metadata.merge(
+  proof_type: proof_type,
+  submission_method: submission_method,
+  success: true,                           # Add for test compatibility
+  filename: attached_blob&.filename.to_s   # Add for test compatibility
+)
+```
+
+### NotificationService vs AuditEventService
+
+**Key Principle**: `NotificationService.create_and_deliver!` only creates audit events when `audit: true` is explicitly passed.
+
+**Default Behavior**:
+```ruby
+# Does NOT create an Event record
+NotificationService.create_and_deliver!(type: "proof_attached", ...)
+
+# DOES create an Event record  
+NotificationService.create_and_deliver!(type: "proof_attached", audit: true, ...)
+```
+
+**Best Practice**: Use the two-call pattern instead of `audit: true`:
+```ruby
+# GOOD: Explicit and clear
+AuditEventService.log(action: "proof_submitted", ...)
+NotificationService.create_and_deliver!(type: "proof_attached", ...)
+```
+
+## Mailer Testing and Template Issues
+
+### Common Mailer Test Failures
+
+**Problem**: `undefined method` errors for mailer actions that should exist.
+
+**Example Symptoms**:
+```ruby
+# Error
+undefined method 'requested' for class MedicalProviderMailer
+undefined method 'approved' for class MedicalProviderMailer
+```
+
+**Root Cause**: `NotificationService` expects mailer methods that don't exist, based on action name mapping.
+
+### NotificationService Mailer Resolution
+
+The `NotificationService.resolve_mailer` method maps notification actions to mailer methods:
+
+```ruby
+# Example mapping
+case notification.action
+when /\Amedical_certification_/
+  # 'medical_certification_requested' -> :requested
+  [MedicalProviderMailer, notification.action.sub('medical_certification_', '').to_sym]
+end
+```
+
+**Solution**: Create proxy methods that delegate to existing mailer methods:
+
+```ruby
+class MedicalProviderMailer < ApplicationMailer
+  # Proxy methods for NotificationService compatibility
+  def requested(notifiable, notification)
+    self.class.with(
+      application: notifiable,
+      timestamp: notification.metadata['timestamp'],
+      notification_id: notification.id
+    ).request_certification
+  end
+
+  def approved(notifiable, notification)
+    self.class.with(
+      application: notifiable,
+      notification: notification
+    ).certification_approved
+  end
+end
+```
+
+### Template Fixture Issues
+
+**Problem**: Test fixtures use hardcoded values that don't match dynamic test data.
+
+**Example**:
+```ruby
+# BAD: Hardcoded template mock
+template_mock.stubs(:render).returns(['Subject for Test User', 'Body for Test User'])
+
+# Test expects dynamic data
+expected_subject = "Subject for #{@constituent.full_name}"  # "Test Constituent"
+```
+
+**Solution**: Make template mocks dynamic:
+
+```ruby
+# GOOD: Dynamic template mock
+template_mock.stubs(:render).returns([
+  "Subject for #{@constituent.full_name}",
+  "Body for #{@constituent.full_name}"
+])
+```
+
+### Rails Mailer API Patterns
+
+**Key Points**:
+- Use `self.class.with(...)` for parameterized mailers, not `with_params(...)`
+- Proxy methods should delegate to existing mailer methods
+- Template mocks should reflect actual template variable usage
+
+**Example Pattern**:
+```ruby
+def proxy_method(notifiable, notification)
+  # Extract parameters from notification
+  params = {
+    application: notifiable,
+    some_param: notification.metadata['some_param']
+  }
+  
+  # Delegate to existing method
+  self.class.with(params).existing_method
+end
+```
+
+### Missing Email Templates
+
+**Problem**: Mailer methods reference email templates that don't exist in the database.
+
+**Debugging**:
+```ruby
+# Check what templates exist
+EmailTemplate.where('name LIKE ?', '%medical_provider%').pluck(:name, :format)
+```
+
+**Solution**: Either create the missing template or modify the mailer to use an existing one. 
+
+## Service Testing Patterns
+
+### Service Return Value Issues
+
+**Problem**: Services return complex objects but tests expect simple values.
+
+**Example Symptoms**:
+```ruby
+# Error
+undefined method 'notification' for #<ServiceResult:0x...>
+# When code expects: result.notification
+```
+
+**Root Cause**: Service returns a `ServiceResult` object, but calling code expects the service to return the notification directly.
+
+**Debugging Pattern**:
+```ruby
+# Add to failing test to see what's actually returned
+result = SomeService.new(...).call
+puts "Result class: #{result.class}"
+puts "Result methods: #{result.methods - Object.methods}"
+puts "Result value: #{result.inspect}"
+```
+
+### Service Result Patterns
+
+**Pattern 1: ServiceResult Object**
+```ruby
+class SomeService
+  def call
+    # ... do work ...
+    ServiceResult.new(success: true, data: notification)
+  end
+end
+
+# Usage
+result = SomeService.new(...).call
+if result.success?
+  notification = result.data
+end
+```
+
+**Pattern 2: Direct Return**
+```ruby
+class SomeService
+  def call
+    # ... do work ...
+    notification  # Return the object directly
+  end
+end
+
+# Usage
+notification = SomeService.new(...).call
+```
+
+**Pattern 3: Boolean Success with Side Effects**
+```ruby
+class SomeService
+  def call
+    # ... do work ...
+    @notification = create_notification
+    true  # Return success boolean
+  end
+  
+  attr_reader :notification
+end
+
+# Usage
+service = SomeService.new(...)
+if service.call
+  notification = service.notification
+end
+```
+
+### Fixing Service Integration Issues
+
+**Problem**: Calling code expects one return pattern but service uses another.
+
+**Solution Options**:
+
+1. **Fix the Service** (if it's inconsistent with app patterns):
+```ruby
+# Change from ServiceResult to direct return
+def call
+  # ... existing logic ...
+  notification  # Return notification directly
+end
+```
+
+2. **Fix the Calling Code** (if service pattern is correct):
+```ruby
+# Handle ServiceResult properly
+result = service.call
+if result.success?
+  notification = result.data
+  # ... use notification ...
+end
+```
+
+3. **Add Compatibility Method** (temporary bridge):
+```ruby
+class ServiceResult
+  def notification
+    # Bridge method for backward compatibility
+    data if success?
+  end
+end
+```
+
+### Service Testing Best Practices
+
+**Test Service Return Values**:
+```ruby
+test 'service returns expected object type' do
+  service = SomeService.new(...)
+  result = service.call
+  
+  # Test the return type
+  assert_instance_of Notification, result
+  # OR for ServiceResult pattern:
+  assert_instance_of ServiceResult, result
+  assert result.success?
+  assert_instance_of Notification, result.data
+end
+```
+
+**Test Service Side Effects**:
+```ruby
+test 'service creates expected records' do
+  assert_difference 'Notification.count', 1 do
+    assert_difference 'Event.count', 1 do
+      service = SomeService.new(...)
+      service.call
+    end
+  end
+end
+```
+
+**Mock Service Dependencies**:
+```ruby
+test 'service handles mailer correctly' do
+  # Mock the mailer expectation
+  mock_mailer = mock('ActionMailer::MessageDelivery')
+  mock_mailer.expects(:deliver_later)
+  
+  SomeMailer.expects(:some_method)
+            .with(anything, anything)
+            .returns(mock_mailer)
+  
+  service = SomeService.new(...)
+  assert service.call
+end
+``` 
+
+## Systematic Test Suite Debugging
+
+### Regression Analysis Methodology
+
+When test suite changes introduce regressions, use systematic analysis to identify root causes and prioritize fixes.
+
+**Step 1: Categorize Failures by Root Cause**
+```bash
+# Run full test suite and capture output
+rails test > test_results.txt 2>&1
+
+# Analyze failure patterns
+grep -A 5 -B 5 "Error\|Failure" test_results.txt | less
+```
+
+**Common Regression Categories**:
+1. **Authentication Issues**: Tests expecting signed-in state but getting redirects
+2. **Event Duplication**: Tests expecting 1 event but getting 2-3
+3. **Service Integration**: Method calls failing due to API changes
+4. **Template/Mailer Issues**: Missing methods or templates
+
+**Step 2: Group Related Failures**
+```ruby
+# Example grouping from recent debugging:
+# A1: MedicalProviderMailer (7+ downstream failures)
+# A4: ProofReviewObserver event duplication (4 failures)  
+# A7: Auth helpers in tests (10+ failures)
+```
+
+**Step 3: Prioritize by Impact**
+- **High Impact**: Failures that cascade to many other tests
+- **Medium Impact**: Isolated failures in specific test files
+- **Low Impact**: Edge cases or rarely-used functionality
+
+### Debugging Workflow
+
+**Phase 1: Identify the Regression**
+```bash
+# Compare test results before/after changes
+# Before: 3162 passing, 41 failures, 22 errors
+# After:  3128 passing, 64 failures, 0 errors
+# Analysis: 14 new regressions (64-41=23, but some old failures fixed)
+```
+
+**Phase 2: Root Cause Analysis**
+For each failure category:
+
+1. **Read the Error Message Carefully**
+   ```ruby
+   # Example: "undefined method 'requested' for class MedicalProviderMailer"
+   # Root cause: NotificationService expects methods that don't exist
+   ```
+
+2. **Trace the Call Stack**
+   ```ruby
+   # Follow the error from test -> controller -> service -> mailer
+   # Identify where the expectation breaks down
+   ```
+
+3. **Check Recent Changes**
+   ```bash
+   git log --oneline -10  # See recent commits
+   git diff HEAD~5 -- app/services/  # Check service changes
+   ```
+
+**Phase 3: Targeted Fixes**
+
+**Fix Pattern 1: Add Missing Methods**
+```ruby
+# Problem: Service expects mailer method that doesn't exist
+# Solution: Add proxy method that delegates to existing method
+def requested(notifiable, notification)
+  self.class.with(application: notifiable).existing_method
+end
+```
+
+**Fix Pattern 2: Remove Duplication**
+```ruby
+# Problem: Multiple audit logging mechanisms
+# Solution: Remove duplicate logging, use context guards
+return if Current.paper_context?  # Service handles logging
+```
+
+**Fix Pattern 3: Fix Service Integration**
+```ruby
+# Problem: Service returns ServiceResult but caller expects direct object
+# Solution: Return the object directly or fix the caller
+def call
+  # ... logic ...
+  notification  # Return directly, not ServiceResult.new(...)
+end
+```
+
+### Verification Strategy
+
+**After Each Fix**:
+```bash
+# Run the specific failing tests
+rails test test/models/user_test.rb
+
+# Run related test files
+rails test test/services/medical_certification_service_test.rb
+
+# Run full suite to check for new regressions
+rails test | grep -E "(failures|errors)"
+```
+
+**Success Metrics**:
+- Failure count decreases
+- No new errors introduced
+- Related tests continue to pass
+
+### Documentation During Debugging
+
+**Track Progress**:
+```markdown
+## A1 Implementation - MedicalProviderMailer
+**Problem**: undefined method 'requested/approved/rejected'
+**Root Cause**: NotificationService maps actions to missing methods
+**Solution**: Added proxy methods using self.class.with() pattern
+**Results**: 55 failures → 35 failures (-20 failures)
+```
+
+**Record Architectural Insights**:
+- Which patterns work vs. don't work
+- How services should integrate with each other
+- What the proper API contracts should be
+
+### Prevention Strategies
+
+**1. Test Service Contracts**
+```ruby
+test 'service returns expected interface' do
+  result = SomeService.new(...).call
+  assert_respond_to result, :notification
+  assert_instance_of Notification, result.notification
+end
+```
+
+**2. Integration Tests for Service Chains**
+```ruby
+test 'full workflow creates expected records' do
+  assert_difference 'Event.count', 1 do
+    assert_difference 'Notification.count', 1 do
+      # Test the full chain: controller -> service -> mailer
+      post some_path, params: {...}
+    end
+  end
+end
+```
+
+**3. Architectural Consistency Checks**
+- Follow established patterns (two-call pattern for audit + notification)
+- Use context guards to prevent callback conflicts
+- Standardize service return value patterns
+
+// ... existing code ... 

@@ -4,9 +4,10 @@ require 'test_helper'
 
 module ConstituentPortal
   class ApplicationsDisabilityTest < ActionDispatch::IntegrationTest
+    include AuthenticationTestHelper
     setup do
       @constituent = create(:constituent)
-      sign_in(@constituent)
+      sign_in_for_integration_test(@constituent)
 
       @application_params = {
         application: {

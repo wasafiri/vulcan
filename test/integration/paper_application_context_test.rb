@@ -4,7 +4,7 @@ require 'test_helper'
 
 class PaperApplicationContextTest < ActionDispatch::IntegrationTest
   setup do
-    @constituent = FactoryBot.create(:user, :constituent)
+    @constituent = FactoryBot.create(:constituent)
     @application = FactoryBot.create(:application,
                                      user: @constituent,
                                      status: :in_progress,
@@ -28,7 +28,8 @@ class PaperApplicationContextTest < ActionDispatch::IntegrationTest
     # Verify ProofManageable validation also fails if applicable (e.g., verify_proof_attachments)
     # Note: ProofConsistencyValidation might catch it first.
     # We primarily want to ensure *some* proof validation fails here.
-    assert_not_empty @application.errors.keys.grep(/proof/), 'Expected proof-related validation errors'
+    proof_errors = @application.errors.to_hash.keys.select { |k| k.to_s.include?('proof') }
+    assert_not_empty proof_errors, 'Expected proof-related validation errors'
   end
 
   test 'proof validations are skipped within paper application context' do
@@ -36,12 +37,12 @@ class PaperApplicationContextTest < ActionDispatch::IntegrationTest
     # This simulates how the CreateOrUpdateCommand will operate
     saved_successfully = false
     begin
-      Thread.current[:paper_application_context] = true
+      setup_paper_application_context
       # Attempt to save the application again. It should now succeed because
       # ProofConsistencyValidation and ProofManageable checks are bypassed.
       saved_successfully = @application.save
     ensure
-      Thread.current[:paper_application_context] = nil # Ensure cleanup
+      teardown_paper_application_context # Ensure cleanup
     end
 
     assert saved_successfully,
@@ -53,22 +54,28 @@ class PaperApplicationContextTest < ActionDispatch::IntegrationTest
     assert_nil Thread.current[:paper_application_context], 'Context should be nil initially'
 
     begin
-      Thread.current[:paper_application_context] = true
+      setup_paper_application_context
       raise StandardError, 'Simulated error during processing'
     rescue StandardError
       # Error caught, context should be cleaned up by ensure block (if implemented correctly)
     ensure
       # Manually clean up in test if not using a wrapper module yet
-      Thread.current[:paper_application_context] = nil
+      teardown_paper_application_context
     end
 
     assert_nil Thread.current[:paper_application_context], 'Context should be nil after exception and cleanup'
 
     # Verify normal validation runs again after context is cleared
-    application_invalid_again = FactoryBot.build(:application,
-                                                 user: @constituent,
-                                                 status: :in_progress,
-                                                 income_proof_status: :approved) # Invalid state
-    assert_not application_invalid_again.valid?, 'Validation should be active again after context cleanup'
+    # Create a fresh application to avoid cached validation state
+    fresh_application = FactoryBot.build(:application,
+                                        user: @constituent,
+                                        status: :in_progress,
+                                        income_proof_status: :approved) # Invalid state - approved but no proof attached
+    
+    # Ensure no proofs are attached to this fresh application
+    fresh_application.income_proof.detach if fresh_application.income_proof.attached?
+    fresh_application.residency_proof.detach if fresh_application.residency_proof.attached?
+    
+    assert_not fresh_application.valid?, 'Validation should be active again after context cleanup'
   end
 end

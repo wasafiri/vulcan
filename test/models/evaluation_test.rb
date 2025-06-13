@@ -6,7 +6,7 @@ class EvaluationTest < ActiveSupport::TestCase
   test 'creates a valid evaluation' do
     evaluation = create(:evaluation)
     assert evaluation.valid?
-    assert_equal 'requested', evaluation.status
+    assert_equal 'scheduled', evaluation.status
   end
 
   test 'creates a completed evaluation' do

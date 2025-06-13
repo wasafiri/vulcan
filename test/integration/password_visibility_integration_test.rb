@@ -24,17 +24,14 @@ class PasswordVisibilityIntegrationTest < ActionDispatch::IntegrationTest
   end
 
   test 'password visibility toggle works on password reset page' do
-    # Build a user-like object that will pass the controller checks
-    # Using build_stubbed avoids hitting the database
-    user = build_stubbed(:user)
-
-    # Stub the actual lookup method used by the controller's set_user before_action
-    # to make the controller think 'fake_token' is valid and finds a user
-    User.stubs(:find_by).with(reset_password_token: 'fake_token').returns(user)
-    # The password_reset_period_valid? check doesn't seem relevant for the edit action itself
-
-    # Visit the edit path, which is where the password fields are
-    get edit_password_path(token: 'fake_token')
+    # Create a real user and generate a valid reset token
+    user = create(:user)
+    
+    # Generate a valid password reset token using Rails' token system
+    token = user.generate_token_for(:password_reset)
+    
+    # Visit the edit path with the valid token
+    get edit_password_path(token: token)
     assert_response :success
 
     # Check that password fields exist within the visibility controller div

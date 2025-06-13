@@ -59,7 +59,7 @@ class ProofsSystemTest < ApplicationSystemTestCase
     assert_current_path new_proof_constituent_portal_application_path(@application, proof_type: 'income')
 
     # Upload new proof
-    attach_file 'income_proof', @valid_pdf.path, make_visible: true
+    attach_file 'income_proof_upload', @valid_pdf.path, make_visible: true
     click_button 'Submit'
 
     # Verify success
@@ -98,7 +98,7 @@ class ProofsSystemTest < ApplicationSystemTestCase
     assert_current_path new_proof_constituent_portal_application_path(@application, proof_type: 'income')
 
     # Attach invalid file
-    attach_file 'income_proof', @invalid_file.path, make_visible: true
+    attach_file 'income_proof_upload', @invalid_file.path, make_visible: true
     click_button 'Submit'
 
     # Should show error message
@@ -117,7 +117,7 @@ class ProofsSystemTest < ApplicationSystemTestCase
     assert_current_path new_proof_constituent_portal_application_path(@application, proof_type: 'income')
 
     # First upload should succeed
-    attach_file 'income_proof', @valid_pdf.path, make_visible: true
+    attach_file 'income_proof_upload', @valid_pdf.path, make_visible: true
     click_button 'Submit'
     assert_text 'Proof submitted successfully'
 
@@ -126,7 +126,7 @@ class ProofsSystemTest < ApplicationSystemTestCase
     assert_text 'Application Details'
     click_on 'Resubmit Income Proof'
     assert_current_path new_proof_constituent_portal_application_path(@application, proof_type: 'income')
-    attach_file 'income_proof', @valid_pdf.path, make_visible: true
+    attach_file 'income_proof_upload', @valid_pdf.path, make_visible: true
     click_button 'Submit'
     assert_text 'Please wait before submitting another proof'
   end
@@ -146,12 +146,12 @@ class ProofsSystemTest < ApplicationSystemTestCase
     assert_current_path new_proof_constituent_portal_application_path(@application, proof_type: 'income')
 
     # Form should be accessible
-    assert_selector "label[for='income_proof']"
+    assert_selector "label[for='income_proof_upload']"
     assert_selector "[aria-label='Upload progress']"
     assert_selector "button[type='submit']"
 
     # Attach file
-    attach_file 'income_proof', @valid_pdf.path, make_visible: true
+    attach_file 'income_proof_upload', @valid_pdf.path, make_visible: true
 
     # Progress information should be announced
     assert_selector "[role='progressbar']"

@@ -76,13 +76,15 @@
                               </p>
                               <% if change.metadata['changes'].present? %>
                                 <div class="mt-1 text-xs text-gray-600">
-                                  <% change.metadata['changes'].keys.first(2).each do |field| %>
-                                    <span class="inline-block bg-gray-100 rounded px-2 py-1 mr-1 mb-1">
-                                      <%= field.humanize %>
-                                    </span>
-                                  <% end %>
-                                  <% if change.metadata['changes'].keys.length > 2 %>
-                                    <span class="text-gray-500">+<%= change.metadata['changes'].keys.length - 2 %> more</span>
+                                  <% change.metadata['changes'].each do |field, values| %>
+                                    <div class="mb-1">
+                                      <span class="inline-block bg-gray-100 rounded px-2 py-1 mr-1">
+                                        <%= field.humanize %>
+                                      </span>
+                                      <span class="text-red-600"><%= values['old'] %></span>
+                                      <span class="text-gray-500">→</span>
+                                      <span class="text-green-600"><%= values['new'] %></span>
+                                    </div>
                                   <% end %>
                                 </div>
                               <% end %>
@@ -105,8 +107,6 @@
               <% end %>
             </div>
           </div>
-
-
         </div>
       </div>
     </main>

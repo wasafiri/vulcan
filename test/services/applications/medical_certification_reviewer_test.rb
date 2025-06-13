@@ -22,7 +22,7 @@ module Applications
       # Stub the attachment service call to return success
       MedicalCertificationAttachmentService.stub(:reject_certification, ->(**_args) { { success: true } }) do
         result = @service.reject(rejection_reason: 'Invalid documentation')
-        assert(result[:success], 'Expected reviewer service to return success when attachment service succeeds')
+        assert(result.success?, 'Expected reviewer service to return success when attachment service succeeds')
       end
 
       # We can't easily verify the status change here without letting the actual service run,
@@ -32,16 +32,16 @@ module Applications
 
     test 'fails when rejection reason is missing' do
       result = @service.reject(rejection_reason: '')
-      assert_not(result[:success], 'Expected rejection to fail without a reason')
-      assert_match(/Rejection reason is required/, result[:error])
+      assert_not(result.success?, 'Expected rejection to fail without a reason')
+      assert_match(/Rejection reason is required/, result.message)
     end
 
     test 'fails when medical provider has no contact methods' do
       @application.update(medical_provider_email: nil, medical_provider_fax: nil)
 
       result = @service.reject(rejection_reason: 'Invalid documentation')
-      assert_not(result[:success], 'Expected rejection to fail without contact methods')
-      assert_match(/No contact method available/, result[:error])
+      assert_not(result.success?, 'Expected rejection to fail without contact methods')
+      assert_match(/No contact method available/, result.message)
     end
 
     test 'creates an application note when notes are provided' do
@@ -85,7 +85,7 @@ module Applications
       # Stub the attachment service call to return success (simulating internal notification failure but overall success)
       MedicalCertificationAttachmentService.stub(:reject_certification, ->(**_args) { { success: true } }) do
         result = @service.reject(rejection_reason: 'Invalid documentation')
-        assert(result[:success], 'Expected reviewer service to return success even if internal notification failed')
+        assert(result.success?, 'Expected reviewer service to return success even if internal notification failed')
       end
 
       # Status verification removed for same reason as above test
@@ -95,11 +95,11 @@ module Applications
     test 'returns error when attachment service fails' do
       # Stub the attachment service call to return failure
       error_message = 'Simulated service failure'
-      MedicalCertificationAttachmentService.stub(:reject_certification, ->(**_args) { { success: false, error: error_message } }) do
+      MedicalCertificationAttachmentService.stub(:reject_certification, ->(**_args) { { success: false, error: StandardError.new(error_message) } }) do
         result = @service.reject(rejection_reason: 'Invalid documentation')
-        assert_not(result[:success], 'Expected reviewer service to return failure when attachment service fails')
+        assert_not(result.success?, 'Expected reviewer service to return failure when attachment service fails')
         # The reviewer service should pass through the error message from the attachment service
-        assert_equal(error_message, result[:error])
+        assert_match(/#{error_message}/, result.message)
       end
     end
   end

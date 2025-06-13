@@ -105,7 +105,7 @@ module Applications
       end
 
       # Use NotificationService for centralized notification creation
-      result = NotificationService.create_and_deliver!(
+      NotificationService.create_and_deliver!(
         type: 'medical_certification_requested',
         recipient: application.user,
         actor: actor,
@@ -117,8 +117,6 @@ module Applications
         },
         channel: :email
       )
-
-      result.notification
     rescue StandardError => e
       # Log but don't fail the process
       log_error(e, 'Failed to create notification')

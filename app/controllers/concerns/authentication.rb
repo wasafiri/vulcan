@@ -61,12 +61,28 @@ module Authentication
   end
 
   def find_test_session
-    # Check for test user header FIRST
+    # Check Current.test_user_id FIRST (set by authentication helpers)
+    if defined?(Current) && Current.test_user_id.present?
+      test_user = User.find_by(id: Current.test_user_id)
+      if test_user
+        return Session.new(user: test_user)
+      end
+    end
+
+    # Check for test user header SECOND
     test_user_id = request.headers['X-Test-User-Id'] || request.headers['HTTP_X_TEST_USER_ID']
+    
     if test_user_id.present?
       test_user = User.find_by(id: test_user_id)
       if test_user
-        puts "TEST AUTH: Using X-Test-User-Id header: #{test_user.email}" if ENV['DEBUG_AUTH'] == 'true'
+        return Session.new(user: test_user)
+      end
+    end
+
+    # Check ENV['TEST_USER_ID'] as fallback THIRD
+    if ENV['TEST_USER_ID'].present?
+      test_user = User.find_by(id: ENV['TEST_USER_ID'])
+      if test_user
         return Session.new(user: test_user)
       end
     end
@@ -87,32 +103,11 @@ module Authentication
       return session_record if session_record
     end
 
-    # Debug logging for authentication issues
-    if ENV['DEBUG_AUTH'] == 'true'
-      puts 'AUTH DEBUG: current_session method called'
-      puts "AUTH DEBUG: cookies: #{cookies.inspect}"
-      puts "AUTH DEBUG: session_token in cookies: #{cookies[:session_token]}"
-      puts "AUTH DEBUG: signed session_token: #{cookies.signed[:session_token]}" if cookies.respond_to?(:signed)
-
-      # Check if the session record exists
-      if cookies[:session_token].present?
-        session_record = Session.find_by(session_token: cookies[:session_token])
-        if session_record
-          puts "AUTH DEBUG: Session record found with token: #{cookies[:session_token]}"
-          puts "AUTH DEBUG: Session user ID: #{session_record.user_id}"
-          puts "AUTH DEBUG: Session created at: #{session_record.created_at}"
-        else
-          puts "AUTH DEBUG: No session record found with token: #{cookies[:session_token]}"
-        end
-      end
-    end
     nil
   end
 
   # Redirects unauthenticated users to the sign-in page with an alert message
   def authenticate_user!
-    debug_auth_info if debug_auth_enabled?
-
     return if current_user.present?
 
     store_location
@@ -136,23 +131,5 @@ module Authentication
     redirect_to root_path, alert: 'Unauthorized access'
   end
 
-  def debug_auth_enabled?
-    Rails.env.test? && ENV['DEBUG_AUTH'] == 'true'
-  end
 
-  def debug_auth_info
-    debug_info = {
-      called_from: caller(1..1).first,
-      current_user: current_user&.email || 'nil',
-      test_user_id: ENV.fetch('TEST_USER_ID', 'nil'),
-      cookies: cookies.to_h
-    }
-
-    if (token = cookies[:session_token])
-      session = Session.find_by(session_token: token)
-      debug_info[:session_found_by_token] = session&.id || 'nil'
-    end
-
-    Rails.logger.debug { "AUTHENTICATE_USER! debug info: #{debug_info.inspect}" }
-  end
 end

@@ -375,6 +375,12 @@ class ApplicationNotificationsMailer < ApplicationMailer
   helper Mailers::ApplicationNotificationsHelper
 
   def account_created(constituent, temp_password)
+    # Guard against nil constituent
+    if constituent.nil?
+      Rails.logger.error("ApplicationNotificationsMailer#account_created called with nil constituent")
+      return
+    end
+
     # Letter generation using database templates
     if constituent.communication_preference == 'letter'
       Letters::TextTemplateToPdfService.new(
@@ -714,6 +720,66 @@ class ApplicationNotificationsMailer < ApplicationMailer
     message
   rescue StandardError => e
     Rails.logger.error("Failed to send registration confirmation email for user #{user&.id}: #{e.message}")
+    Rails.logger.error(e.backtrace.join("\n"))
+    raise e
+  end
+
+  def proof_received(application, proof_type)
+    user = application.user
+    
+    # For now, reuse the proof_approved template since the functionality is similar
+    # This can be customized later with a dedicated proof_received template if needed
+    template_name = 'application_notifications_proof_approved'
+    
+    begin
+      text_template = EmailTemplate.find_by!(name: template_name, format: :text)
+    rescue ActiveRecord::RecordNotFound => e
+      Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
+      raise "Email template not found for #{template_name}"
+    end
+
+    # Prepare variables (similar to proof_approved but simpler)
+    organization_name = Policy.get('organization_name') || 'MAT Program'
+    proof_type_formatted = format_proof_type(proof_type)
+    
+    # Common elements
+    header_title = "Document Received: #{proof_type_formatted.capitalize}"
+    footer_contact_email = Policy.get('support_email') || 'support@example.com'
+    footer_website_url = root_url(host: default_url_options[:host])
+    footer_show_automated_message = true
+    header_logo_url = begin
+      ActionController::Base.helpers.asset_path('logo.png', host: default_url_options[:host])
+    rescue StandardError
+      nil
+    end
+
+    variables = {
+      user_first_name: user.first_name,
+      organization_name: organization_name,
+      proof_type_formatted: proof_type_formatted,
+      header_text: header_text(title: header_title, logo_url: header_logo_url),
+      footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
+                               organization_name: organization_name, show_automated_message: footer_show_automated_message),
+      all_proofs_approved_message_text: nil, # Not applicable for received notification
+      header_logo_url: header_logo_url,
+      header_subtitle: nil
+    }.compact
+
+    # Render subject and body
+    rendered_subject, rendered_text_body = text_template.render(**variables)
+    
+    # Customize the subject to be more appropriate for "received" vs "approved"
+    rendered_subject = rendered_subject.gsub(/approved/i, 'received').gsub(/Approved/i, 'Received')
+
+    mail(
+      to: user.email,
+      subject: rendered_subject,
+      message_stream: 'notifications'
+    ) do |format|
+      format.text { render plain: rendered_text_body }
+    end
+  rescue StandardError => e
+    Rails.logger.error("Failed to send proof received email for application #{application&.id}: #{e.message}")
     Rails.logger.error(e.backtrace.join("\n"))
     raise e
   end

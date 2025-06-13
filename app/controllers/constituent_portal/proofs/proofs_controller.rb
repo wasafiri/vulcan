@@ -163,7 +163,7 @@ module ConstituentPortal
         Rails.logger.debug { 'AUTHORIZE_PROOF_ACCESS: FAILED - Redirecting' } # Log failure
         redirect_to constituent_portal_application_path(@application),
                     alert: 'Invalid proof type or status'
-        false # Return false to signal failure
+        return false # Add explicit return to halt execution
       end
 
       def check_rate_limit
@@ -188,14 +188,14 @@ module ConstituentPortal
           Rails.logger.info "Resubmitting previously rejected #{params[:proof_type]} proof for application #{@application.id}"
         end
 
-        # Set thread local variable to communicate resubmission status to validation layer
-        Thread.current[:resubmitting_proof] = is_resubmitting
+        # Set Current attribute to communicate resubmission status to validation layer
+        Current.resubmitting_proof = is_resubmitting
 
         begin
           result = ProofAttachmentService.attach_proof({
             application: @application,
             proof_type: params[:proof_type],
-            blob_or_file: params[:"#{params[:proof_type]}_proof"],
+            blob_or_file: params[:"#{params[:proof_type]}_proof_upload"],
             status: :not_reviewed,
             admin: current_user,
             submission_method: :web,
@@ -206,8 +206,8 @@ module ConstituentPortal
             }
           })
         ensure
-          # Always reset thread local, even if an exception occurs
-          Thread.current[:resubmitting_proof] = nil
+          # Always reset Current attribute, even if an exception occurs
+          Current.resubmitting_proof = nil
         end
 
         return if result[:success]

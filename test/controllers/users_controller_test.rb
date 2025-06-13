@@ -5,7 +5,7 @@ require 'test_helper'
 class UsersControllerTest < ActionDispatch::IntegrationTest
   setup do
     @user = create(:constituent)
-    sign_in(@user)
+    sign_in_for_controller_test(@user)
   end
 
   test 'should get edit' do
@@ -77,7 +77,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
   test 'should redirect admin to admin dashboard after update' do
     admin = create(:admin)
     sign_out
-    sign_in(admin)
+    sign_in_for_controller_test(admin)
 
     patch profile_path, params: {
       user: {
@@ -91,7 +91,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
   test 'should redirect evaluator to evaluator dashboard after update' do
     evaluator = create(:evaluator)
     sign_out
-    sign_in(evaluator)
+    sign_in_for_controller_test(evaluator)
 
     patch profile_path, params: {
       user: {
@@ -105,7 +105,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
   test 'should redirect vendor to vendor dashboard after update' do
     vendor = create(:vendor_user)
     sign_out
-    sign_in(vendor)
+    sign_in_for_controller_test(vendor)
 
     patch profile_path, params: {
       user: {

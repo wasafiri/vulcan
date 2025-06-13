@@ -48,7 +48,7 @@ module Applications
     # Load proof reviews with minimal eager loading
     def load_proof_reviews
       ProofReview
-        .select('id, application_id, admin_id, proof_type, created_at, reviewed_at, rejection_reason, notes')
+        .select('id, application_id, admin_id, proof_type, status, created_at, reviewed_at, rejection_reason, notes')
         .includes(admin: []) # Include the admin but not role_capabilities
         .where(application_id: application.id)
         .order(created_at: :desc)

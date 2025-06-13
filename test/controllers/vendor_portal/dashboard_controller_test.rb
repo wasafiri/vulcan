@@ -15,7 +15,7 @@ module VendorPortal
       }
 
       # Use the sign_in helper from test_helper.rb
-      sign_in(@vendor)
+      sign_in_for_integration_test(@vendor)
     end
 
     def test_get_show

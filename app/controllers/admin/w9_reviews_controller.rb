@@ -38,8 +38,7 @@ module Admin
 
       if @w9_review.save
         Rails.logger.debug 'W9Review saved successfully'
-        # Update vendor's w9_status based on the review
-        @vendor.update(w9_status: @w9_review.status)
+        # The W9Review model's after_commit callback will update the vendor's w9_status
         redirect_to admin_vendor_path(@vendor), notice: 'W9 review completed successfully'
       else
         # If validation fails, render the form with error messages

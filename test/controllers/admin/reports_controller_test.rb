@@ -15,7 +15,7 @@ module Admin
       }
 
       # Use the sign_in helper from test_helper.rb
-      sign_in(@admin)
+      sign_in_for_integration_test(@admin)
     end
 
     def test_should_get_index

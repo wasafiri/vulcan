@@ -6,7 +6,7 @@ module Admin
   class ApplicationAnalyticsControllerTest < ActionDispatch::IntegrationTest
     setup do
       @admin = create(:admin)
-      sign_in(@admin)
+      sign_in_for_integration_test(@admin)
     end
 
     test 'should get pain_points' do

@@ -1,12 +1,21 @@
 # Service Architecture
 
-## Overview
+Short, actionable reference for how our service objects work and how to build new ones.
 
-The application uses service objects to encapsulate business logic and provide a maintainable, testable codebase. Services follow consistent patterns and handle complex operations that span multiple models.
+---
 
-## BaseService
+## 1 · Philosophy
 
-The `BaseService` class provides common functionality for all service objects:
+| Principle | In practice |
+|-----------|-------------|
+| **Encapsulate business logic** | One service ↔ one use-case. Keep controllers/models thin. |
+| **Consistent patterns** | All services inherit helpers from `BaseService`. |
+| **Transactional safety** | Wrap side-effect chains in DB transactions. |
+| **Clear result surface** | Return `true/false`, expose `errors`. Complex services may return a result hash. |
+
+---
+
+## 2 · BaseService
 
 ```ruby
 class BaseService
@@ -30,356 +39,222 @@ class BaseService
 end
 ```
 
-## Core Services
+---
 
-### Applications::EventDeduplicationService
+## 3 · Core Services (examples)
 
-**NEW - Consolidated December 2025**
-
-Provides centralized, robust event deduplication across the entire application. This service replaced multiple competing deduplication systems that previously caused conflicts.
+### 3.1 · Applications::EventDeduplicationService
 
 ```ruby
-service = Applications::EventDeduplicationService.new
-deduplicated_events = service.deduplicate([notification, event, status_change])
+deduped = Applications::EventDeduplicationService
+           .new.deduplicate(events)
 ```
 
-**Key Features**:
-- **Single Source of Truth**: Eliminates conflicts between multiple deduplication systems
-- **Flexible Fingerprinting**: Handles Notification, Event, and ApplicationStatusChange objects
-- **Time-Window Grouping**: 1-minute deduplication windows using proper bucketing
-- **Priority-Based Selection**: ApplicationStatusChange > Event > Notification
-- **Medical Certification Aware**: Special handling for medical certification events
+* **Single source of truth** for event deduping.  
+* 1-minute buckets, priority: StatusChange > Event > Notification.  
+* Fingerprints events via `event_fingerprint(event)`.
 
-**Fingerprinting Algorithm**:
+<details>
+<summary>Fingerprint snippet</summary>
+
 ```ruby
 def event_fingerprint(event)
-  action = generic_action(event)
+  action  = generic_action(event)
   details = case event
             when ApplicationStatusChange
-              if medical_certification_event?(event)
-                nil # Group medical cert events together
-              else
+              medical_certification_event?(event) ? nil :
                 "#{event.from_status}-#{event.to_status}"
-              end
             when ->(e) { e.action&.include?('proof_submitted') }
               "#{event.metadata['proof_type']}-#{event.metadata['submission_method']}"
-            else
-              nil
             end
   [action, details].compact.join('_')
 end
 ```
+</details>
 
-**Time Bucketing**:
+---
+
+### 3.2 · Applications::MedicalCertificationService
+
 ```ruby
-# Groups events into 1-minute windows
-time_bucket = (event.created_at.to_i / DEDUPLICATION_WINDOW) * DEDUPLICATION_WINDOW
+service = Applications::MedicalCertificationService
+            .new(application: app, actor: current_user)
+service.request_certification
 ```
 
-**Priority Selection**:
-- ApplicationStatusChange: Priority 3 (highest)
-- Event: Priority 2 (medium)  
-- Notification: Priority 1 (lowest)
+* Uses `update_columns` to avoid unrelated validations.  
+* Timestamps = audit trail.  
+* Background jobs for emails; graceful error capture.
 
-### Applications::MedicalCertificationService
+---
 
-Handles medical certification requests safely, avoiding validation conflicts:
+### 3.3 · Applications::PaperApplicationService
 
-```ruby
-service = Applications::MedicalCertificationService.new(
-  application: application,
-  actor: current_user
-)
+(See **Paper Application Architecture** doc for full details.)
 
-if service.request_certification
-  # Success path
-else
-  # Error handling with service.errors
-end
-```
+Key points:
 
-**Key Features**:
-- Uses `update_columns` to bypass unrelated model validations
-- Maintains proper audit trails via timestamps
-- Handles notification creation failures gracefully
-- Uses background jobs for email delivery
-- Logs detailed errors for troubleshooting
+| Concern | How handled |
+|---------|-------------|
+| Validation bypass | `Current.paper_context = true` |
+| Self vs dependent | GuardianRelationship creation when needed |
+| Proofs | Accept / reject, uploads, audits |
+| Notifications | Triggered after success |
 
-### Applications::PaperApplicationService
+---
 
-Handles paper application submissions by administrators with proper Current attributes context:
+### 3.4 · Applications::EventService
 
 ```ruby
-service = Applications::PaperApplicationService.new(
-  params: paper_application_params,
-  admin: current_user
-)
-
-if service.create
-  redirect_to admin_application_path(service.application)
-else
-  handle_errors(service.errors)
-end
-```
-
-**Key Features**:
-- Sets `Current.paper_context` to bypass online validations
-- Handles both self-applicant and guardian/dependent scenarios
-- Processes proof uploads and rejections
-- Creates proper audit trails and notifications
-- Manages GuardianRelationship creation for new dependents
-
-### Applications::EventService
-
-Centralizes event logging for applications with proper metadata:
-
-```ruby
-service = Applications::EventService.new(application: app, user: current_user)
-
-# Log dependent application updates
+service = Applications::EventService
+            .new(application: app, user: current_user)
 service.log_dependent_application_update(
-  dependent: dependent_user,
-  relationship_type: 'Parent'
-)
-
-# Log submission events
-service.log_submission_for_dependent(
-  dependent: dependent_user,
-  relationship_type: 'Parent'
+  dependent: dep, relationship_type: 'Parent'
 )
 ```
 
-### ProofAttachmentService
+Centralises event + metadata logging.
 
-Handles proof file attachments with comprehensive error handling:
+---
+
+### 3.5 · ProofAttachmentService
 
 ```ruby
 result = ProofAttachmentService.attach_proof(
-  application: application,
-  proof_type: 'income',
-  blob_or_file: uploaded_file,
-  status: :approved,
-  admin: admin_user,
-  submission_method: :paper,
-  metadata: { ip_address: request.remote_ip }
+  application:        app,
+  proof_type:         'income',
+  blob_or_file:       uploaded_file,
+  status:             :approved,
+  admin:              current_user,
+  submission_method:  :paper,
+  metadata:           { ip: request.remote_ip }
 )
-
-if result[:success]
-  # Handle success
-else
-  # Handle error: result[:error]
-end
 ```
 
-**Features**:
-- Supports both file uploads and signed blob IDs
-- Creates audit records automatically
-- Handles paper application context properly
-- Provides detailed error reporting
-- Records metrics for monitoring
+* Supports files **or** signed blob IDs.  
+* Auto-creates audits; honours `Current.paper_context`; returns structured result.
 
-## Service Patterns
+---
 
-### Current Attributes Context Management
+## 4 · Service Patterns & Helpers
 
-**UPDATED - December 2025**: Migrated from Thread-local variables to Rails CurrentAttributes
-
-Services that need to bypass validations use Current attributes for better isolation and testability:
+### 4.1 · CurrentAttributes
 
 ```ruby
-def process_paper_application
-  Current.paper_context = true
-  begin
-    # Service logic that bypasses online validations
-    process_application
-  ensure
-    Current.reset
-  end
-end
+Current.paper_context         # bypass proof checks
+Current.skip_proof_validation # broader bypass
+Current.force_notifications   # useful in tests
 ```
 
-**Current Attributes Available**:
-- `Current.paper_context` - Bypasses proof validations for paper applications
-- `Current.skip_proof_validation` - General proof validation bypass
-- `Current.resubmitting_proof` - Indicates proof resubmission context
-- `Current.reviewing_single_proof` - Single proof review mode
-- `Current.force_notifications` - Forces notification delivery in tests
+* Rails-native cleanup between requests.  
+* Test isolation with `Current.reset` in teardown.
 
-**Used by**:
-- `ProofConsistencyValidation#skip_proof_validation?`
-- `ProofManageable#verify_proof_attachments`
-- `ProofManageable#require_proof_validations?`
-
-**Benefits over Thread-local**:
-- Automatic cleanup between requests
-- Better test isolation
-- Rails-native approach
-- Consistent state management
-
-### Error Handling Pattern
-
-Services use consistent error handling:
+### 4.2 · Standard Error Handling
 
 ```ruby
 def perform_operation
   ActiveRecord::Base.transaction do
     return add_error('Validation failed') unless valid?
-    
+
     perform_core_logic
     true
   end
-rescue StandardError => e
-  log_error(e, 'Operation context')
+rescue => e
+  log_error(e, 'perform_operation')
   add_error(e.message)
-  false
 end
 ```
 
-### Result Objects
-
-Complex services return structured results:
+### 4.3 · Result Object Template
 
 ```ruby
-def attach_proof(...)
-  result = { success: false, error: nil, duration_ms: 0 }
-  start_time = Time.current
-  
-  begin
-    # Service logic
-    result[:success] = true
-  rescue StandardError => e
-    result[:error] = e
-  ensure
-    result[:duration_ms] = ((Time.current - start_time) * 1000).round
-  end
-  
-  result
+{ success: false, error: nil, duration_ms: 0 }
+```
+
+Populate and return from service when you need more than a boolean.
+
+---
+
+## 5 · Guardian / Dependent Logic (in services)
+
+```ruby
+if applicant_type == 'dependent'
+  guardian   = find_or_create_guardian
+  dependent  = create_dependent_with_guardian_info
+  GuardianRelationship.create!(
+    guardian_user:  guardian,
+    dependent_user: dependent,
+    relationship_type: relationship_type
+  )
+else
+  dependent = find_or_create_self_applicant
 end
 ```
 
-## Guardian/Dependent Handling
+---
 
-Services properly handle guardian/dependent relationships:
+## 6 · Testing Services
 
-```ruby
-# In PaperApplicationService
-def process_constituent
-  if applicant_type == 'dependent'
-    # Handle guardian creation/lookup
-    @guardian_user_for_app = find_or_create_guardian
-    
-    # Handle dependent creation with guardian's contact info if needed
-    @constituent = create_dependent_with_guardian_info
-    
-    # Create GuardianRelationship
-    GuardianRelationship.create!(
-      guardian_user: @guardian_user_for_app,
-      dependent_user: @constituent,
-      relationship_type: relationship_type
-    )
-  else
-    # Handle self-applicant
-    @constituent = find_or_create_self_applicant
-  end
-end
-```
-
-## Testing Services
-
-### Unit Testing Pattern
+### 6.1 · Unit Test Skeleton
 
 ```ruby
-class ServiceTest < ActiveSupport::TestCase
-  setup do
-    @admin = create(:admin)
-    @application = create(:application)
-  end
+class FooServiceTest < ActiveSupport::TestCase
+  setup { @admin = create(:admin) }
 
-  test 'successful operation' do
-    service = MyService.new(application: @application, admin: @admin)
-    
+  test 'success' do
+    service = FooService.new(admin: @admin)
     assert service.perform
     assert_empty service.errors
-    
-    # Verify expected changes
-    @application.reload
-    assert_equal 'expected_status', @application.status
   end
 
-  test 'handles errors gracefully' do
-    # Set up error condition
-    @application.stubs(:save).returns(false)
-    
-    service = MyService.new(application: @application, admin: @admin)
-    
+  test 'handles failure' do
+    Foo.stubs(:create!).raises(StandardError, 'boom')
+    service = FooService.new(admin: @admin)
     assert_not service.perform
-    assert_includes service.errors, 'Expected error message'
+    assert_includes service.errors, 'boom'
   end
 end
 ```
 
-### Integration Testing
+### 6.2 · Integration Example
 
 ```ruby
-test 'paper application service creates complete application' do
-  params = {
-    applicant_type: 'dependent',
-    relationship_type: 'Parent',
-    guardian_attributes: { ... },
-    dependent_attributes: { ... },
-    application: { ... }
-  }
-  
-  service = Applications::PaperApplicationService.new(
-    params: params,
-    admin: @admin
-  )
-  
-  assert_difference ['Application.count', 'GuardianRelationship.count'] do
-    assert service.create
-  end
-  
-  application = service.application
-  assert application.for_dependent?
-  assert_equal @admin.id, application.managing_guardian_id
+assert_difference ['Application.count', 'GuardianRelationship.count'] do
+  assert Applications::PaperApplicationService
+           .new(params: dep_params, admin: @admin).create
 end
 ```
 
-## Future Service Candidates
+---
 
-Areas that could benefit from service object extraction:
+## 7 · When to Extract a Service
 
-1. **Voucher Management** - Complex voucher issuance and tracking logic
-2. **Application Status Transitions** - State machine-like status changes
-3. **User Verification Processes** - Multi-step verification workflows
-4. **Notification Orchestration** - Complex notification routing and delivery
-5. **Report Generation** - Complex data aggregation and formatting
+* Logic spans **multiple models**.  
+* Needs **transaction** wrapping.  
+* Complex **error handling**.  
+* **Background job** orchestration.  
+* The controller/model would otherwise grow unwieldy.
 
-## Service Guidelines
+---
 
-### When to Create a Service
+## 8 · Future Service Candidates
 
-Create a service when:
-- Logic spans multiple models
-- Complex business rules need encapsulation
-- Operations need transaction management
-- Error handling is complex
-- Background job coordination is needed
+| Area | Why |
+|------|-----|
+| Voucher management | Multi-step issuance, expiry, audit trail |
+| Status transitions | State-machine-like rules, notifications |
+| User verification | Document uploads, external checks |
+| Notification orchestration | Multiple channels + rules |
+| Report generation | Large data aggregation, formatting |
 
-### Service Responsibilities
+---
 
-Services should:
-- Encapsulate business logic
-- Handle error conditions gracefully
-- Maintain audit trails
-- Coordinate model interactions
-- Provide clear success/failure indicators
+## 9 · Dos & Don’ts
 
-### What Services Should Not Do
-
-Avoid:
-- Direct view rendering
-- Session management
-- HTTP request/response handling
-- Complex parameter parsing (use form objects)
-- Direct database queries (use models/scopes) 
+| Do | Don’t |
+|----|-------|
+| Keep services PORO-ish | Render views |
+| Return clear success/failure | Manage sessions |
+| Log & collect errors | Parse complex params (use form objects) |
+| Maintain audits | Skip transactions when needed |
+| Use models/scopes for queries | Embed raw SQL everywhere |

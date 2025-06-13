@@ -143,6 +143,7 @@ class VendorNotificationsMailer < ApplicationMailer
     # Common elements for shared partials
     header_title = 'W9 Form Approved'
     footer_contact_email = Policy.get('support_email') || 'support@example.com'
+    footer_organization_name = Policy.get('organization_name') || 'MAT Program'
     footer_website_url = root_url(host: default_url_options[:host])
     footer_show_automated_message = true
     header_logo_url = begin
@@ -159,7 +160,7 @@ class VendorNotificationsMailer < ApplicationMailer
       # Shared partials
       status_box_text: status_box_text(status: :success, title: status_box_title, message: status_box_message),
       header_text: header_text(title: header_title, logo_url: header_logo_url),
-      footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
+      footer_text: footer_text(organization_name: footer_organization_name, contact_email: footer_contact_email, website_url: footer_website_url,
                                show_automated_message: footer_show_automated_message),
       header_logo_url: header_logo_url, # Optional
       header_subtitle: nil # Optional
@@ -220,6 +221,7 @@ class VendorNotificationsMailer < ApplicationMailer
     # Common elements for shared partials
     header_title = 'W9 Form Requires Attention'
     footer_contact_email = Policy.get('support_email') || 'support@example.com'
+    footer_organization_name = Policy.get('organization_name') || 'MAT Program'
     footer_website_url = root_url(host: default_url_options[:host])
     footer_show_automated_message = true
     header_logo_url = begin
@@ -238,7 +240,7 @@ class VendorNotificationsMailer < ApplicationMailer
       # Shared partials (text only for non-multipart emails)
       status_box_text: status_box_text(status: :error, title: status_box_title, message: status_box_message),
       header_text: header_text(title: header_title, logo_url: header_logo_url),
-      footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
+      footer_text: footer_text(organization_name: footer_organization_name, contact_email: footer_contact_email, website_url: footer_website_url,
                                show_automated_message: footer_show_automated_message),
       header_logo_url: header_logo_url, # Optional
       header_subtitle: nil # Optional
@@ -301,6 +303,7 @@ class VendorNotificationsMailer < ApplicationMailer
     # Common elements for shared partials
     header_title = 'W9 Form Expiring Soon'
     footer_contact_email = Policy.get('support_email') || 'support@example.com'
+    footer_organization_name = Policy.get('organization_name') || 'MAT Program'
     footer_website_url = root_url(host: default_url_options[:host])
     footer_show_automated_message = true
     header_logo_url = begin
@@ -387,6 +390,7 @@ class VendorNotificationsMailer < ApplicationMailer
     # Common elements for shared partials
     header_title = 'W9 Form Has Expired - Action Required'
     footer_contact_email = Policy.get('support_email') || 'support@example.com'
+    footer_organization_name = Policy.get('organization_name') || 'MAT Program'
     footer_website_url = root_url(host: default_url_options[:host])
     footer_show_automated_message = true
     header_logo_url = begin

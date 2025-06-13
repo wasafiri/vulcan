@@ -44,7 +44,7 @@
             <%= hidden_field_tag :proof_type, @proof_type %>
             
             <div>
-              <label for="<%= "#{@proof_type}_proof" %>" class="block text-sm font-medium text-gray-700">
+              <label for="<%= "#{@proof_type}_proof_upload" %>" class="block text-sm font-medium text-gray-700">
                 Upload your <%= @proof_type.titleize %> document
               </label>
               <p class="mt-1 text-sm text-gray-500" id="file-description">
@@ -52,7 +52,7 @@
               </p>
               
               <div class="mt-2">
-                <%= form.file_field "#{@proof_type}_proof", 
+                <%= form.file_field "#{@proof_type}_proof_upload", 
                     class: "block w-full text-sm text-gray-900 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500",
                     direct_upload: true,
                     accept: ".pdf,.jpg,.jpeg,.png",

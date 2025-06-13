@@ -6,8 +6,11 @@
 # based on their recipient addresses.
 
 require 'test_helper'
+require 'action_mailbox/test_helper'
 
 class ApplicationMailboxRoutingTest < ActionMailbox::TestCase
+  include ActionMailboxTestHelper
+
   setup do
     # Create users needed for mailbox processing
     @constituent = create(:constituent, email: 'constituent@example.com')
@@ -40,13 +43,11 @@ class ApplicationMailboxRoutingTest < ActionMailbox::TestCase
   end
 
   test 'routes proof@example.com emails to proof submission mailbox' do
-    email = receive_inbound_email_from_mail(
+    assert_mailbox_routed ProofSubmissionMailbox,
       to: 'proof@example.com',
       from: @constituent.email,
       subject: 'Test Subject',
       body: 'Test Body'
-    )
-    assert_mailbox_routed email, to: 'proof_submission'
   end
 
   test 'routes emails to Postmark inbound address to proof submission mailbox' do
@@ -56,35 +57,29 @@ class ApplicationMailboxRoutingTest < ActionMailbox::TestCase
     # Set test address
     MatVulcan::InboundEmailConfig.inbound_email_address = 'test-hash@inbound.postmarkapp.com'
 
-    email = receive_inbound_email_from_mail(
+    assert_mailbox_routed ProofSubmissionMailbox,
       to: 'test-hash@inbound.postmarkapp.com',
       from: @constituent.email,
       subject: 'Test Subject',
       body: 'Test Body'
-    )
-    assert_mailbox_routed email, to: 'proof_submission'
 
     # Restore original address
     MatVulcan::InboundEmailConfig.inbound_email_address = original_address
   end
 
   test 'routes medical-cert@mdmat.org emails to medical certification mailbox' do
-    email = receive_inbound_email_from_mail(
+    assert_mailbox_routed MedicalCertificationMailbox,
       to: 'medical-cert@mdmat.org',
       from: @medical_provider.email,
       subject: 'Medical Certification',
       body: 'Test Medical Certification'
-    )
-    assert_mailbox_routed email, to: 'medical_certification'
   end
 
   test 'routes unmatched emails to default mailbox' do
-    email = receive_inbound_email_from_mail(
+    assert_mailbox_routed DefaultMailbox,
       to: 'unknown@example.com',
       from: 'sender@example.com',
       subject: 'Unknown Email',
       body: 'This email should go to the default mailbox'
-    )
-    assert_mailbox_routed email, to: :default
   end
 end

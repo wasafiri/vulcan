@@ -9,7 +9,7 @@ class ApplicationTest < ActiveSupport::TestCase
     @admin = create(:admin)
 
     # Set paper application context for tests
-    Thread.current[:paper_application_context] = true
+    setup_paper_application_context
 
     # Use skip_proofs option to avoid callbacks that might cause recursion
     @application = create(:application, :in_progress, skip_proofs: true)
@@ -19,8 +19,8 @@ class ApplicationTest < ActiveSupport::TestCase
   end
 
   def teardown
-    # Clear paper application context after tests
-    Thread.current[:paper_application_context] = nil
+    # Clear Current attributes after tests
+    Current.reset
   end
 
   # Skip notifications tests for now as they're inconsistent with our new safeguards
@@ -29,9 +29,9 @@ class ApplicationTest < ActiveSupport::TestCase
   end
 
   test 'paper applications can be rejected without attachments' do
-    # Disable notifications for test
-    Thread.current[:force_notifications] = false
-    Thread.current[:paper_application_context] = true
+    # Set Current attributes for paper application context
+    Current.force_notifications = false
+    Current.paper_context = true
 
     begin
       # Create a basic application
@@ -48,16 +48,15 @@ class ApplicationTest < ActiveSupport::TestCase
       assert_not application.income_proof.attached?
       assert_not application.residency_proof.attached?
     ensure
-      # Reset thread variables
-      Thread.current[:force_notifications] = nil
-      Thread.current[:paper_application_context] = nil
+      # Reset Current attributes
+      Current.reset
     end
   end
 
   test 'applications correctly track proof status changes' do
-    # Disable notifications to prevent recursion
-    Thread.current[:force_notifications] = false
-    Thread.current[:paper_application_context] = true
+    # Set Current attributes for paper application context
+    Current.force_notifications = false
+    Current.paper_context = true
 
     begin
       # Create a test application
@@ -87,15 +86,14 @@ class ApplicationTest < ActiveSupport::TestCase
       assert_equal 'approved', application.income_proof_status
       assert_equal 'approved', application.residency_proof_status
     ensure
-      # Reset thread variables
-      Thread.current[:force_notifications] = nil
-      Thread.current[:paper_application_context] = nil
+      # Reset Current attributes
+      Current.reset
     end
   end
 
   test 'log_status_change uses application user when Current.user is nil' do
-    # Explicitly tell all callbacks to disable notifications in tests
-    Thread.current[:force_notifications] = false
+    # Set Current attributes to disable notifications in tests
+    Current.force_notifications = false
 
     # Create an application with a known user (proofs will be attached by factory default)
     application = create(:application, :draft)
@@ -125,14 +123,14 @@ class ApplicationTest < ActiveSupport::TestCase
       assert_equal 'draft', event.metadata['old_status']
       assert_equal 'in_progress', event.metadata['new_status']
     ensure
-      # Reset the flag to default
-      Thread.current[:force_notifications] = nil
+      # Reset Current attributes
+      Current.reset
     end
   end
 
   test 'log_status_change uses Current.user when available' do
-    # Explicitly tell all callbacks to disable notifications in tests
-    Thread.current[:force_notifications] = false
+    # Set Current attributes to disable notifications in tests
+    Current.force_notifications = false
 
     # Create an application (proofs will be attached by factory default)
     application = create(:application, :draft)
@@ -160,9 +158,8 @@ class ApplicationTest < ActiveSupport::TestCase
       assert_equal 'draft', event.metadata['old_status']
       assert_equal 'in_progress', event.metadata['new_status']
     ensure
-      # Reset Current.user and thread variables to avoid affecting other tests
-      Current.user = nil
-      Thread.current[:force_notifications] = nil
+      # Reset Current attributes to avoid affecting other tests
+      Current.reset
     end
   end
 

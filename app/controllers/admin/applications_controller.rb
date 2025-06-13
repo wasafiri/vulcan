@@ -346,12 +346,14 @@ module Admin
         actor: current_user
       )
 
-      if service.request_certification
+      result = service.request_certification
+
+      if result.success?
         redirect_to admin_application_path(@application),
                     notice: 'Certification request sent successfully.'
       else
         redirect_to admin_application_path(@application),
-                    alert: "Failed to process certification request: #{service.errors.join(', ')}"
+                    alert: "Failed to process certification request: #{result.message}"
       end
     end
 

@@ -34,13 +34,15 @@ class GuardianApplicationFlowTest < ActionDispatch::IntegrationTest
     get new_constituent_portal_dependent_path
     assert_response :success
 
-    # Submit the form with valid parameters
+    # Submit the form with valid parameters including unique phone
+    unique_phone = "555-#{rand(100..999)}-#{rand(1000..9999)}"
     assert_difference -> { @guardian.dependents.count } do
       post constituent_portal_dependents_path, params: {
         dependent: {
           first_name: 'Dependent',
           last_name: 'Child',
           email: 'dependent_child@example.com',
+          phone: unique_phone,
           date_of_birth: 10.years.ago.to_date,
           vision_disability: true
         },
@@ -56,11 +58,13 @@ class GuardianApplicationFlowTest < ActionDispatch::IntegrationTest
 
   test 'guardian can apply on behalf of a minor or dependent' do
     # ----- Arrange: create a dependent and the relationship -----
+    unique_phone = "555-#{rand(100..999)}-#{rand(1000..9999)}"
     dependent = create(
       :constituent,
       first_name: 'Dependent',
       last_name: 'Child',
       email: 'dependent_child@example.com',
+      phone: unique_phone,
       date_of_birth: 10.years.ago.to_date
     )
 
@@ -76,7 +80,8 @@ class GuardianApplicationFlowTest < ActionDispatch::IntegrationTest
     assert_response :success
 
     # Verify dashboard has the button/link for dependent application
-    assert_select 'a[href=?]', new_constituent_portal_application_path(for_self: false), text: 'Apply for a Dependent'
+    # The view shows specific links for each dependent, not a generic "Apply for a Dependent" link
+    assert_select 'a[href=?]', new_constituent_portal_application_path(user_id: dependent.id, for_self: false), text: "Apply for #{dependent.full_name}"
 
     # Navigate to the new application form for the dependent
     get new_constituent_portal_application_path(for_self: false)
@@ -118,7 +123,8 @@ class GuardianApplicationFlowTest < ActionDispatch::IntegrationTest
 
   test 'dependent applications appear on guardian dashboard' do
     # Create a dependent
-    dependent = create(:constituent, first_name: 'Dependent', last_name: 'Child')
+    unique_phone = "555-#{rand(100..999)}-#{rand(1000..9999)}"
+    dependent = create(:constituent, first_name: 'Dependent', last_name: 'Child', phone: unique_phone)
 
     # Create the guardian relationship
     GuardianRelationship.create!(

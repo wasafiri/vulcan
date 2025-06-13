@@ -34,7 +34,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
 
   # --- Authorization Tests ---
   test 'trainer should only see their own training sessions' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
     # other_trainer_session is created in setup
 
     get trainers_training_session_url(@training_session) # Trainer's own session
@@ -46,7 +46,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'admin should see any training session' do
-    sign_in @admin
+    sign_in_for_controller_test @admin
     # other_trainer_session is created in setup
 
     get trainers_training_session_url(@training_session) # Trainer's session
@@ -63,7 +63,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
 
   # --- Show Action Tests ---
   test 'should get show and assign instance variables for trainer' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
     # Create the session *inside* the test
     training_session = create(:training_session, :scheduled, trainer: @trainer, application: @application)
     get trainers_training_session_url(training_session) # Use the locally created session
@@ -81,7 +81,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'should get show and assign instance variables for admin' do
-    sign_in @admin
+    sign_in_for_controller_test @admin
     get trainers_training_session_url(@training_session)
     assert_response :success
 
@@ -97,7 +97,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'show action should correctly calculate constituent_cancelled_sessions_count' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
     # Create some cancelled/no-show events for the constituent across different applications
     # @constituent, @app2, @session1_cancelled, and @session2_no_show are created in setup
 
@@ -118,7 +118,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
   # --- Status Update Action Tests ---
 
   test 'update_status should update status and log generic event' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
     original_status = @training_session.status # Define original_status here
     new_status = :confirmed
 
@@ -141,7 +141,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'update_status should handle no_show status and log specific event' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
     # original_status is not used after assignment
     new_status = :no_show
     no_show_notes = 'Constituent did not appear for the session.'
@@ -166,7 +166,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'update_status should clear cancellation_reason when status changes away from cancelled' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
     @cancelled_session.update!(cancellation_reason: 'Was cancelled')
     assert_not_nil @cancelled_session.cancellation_reason
 
@@ -179,7 +179,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'update_status should clear no_show_notes when status changes away from no_show' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
     @no_show_session.update!(no_show_notes: 'Was no show')
     assert_not_nil @no_show_session.no_show_notes
 
@@ -193,7 +193,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
 
   # --- Complete Action Tests ---
   test 'complete should update status to completed, set completed_at, notes, product, and log specific event' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
     notes = 'Training session completed successfully.'
     # @product is created in setup
 
@@ -222,7 +222,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'complete should fail without notes' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
     # @product is created in setup
 
     assert_no_difference('Event.count') do
@@ -236,7 +236,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'complete should fail without product_trained_on_id' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
     notes = 'Training session completed successfully.'
 
     assert_no_difference('Event.count') do
@@ -251,7 +251,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
 
   # --- Schedule Action Tests ---
   test 'schedule should update status to scheduled, set scheduled_for, notes, and log specific event' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
     scheduled_time = 2.days.from_now
     notes = 'Scheduling notes.'
 
@@ -285,7 +285,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'schedule should fail without scheduled_for' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
     notes = 'Scheduling notes.'
 
     assert_no_difference('Event.count') do
@@ -300,7 +300,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
 
   # --- Reschedule Action Tests ---
   test 'reschedule should update scheduled_for, reschedule_reason, status to scheduled, and log specific event' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
     new_scheduled_time = 3.days.from_now
     reschedule_reason = 'Trainer unavailable at original time.'
     # original_scheduled_for is not used after assignment
@@ -330,7 +330,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'reschedule should fail without scheduled_for' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
     reschedule_reason = 'Trainer unavailable.'
 
     assert_no_difference('Event.count') do
@@ -344,7 +344,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'reschedule should fail without reschedule_reason' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
     new_scheduled_time = 3.days.from_now
 
     assert_no_difference('Event.count') do
@@ -359,7 +359,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
 
   # --- Cancel Action Tests ---
   test 'cancel should update status to cancelled, set cancelled_at, cancellation_reason, and log specific event' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
     cancellation_reason = 'Constituent cancelled.'
 
     assert_difference('Event.count') do
@@ -384,7 +384,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'cancel should fail without cancellation_reason' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
 
     assert_no_difference('Event.count') do
       post cancel_trainers_training_session_url(@training_session)
@@ -400,7 +400,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
 
   # Basic reachability check
   test 'index should return success when signed in (basic check)' do
-    sign_in @trainer # Uses ENV['TEST_USER_ID']
+    sign_in_for_controller_test @trainer # Uses ENV['TEST_USER_ID']
     get trainers_training_sessions_url # Basic index route
     # This action should redirect if no params, but we want to check if it's reachable (not 404)
     # A 302 redirect to dashboard is expected success here, proving reachability.
@@ -408,13 +408,13 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'index should redirect to dashboard if no filter params' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
     get trainers_training_sessions_url # No params
     assert_redirected_to trainers_dashboard_url
   end
 
   test 'index should filter sessions if filter params are present (trainer)' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
     # Sessions are created in setup
     trainer_scheduled = @training_session
     trainer_completed = @completed_session
@@ -430,7 +430,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'index should filter sessions if filter params are present (admin)' do
-    sign_in @admin
+    sign_in_for_controller_test @admin
     # Sessions are created in setup
     trainer_scheduled = @training_session
     trainer_completed = @completed_session
@@ -446,7 +446,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'filter should filter sessions and render index (trainer)' do
-    sign_in @trainer
+    sign_in_for_controller_test @trainer
     # Sessions are created in setup
     trainer_scheduled = @training_session
     trainer_completed = @completed_session
@@ -463,7 +463,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'filter should filter sessions and render index (admin)' do
-    sign_in @admin
+    sign_in_for_controller_test @admin
     # Sessions are created in setup
     trainer_scheduled = @training_session
     trainer_completed = @completed_session

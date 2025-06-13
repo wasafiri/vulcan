@@ -18,7 +18,7 @@ class DebugAuthenticationTest < ActionDispatch::IntegrationTest
   # Test the basic sign_in helper with detailed debugging
   test 'debug sign_in helper' do
     # Sign in the user
-    sign_in(@user)
+    sign_in_for_integration_test(@user)
 
     # Debug output
     puts "\n\n=== DEBUG: After sign_in ==="
@@ -74,7 +74,7 @@ class DebugAuthenticationTest < ActionDispatch::IntegrationTest
   test 'debug checkbox test approach' do
     # Use the same approach as the checkbox test
     # No need to reassign @user as it's already set in setup
-    sign_in(@user)
+    sign_in_for_integration_test(@user)
 
     # Debug output
     puts "\n\n=== DEBUG: After checkbox test approach sign_in ==="
