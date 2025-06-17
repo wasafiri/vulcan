@@ -4,35 +4,75 @@ class TwoFactorAuthenticationsController < ApplicationController
   include TwoFactorVerification
 
   before_action :authenticate_user!
-  skip_before_action :authenticate_user!, only: %i[verify_method process_verification verification_options]
+  skip_before_action :authenticate_user!, only: %i[verify verify_method process_verification verification_options setup]
 
   # GET /two_factor_authentication/setup
   def setup
+    # Handle both authenticated users and users in 2FA flow
+    @user = current_user || find_user_for_two_factor
+
+    unless @user
+      redirect_to sign_in_path
+      return
+    end
+
     # Check for existing credentials
-    @user = current_user
     @has_webauthn = @user.webauthn_credentials.exists?
     @has_totp = @user.totp_credentials.exists?
     @has_sms = @user.sms_credentials.exists?
 
-    # If user already has any 2FA method set up and force param is not present,
-    # redirect to account settings
+    # If user already has any 2FA method set up and force param is not present, redirect appropriately
     return unless (@has_webauthn || @has_totp || @has_sms) && params[:force] != 'true'
 
-    redirect_to edit_profile_path, notice: 'Your account is already secured with two-factor authentication.'
+    if current_user
+      # Fully authenticated user
+      redirect_to edit_profile_path, notice: 'Your account is already secured with two-factor authentication.'
+    elsif @has_totp
+      # User in 2FA flow - redirect to appropriate verification method
+      redirect_to verify_method_two_factor_authentication_path(type: 'totp')
+    elsif @has_sms
+      redirect_to verify_method_two_factor_authentication_path(type: 'sms')
+    elsif @has_webauthn
+      redirect_to verify_method_two_factor_authentication_path(type: 'webauthn')
+    end
   end
 
   # GET /two_factor_authentication/verify
   def verify
+    # Handle both authenticated users and users in 2FA flow
+    @user = current_user || find_user_for_two_factor
+
+    unless @user
+      redirect_to sign_in_path
+      return
+    end
+
     # Check if user has 2FA enabled
-    redirect_to setup_two_factor_authentication_path unless current_user.second_factor_enabled?
+    unless @user.second_factor_enabled?
+      redirect_to setup_two_factor_authentication_path
+      return
+    end
 
-    # This handles the 2FA challenge during sign-in
-    @webauthn_enabled = current_user.webauthn_credentials.exists?
-    @totp_enabled = current_user.totp_credentials.exists?
-    @sms_enabled = current_user.sms_credentials.exists?
+    # Set available methods
+    @webauthn_enabled = @user.webauthn_credentials.exists?
+    @totp_enabled = @user.totp_credentials.exists?
+    @sms_enabled = @user.sms_credentials.exists?
 
-    # Send SMS code if that method is selected
-    send_sms_verification_code if @sms_enabled && params[:method] == 'sms'
+    # If only one method is available, redirect directly to it
+    available_methods = [@webauthn_enabled, @totp_enabled, @sms_enabled].count(true)
+    return unless available_methods == 1
+
+    if @totp_enabled
+      redirect_to verify_method_two_factor_authentication_path(type: 'totp')
+    elsif @sms_enabled
+      redirect_to verify_method_two_factor_authentication_path(type: 'sms')
+    elsif @webauthn_enabled
+      redirect_to verify_method_two_factor_authentication_path(type: 'webauthn')
+    end
+    nil
+
+    # If multiple methods available, show choice screen
+    # The view will be rendered automatically
   end
 
   # POST /two_factor_authentication/verify_code
@@ -97,9 +137,19 @@ class TwoFactorAuthenticationsController < ApplicationController
   def render_verification_template(type)
     case type
     when 'webauthn'
-      render 'verify_webauthn', layout: 'application'
+      if @webauthn_enabled
+        render 'verify_webauthn', layout: 'application'
+      else
+        redirect_to setup_two_factor_authentication_path,
+                    alert: 'No security keys are registered. Please set up a security key first.'
+      end
     when 'totp'
-      render 'verify_totp', layout: 'application'
+      if @totp_enabled
+        render 'verify_totp', layout: 'application'
+      else
+        redirect_to setup_two_factor_authentication_path,
+                    alert: 'No authenticator app is set up. Please set up TOTP authentication first.'
+      end
     when 'sms'
       handle_sms_verification
     else
@@ -151,7 +201,13 @@ class TwoFactorAuthenticationsController < ApplicationController
       else
         format.html do
           flash.now[:alert] = message
-          render "verify_#{@type}"
+          # Use safe template mapping instead of direct interpolation
+          template = case @type
+                     when 'webauthn' then 'verify_webauthn'
+                     when 'sms' then 'verify_sms'
+                     else 'verify_totp' # safe fallback for totp and unknown types
+                     end
+          render template
         end
         format.json { render json: { error: message }, status: :not_found }
       end
@@ -212,7 +268,7 @@ class TwoFactorAuthenticationsController < ApplicationController
         end
       else
         respond_to do |format|
-          format.json { render json: { error: 'User not found or no credentials registered' }, status: :not_found }
+          format.json { render json: { error: 'No security keys are registered for this account' }, status: :not_found }
           format.html { redirect_to sign_in_path, alert: 'No security key registered for this account.' }
         end
       end
@@ -260,8 +316,8 @@ class TwoFactorAuthenticationsController < ApplicationController
       render 'webauthn_credentials/new'
     when 'totp'
       # Use the secret from params if provided (for redirects after failed verification),
-      # otherwise generate a new one
-      @secret = params[:secret].presence || ROTP::Base32.random
+      # otherwise generate a new one. Validate secret to prevent XSS.
+      @secret = validate_base32_secret(params[:secret]) || ROTP::Base32.random
 
       # Store the secret in the session
       store_challenge(
@@ -700,5 +756,16 @@ class TwoFactorAuthenticationsController < ApplicationController
   def valid_phone_number?(phone)
     # Basic validation (could use a gem like phonelib for better validation)
     phone.present? && phone.gsub(/\D/, '').length >= 10
+  end
+
+  # Validates TOTP secret to prevent XSS - uses ROTP's own validation
+  def validate_base32_secret(secret)
+    return nil if secret.blank?
+
+    # Use ROTP to validate the secret format
+    ROTP::Base32.decode(secret)
+    secret
+  rescue ArgumentError, ROTP::Base32::Base32Error
+    nil
   end
 end

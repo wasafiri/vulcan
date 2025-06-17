@@ -88,16 +88,19 @@ module TwoFactorVerification
   def verify_totp_credential(code)
     return [false, 'No code provided'] if code.blank?
 
-    current_user.totp_credentials.each do |credential|
+    user_for_2fa = find_user_for_two_factor
+    return [false, 'User session not found'] unless user_for_2fa
+
+    user_for_2fa.totp_credentials.each do |credential|
       totp = ROTP::TOTP.new(credential.secret)
       next unless totp.verify(code, drift_behind: 30, drift_ahead: 30)
 
       credential.update(last_used_at: Time.current)
-      log_verification_success(current_user.id, :totp, credential_id: credential.id)
+      log_verification_success(user_for_2fa.id, :totp, credential_id: credential.id)
       return [true, 'Verification successful']
     end
 
-    log_verification_failure(current_user.id, :totp, 'Invalid code', credential_ids: current_user.totp_credentials.pluck(:id))
+    log_verification_failure(user_for_2fa.id, :totp, 'Invalid code', credential_ids: user_for_2fa.totp_credentials.pluck(:id))
     [false, TwoFactorAuth::ERROR_MESSAGES[:invalid_code]]
   end
 

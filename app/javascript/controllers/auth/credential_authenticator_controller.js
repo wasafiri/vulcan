@@ -35,9 +35,9 @@ class CredentialAuthenticatorController extends Controller {
     const form = this.webauthnFormTarget
     const formData = new FormData(form)
 
-    const challenge = formData.get('challenge')
-    const timeout = parseInt(formData.get('timeout')) || 30000
-    const rpId = formData.get('rp_id')
+    let challenge = formData.get('challenge')
+    let timeout = parseInt(formData.get('timeout')) || 30000
+    let rpId = formData.get('rp_id')
     let allowCredentials
 
     try {
@@ -46,8 +46,46 @@ class CredentialAuthenticatorController extends Controller {
       allowCredentials = []
     }
 
+    // If no challenge in form, fetch it dynamically (old controller pattern)
     if (!challenge) {
-      console.error("No challenge found in form data")
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("No challenge in form, fetching dynamically...")
+      }
+      
+      try {
+        const optionsUrl = form.action || '/two_factor_authentication/verification_options/webauthn'
+        const response = await fetch(optionsUrl, {
+          headers: { "Accept": "application/json" },
+          credentials: "same-origin"
+        })
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error ${response.status}`)
+        }
+
+        const options = await response.json()
+        
+        challenge = options.challenge
+        timeout = options.timeout || 30000
+        rpId = options.rpId
+        allowCredentials = options.allowCredentials || []
+        
+        if (process.env.NODE_ENV !== 'production') {
+          console.log("Fetched WebAuthn options:", options)
+        }
+      } catch (error) {
+        console.error("Failed to fetch WebAuthn options:", error)
+        if (error.message.includes('404')) {
+          this.showFlashMessage("No security keys are registered for this account.", "error")
+        } else {
+          this.showFlashMessage("Failed to get verification options. Please try again.", "error")
+        }
+        return
+      }
+    }
+
+    if (!challenge) {
+      console.error("No challenge found after fetching")
       this.showFlashMessage("Verification failed: No challenge provided.", "error")
       return
     }
@@ -61,7 +99,8 @@ class CredentialAuthenticatorController extends Controller {
         userVerification: "required"
       }
 
-      const callbackUrl = form.action
+      // Use verification endpoint instead of options endpoint
+      const callbackUrl = '/two_factor_authentication/verify/webauthn'
 
       // We pass `null` for the feedback element, since we now use the flash outlet
       const result = await verifyWebAuthn(

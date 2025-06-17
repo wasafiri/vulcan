@@ -10,23 +10,43 @@ class SessionsController < ApplicationController
   end
 
   def create
-    user = User.find_by_email(params[:email])
+    user = User.find_by(email: params[:email])
 
-    if user && user.authenticate(params[:password])
-      if user.second_factor_enabled?
-        # Store user ID temporarily and redirect to 2FA step
-        cookies.delete(:session_token) # Ensure no old session interferes
-        TwoFactorAuth.clear_challenge(session) # Clear any stale challenge
-        TwoFactorAuth.store_temp_user_id(session, user.id)
-        TwoFactorAuth.store_return_path(session, session[:return_to])
+    handle_invalid_credentials and return unless user&.authenticate(params[:password])
+
+    # User doesn't have 2FA, sign them in directly using the ApplicationController helper
+    sign_in(user) and return unless user.second_factor_enabled?
+
+    # Store user ID temporarily and redirect to 2FA step
+    cookies.delete(:session_token) # Ensure no old session interferes
+    TwoFactorAuth.clear_challenge(session) # Clear any stale challenge
+    TwoFactorAuth.store_temp_user_id(session, user.id)
+    TwoFactorAuth.store_return_path(session, session[:return_to])
+
+    # Check available 2FA methods
+    has_totp = user.totp_credentials.exists?
+    has_sms = user.sms_credentials.exists?
+    has_webauthn = user.webauthn_credentials.exists?
+
+    # Count available methods
+    available_methods = [has_totp, has_sms, has_webauthn].count(true)
+
+    case available_methods
+    when 0
+      # User has 2FA enabled but no credentials - redirect to setup
+      redirect_to setup_two_factor_authentication_path and return
+    when 1
+      # Only one method available - go directly to it
+      if has_totp
+        redirect_to verify_method_two_factor_authentication_path(type: 'totp') and return
+      elsif has_sms
+        redirect_to verify_method_two_factor_authentication_path(type: 'sms') and return
+      elsif has_webauthn
         redirect_to verify_method_two_factor_authentication_path(type: 'webauthn') and return
-      else
-        # User doesn't have 2FA, sign them in directly using the ApplicationController helper
-        sign_in(user) and return # This now calls the refactored method in ApplicationController
-        # The sign_in method handles the redirect
       end
     else
-      handle_invalid_credentials and return # Keep existing invalid credential handling
+      # Multiple methods available - show choice screen
+      redirect_to verify_two_factor_authentication_path and return
     end
   end
 
@@ -35,7 +55,10 @@ class SessionsController < ApplicationController
     TwoFactorAuth.complete_authentication(session) if two_factor_authentication_initiated?
 
     # Find and destroy the current session if it exists
-    current_user&.sessions&.find_by(session_token: cookies.signed[:session_token])&.destroy
+    if current_user&.sessions
+      session_to_destroy = current_user.sessions.find_by(session_token: cookies.signed[:session_token])
+      session_to_destroy&.destroy
+    end
 
     # Always clear the session cookie
     cookies.delete(:session_token)

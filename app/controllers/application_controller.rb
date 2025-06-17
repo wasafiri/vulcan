@@ -35,7 +35,7 @@ class ApplicationController < ActionController::Base
     redirect_to edit_password_path, notice: 'For security reasons, you must change your password before continuing.'
   end
 
-  # --- Refactored Session Handling ---
+  # --- Session Handling ---
 
   # Creates a session, sets the cookie, tracks sign-in, and redirects.
   # To be called after successful authentication (password or 2FA).
@@ -94,7 +94,10 @@ class ApplicationController < ActionController::Base
 
   # Completes the 2FA authentication and redirects appropriately
   def complete_two_factor_authentication(user)
-    # Complete the 2FA authentication process
+    # Get the return path BEFORE clearing the 2FA session data
+    stored_location = TwoFactorAuth.get_return_path(session) || session.delete(:return_to)
+
+    # Complete the 2FA authentication process (this clears session data)
     TwoFactorAuth.complete_authentication(session)
 
     # Create the session and redirect
@@ -102,7 +105,6 @@ class ApplicationController < ActionController::Base
 
     if session_record
       # Redirect to stored location or appropriate dashboard
-      stored_location = TwoFactorAuth.get_return_path(session) || session.delete(:return_to)
       redirect_to stored_location || _dashboard_for(user), notice: 'Signed in successfully'
     else
       redirect_to sign_in_path, alert: 'Unable to create session.'
