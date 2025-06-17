@@ -170,6 +170,7 @@ module Applications
 
       # Load recent notifications
       notifications = Notification.select('id, recipient_id, actor_id, notifiable_id, notifiable_type, action, read_at, created_at, message_id, delivery_status, metadata')
+                                  .includes(:notifiable, :actor)
                                   .order(created_at: :desc)
                                   .limit(5)
 
