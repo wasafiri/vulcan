@@ -2,13 +2,11 @@
 # --------------------------------------------------
 EmailTemplate.create_or_find_by!(name: 'voucher_notifications_voucher_assigned', format: :text) do |template|
   template.subject = 'Your Voucher Has Been Assigned'
-  template.description = 'Sent to the vendor when a voucher has been successfully generated and assigned to their approved application.'
+  template.description = 'Sent to the constituent when a voucher has been successfully generated and assigned to their approved application.'
   template.body = <<~TEXT
-    %<header_text>s
+    Dear %<user_first_name>s,
 
-    Dear %<vendor_business_name>s,
-
-    We are pleased to inform you that a voucher has been assigned to your application by %<user_first_name>s.
+    Congratulations! We are pleased to inform you that a voucher has been assigned to your application.
 
     Voucher Details:
     - Voucher Code: %<voucher_code>s
@@ -25,7 +23,14 @@ EmailTemplate.create_or_find_by!(name: 'voucher_notifications_voucher_assigned',
 
     If you have any questions about using your voucher, please don't hesitate to contact us.
 
-    %<footer_text>s
+    Thank you for participating in the Maryland Accessible Telecommunications Program.
+
+    --
+    Maryland Accessible Telecommunications Program
+    Email: support@mdmat.org
+    Website: https://mdmat.org
+
+    This is an automated message. Please do not reply directly to this email.
   TEXT
   template.version = 1
 end
