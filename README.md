@@ -102,7 +102,7 @@ Vulcan is a Ruby on Rails application that facilitates Maryland Accessible Telec
 
 ## Technical Stack
 
-- **Ruby** 3.4.2
+- **Ruby** 3.4.4
 - **Rails** 8.0.2
 - **PostgreSQL**
 - **Tailwind CSS**
@@ -133,7 +133,7 @@ Vulcan is a Ruby on Rails application that facilitates Maryland Accessible Telec
 
 ## Prerequisites
 
-- Ruby 3.4.2 or higher
+- Ruby 3.4.4 or higher
 - PostgreSQL 14 or higher
 - Node.js 18 or higher
 - Yarn

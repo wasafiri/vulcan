@@ -35,45 +35,8 @@ module Admin
             # For full page load without query, re-query without limit
             @users = User.order(:type, :last_name, :first_name).to_a
 
-            # Only get the counts that the index view needs to avoid N+1 queries
-            constituent_ids = @users.select { |user| user.is_a?(Users::Constituent) }.map(&:id)
-            if constituent_ids.any?
-              constituent_records = {}
-
-              # Get counts directly rather than loading associations
-              dependents_counts = GuardianRelationship.where(guardian_id: constituent_ids)
-                                                      .group(:guardian_id)
-                                                      .count
-
-              has_guardian = GuardianRelationship.where(dependent_id: constituent_ids)
-                                                 .distinct
-                                                 .pluck(:dependent_id)
-
-              # Get the actual users
-              Users::Constituent.where(id: constituent_ids).find_each do |user|
-                # Store the counts as attributes on the user
-                user.instance_variable_set(:@dependents_count, dependents_counts[user.id] || 0)
-                user.instance_variable_set(:@has_guardian, has_guardian.include?(user.id))
-
-                # Add helper methods to access this data
-                class << user
-                  def dependents_count
-                    @dependents_count || 0
-                  end
-
-                  def has_guardian?
-                    @has_guardian || false
-                  end
-                end
-
-                constituent_records[user.id] = user
-              end
-
-              # Replace the users in the array with our enhanced users
-              @users.each_with_index do |user, index|
-                @users[index] = constituent_records[user.id] if user.is_a?(Users::Constituent) && constituent_records[user.id]
-              end
-            end
+            # Preload all data needed by the view to avoid N+1 queries
+            optimize_users_for_index_view(@users)
           end
         end
         format.json { render json: @users.as_json(only: %i[id first_name last_name email]) }
@@ -468,6 +431,74 @@ module Admin
       query = query.where.not(id: user.id) if user.persisted?
       
       query.exists?
+    end
+
+    # Avoid N+1 queries on users index
+    def optimize_users_for_index_view(users)
+      user_ids = users.map(&:id)
+      return if user_ids.empty?
+
+      # Preload guardian relationship data
+      guardian_counts = GuardianRelationship.where(guardian_id: user_ids).group(:guardian_id).count
+      has_guardian_ids = GuardianRelationship.where(dependent_id: user_ids).pluck(:dependent_id)
+      
+      # Preload guardian relationships without including users
+      guardian_rels = GuardianRelationship.where(dependent_id: user_ids).group_by(&:dependent_id)
+      
+      # Manually preload guardian users
+      guardian_user_ids = guardian_rels.values.flatten.map(&:guardian_id).uniq
+      guardian_users = User.where(id: guardian_user_ids).index_by(&:id) if guardian_user_ids.any?
+
+      # Preload role capabilities
+      capabilities_by_user = RoleCapability.where(user_id: user_ids)
+                                           .pluck(:user_id, :capability)
+                                           .group_by(&:first)
+                                           .transform_values { |caps| caps.map(&:second) }
+
+      # Add helper methods to each user to avoid N+1 queries
+      users.each do |user|
+        user.define_singleton_method(:dependents_count) { guardian_counts[id] || 0 }
+        user.define_singleton_method(:has_guardian?) { has_guardian_ids.include?(id) }
+        user.define_singleton_method(:guardian?) { dependents_count > 0 }
+        user.define_singleton_method(:dependent?) { has_guardian? }
+        user.define_singleton_method(:guardian_relationships_as_dependent) do
+          rels = guardian_rels[id] || []
+          # Set guardian_user for each relationship
+          rels.each do |rel|
+            rel.define_singleton_method(:guardian_user) do
+              guardian_users&.fetch(guardian_id, nil)
+            end
+          end
+          rels
+        end
+        user.define_singleton_method(:guardians) do
+          guardian_relationships_as_dependent.map(&:guardian_user).compact
+        end
+        user.define_singleton_method(:has_capability?) do |capability|
+          (capabilities_by_user[id] || []).include?(capability)
+        end
+        user.define_singleton_method(:available_capabilities) do
+          case type
+          when 'Users::Administrator' then []
+          when 'Users::Evaluator' then %w[can_evaluate]
+          when 'Users::Trainer' then %w[can_train]
+          when 'Users::Vendor' then []
+          when 'Users::Constituent' then %w[can_train can_evaluate]
+          else []
+          end
+        end
+        user.define_singleton_method(:inherent_capabilities) do
+          case type
+          when 'Users::Administrator' then []
+          when 'Users::Evaluator' then %w[can_evaluate]
+          when 'Users::Trainer' then %w[can_train]
+          when 'Users::Vendor' then []
+          when 'Users::Constituent' then []
+          else []
+          end
+        end
+        user.define_singleton_method(:role_type) { type&.demodulize || 'Unknown' }
+      end
     end
   end
 end

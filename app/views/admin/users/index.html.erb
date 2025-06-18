@@ -50,9 +50,8 @@
         <tbody class="bg-white divide-y divide-gray-200">
           <% @users.each do |user| %>
             <%
-              is_guardian = user.is_guardian?
-              is_dependent = user.is_dependent?
-              # is_minor = user.respond_to?(:minor?) && user.minor? # Removed based on feedback and model check
+              is_guardian = user.guardian?
+              is_dependent = user.dependent?
               
               row_classes = ["hover:bg-gray-50"]
               row_classes << "bg-yellow-50 hover:bg-yellow-100" if user.needs_duplicate_review
@@ -77,19 +76,16 @@
                       </svg>
                     <% end %>
                     <%= link_to user.full_name, admin_user_path(user), class: "hover:text-indigo-600" %>
-                    <% if is_guardian && user.respond_to?(:dependents_count) && user.dependents_count > 0 %>
+                    <% if is_guardian && user.dependents_count > 0 %>
                       <span class="ml-1 text-xs text-gray-500">(<%= pluralize(user.dependents_count, "dependent") %>)</span>
-                    <% elsif is_guardian && user.dependents.any? %>
-                      <span class="ml-1 text-xs text-gray-500">(<%= pluralize(user.dependents.count, "dependent") %>)</span>
                     <% end %>
                     <% if user.needs_duplicate_review %>
                       <span class="ml-2 text-xs font-semibold text-yellow-800 bg-yellow-200 px-2 py-0.5 rounded-full">Needs Review</span>
                     <% end %>
-                    <%# Minor badge removed based on feedback %>
                   </div>
                   <div class="text-sm text-gray-600 flex flex-wrap gap-2">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      <%= user.role_type if user.respond_to?(:role_type) %>
+                      <%= user.role_type %>
                     </span>
                     <% user.available_capabilities.each do |capability| %>
                       <% if user.has_capability?(capability) %>
@@ -109,9 +105,7 @@
                 <%= is_dependent ? 'Yes' : 'No' %>
               </td>
               <td class="px-6 py-4 text-sm text-gray-900">
-                <% if is_dependent && user.respond_to?(:has_guardian?) && user.has_guardian? %>
-                  <div class="text-sm text-gray-500">Has guardian(s)</div>
-                <% elsif is_dependent && user.guardians.any? %>
+                <% if is_dependent && user.guardians.any? %>
                   <ul class="list-disc list-inside">
                     <% user.guardian_relationships_as_dependent.each do |gr| %>
                       <li>

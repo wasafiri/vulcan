@@ -28,6 +28,14 @@ module Admin
       attachments_index   = preload_attachments(page_of_apps)
 
       @applications = decorate_apps(page_of_apps, attachments_index)
+      
+      # Load recent notifications with proper eager loading to avoid N+1 queries
+      @recent_notifications = Notification
+        .includes(:notifiable, :actor)
+        .where('created_at > ?', 7.days.ago)
+        .order(created_at: :desc)
+        .limit(5)
+        .map { |n| NotificationDecorator.new(n) }
     end
 
     def show
