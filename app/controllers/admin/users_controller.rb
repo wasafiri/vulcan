@@ -207,90 +207,21 @@ module Admin
     }.freeze
 
     def update_role
-      # This logger is crucial to see what Rails gives us *before* any of our logic.
-      Rails.logger.info "Admin::UsersController#update_role - Received raw params[:role]: #{params[:role].inspect} for user_id: #{params[:id]}"
       user = User.find(params[:id])
-      raw_role_param = params[:role]
+      Rails.logger.info "Admin::UsersController#update_role - Received raw params[:role]: #{params[:role].inspect} for user_id: #{user.id}"
 
-      namespaced_role = nil
-      if raw_role_param.present? && raw_role_param.include?('::')
-        # If it already looks namespaced, check if it's a valid known namespaced type
-        namespaced_role = VALID_USER_TYPES.values.find { |v| v == raw_role_param }
-      elsif raw_role_param.present?
-        # If it's (presumably) demodulized, try to map it from its classified form
-        namespaced_role = VALID_USER_TYPES[raw_role_param.classify]
-      end
+      namespaced_role = validate_and_normalize_role(params[:role], user.id)
+      return if performed? # Early return if validation failed and response was rendered
 
-      if namespaced_role.blank?
-        Rails.logger.warn "Admin::UsersController#update_role - Invalid or unmappable role received: #{raw_role_param.inspect} for user_id: #{user.id}. Valid types are: #{VALID_USER_TYPES.keys.join(', ')} (demodulized) or #{VALID_USER_TYPES.values.join(', ')} (namespaced)."
-        render json: {
-          success: false,
-          message: "Invalid role specified: '#{raw_role_param}'. Please select a valid role."
-        }, status: :unprocessable_entity
+      unless can_update_user_role?(user, namespaced_role)
+        render_self_update_error
         return
       end
 
-      Rails.logger.info "Admin::UsersController#update_role - Determined namespaced_role: #{namespaced_role.inspect} for user_id: #{user.id}"
-
-      # Prevent Admin from changing their own role.
-      # This method should ideally work with namespaced role strings.
-      if user.prevent_self_role_update(current_user, namespaced_role)
-        if user.type == namespaced_role
-          # Type is not actually changing, just ensure capabilities are updated if sent
-          update_user_capabilities(user, params[:capabilities]) if params[:capabilities].present?
-          Rails.logger.info "Admin::UsersController#update_role - Type #{user.type} not changed. Capabilities updated if provided."
-          render json: {
-            success: true,
-            message: "#{user.full_name}'s role is already #{namespaced_role.demodulize.titleize}."
-          }
-        else
-          # Type is changing
-          new_klass = namespaced_role.safe_constantize
-          if new_klass.blank? || !new_klass.ancestors.include?(User)
-            Rails.logger.error "Admin::UsersController#update_role - Invalid target class for STI: #{namespaced_role}"
-            render json: { success: false, message: 'Invalid target role class.' }, status: :unprocessable_entity
-            return
-          end
-
-          # Convert the user to the new type. `becomes` returns a new object of the target class.
-          converted_user = user.becomes(new_klass)
-
-          # Explicitly null out type-specific fields when changing from one type to another
-          # to avoid validation crossover issues
-          if user.type_was == 'Users::Vendor' && !converted_user.is_a?(Users::Vendor)
-            Rails.logger.info "Admin::UsersController#update_role - Nullifying vendor-specific fields for user_id: #{user.id}"
-            converted_user.business_name = nil
-            converted_user.business_tax_id = nil
-            converted_user.terms_accepted_at = nil
-            converted_user.w9_status = nil # Reset enum to default if it exists
-            # Don't purge attachments in the controller - that should be a separate, deliberate action
-          end
-          # Add similar blocks for other types if they have type-specific fields
-
-          # Attributes are copied. Now, when we save converted_user,
-          # only validations for the new_klass (and User base) should run.
-
-          if converted_user.save # Save the new, converted instance
-            update_user_capabilities(converted_user, params[:capabilities]) if params[:capabilities].present?
-            Rails.logger.info "Admin::UsersController#update_role - Successfully updated user_id: #{converted_user.id} to type: #{converted_user.type}"
-            render json: {
-              success: true,
-              message: "#{converted_user.full_name}'s role updated to #{converted_user.type.demodulize.titleize}."
-            }
-          else
-            Rails.logger.error "Admin::UsersController#update_role - Failed to save converted_user_id: #{user.id} (original id) as type #{namespaced_role}: #{converted_user.errors.full_messages.join(', ')}"
-            render json: {
-              success: false,
-              message: converted_user.errors.full_messages.join(', ')
-            }, status: :unprocessable_entity
-          end
-        end
+      if role_unchanged?(user, namespaced_role)
+        handle_unchanged_role(user, namespaced_role)
       else
-        Rails.logger.warn "Admin::UsersController#update_role - Denied attempt by user_id: #{current_user.id} to change own role for user_id: #{user.id} to #{namespaced_role}"
-        render json: {
-          success: false,
-          message: 'You cannot change your own role.'
-        }, status: :forbidden
+        handle_role_change(user, namespaced_role)
       end
     end
 
@@ -362,6 +293,106 @@ module Admin
     end
 
     private
+
+    # Role update helper methods
+    def validate_and_normalize_role(raw_role_param, user_id)
+      return nil if raw_role_param.blank?
+
+      namespaced_role = if raw_role_param.include?('::')
+                          VALID_USER_TYPES.values.find { |v| v == raw_role_param }
+                        else
+                          VALID_USER_TYPES[raw_role_param.classify]
+                        end
+
+      if namespaced_role.blank?
+        Rails.logger.warn "Admin::UsersController#update_role - Invalid role: #{raw_role_param.inspect} for user_id: #{user_id}"
+        render json: {
+          success: false,
+          message: "Invalid role specified: '#{raw_role_param}'. Please select a valid role."
+        }, status: :unprocessable_entity
+        return nil
+      end
+
+      Rails.logger.info "Admin::UsersController#update_role - Determined namespaced_role: #{namespaced_role.inspect} for user_id: #{user_id}"
+      namespaced_role
+    end
+
+    def can_update_user_role?(user, namespaced_role)
+      user.prevent_self_role_update(current_user, namespaced_role)
+    end
+
+    def render_self_update_error
+      Rails.logger.warn "Admin::UsersController#update_role - Denied self role change attempt by user_id: #{current_user.id}"
+      render json: {
+        success: false,
+        message: 'You cannot change your own role.'
+      }, status: :forbidden
+    end
+
+    def role_unchanged?(user, namespaced_role)
+      user.type == namespaced_role
+    end
+
+    def handle_unchanged_role(user, namespaced_role)
+      update_user_capabilities(user, params[:capabilities]) if params[:capabilities].present?
+      Rails.logger.info "Admin::UsersController#update_role - Type #{user.type} not changed. Capabilities updated if provided."
+      render json: {
+        success: true,
+        message: "#{user.full_name}'s role is already #{namespaced_role.demodulize.titleize}."
+      }
+    end
+
+    def handle_role_change(user, namespaced_role)
+      new_klass = validate_target_class(namespaced_role)
+      return if performed? # Early return if validation failed
+
+      converted_user = convert_user_to_new_type(user, new_klass)
+      save_converted_user(converted_user, user)
+    end
+
+    def validate_target_class(namespaced_role)
+      new_klass = namespaced_role.safe_constantize
+      if new_klass.blank? || !new_klass.ancestors.include?(User)
+        Rails.logger.error "Admin::UsersController#update_role - Invalid target class for STI: #{namespaced_role}"
+        render json: { success: false, message: 'Invalid target role class.' }, status: :unprocessable_entity
+        return nil
+      end
+      new_klass
+    end
+
+    def convert_user_to_new_type(user, new_klass)
+      converted_user = user.becomes(new_klass)
+      clear_type_specific_fields(user, converted_user)
+      converted_user
+    end
+
+    def clear_type_specific_fields(original_user, converted_user)
+      if original_user.type_was == 'Users::Vendor' && !converted_user.is_a?(Users::Vendor)
+        Rails.logger.info "Admin::UsersController#update_role - Nullifying vendor-specific fields for user_id: #{original_user.id}"
+        converted_user.business_name = nil
+        converted_user.business_tax_id = nil
+        converted_user.terms_accepted_at = nil
+        converted_user.w9_status = nil
+      end
+      # Add similar blocks for other types if they have type-specific fields
+    end
+
+    def save_converted_user(converted_user, original_user)
+      if converted_user.save
+        update_user_capabilities(converted_user, params[:capabilities]) if params[:capabilities].present?
+        Rails.logger.info "Admin::UsersController#update_role - Successfully updated user_id: #{converted_user.id} to type: #{converted_user.type}"
+        render json: {
+          success: true,
+          message: "#{converted_user.full_name}'s role updated to #{converted_user.type.demodulize.titleize}."
+        }
+      else
+        Rails.logger.error "Admin::UsersController#update_role - Failed to save converted_user_id: #{original_user.id} as type #{converted_user.type}: #{converted_user.errors.full_messages.join(', ')}"
+        render json: {
+          success: false,
+          message: converted_user.errors.full_messages.join(', ')
+        }, status: :unprocessable_entity
+      end
+    end
 
     def require_admin!
       redirect_to root_path, alert: 'Not authorized' unless current_user&.admin?

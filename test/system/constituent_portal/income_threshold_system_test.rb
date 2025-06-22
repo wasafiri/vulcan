@@ -66,7 +66,7 @@ module ConstituentPortal
                      "Expected submit button to be #{expected_disabled ? 'disabled' : 'enabled'} for household size #{household_size} and income #{income}"
 
         # Check if the warning is displayed as expected
-        warning = find('#income-threshold-warning', visible: false)
+        warning = find_by_id('income-threshold-warning', visible: false)
         actual_visible = warning.visible?
 
         assert_equal expected_disabled, actual_visible,
@@ -125,7 +125,7 @@ module ConstituentPortal
       sleep 0.5
 
       # The warning should not be visible initially
-      warning = find('#income-threshold-warning', visible: false)
+      warning = find_by_id('income-threshold-warning', visible: false)
       assert_equal false, warning.visible?,
                    'Warning should not be visible initially for zero values'
     end

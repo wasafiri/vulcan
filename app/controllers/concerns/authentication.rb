@@ -25,10 +25,10 @@ module Authentication
 
     # Return the already loaded user from the session if possible
     @current_user = @current_session&.user
-    
+
     # Set Current.user for the request context - needed for verify_authentication_state
     Current.user = @current_user if @current_user.present?
-    
+
     @current_user
   end
 
@@ -44,7 +44,7 @@ module Authentication
                        end
 
     # Check for expired session
-    if @current_session && @current_session.respond_to?(:expired?) && @current_session.expired?
+    if @current_session.respond_to?(:expired?) && @current_session.expired?
       @current_session = nil
       cookies.delete(:session_token)
     end
@@ -53,7 +53,7 @@ module Authentication
   end
 
   def find_production_session
-    return unless cookies.signed[:session_token].present?
+    return if cookies.signed[:session_token].blank?
 
     # Only include the user without eager loading role_capabilities
     Session.includes(:user)
@@ -61,49 +61,51 @@ module Authentication
   end
 
   def find_test_session
-    # Check Current.test_user_id FIRST (set by authentication helpers)
-    if defined?(Current) && Current.test_user_id.present?
-      test_user = User.find_by(id: Current.test_user_id)
-      if test_user
-        return Session.new(user: test_user)
-      end
-    end
+    # Try test user sources in priority order
+    find_current_test_user ||
+      find_header_test_user ||
+      find_env_test_user ||
+      find_cookie_session
+  end
 
-    # Check for test user header SECOND
+  def find_current_test_user
+    return unless defined?(Current) && Current.test_user_id.present?
+
+    create_test_session_for_user_id(Current.test_user_id)
+  end
+
+  def find_header_test_user
     test_user_id = request.headers['X-Test-User-Id'] || request.headers['HTTP_X_TEST_USER_ID']
-    
-    if test_user_id.present?
-      test_user = User.find_by(id: test_user_id)
-      if test_user
-        return Session.new(user: test_user)
-      end
-    end
+    return if test_user_id.blank?
 
-    # Check ENV['TEST_USER_ID'] as fallback THIRD
-    if ENV['TEST_USER_ID'].present?
-      test_user = User.find_by(id: ENV['TEST_USER_ID'])
-      if test_user
-        return Session.new(user: test_user)
-      end
-    end
+    create_test_session_for_user_id(test_user_id)
+  end
 
-    session_record = nil
+  def find_env_test_user
+    return if ENV['TEST_USER_ID'].blank?
 
-    # Try signed cookies first
-    if cookies.signed[:session_token].present?
-      session_record = Session.includes(:user)
-                              .find_by(session_token: cookies.signed[:session_token])
-      return session_record if session_record
-    end
+    create_test_session_for_user_id(ENV.fetch('TEST_USER_ID', nil))
+  end
 
-    # Fall back to unsigned cookies
-    if cookies[:session_token].present?
-      session_record = Session.includes(:user)
-                              .find_by(session_token: cookies[:session_token])
-      return session_record if session_record
-    end
+  def create_test_session_for_user_id(user_id)
+    test_user = User.find_by(id: user_id)
+    Session.new(user: test_user) if test_user
+  end
 
-    nil
+  def find_cookie_session
+    find_signed_cookie_session || find_unsigned_cookie_session
+  end
+
+  def find_signed_cookie_session
+    return if cookies.signed[:session_token].blank?
+
+    Session.includes(:user).find_by(session_token: cookies.signed[:session_token])
+  end
+
+  def find_unsigned_cookie_session
+    return if cookies[:session_token].blank?
+
+    Session.includes(:user).find_by(session_token: cookies[:session_token])
   end
 
   # Redirects unauthenticated users to the sign-in page with an alert message
@@ -130,6 +132,4 @@ module Authentication
 
     redirect_to root_path, alert: 'Unauthorized access'
   end
-
-
 end

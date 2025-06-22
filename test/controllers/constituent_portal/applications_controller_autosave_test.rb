@@ -193,7 +193,7 @@ module ConstituentPortal
       # Verify the relationships were created properly
       assert_equal 1, @user.guardian_relationships_as_guardian.count
       @user.reload
-      assert @user.is_guardian?, 'User should be recognized as a guardian'
+      assert @user.guardian?, 'User should be recognized as a guardian'
       assert_equal 'Parent', @user.relationship_types_for_dependent(dependent).first
 
       # Verify the application is properly set up

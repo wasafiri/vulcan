@@ -14,7 +14,8 @@ class W9Review < ApplicationRecord
   }, prefix: true
 
   # Validations
-  validates :status, :reviewed_at, presence: true
+  validates :status, presence: true
+  validates :reviewed_at, presence: true
   validates :rejection_reason, presence: true, if: -> { status_rejected? }
   validates :rejection_reason_code, presence: true, if: -> { status_rejected? }
   validate :admin_must_be_admin_type

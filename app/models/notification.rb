@@ -5,7 +5,8 @@ class Notification < ApplicationRecord
   belongs_to :actor, class_name: 'User', optional: true
   belongs_to :notifiable, polymorphic: true, optional: true
 
-  validates :recipient_id, :action, presence: true
+  validates :recipient_id, presence: true
+  validates :action, presence: true
 
   scope :unread, -> { where(read_at: nil) }
   scope :read, -> { where.not(read_at: nil) }

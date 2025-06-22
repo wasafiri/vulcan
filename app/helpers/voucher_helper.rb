@@ -3,10 +3,10 @@
 module VoucherHelper
   # Masks the voucher code, showing only the last 3 characters
   def masked_voucher_code(code)
-    return nil unless code.present?
+    return nil if code.blank?
 
     # Keep only the last 3 characters visible
-    '*' * (code.length - 3) + code[-3..]
+    ('*' * (code.length - 3)) + code[-3..]
   end
 
   def voucher_status_badge(voucher)

@@ -53,7 +53,7 @@ module Admin
       assert_equal 0, find_all('.letter-checkbox:checked').size
 
       # Click the "Select All" checkbox
-      find('#select-all-pending').check
+      find_by_id('select-all-pending').check
 
       # All letter checkboxes should be checked now
       letter_checkboxes = find_all('.letter-checkbox')
@@ -64,7 +64,7 @@ module Admin
       assert_button 'Mark Selected as Printed', disabled: false
 
       # Uncheck the "Select All" checkbox
-      find('#select-all-pending').uncheck
+      find_by_id('select-all-pending').uncheck
 
       # All letter checkboxes should be unchecked now
       assert_equal 0, find_all('.letter-checkbox:checked').size
@@ -85,7 +85,7 @@ module Admin
 
       # Click the "Mark Selected as Printed" button
       accept_confirm do
-        find('#mark-printed-btn').click
+        find_by_id('mark-printed-btn').click
       end
 
       # Wait for the page to reload

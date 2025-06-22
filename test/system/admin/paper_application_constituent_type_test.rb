@@ -18,9 +18,9 @@ module Admin
       unless current_path == root_path
         puts "DEBUG: Failed to reach admin_applications_path. Current path is #{current_path}"
         if page.has_css?('#flash .alert')
-          puts "DEBUG: Flash alert message: #{find('#flash .alert').text}"
+          puts "DEBUG: Flash alert message: #{find_by_id('flash').find('.alert').text}"
         elsif page.has_css?('#flash .notice')
-          puts "DEBUG: Flash notice message: #{find('#flash .notice').text}"
+          puts "DEBUG: Flash notice message: #{find_by_id('flash').find('.notice').text}"
         else
           puts 'DEBUG: No flash message found.'
         end

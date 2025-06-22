@@ -1,67 +1,72 @@
 # frozen_string_literal: true
 
 module Mailers
-  # Shared helper methods for rendering common mailer partials like headers and footers.
+  # Shared helper methods for rendering common mailer partials and templates.
   module SharedPartialHelpers
-    extend ActiveSupport::Concern # Use Concern to manage dependencies and class methods if needed later
+    extend ActiveSupport::Concern
 
     included do
-      # Ensure url_helpers are available if not already included in the mailer
-      # include Rails.application.routes.url_helpers unless self.included_modules.include?(Rails.application.routes.url_helpers)
-
-      # Helper method to access ActionView helpers like asset_path if needed within partials
-      # helper :application # Or specific helpers
+      # Ensure path and url helpers are available
+      include Rails.application.routes.url_helpers
+      helper :application
     end
 
     private
 
-    # Renders a shared mailer partial to a string for inclusion in templates.
-    # Caches rendered partials for efficiency within a single mailer invocation.
-    # Assumes the mailer instance calling this has `render_to_string` available.
-    def render_shared_partial_to_string(partial_name, format, locals = {})
-      # Thread.current to store cache instead of instance variables
-      Thread.current[:rendered_partials_cache] ||= {}
-      # Use a more robust cache key that handles different object instances correctly
-      cache_key = [partial_name, format, locals.to_s] # Convert locals to string for hashing consistency
-      Thread.current[:rendered_partials_cache][cache_key] ||= render_to_string(
-        partial: "shared/mailers/#{partial_name}",
-        formats: [format], # Ensure correct format is rendered
-        locals: locals
-      ).freeze # Freeze the string to prevent accidental modification
-    rescue ActionView::MissingTemplate => e
-      Rails.logger.error "Missing shared mailer partial: shared/mailers/#{partial_name} for format #{format}. Error: #{e.message}"
-      # Return a placeholder or raise a more specific error
-      # Ensure render_to_string is available in the context including this module
-      "Error: Missing partial 'shared/mailers/#{partial_name}' for format #{format}"
-    rescue StandardError => e
-      Rails.logger.error "Error rendering shared mailer partial: shared/mailers/#{partial_name}. Error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
-      "Error rendering partial '#{partial_name}'"
+    # Central cache for rendered content within a mailer invocation
+    def mailer_cache
+      Thread.current[:mailer_render_cache] ||= {}
     end
 
-    # Renders an email template to a string for inclusion in other templates.
-    # Caches rendered templates for efficiency within a single mailer invocation.
+    # Generic helper for caching and rendering blocks
+    def fetch_from_cache(key, &block)
+      mailer_cache[key] ||= begin
+        result = block.call.freeze
+        result
+      end
+    rescue StandardError => e
+      Rails.logger.error "Error during cached render (#{key.first}): #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+      # Return a generic error message for safety
+      "Error rendering #{key.first} '#{key[1]}'"
+    end
+
+    # Renders a shared mailer partial (ERB) to string, with caching.
+    def render_shared_partial_to_string(partial_name, format, locals = {})
+      key = [:partial, partial_name, format, locals.hash]
+      fetch_from_cache(key) do
+        render_to_string(
+          partial: "shared/mailers/#{partial_name}",
+          formats: [format],
+          locals: locals
+        )
+      end
+    rescue ActionView::MissingTemplate => e
+      Rails.logger.error "Missing shared mailer partial: shared/mailers/#{partial_name} (#{e.message})"
+      "Error: Missing partial 'shared/mailers/#{partial_name}' for format #{format}"
+    end
+
+    # Renders an email template stored in DB, using ActionView to avoid ERB injection,
+    # with caching.
     def render_email_template(template_name, format, locals = {})
-      Thread.current[:rendered_templates_cache] ||= {}
-      cache_key = [template_name, format, locals.to_s] # Convert locals to string for hashing consistency
-
-      Thread.current[:rendered_templates_cache][cache_key] ||= begin
+      key = [:template, template_name, format, locals.hash]
+      fetch_from_cache(key) do
         template = EmailTemplate.find_by(name: template_name, format: format)
-
-        if template
-          # Create a binding with locals for ERB evaluation
-          template_str = template.body
-          b = binding
-          locals.each { |key, value| b.local_variable_set(key.to_sym, value) }
-
-          # Render the template with the binding
-          ERB.new(template_str).result(b).freeze
-        else
+        unless template
           Rails.logger.error "Missing email template: #{template_name} for format #{format}"
-          "Error: Missing email template '#{template_name}' for format #{format}"
+          return "Error: Missing email template '#{template_name}' for format #{format}"
         end
-      rescue StandardError => e
-        Rails.logger.error "Error rendering email template: #{template_name}. Error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
-        "Error rendering email template '#{template_name}'"
+
+        # Rails 8 requires proper ActionView::Base initialization with empty template cache
+        view_context = ActionView::Base.with_empty_template_cache.new(
+          ActionView::LookupContext.new([]),
+          {},
+          ActionController::Base.new
+        )
+        view_context.render(
+          inline: template.body,
+          type: :erb,
+          locals: locals
+        )
       end
     end
 
@@ -82,7 +87,6 @@ module Mailers
     # Generates a simple text representation for a status box.
     # Expects locals like: :status, :title, :message
     def status_box_text(status:, title:, message:)
-      # Simple text representation, can be enhanced if needed
       "[#{status.to_s.upcase}] #{title}: #{message}"
     end
   end

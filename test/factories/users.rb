@@ -47,6 +47,10 @@ FactoryBot.define do
         type { 'Users::Trainer' }
         first_name { 'Test' }
         last_name { 'Trainer' }
+
+        after(:create) do |trainer|
+          create(:role_capability, user: trainer, capability: 'can_train')
+        end
       end
 
       factory :constituent, class: 'Users::Constituent' do # Match class name used in controller/associations
@@ -82,21 +86,20 @@ FactoryBot.define do
         # This trait now creates a single dependent for the guardian.
         trait :as_guardian do
           transient do
-            dependent_user { create(:constituent, first_name: 'Dependent', last_name: 'Child') }
+            dependent_attributes { { first_name: 'Dependent', last_name: 'Child' } }
           end
           after(:create) do |guardian, evaluator|
-            create(:guardian_relationship, guardian_user: guardian, dependent_user: evaluator.dependent_user, relationship_type: 'Parent')
+            dependent = create(:constituent, evaluator.dependent_attributes)
+            create(:guardian_relationship, guardian_user: guardian, dependent_user: dependent, relationship_type: 'Parent')
           end
         end
 
         # DEPRECATED: Use :with_dependent trait with specific relationship_type.
         # This trait now creates a single dependent with 'Legal Guardian' relationship.
         trait :as_legal_guardian do
-          transient do
-            dependent_user { create(:constituent, first_name: 'Dependent', last_name: 'Ward') }
-          end
-          after(:create) do |guardian, evaluator|
-            create(:guardian_relationship, guardian_user: guardian, dependent_user: evaluator.dependent_user,
+          after(:create) do |guardian|
+            dependent = create(:constituent, first_name: 'Dependent', last_name: 'Ward')
+            create(:guardian_relationship, guardian_user: guardian, dependent_user: dependent,
                                            relationship_type: 'Legal Guardian')
           end
         end
@@ -129,11 +132,12 @@ FactoryBot.define do
 
         trait :with_guardian do
           transient do
-            guardian_user { create(:constituent, first_name: 'Guardian', last_name: 'Parent') }
+            guardian_attributes { { first_name: 'Guardian', last_name: 'Parent' } }
             guardian_relationship_type { 'Parent' }
           end
           after(:create) do |dependent, evaluator|
-            create(:guardian_relationship, guardian_user: evaluator.guardian_user, dependent_user: dependent,
+            guardian = create(:constituent, evaluator.guardian_attributes)
+            create(:guardian_relationship, guardian_user: guardian, dependent_user: dependent,
                                            relationship_type: evaluator.guardian_relationship_type)
           end
         end
@@ -213,7 +217,7 @@ FactoryBot.define do
     after(:build) do |vendor|
       unless vendor.w9_form.attached?
         vendor.w9_form.attach(
-          io: File.open(Rails.root.join('test/fixtures/files/sample_w9.pdf')),
+          io: Rails.root.join('test/fixtures/files/sample_w9.pdf').open,
           filename: 'sample_w9.pdf',
           content_type: 'application/pdf'
         )

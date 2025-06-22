@@ -25,7 +25,7 @@ module Admin
       assert_selector '#proofRejectionModal', visible: true
 
       # Check that the proof type is set to income
-      assert_equal 'income', find('#rejection-proof-type', visible: false).value
+      assert_equal 'income', find_by_id('rejection-proof-type', visible: false).value
 
       # Check that all common rejection reason buttons are visible
       within('#proofRejectionModal') do
@@ -56,7 +56,7 @@ module Admin
       assert_selector '#proofRejectionModal', visible: true
 
       # Check that the proof type is set to residency
-      assert_equal 'residency', find('#rejection-proof-type', visible: false).value
+      assert_equal 'residency', find_by_id('rejection-proof-type', visible: false).value
 
       # Check that common rejection reason buttons are visible
       within('#proofRejectionModal') do

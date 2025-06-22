@@ -51,3 +51,10 @@ chrome/
 .DS_Store
 test/controllers/.DS_Store
 test/.DS_Store
+.DS_Store
+.codebuddy/.gitignore
+.vscode/settings.json
+.cursor/rules/mat-vulcan.mdc
+app/.DS_Store
+test/.DS_Store
+test/controllers/.DS_Store

@@ -100,7 +100,7 @@ module ConstituentPortal
     # @param exception [Exception, nil] Optional exception for stack trace
     def log_error(message, exception = nil)
       Rails.logger.error(message)
-      Rails.logger.error(exception.backtrace.join("\n")) if exception && exception.backtrace
+      Rails.logger.error(exception.backtrace.join("\n")) if exception&.backtrace
     end
 
     # Redirect with a notice message
@@ -155,23 +155,51 @@ module ConstituentPortal
       @application = current_user.applications.new
       @application.medical_provider_attributes ||= {}
 
-      # If user_id is provided, set up the application for that dependent
-      if params[:user_id].present?
-        dependent = current_user.dependents.find_by(id: params[:user_id])
-        if dependent
-          @application.user = dependent
-          @application.user_id = dependent.id
-          @application.managing_guardian_id = current_user.id
-        end
-      # If for_self=false is provided, set up for dependent selection (but don't select a specific dependent)
-      elsif params[:for_self] == 'false' || params[:for_self] == false
-        # Don't set a specific dependent, but mark this as a dependent application
-        # The user will need to select a dependent from the dropdown
-        @application.managing_guardian_id = current_user.id
-        # Don't set user_id yet - it will be set when the user selects a dependent
-      end
+      setup_dependent_application
+      setup_address_for_form
+    end
 
-      # Pre-populate address fields from user profile
+    def edit; end
+
+    private
+
+    # Set up the application for dependent users based on params
+    # @return [void]
+    def setup_dependent_application
+      if params[:user_id].present?
+        setup_specific_dependent_application
+      elsif for_dependent_application?
+        setup_guardian_application_context
+      end
+    end
+
+    # Set up application for a specific dependent
+    # @return [void]
+    def setup_specific_dependent_application
+      dependent = current_user.dependents.find_by(id: params[:user_id])
+      return unless dependent
+
+      @application.user = dependent
+      @application.user_id = dependent.id
+      @application.managing_guardian_id = current_user.id
+    end
+
+    # Set up guardian context for dependent application without selecting specific dependent
+    # @return [void]
+    def setup_guardian_application_context
+      @application.managing_guardian_id = current_user.id
+      # Don't set user_id yet - it will be set when the user selects a dependent
+    end
+
+    # Check if this is a dependent application based on params
+    # @return [Boolean]
+    def for_dependent_application?
+      ['false', false].include?(params[:for_self])
+    end
+
+    # Pre-populate address fields from user profile
+    # @return [void]
+    def setup_address_for_form
       @address = Address.new(
         physical_address_1: current_user.physical_address_1,
         physical_address_2: current_user.physical_address_2,
@@ -181,7 +209,7 @@ module ConstituentPortal
       )
     end
 
-    def edit; end
+    public
 
     # Create a new application using clean service layer architecture
     # Form handles validation, ApplicationCreator handles persistence
@@ -191,11 +219,11 @@ module ConstituentPortal
         current_user: current_user,
         params: params
       )
-      
+
       return render_form_errors unless @form.valid?
-      
+
       result = Applications::ApplicationCreator.call(@form)
-      
+
       if result.success?
         redirect_to_app(result.application)
       else
@@ -204,15 +232,11 @@ module ConstituentPortal
         result.error_messages.each do |message|
           @application.errors.add(:base, message)
         end
-        
+
         initialize_address_and_provider_for_form
         render :new, status: :unprocessable_entity
       end
     end
-
-    # REMOVED: guardian_relationship_missing? - logic is now part of dependent selection
-    # REMOVED: render_guardian_validation_error - handled by standard validation flow
-    # REMOVED: set_guardian_status - managing_guardian_id now handles this
 
     def render_form_errors
       # Transfer form errors to application for view compatibility
@@ -220,17 +244,17 @@ module ConstituentPortal
       @form.errors.each do |error|
         @application.errors.add(error.attribute, error.message)
       end
-      
+
       initialize_address_and_provider_for_form
       render :new, status: :unprocessable_entity
     end
-    
+
     def render_update_form_errors
       # Transfer form errors to existing application for view compatibility
       @form.errors.each do |error|
         @application.errors.add(error.attribute, error.message)
       end
-      
+
       prepare_medical_provider_for_edit
       render :edit, status: :unprocessable_entity
     end
@@ -240,52 +264,54 @@ module ConstituentPortal
       build_medical_provider_for_form
     end
 
-    # Set medical provider details from params
+    # Apply medical provider details from params
     # @param application [Application] The application to update
-    def set_medical_provider_details(application)
-      # Look for medical provider info from various possible locations
-      # 1. Check for nested attributes under application params
-      if params.dig(:application, :medical_provider_attributes).present?
-        mp_attrs = params[:application][:medical_provider_attributes]
-        provider_info = MedicalProviderInfo.new(
-          name: mp_attrs[:name],
-          phone: mp_attrs[:phone],
-          fax: mp_attrs[:fax],
-          email: mp_attrs[:email]
-        )
+    def apply_medical_provider_details(application)
+      provider_info = extract_medical_provider_info
+
+      if provider_info
         set_provider_fields(application, provider_info)
-
-        # Enhanced debug logging for nested attributes
-        log_debug("Setting medical provider from nested attributes: #{provider_info.to_h}")
-
-      # 2. Check for top-level medical_provider params (used in tests)
-      elsif params[:medical_provider].present?
-        mp_attrs = params[:medical_provider]
-        provider_info = MedicalProviderInfo.new(
-          name: mp_attrs[:name],
-          phone: mp_attrs[:phone],
-          fax: mp_attrs[:fax],
-          email: mp_attrs[:email]
-        )
-        set_provider_fields(application, provider_info)
-
-        # Enhanced debug logging for top-level params (common in tests)
-        log_debug("Setting medical provider from top-level params: #{provider_info.to_h}")
-
-      # 3. Fall back to @medical_provider instance variable if available
-      elsif @medical_provider.present? && @medical_provider.is_a?(MedicalProviderInfo)
-        set_provider_fields(application, @medical_provider)
-
-        # Enhanced debug logging for instance variable fallback
-        log_debug("Setting medical provider from instance variable: #{@medical_provider.to_h}")
+        log_debug("Setting medical provider: #{provider_info.to_h}")
       else
         log_debug('No medical provider data found in params')
       end
 
-      # Always log the final state of medical provider fields
-      log_debug("Final medical provider details: name=#{application.medical_provider_name}, " +
-              "phone=#{application.medical_provider_phone}, " +
-              "email=#{application.medical_provider_email}")
+      log_final_provider_state(application)
+    end
+
+    # Extract medical provider info from various param locations
+    # @return [MedicalProviderInfo, nil] Provider info if found, nil otherwise
+    def extract_medical_provider_info
+      # 1. Check for nested attributes under application params
+      if params.dig(:application, :medical_provider_attributes).present?
+        build_provider_from_params(params[:application][:medical_provider_attributes])
+      # 2. Check for top-level medical_provider params (used in tests)
+      elsif params[:medical_provider].present?
+        build_provider_from_params(params[:medical_provider])
+      # 3. Fall back to @medical_provider instance variable if available
+      elsif @medical_provider.present? && @medical_provider.is_a?(MedicalProviderInfo)
+        @medical_provider
+      end
+    end
+
+    # Build MedicalProviderInfo from param attributes
+    # @param mp_attrs [Hash] Medical provider attributes
+    # @return [MedicalProviderInfo] Provider info object
+    def build_provider_from_params(mp_attrs)
+      MedicalProviderInfo.new(
+        name: mp_attrs[:name],
+        phone: mp_attrs[:phone],
+        fax: mp_attrs[:fax],
+        email: mp_attrs[:email]
+      )
+    end
+
+    # Log the final state of medical provider fields
+    # @param application [Application] The application to log state for
+    def log_final_provider_state(application)
+      log_debug("Final medical provider details: name=#{application.medical_provider_name}, " \
+                "phone=#{application.medical_provider_phone}, " \
+                "email=#{application.medical_provider_email}")
     end
 
     # Helper method to set provider fields on application
@@ -351,17 +377,17 @@ module ConstituentPortal
     # @return [void] Redirects to application path or renders form with errors
     def update
       original_status = @application.status
-      
+
       @form = ApplicationForm.new(
         current_user: current_user,
         application: @application,
         params: params
       )
-      
+
       return render_update_form_errors unless @form.valid?
-      
+
       result = Applications::ApplicationCreator.call(@form)
-      
+
       if result.success?
         notice = determine_update_notice(original_status)
         redirect_to constituent_portal_application_path(result.application), notice: notice
@@ -371,7 +397,7 @@ module ConstituentPortal
         result.error_messages.each do |message|
           @application.errors.add(:base, message)
         end
-        
+
         prepare_medical_provider_for_edit
         render :edit, status: :unprocessable_entity
       end
@@ -394,12 +420,12 @@ module ConstituentPortal
       # Permit only the user-related attributes from the application params
       # Use .to_h.symbolize_keys to ensure we get a hash with symbol keys
       # Old guardian fields removed, only disability flags remain relevant for user update here.
-      params.require(:application).permit(
-        :hearing_disability,
-        :vision_disability,
-        :speech_disability,
-        :mobility_disability,
-        :cognition_disability
+      params.expect(
+        application: %i[hearing_disability
+                        vision_disability
+                        speech_disability
+                        mobility_disability
+                        cognition_disability]
       ).to_h.symbolize_keys
     end
 
@@ -482,7 +508,7 @@ module ConstituentPortal
       @application = current_user.applications.find(params[:id])
 
       # Early return if no documents were provided
-      return handle_missing_documents unless params[:documents].present?
+      return handle_missing_documents if params[:documents].blank?
 
       # Process the document uploads within a transaction
       success = process_document_uploads
@@ -544,14 +570,14 @@ module ConstituentPortal
     # @return [ProofResult] Result with success, type, and optional message
     def attach_proof_document(proof_type, file)
       result = ProofAttachmentService.attach_proof({
-        application: @application,
-        proof_type: proof_type,
-        blob_or_file: file,
-        status: :not_reviewed, # Default status for constituent uploads
-        admin: nil, # No admin for constituent uploads
-        submission_method: :web,
-        metadata: { ip_address: request.remote_ip }
-      })
+                                                     application: @application,
+                                                     proof_type: proof_type,
+                                                     blob_or_file: file,
+                                                     status: :not_reviewed, # Default status for constituent uploads
+                                                     admin: nil, # No admin for constituent uploads
+                                                     submission_method: :web,
+                                                     metadata: { ip_address: request.remote_ip }
+                                                   })
 
       ProofResult.new(
         success: result[:success],
@@ -568,7 +594,7 @@ module ConstituentPortal
       @application.reload.save!
 
       # Store processed proofs in flash for better user feedback
-      flash[:processed_proofs] = processed_proofs
+      flash.now[:processed_proofs] = processed_proofs
     end
 
     # Handle the result of document uploads
@@ -741,66 +767,136 @@ module ConstituentPortal
     # This action handles AJAX requests to save individual fields as users navigate the form
     # @return [JSON] JSON response with success status, errors, and application ID if new
     def autosave_field
-      # Parse field_name and field_value from the request
+      result = process_autosave_request
+      render_autosave_response(result)
+    rescue ActiveRecord::RecordNotFound
+      render_autosave_error('Application not found', :not_found)
+    rescue StandardError => e
+      log_error("Autosave error: #{e.message}", e)
+      render_autosave_error('An error occurred during autosave', :internal_server_error)
+    end
+
+    # Return FPL thresholds for JavaScript form calculations
+    # @return [JSON] JSON response with thresholds and modifier
+    def fpl_thresholds
+      thresholds = {}
+      (1..8).each do |size|
+        policy = Policy.find_by(key: "fpl_#{size}_person")
+        thresholds[size.to_s] = policy&.value.to_i
+      end
+      modifier = Policy.find_by(key: 'fpl_modifier_percentage')&.value.to_i || 400
+      render json: { thresholds: thresholds, modifier: modifier }
+    end
+
+    private
+
+    # Process the autosave request and return result
+    # @return [Hash] Result with success status and data
+    def process_autosave_request
       field_name = params[:field_name]
       field_value = params[:field_value]
 
-      # Verify required parameters
-      if field_name.blank?
-        return render json: { success: false, errors: { base: ['Field name is required'] } }, status: :unprocessable_entity
-      end
+      return autosave_error_result('Field name is required') if field_name.blank?
+      return autosave_error_result('File uploads are not supported for autosave', field_name) if file_field?(field_name)
 
-      # Find or initialize the application draft
+      initialize_application_for_autosave
+      save_autosave_field(field_name, field_value)
+    end
+
+    # Check if the field is a file upload field
+    # @param field_name [String] The field name to check
+    # @return [Boolean] Whether this is a file field
+    def file_field?(field_name)
+      field_name.ends_with?('proof]') || field_name.include?('file')
+    end
+
+    # Initialize or find application for autosave
+    # @return [void]
+    def initialize_application_for_autosave
       @application = if params[:id].present?
-                       current_user.applications.find_or_initialize_by(id: params[:id]) do |app|
-                         app.status = :draft
-                         app.application_date = Time.current
-                         app.submission_method = :online
-                         app.application_type ||= :new
-                       end
+                       find_existing_application_for_autosave
                      else
-                       # For new applications
-                       current_user.applications.new(
-                         status: :draft,
-                         application_date: Time.current,
-                         submission_method: :online,
-                         application_type: :new
-                       )
+                       create_new_application_for_autosave
                      end
+    end
 
-      # Skip file inputs
-      if field_name.ends_with?('proof]') || field_name.include?('file')
-        return render json: { success: false, errors: { field_name => ['File uploads are not supported for autosave'] } },
-                      status: :unprocessable_entity
+    # Find existing application for autosave
+    # @return [Application] The found or initialized application
+    def find_existing_application_for_autosave
+      current_user.applications.find_or_initialize_by(id: params[:id]) do |app|
+        app.status = :draft
+        app.application_date = Time.current
+        app.submission_method = :online
+        app.application_type ||= :new
       end
+    end
 
-      # Extract the actual field name from the params key (e.g., "application[field_name]" -> "field_name")
+    # Create new application for autosave
+    # @return [Application] The new application
+    def create_new_application_for_autosave
+      current_user.applications.new(
+        status: :draft,
+        application_date: Time.current,
+        submission_method: :online,
+        application_type: :new
+      )
+    end
+
+    # Save a field during autosave
+    # @param field_name [String] The field name from the form
+    # @param field_value [String] The field value to save
+    # @return [Hash] Result with success status and data
+    def save_autosave_field(field_name, field_value)
       attribute_name = extract_attribute_name(field_name)
-      log_debug("Extracted attribute name: #{attribute_name}")
-
-      # Determine which model this field belongs to (Application vs User)
       target_model, actual_attribute = determine_target_model_and_attribute(attribute_name)
-      log_debug("Target model: #{target_model}, actual attribute: #{actual_attribute}")
 
-      # Process and save the field
+      log_debug("Autosave - attribute: #{attribute_name}, target: #{target_model}")
+
       result = if target_model == :user
                  autosave_user_field(actual_attribute, field_value)
                else
                  autosave_application_field(actual_attribute, field_value)
                end
 
-      # Return JSON response
-      render json: if result[:success]
-                     { success: true, applicationId: @application.id, message: 'Field saved successfully' }
-                   else
-                     { success: false, errors: result[:errors] }
-                   end,
-             status: result[:success] ? :ok : :unprocessable_entity
-    rescue ActiveRecord::RecordNotFound
-      render json: { success: false, errors: { base: ['Application not found'] } }, status: :not_found
-    rescue StandardError => e
-      log_error("Autosave error: #{e.message}", e)
-      render json: { success: false, errors: { base: ['An error occurred during autosave'] } }, status: :internal_server_error
+      result[:success] ? autosave_success_result : result
+    end
+
+    # Create a success result for autosave
+    # @return [Hash] Success result
+    def autosave_success_result
+      { success: true, application_id: @application.id, message: 'Field saved successfully' }
+    end
+
+    # Create an error result for autosave
+    # @param message [String] The error message
+    # @param field_name [String, nil] Optional field name for specific field errors
+    # @return [Hash] Error result
+    def autosave_error_result(message, field_name = nil)
+      errors = field_name ? { field_name => [message] } : { base: [message] }
+      { success: false, errors: errors }
+    end
+
+    # Render the autosave response
+    # @param result [Hash] The result to render
+    # @return [void]
+    def render_autosave_response(result)
+      if result[:success]
+        render json: { 
+          success: true, 
+          applicationId: result[:application_id], 
+          message: result[:message] 
+        }, status: :ok
+      else
+        render json: { success: false, errors: result[:errors] }, status: :unprocessable_entity
+      end
+    end
+
+    # Render an autosave error response
+    # @param message [String] The error message
+    # @param status [Symbol] The HTTP status symbol
+    # @return [void]
+    def render_autosave_error(message, status)
+      render json: { success: false, errors: { base: [message] } }, status: status
     end
 
     # Extract the attribute name from the form field name
@@ -879,60 +975,72 @@ module ConstituentPortal
     # @param value [String, Boolean] The value to save
     # @return [Hash] Result with success flag and any errors
     def autosave_application_field(attribute, value)
-      # Skip ignored attributes
-      return { success: false, errors: { "application[#{attribute}]" => ['This field cannot be autosaved'] } } if attribute == :ignored
+      return handle_ignored_attribute(attribute) if attribute == :ignored
 
-      # Perform additional type validation for numeric fields
-      if attribute == 'annual_income' && !value.to_s.match?(/\A\d+(\.\d+)?\z/)
-        return { success: false,
-                 errors: { 'application[annual_income]' => ['Must be a valid number'] } }
-      end
+      validation_result = validate_application_field_value(attribute, value)
+      return validation_result unless validation_result[:success]
 
-      if attribute == 'household_size' && !value.to_s.match?(/\A\d+\z/)
-        return { success: false,
-                 errors: { 'application[household_size]' => ['Must be a valid integer'] } }
-      end
+      save_result = save_application_field_value(attribute, value)
+      return save_result unless save_result[:success]
 
-      # Cast value if it's a boolean field
-      value = to_boolean(value) if %w[maryland_resident self_certify_disability].include?(attribute)
-
-      begin
-        # Assign the value for validation
-        @application.assign_attributes(attribute => value)
-      rescue ActiveRecord::UnknownAttributeError
-        # Handle unknown attributes (like physical_address_1)
-        return { success: false, errors: { "application[#{attribute}]" => ['This field cannot be autosaved'] } }
-      end
-
-      # Validate only this attribute
-      @application.valid?
-
-      # Check for errors on just this attribute
-      if @application.errors[attribute].any?
-        return { success: false,
-                 errors: { "application[#{attribute}]" => @application.errors[attribute] } }
-      end
-
-      # If valid, save without validations (since we're just saving one field at a time)
-      @application.save(validate: false)
-
-      # Update last visited step after successful save
-      @application.update_column(:last_visited_step, attribute)
-
+      update_last_visited_step(attribute)
       { success: true }
     rescue StandardError => e
       log_error("Error autosaving application field #{attribute}: #{e.message}", e)
       { success: false, errors: { "application[#{attribute}]" => [e.message] } }
     end
 
-    def fpl_thresholds
-      thresholds = {}
-      (1..8).each do |size|
-        policy = Policy.find_by(key: "fpl_#{size}_person")
-        thresholds[size.to_s] = policy&.value.to_i
+    # Handle ignored attributes that cannot be autosaved
+    # @param attribute [String] The attribute name
+    # @return [Hash] Error result
+    def handle_ignored_attribute(attribute)
+      { success: false, errors: { "application[#{attribute}]" => ['This field cannot be autosaved'] } }
+    end
+
+    # Validate the value for an application field
+    # @param attribute [String] The attribute name
+    # @param value [String, Boolean] The value to validate
+    # @return [Hash] Validation result
+    def validate_application_field_value(attribute, value)
+      case attribute
+      when 'annual_income'
+        return { success: false, errors: { 'application[annual_income]' => ['Must be a valid number'] } } unless value.to_s.match?(/\A\d+(\.\d+)?\z/)
+      when 'household_size'
+        return { success: false, errors: { 'application[household_size]' => ['Must be a valid integer'] } } unless value.to_s.match?(/\A\d+\z/)
       end
-      modifier = Policy.find_by(key: 'fpl_modifier_percentage')&.value.to_i || 400
-      render json: { thresholds: thresholds, modifier: modifier }
+
+      { success: true }
+    end
+
+    # Save the application field value
+    # @param attribute [String] The attribute name
+    # @param value [String, Boolean] The value to save
+    # @return [Hash] Save result
+    def save_application_field_value(attribute, value)
+      # Cast value if it's a boolean field
+      processed_value = %w[maryland_resident self_certify_disability].include?(attribute) ? to_boolean(value) : value
+
+      begin
+        @application.assign_attributes(attribute => processed_value)
+      rescue ActiveRecord::UnknownAttributeError
+        return { success: false, errors: { "application[#{attribute}]" => ['This field cannot be autosaved'] } }
+      end
+
+      # Validate only this attribute
+      @application.valid?
+
+      return { success: false, errors: { "application[#{attribute}]" => @application.errors[attribute] } } if @application.errors[attribute].any?
+
+      # Save without validations since we're just saving one field at a time
+      @application.save(validate: false)
+      { success: true }
+    end
+
+    # Update the last visited step for the application
+    # @param attribute [String] The attribute name
+    # @return [void]
+    def update_last_visited_step(attribute)
+      @application.update_column(:last_visited_step, attribute)
     end
 
     # Save application with potential status update (bang version)
@@ -959,8 +1067,6 @@ module ConstituentPortal
         :mobility_disability, :cognition_disability
       )
     end
-
-    private
 
     # Update user attributes (simplified - raises error on failure)
     # @param attrs [Hash] The attributes to update
@@ -1158,38 +1264,38 @@ module ConstituentPortal
     end
 
     def application_params
-      params.require(:application).permit(
-        :user_id, # Allow user_id for selecting dependent
-        :application_type,
-        :submission_method,
-        :maryland_resident,
-        :annual_income,
-        :household_size,
-        :self_certify_disability,
-        :residency_proof,
-        :income_proof,
-        :income_details,
-        :residency_details,
-        :terms_accepted,
-        :information_verified,
-        :medical_release_authorized,
-        :alternate_contact_name,
-        :alternate_contact_phone,
-        :alternate_contact_email,
-        # :is_guardian, # Deprecated user fields, not application fields
-        # :guardian_relationship, # Deprecated user fields, not application fields
-        :hearing_disability, # These are user attributes, but often submitted with app
-        :vision_disability,
-        :speech_disability,
-        :mobility_disability,
-        :cognition_disability,
-        :physical_address_1,
-        :physical_address_2,
-        :city,
-        :state,
-        :zip_code,
-        # Permit nested attributes directly
-        medical_provider_attributes: %i[name phone fax email]
+      params.expect(
+        application: [:user_id, # Allow user_id for selecting dependent
+                      :application_type,
+                      :submission_method,
+                      :maryland_resident,
+                      :annual_income,
+                      :household_size,
+                      :self_certify_disability,
+                      :residency_proof,
+                      :income_proof,
+                      :income_details,
+                      :residency_details,
+                      :terms_accepted,
+                      :information_verified,
+                      :medical_release_authorized,
+                      :alternate_contact_name,
+                      :alternate_contact_phone,
+                      :alternate_contact_email,
+                      # :is_guardian, # Deprecated user fields, not application fields
+                      # :guardian_relationship, # Deprecated user fields, not application fields
+                      :hearing_disability, # These are user attributes, but often submitted with app
+                      :vision_disability,
+                      :speech_disability,
+                      :mobility_disability,
+                      :cognition_disability,
+                      :physical_address_1,
+                      :physical_address_2,
+                      :city,
+                      :state,
+                      :zip_code,
+                      # Permit nested attributes directly
+                      medical_provider_attributes: %i[name phone fax email]]
       )
       # Remove the key transformation logic
       # Return params with nested attributes if present

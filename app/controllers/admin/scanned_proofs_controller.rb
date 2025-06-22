@@ -25,7 +25,7 @@ module Admin
         # domain logic near your ApplicationRecord base class if needed.
         ApplicationRecord.transaction do
           attach_proof
-          # Note: audit trail is handled by ProofAttachmentService.attach_proof
+          # NOTE: audit trail is handled by ProofAttachmentService.attach_proof
         end
 
         success = true
@@ -74,11 +74,15 @@ module Admin
     end
 
     def validate_file
-      return redirect_to(new_admin_application_scanned_proof_path(@application),
-                         alert: 'Please select a file to upload') if params[:file].blank?
+      if params[:file].blank?
+        return redirect_to(new_admin_application_scanned_proof_path(@application),
+                           alert: 'Please select a file to upload')
+      end
 
-      return redirect_to(new_admin_application_scanned_proof_path(@application),
-                         alert: 'File type not allowed') unless valid_file_type?
+      unless valid_file_type?
+        return redirect_to(new_admin_application_scanned_proof_path(@application),
+                           alert: 'File type not allowed')
+      end
 
       return if valid_file_size?
 
@@ -96,28 +100,34 @@ module Admin
 
     def attach_proof
       result = ProofAttachmentService.attach_proof({
-        application: @application,
-        proof_type: params[:proof_type].to_sym,
-        blob_or_file: params[:file],
-        status: :approved,
-        admin: current_user,
-        submission_method: :paper,
-        skip_audit_events: true, # Admin controller handles its own audit events
-        metadata: {
-          scanned_by: current_user.id,
-          scan_location: params[:scan_location] || 'central_office'
-        }
-      })
+                                                     application: @application,
+                                                     proof_type: params[:proof_type].to_sym,
+                                                     blob_or_file: params[:file],
+                                                     status: :approved,
+                                                     admin: current_user,
+                                                     submission_method: :paper,
+                                                     skip_audit_events: true, # Admin controller handles its own audit events
+                                                     metadata: {
+                                                       scanned_by: current_user.id,
+                                                       scan_location: params[:scan_location] || 'central_office'
+                                                     }
+                                                   })
       raise "Failed to attach proof: #{result[:error]&.message}" unless result[:success]
-      
+
       # Create tracking event for audit trail (similar to constituent portal)
       track_submission
     end
 
     def track_submission
       # Get the blob ID from the actually attached blob for consistency with ProofAttachmentService
-      attached_blob = @application.send("#{params[:proof_type]}_proof").blob
-      
+      # Replace dynamic send with explicit case statement
+      attached_blob = case params[:proof_type]
+                      when 'income'
+                        @application.income_proof.blob
+                      when 'residency'
+                        @application.residency_proof.blob
+                      end
+
       # Create Event for application audit log (matches constituent portal pattern)
       AuditEventService.log(
         action: 'proof_submitted',

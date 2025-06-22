@@ -3,13 +3,32 @@
 # Manages the application lifecycle including proof submission, review,
 # medical certification, training sessions, evaluations, and voucher issuance
 class Application < ApplicationRecord
-  # Alternate contact validations
-  validates :alternate_contact_phone,
-            format: { with: /\A\+?[\d\-\(\)\s]+\z/, allow_blank: true }
-  validates :alternate_contact_email,
-            format: { with: URI::MailTo::EMAIL_REGEXP, allow_blank: true }
-  # Virtual attribute to hold nested medical provider params for the form
-  attr_accessor :medical_provider_attributes
+  # Constants
+  # Definition for Medical Provider Info struct
+  MedicalProviderInfo = Struct.new(:name, :phone, :fax, :email, keyword_init: true) do
+    def present?
+      name.present? || phone.present? || fax.present? || email.present?
+    end
+
+    def valid_phone?
+      phone.present? && phone.match?(/\A[\d\-\(\)\s\.]+\z/)
+    end
+
+    def valid_email?
+      email.present? && email.match?(/\A[^@\s]+@[^@\s]+\.[^@\s]+\z/)
+    end
+  end
+
+  # Definition for ProofResult struct
+  ProofResult = Struct.new(:success, :type, :message, :error, keyword_init: true) do
+    def success?
+      success == true
+    end
+
+    def error_message
+      error&.message || message
+    end
+  end
 
   # Concerns
   include ApplicationStatusManagement
@@ -21,36 +40,9 @@ class Application < ApplicationRecord
   include TrainingManagement
   include EvaluationManagement
 
-  # Associations - made more flexible to work with both Constituent and Users::Constituent
-  belongs_to :user, -> { where("type = 'Users::Constituent' OR type = 'Constituent'") },
-             class_name: 'User',
-             foreign_key: :user_id,
-             inverse_of: :applications
-  belongs_to :income_verified_by,
-             class_name: 'User',
-             optional: true,
-             inverse_of: :income_verified_applications
-
-  belongs_to :managing_guardian,
-             class_name: 'User',
-             optional: true,
-             inverse_of: :managed_applications
-
-  has_many :training_sessions, class_name: 'TrainingSession', dependent: :destroy
-  has_many :trainers, through: :training_sessions
-  has_many :evaluations, dependent: :destroy
-  has_many :notifications, as: :notifiable, dependent: :destroy
-  has_many :proof_reviews, dependent: :destroy
-  has_many :status_changes, class_name: 'ApplicationStatusChange', dependent: :destroy
-  has_many :events, as: :auditable, dependent: :destroy # Added for audit trail
-  has_many :vouchers, dependent: :restrict_with_error
-  has_many :application_notes, dependent: :destroy
-  has_and_belongs_to_many :products
-  has_one_attached :medical_certification
-  belongs_to :medical_certification_verified_by,
-             class_name: 'User',
-             optional: true,
-             inverse_of: :medical_certification_verified_applications
+  # Attribute accessors
+  # Virtual attribute to hold nested medical provider params for the form
+  attr_accessor :medical_provider_attributes
 
   # Enums
   enum :status, {
@@ -84,20 +76,59 @@ class Application < ApplicationRecord
     rejected: 4
   }, prefix: :medical_certification_status
 
+  # Associations - made more flexible to work with both Constituent and Users::Constituent
+  belongs_to :user, -> { where("type = 'Users::Constituent' OR type = 'Constituent'") },
+             class_name: 'User',
+             foreign_key: :user_id,
+             inverse_of: :applications
+  belongs_to :income_verified_by,
+             class_name: 'User',
+             optional: true,
+             inverse_of: :income_verified_applications
+  belongs_to :managing_guardian,
+             class_name: 'User',
+             optional: true,
+             inverse_of: :managed_applications
+  belongs_to :medical_certification_verified_by,
+             class_name: 'User',
+             optional: true,
+             inverse_of: :medical_certification_verified_applications
+
+  has_many :training_sessions, class_name: 'TrainingSession', dependent: :destroy
+  has_many :trainers, through: :training_sessions
+  has_many :evaluations, dependent: :destroy
+  has_many :notifications, as: :notifiable, dependent: :destroy
+  has_many :proof_reviews, dependent: :destroy
+  has_many :status_changes, class_name: 'ApplicationStatusChange', dependent: :destroy
+  has_many :events, as: :auditable, dependent: :destroy # Added for audit trail
+  has_many :vouchers, dependent: :restrict_with_error
+  has_many :application_notes, dependent: :destroy
+  has_and_belongs_to_many :products
+  has_one_attached :medical_certification
+
   # Validations
-  validates :application_date, :status, presence: true
+  validates :application_date, presence: true
+  validates :status, presence: true
   validates :maryland_resident, inclusion: { in: [true], message: 'You must be a Maryland resident to apply' }, unless: :status_draft?
-  validates :terms_accepted, :information_verified, :medical_release_authorized,
-            acceptance: { accept: true }, if: :submitted?
-  validates :medical_provider_name, :medical_provider_phone, :medical_provider_email,
-            presence: true, unless: :status_draft?
-  validates :household_size, :annual_income, presence: true, unless: :status_draft?
+  validates :terms_accepted, acceptance: { accept: true }, if: :submitted?
+  validates :information_verified, acceptance: { accept: true }, if: :submitted?
+  validates :medical_release_authorized, acceptance: { accept: true }, if: :submitted?
+  validates :medical_provider_name, presence: true, unless: :status_draft?
+  validates :medical_provider_phone, presence: true, unless: :status_draft?
+  validates :medical_provider_email, presence: true, unless: :status_draft?
+  validates :household_size, presence: true, unless: :status_draft?
+  validates :annual_income, presence: true, unless: :status_draft?
   validates :self_certify_disability, inclusion: { in: [true, false] }, unless: :status_draft?
+  validates :alternate_contact_phone,
+            format: { with: /\A\+?[\d\-\(\)\s]+\z/, allow_blank: true }
+  validates :alternate_contact_email,
+            format: { with: URI::MailTo::EMAIL_REGEXP, allow_blank: true }
   validate :waiting_period_completed, on: :create
   validate :constituent_must_have_disability, if: :validate_disability?
-  before_save :ensure_managing_guardian_set, if: :user_id_changed?
-  before_create :ensure_managing_guardian_set
+
   # Callbacks
+  before_create :ensure_managing_guardian_set
+  before_save :ensure_managing_guardian_set, if: :user_id_changed?
   after_update :log_status_change, if: :saved_change_to_status?
   after_save :log_alternate_contact_changes, if: :saved_change_to_alternate_contact?
 
@@ -165,6 +196,7 @@ class Application < ApplicationRecord
       .count
   end
 
+  # Instance Methods
   # Status methods- Delegate approval logic to the Applications::Approver service object
   def approve!(user: Current.user)
     Applications::Approver.new(self, by: user).call
@@ -228,32 +260,6 @@ class Application < ApplicationRecord
 
   def medical_provider_name
     self[:medical_provider_name]
-  end
-
-  # Definition for Medical Provider Info struct
-  MedicalProviderInfo = Struct.new(:name, :phone, :fax, :email, keyword_init: true) do
-    def present?
-      name.present? || phone.present? || fax.present? || email.present?
-    end
-
-    def valid_phone?
-      phone.present? && phone.match?(/\A[\d\-\(\)\s\.]+\z/)
-    end
-
-    def valid_email?
-      email.present? && email.match?(/\A[^@\s]+@[^@\s]+\.[^@\s]+\z/)
-    end
-  end
-
-  # Definition for ProofResult struct
-  ProofResult = Struct.new(:success, :type, :message, :error, keyword_init: true) do
-    def success?
-      success == true
-    end
-
-    def error_message
-      error&.message || message
-    end
   end
 
   # New method to check if the application is for a dependent (managed by a guardian)

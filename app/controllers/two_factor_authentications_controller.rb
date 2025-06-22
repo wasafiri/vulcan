@@ -317,7 +317,12 @@ class TwoFactorAuthenticationsController < ApplicationController
     when 'totp'
       # Use the secret from params if provided (for redirects after failed verification),
       # otherwise generate a new one. Validate secret to prevent XSS.
-      @secret = validate_base32_secret(params[:secret]) || ROTP::Base32.random
+      if params[:secret].present?
+        @secret = validate_base32_secret(params[:secret])
+        @secret = ROTP::Base32.random if @secret.nil? # Fallback if validation fails
+      else
+        @secret = ROTP::Base32.random
+      end
 
       # Store the secret in the session
       store_challenge(
@@ -455,8 +460,10 @@ class TwoFactorAuthenticationsController < ApplicationController
           end
           format.turbo_stream do
             # Regenerate the QR code before rendering the template
-            # Ensure @secret is set correctly from params if needed
-            @secret = params[:secret] || challenge_data[:metadata]&.dig(:secret) # Ensure @secret is available
+            # Ensure @secret is properly validated from params or session
+            raw_secret = params[:secret] || challenge_data[:metadata]&.dig(:secret)
+            @secret = validate_base32_secret(raw_secret) # Always validate before use
+            
             if @secret
               @totp_uri = ROTP::TOTP.new(@secret, issuer: 'MatVulcan').provisioning_uri(current_user.email)
               @qr_code = RQRCode::QRCode.new(@totp_uri).as_svg(
@@ -467,9 +474,17 @@ class TwoFactorAuthenticationsController < ApplicationController
                 use_path: true
               )
             else
-              Rails.logger.error('[2FA_CREDENTIAL] Secret not found when regenerating QR code for failed setup.')
-              # Handle case where secret might be missing (though unlikely here)
-              @qr_code = nil
+              Rails.logger.error('[2FA_CREDENTIAL] Invalid or missing secret when regenerating QR code for failed setup.')
+              # Generate a new valid secret if the old one is invalid
+              @secret = ROTP::Base32.random
+              @totp_uri = ROTP::TOTP.new(@secret, issuer: 'MatVulcan').provisioning_uri(current_user.email)
+              @qr_code = RQRCode::QRCode.new(@totp_uri).as_svg(
+                color: '000',
+                shape_rendering: 'crispEdges',
+                module_size: 4,
+                standalone: true,
+                use_path: true
+              )
             end
 
             # For Turbo Stream, render the template with current flash
@@ -761,6 +776,10 @@ class TwoFactorAuthenticationsController < ApplicationController
   # Validates TOTP secret to prevent XSS - uses ROTP's own validation
   def validate_base32_secret(secret)
     return nil if secret.blank?
+
+    # Ensure secret is a string and contains only valid Base32 characters
+    secret = secret.to_s.strip
+    return nil unless secret.match?(/\A[A-Z2-7]+\z/)
 
     # Use ROTP to validate the secret format
     ROTP::Base32.decode(secret)

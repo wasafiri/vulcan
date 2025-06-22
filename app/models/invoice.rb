@@ -6,7 +6,8 @@ class Invoice < ApplicationRecord
   has_many :voucher_transactions, dependent: :nullify
 
   validates :vendor, presence: true
-  validates :start_date, :end_date, presence: true
+  validates :start_date, presence: true
+  validates :end_date, presence: true
   validates :total_amount, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :invoice_number, presence: true, uniqueness: true
   validate :end_date_after_start_date

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 class VoucherTransaction < ApplicationRecord
+  include Groupdate
   belongs_to :voucher
   belongs_to :vendor, class_name: 'User'
   belongs_to :invoice, optional: true
@@ -52,9 +53,7 @@ class VoucherTransaction < ApplicationRecord
   def self.daily_totals(start_date, end_date, vendor_id = nil)
     scope = completed.in_date_range(start_date, end_date)
     scope = scope.where(vendor_id: vendor_id) if vendor_id
-    scope.group('DATE(processed_at)')
-         .sum(:amount)
-         .transform_values { |v| BigDecimal(v.to_s).to_i }
+    scope.group_by_day(:processed_at).sum(:amount).transform_values { |v| BigDecimal(v.to_s).to_i }
   end
 
   def amount=(value)

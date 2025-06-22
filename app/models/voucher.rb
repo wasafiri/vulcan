@@ -9,7 +9,8 @@ class Voucher < ApplicationRecord
   has_many :events, as: :auditable, dependent: :destroy
 
   validates :code, presence: true, uniqueness: true
-  validates :initial_value, :remaining_value, presence: true, numericality: { greater_than_or_equal_to: 0 }
+  validates :initial_value, presence: true, numericality: { greater_than_or_equal_to: 0 }
+  validates :remaining_value, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validate :remaining_value_cannot_exceed_initial_value
 
   before_validation :generate_code, on: :create
@@ -229,13 +230,12 @@ class Voucher < ApplicationRecord
 
   # Format product data for event metadata
   def format_product_data_for_event(product_data)
-    return nil unless product_data.present?
+    return nil if product_data.blank?
 
     product_data.map do |id, qty|
       { id: id, quantity: qty }
     end
   end
-
 
   def check_status_changes
     return unless saved_change_to_status?

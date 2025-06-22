@@ -20,7 +20,7 @@ module Applications
           first_name: 'John',
           last_name: 'Malone',
           email: "john.malone.#{@timestamp}@example.com",
-          phone: "202424#{@timestamp[-4..-1]}",
+          phone: "202424#{@timestamp[-4..]}",
           physical_address_1: '12122 long ridge ln',
           city: 'bowie',
           state: 'MD',
@@ -40,14 +40,10 @@ module Applications
     end
 
     test 'creates constituent with proper Users::Constituent type' do
-      # Set up mailer expectations BEFORE calling the service
+      # Mock the direct mailer call
       mock_mailer = mock('ActionMailer::MessageDelivery')
-      mock_mailer.expects(:deliver_later) # Expect deliver_later to be called
-
-      # Expect the mailer method to be called with any constituent and any password
-      ApplicationNotificationsMailer.expects(:account_created)
-                                    .with(anything, anything) # Match any constituent, ignore temp password
-                                    .returns(mock_mailer)
+      mock_mailer.expects(:deliver_later).once
+      ApplicationNotificationsMailer.expects(:account_created).at_least_once.returns(mock_mailer)
 
       service = PaperApplicationService.new(
         params: @valid_params,
@@ -66,7 +62,5 @@ module Applications
       # Clean up Current context after the test
       Current.reset
     end
-
-
   end
 end

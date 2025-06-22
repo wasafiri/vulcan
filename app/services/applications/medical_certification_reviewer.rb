@@ -28,7 +28,7 @@ module Applications
       return failure('Application does not have medical provider information') if application.medical_provider_name.blank?
 
       # Make sure there's at least one way to contact the provider
-      unless application.medical_provider_email.present? || application.medical_provider_fax.present?
+      if application.medical_provider_email.blank? && application.medical_provider_fax.blank?
         return failure('No contact method available for medical provider')
       end
 
@@ -41,9 +41,7 @@ module Applications
       )
 
       # Convert hash result to BaseService::Result
-      unless service_result[:success]
-        return failure(service_result[:error]&.message || 'Medical certification service failed')
-      end
+      return failure(service_result[:error]&.message || 'Medical certification service failed') unless service_result[:success]
 
       # If the service call succeeded and notes were provided, create the specific ApplicationNote
       if notes.present?

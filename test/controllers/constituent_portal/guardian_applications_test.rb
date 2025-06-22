@@ -7,6 +7,12 @@ module ConstituentPortal
     include ActionDispatch::TestProcess::FixtureFile
 
     setup do
+      # Clear any stale Current state that might affect test isolation
+      Current.user = nil
+      Current.proof_attachment_service_context = nil
+      Current.paper_context = nil
+      Current.resubmitting_proof = nil
+      
       # Create a guardian user (the one who will be signed in)
       @guardian_user = create(:constituent, email: 'guardian.test@example.com', phone: '5555551111')
       # Create a dependent user (the one the application is for)
@@ -32,6 +38,12 @@ module ConstituentPortal
     teardown do
       # Clean up thread local context after each test
       teardown_paper_application_context
+      
+      # Clear any Current state to prevent test isolation issues
+      Current.user = nil
+      Current.proof_attachment_service_context = nil
+      Current.paper_context = nil
+      Current.resubmitting_proof = nil
     end
 
     test 'should create application for a dependent' do
@@ -76,8 +88,8 @@ module ConstituentPortal
       if application.present?
         # Verify application was created successfully
         assert_equal 'in_progress', application.status
-        assert_equal @dependent_user.id, application.user_id # Application is for the dependent
-        assert_equal @guardian_user.id, application.managing_guardian_id # Guardian is the managing guardian
+        assert_equal @dependent_user.id, application.user_id, "Application should be for the dependent user (expected: #{@dependent_user.id}, got: #{application.user_id})"
+        assert_equal @guardian_user.id, application.managing_guardian_id, "Guardian should be the managing guardian (expected: #{@guardian_user.id}, got: #{application.managing_guardian_id})"
 
         # Verify dependent user's disability was updated (if applicable via form)
         @dependent_user.reload

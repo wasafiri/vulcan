@@ -41,8 +41,8 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
 
     get trainers_training_session_url(@other_trainer_session) # Other trainer's session
-    assert_redirected_to trainers_dashboard_url
-    assert_equal 'You don\'t have access to this training session', flash[:alert]
+    assert_redirected_to trainers_dashboard_path
+    assert_equal "You don't have access to this training session.", flash[:alert]
   end
 
   test 'admin should see any training session' do
@@ -73,7 +73,8 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
     assert_equal training_session.application, assigns(:application)
     assert_equal training_session.constituent, assigns(:constituent)
     assert_not_nil assigns(:max_training_sessions) # Assuming Policy.get('max_training_sessions') returns something
-    assert_equal training_session.application.training_sessions.completed_sessions.count, assigns(:completed_training_sessions_count)
+    assert_equal training_session.application.training_sessions.completed_sessions.count,
+                 assigns(:completed_training_sessions_count)
     assert_equal training_session.application.training_sessions.order(:created_at).pluck(:id).index(training_session.id) + 1,
                  assigns(:session_number)
     assert_not_nil assigns(:constituent_cancelled_sessions_count) # Test the complex query
@@ -89,7 +90,8 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
     assert_equal @training_session.application, assigns(:application)
     assert_equal @training_session.constituent, assigns(:constituent)
     assert_not_nil assigns(:max_training_sessions)
-    assert_equal @training_session.application.training_sessions.completed_sessions.count, assigns(:completed_training_sessions_count)
+    assert_equal @training_session.application.training_sessions.completed_sessions.count,
+                 assigns(:completed_training_sessions_count)
     assert_equal @training_session.application.training_sessions.order(:created_at).pluck(:id).index(@training_session.id) + 1,
                  assigns(:session_number)
     assert_not_nil assigns(:constituent_cancelled_sessions_count)
@@ -123,13 +125,14 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
     new_status = :confirmed
 
     assert_difference('Event.count') do
-      patch update_status_trainers_training_session_url(@training_session), params: { training_session: { status: new_status } }
+      patch update_status_trainers_training_session_url(@training_session),
+            params: { training_session: { status: new_status } }
     end
 
     @training_session.reload
     assert_equal new_status.to_s, @training_session.status
     assert_redirected_to trainers_training_session_url(@training_session)
-    assert_equal 'Training session status updated successfully.', flash[:notice]
+    assert_equal 'Training session status updated successfully.', flash[:notice][:message]
 
     event = Event.last
     assert_equal 'training_status_changed', event.action
@@ -155,7 +158,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
     assert_equal new_status.to_s, @training_session.status
     assert_equal no_show_notes, @training_session.no_show_notes
     assert_redirected_to trainers_training_session_url(@training_session)
-    assert_equal 'Training session status updated successfully.', flash[:notice]
+    assert_equal 'Training session status updated successfully.', flash[:notice][:message]
 
     event = Event.last
     assert_equal 'training_no_show', event.action
@@ -198,18 +201,19 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
     # @product is created in setup
 
     assert_difference('Event.count') do
-      post complete_trainers_training_session_url(@training_session), params: { notes: notes, product_trained_on_id: @product.id }
+      post complete_trainers_training_session_url(@training_session),
+           params: { notes: notes, product_trained_on_id: @product.id }
     end
 
     @training_session.reload
     assert_equal 'completed', @training_session.status
     assert_not_nil @training_session.completed_at
     assert_equal notes, @training_session.notes
-    assert_equal product, @training_session.product_trained_on
+    assert_equal @product, @training_session.product_trained_on
     assert_nil @training_session.cancellation_reason # Ensure cleared
     assert_nil @training_session.no_show_notes # Ensure cleared
     assert_redirected_to trainers_training_session_url(@training_session)
-    assert_equal 'Training session marked as completed.', flash[:notice]
+    assert_equal 'Training session completed successfully.', flash[:notice][:message]
 
     event = Event.last
     assert_equal 'training_completed', event.action
@@ -217,7 +221,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
     assert_equal @training_session.application_id, event.metadata['application_id']
     assert_not_nil event.metadata['completed_at']
     assert_equal notes, event.metadata['notes']
-    assert_equal product.name, event.metadata['product_trained_on']
+    assert_equal @product.name, event.metadata['product_trained_on']
     assert_equal @trainer, event.user
   end
 
@@ -226,7 +230,8 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
     # @product is created in setup
 
     assert_no_difference('Event.count') do
-      post complete_trainers_training_session_url(@training_session), params: { product_trained_on_id: @product.id }
+      post complete_trainers_training_session_url(@training_session),
+           params: { product_trained_on_id: @product.id }
     end
 
     @training_session.reload
@@ -259,10 +264,12 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
     starting_event_count = Event.count
 
     # Perform the action
-    post schedule_trainers_training_session_url(@requested_session), params: { scheduled_for: scheduled_time, notes: notes }
+    post schedule_trainers_training_session_url(@requested_session),
+         params: { scheduled_for: scheduled_time, notes: notes }
 
     # Check the resulting count directly
-    assert_equal starting_event_count + 1, Event.count, 'Expected Event.count to increase by 1 but it remained the same'
+    assert_equal starting_event_count + 1, Event.count,
+                 'Expected Event.count to increase by 1 but it remained the same'
 
     # Verify the training session updates
     @requested_session.reload
@@ -272,7 +279,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
     assert_nil @requested_session.cancellation_reason # Ensure cleared
     assert_nil @requested_session.no_show_notes # Ensure cleared
     assert_redirected_to trainers_training_session_url(@requested_session)
-    assert_equal 'Training session scheduled successfully.', flash[:notice]
+    assert_equal 'Training session scheduled successfully.', flash[:notice][:message]
 
     # Verify the event content
     event = Event.last
@@ -317,7 +324,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
     assert_nil @training_session.cancellation_reason # Ensure cleared
     assert_nil @training_session.no_show_notes # Ensure cleared
     assert_redirected_to trainers_training_session_url(@training_session)
-    assert_equal 'Training session rescheduled successfully.', flash[:notice]
+    assert_equal 'Training session rescheduled successfully.', flash[:notice][:message]
 
     event = Event.last
     assert_equal 'training_rescheduled', event.action
@@ -334,7 +341,8 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
     reschedule_reason = 'Trainer unavailable.'
 
     assert_no_difference('Event.count') do
-      post reschedule_trainers_training_session_url(@training_session), params: { reschedule_reason: reschedule_reason }
+      post reschedule_trainers_training_session_url(@training_session),
+           params: { reschedule_reason: reschedule_reason }
     end
 
     @training_session.reload
@@ -348,7 +356,8 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
     new_scheduled_time = 3.days.from_now
 
     assert_no_difference('Event.count') do
-      post reschedule_trainers_training_session_url(@training_session), params: { scheduled_for: new_scheduled_time }
+      post reschedule_trainers_training_session_url(@training_session),
+           params: { scheduled_for: new_scheduled_time }
     end
 
     @training_session.reload
@@ -363,7 +372,8 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
     cancellation_reason = 'Constituent cancelled.'
 
     assert_difference('Event.count') do
-      post cancel_trainers_training_session_url(@training_session), params: { cancellation_reason: cancellation_reason }
+      post cancel_trainers_training_session_url(@training_session),
+           params: { cancellation_reason: cancellation_reason }
     end
 
     @training_session.reload
@@ -373,7 +383,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
     assert_nil @training_session.notes # Ensure cleared
     assert_nil @training_session.no_show_notes # Ensure cleared
     assert_redirected_to trainers_training_session_url(@training_session)
-    assert_equal 'Training session cancelled successfully.', flash[:notice]
+    assert_equal 'Training session cancelled successfully.', flash[:notice][:message]
 
     event = Event.last
     assert_equal 'training_cancelled', event.action

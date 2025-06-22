@@ -100,7 +100,7 @@ module VendorPortal
       assert_text @voucher.code
 
       # Fill in redemption details - partial amount of the voucher
-      find('#redemption-amount').set('50.0')
+      find_by_id('redemption-amount').set('50.0')
       check "product_#{@product1.id}"
       click_button 'Process Redemption'
       assert_text 'Successfully processed voucher'
@@ -171,7 +171,7 @@ module VendorPortal
       visit redeem_vendor_voucher_path(@voucher.code)
 
       # Try to submit without selecting any products
-      find('#redemption-amount').set('50.0')
+      find_by_id('redemption-amount').set('50.0')
 
       # The button should be disabled, so we need to force the form submission
       page.execute_script("document.getElementById('redemption-form').submit()")
@@ -190,7 +190,7 @@ module VendorPortal
       visit redeem_vendor_voucher_path(@voucher.code)
 
       # Try to submit with amount greater than balance
-      find('#redemption-amount').set('150.0')
+      find_by_id('redemption-amount').set('150.0')
       check "product_#{@product1.id}"
 
       # Submit the form

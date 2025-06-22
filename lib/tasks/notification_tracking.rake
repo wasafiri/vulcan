@@ -80,7 +80,7 @@ namespace :notification_tracking do
       end
 
       application = notification.notifiable
-      unless application.medical_provider_email.present?
+      if application.medical_provider_email.blank?
         puts 'SKIPPED (no provider email)'
         next
       end
@@ -160,53 +160,86 @@ namespace :notification_tracking do
     total_removed = 0
 
     duplicate_counts.each do |count, ids|
-      # Get the actual notification objects
-      count_notifications = notifications.select { |n| ids.include?(n.id) }
-      puts "Request count #{count}: #{count_notifications.size} notifications"
-
-      # Sort by message_id (non-backfilled first, then by created_at)
-      sorted_notifications = count_notifications.sort_by do |n|
-        [n.message_id&.start_with?('backfilled-') ? 1 : 0, n.created_at]
-      end
-
-      # Keep the first notification (either non-backfilled or oldest)
-      keep = sorted_notifications.first
-      remove = sorted_notifications[1..]
-
-      puts "  Keeping: ID #{keep.id} (#{keep.message_id})"
-      puts "  Removing: #{remove.map(&:id).join(', ')}"
-
-      # Remove duplicates
-      begin
-        ids_to_remove = remove.map(&:id)
-        Notification.where(id: ids_to_remove).delete_all
-        total_removed += ids_to_remove.size
-        puts "  Removed #{ids_to_remove.size} duplicate notifications"
-      rescue StandardError => e
-        puts "  ERROR removing duplicates: #{e.message}"
-      end
+      removed_count = process_duplicate_group(count, ids, notifications)
+      total_removed += removed_count
     end
 
-    # Verify application counter matches notification count
+    update_application_counter(app_id)
+    total_removed
+  end
+
+  def process_duplicate_group(count, ids, notifications)
+    count_notifications = get_notifications_by_ids(ids, notifications)
+    puts "Request count #{count}: #{count_notifications.size} notifications"
+
+    keep, remove = split_notifications_for_removal(count_notifications)
+    remove_duplicate_notifications(keep, remove)
+  end
+
+  def get_notifications_by_ids(ids, notifications)
+    notifications.select { |n| ids.include?(n.id) }
+  end
+
+  def split_notifications_for_removal(count_notifications)
+    sorted_notifications = sort_notifications_by_priority(count_notifications)
+    keep = sorted_notifications.first
+    remove = sorted_notifications[1..]
+    [keep, remove]
+  end
+
+  def sort_notifications_by_priority(notifications)
+    # Sort by message_id (non-backfilled first, then by created_at)
+    notifications.sort_by do |n|
+      [n.message_id&.start_with?('backfilled-') ? 1 : 0, n.created_at]
+    end
+  end
+
+  def remove_duplicate_notifications(keep, remove)
+    puts "  Keeping: ID #{keep.id} (#{keep.message_id})"
+    puts "  Removing: #{remove.map(&:id).join(', ')}"
+
+    begin
+      ids_to_remove = remove.map(&:id)
+      Notification.where(id: ids_to_remove).delete_all
+      puts "  Removed #{ids_to_remove.size} duplicate notifications"
+      ids_to_remove.size
+    rescue StandardError => e
+      puts "  ERROR removing duplicates: #{e.message}"
+      0
+    end
+  end
+
+  def update_application_counter(app_id)
     begin
       application = Application.find(app_id)
-      notifications_after = Notification.where(
-        notifiable_type: 'Application',
-        notifiable_id: app_id,
-        action: 'medical_certification_requested'
-      ).count
+      current_count = get_current_notification_count(app_id)
 
-      if application.medical_certification_request_count != notifications_after
-        puts "Updating application request_count from #{application.medical_certification_request_count} to #{notifications_after}"
-        application.update_columns(medical_certification_request_count: notifications_after)
-        puts 'Application counter updated'
+      if application_counter_needs_update?(application, current_count)
+        update_counter_and_log(application, current_count)
       else
         puts "Application counter is already correct: #{application.medical_certification_request_count}"
       end
     rescue StandardError => e
       puts "ERROR checking application counter: #{e.message}"
     end
+  end
 
-    total_removed
+  def get_current_notification_count(app_id)
+    Notification.where(
+      notifiable_type: 'Application',
+      notifiable_id: app_id,
+      action: 'medical_certification_requested'
+    ).count
+  end
+
+  def application_counter_needs_update?(application, current_count)
+    application.medical_certification_request_count != current_count
+  end
+
+  def update_counter_and_log(application, current_count)
+    old_count = application.medical_certification_request_count
+    puts "Updating application request_count from #{old_count} to #{current_count}"
+    application.update_columns(medical_certification_request_count: current_count)
+    puts 'Application counter updated'
   end
 end

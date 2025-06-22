@@ -59,9 +59,9 @@ module Admin
       @completed_training_sessions_count = if @application.respond_to?(:training_sessions) &&
                                               @application.training_sessions.respond_to?(:completed_sessions) &&
                                               @application.training_sessions.completed_sessions.present?
-                                             @application.training_sessions.completed_sessions.count
+                                              @application.training_sessions.completed_sessions.count
                                            else
-                                             0 # Default to 0 if there are no completed sessions or the method doesn't exist
+                                              0 # Default to 0 if there are no completed sessions or the method doesn't exist
                                            end
     end
 
@@ -464,54 +464,7 @@ module Admin
       end
     end
 
-    # Logs detailed information about certification parameters
-    def log_certification_params
-      Rails.logger.info "MEDICAL CERTIFICATION PARAMS: #{params.to_unsafe_h.inspect}"
-      Rails.logger.info "MEDICAL CERTIFICATION FILE PARAM: #{params[:medical_certification].inspect}"
-
-      if params[:medical_certification].present?
-        Rails.logger.info "PARAM CLASS: #{params[:medical_certification].class.name}"
-
-        # Log upload type based on parameter structure
-        if params[:medical_certification].respond_to?(:content_type)
-          Rails.logger.info "Upload type: Regular file upload with content_type: #{params[:medical_certification].content_type}"
-        elsif params[:medical_certification].respond_to?(:[]) && params[:medical_certification][:signed_id].present?
-          Rails.logger.info 'Upload type: Direct upload with signed_id'
-        elsif params[:medical_certification].is_a?(String)
-          Rails.logger.info 'Upload type: String input (potential direct upload signed ID)'
-        else
-          Rails.logger.info "Upload type: Unknown structure: #{params[:medical_certification].class.name}"
-        end
-      end
-
-      Rails.logger.info "REQUEST CONTENT TYPE: #{request.content_type}"
-    end
-
-    # Process a rejected medical certification
-    def process_rejected_certification
-      # Validate required rejection reason
-      if params[:medical_certification_rejection_reason].blank?
-        redirect_to admin_application_path(@application),
-                    alert: 'Please select a rejection reason.'
-        return
-      end
-
-      # Use our service for rejection
-      result = MedicalCertificationAttachmentService.reject_certification(
-        application: @application,
-        admin: current_user,
-        reason: params[:medical_certification_rejection_reason],
-        notes: params[:medical_certification_rejection_notes],
-        submission_method: extract_submission_method || 'admin_review',
-        metadata: request_metadata
-      )
-
-      # Add status information for consistent messaging
-      result[:status] = 'rejected'
-      handle_certification_result(result)
-    end
-
-    private
+  private
 
     # --- Turbo Stream Success Helpers ---
 
@@ -610,6 +563,42 @@ module Admin
                 .reverse
     end
 
+    def log_param_class
+      cls = params[:medical_certification].class.name
+      Rails.logger.info "PARAM CLASS: #{cls}"
+    end
+
+    def log_upload_type
+      file_param = params[:medical_certification]
+
+      upload_type_message =
+        if file_param.respond_to?(:content_type)
+          "Regular file upload with content_type: #{file_param.content_type}"
+        elsif file_param.respond_to?(:[]) && file_param[:signed_id].present?
+          "Direct upload with signed_id"
+        elsif file_param.is_a?(String)
+          "String input (potential direct upload signed ID)"
+        else
+          "Unknown structure: #{file_param.class.name}"
+        end
+
+      Rails.logger.info "Upload type: #{upload_type_message}"
+    end
+
+    # Logs detailed information about certification parameters (only in dev/test)
+    def log_certification_params
+      return unless Rails.env.development? || Rails.env.test?
+
+      Rails.logger.info "MEDICAL CERTIFICATION PARAMS: #{params.to_unsafe_h.inspect}"
+      Rails.logger.info "MEDICAL CERTIFICATION FILE PARAM: #{params[:medical_certification].inspect}"
+
+      return if params[:medical_certification].blank?
+
+      log_param_class
+      log_upload_type
+      Rails.logger.info "REQUEST CONTENT TYPE: #{request.content_type}"
+    end
+
     # Load audit logs using the audit log builder service
     def load_audit_logs_with_service
       return unless @application
@@ -684,59 +673,57 @@ module Admin
     def set_current_attributes
       Current.set(request, current_user)
     end
+
     ### metrics --------------------------------------------------------------------
 
     def load_dashboard_metrics
-      begin
-        # Direct approach - use the database counts as our primary source
-        @open_applications_count = Application.active.count
-        @pending_services_count = Application.where(status: :approved).count
-
-        # Load all other counts from the reporting service
-        service_result = Applications::ReportingService.new.generate_index_data
-
-        if service_result.is_a?(BaseService::Result) && service_result.success?
-          # Extract data based on result type
-          service_data = service_result.data || {}
-
-          # Assign instance variables for all other data we might want from the service
-          service_data.each_pair do |key, value|
-            next if %w[open_applications_count pending_services_count].include?(key.to_s)
-            next if key.to_s.strip.empty? || value.nil?
-
-            # Use our safe_assign method to avoid invalid variable names
-            instance_variable_set("@#{key}", value)
-          end
-        end
-      rescue StandardError => e
-        Rails.logger.error "Dashboard metric error: #{e.message}"
-        # No need to set flash alert since we already have the counts
-      end
-
-      # Ensure counts for Common Tasks section are also directly set
-      @proofs_needing_review_count = Application.where(income_proof_status: :not_reviewed)
-                                                .or(Application.where(residency_proof_status: :not_reviewed))
-                                                .distinct
-                                                .count
-
-      @medical_certs_to_review_count = Application.where.not(status: %i[rejected archived])
-                                                  .where(medical_certification_status: :received)
-                                                  .count
-
-      # Count training requests from both sources
-      @training_requests_count = Notification.where(action: 'training_requested')
-                                             .where(notifiable_type: 'Application')
-                                             .select(:notifiable_id)
-                                             .distinct
-                                             .count
-
-      return unless @training_requests_count.zero?
-
-      @training_requests_count = Application.joins(:training_sessions)
-                                            .where(training_sessions: { status: %i[requested scheduled confirmed] })
-                                            .distinct
-                                            .count
+      load_simple_counts
+      load_reporting_service_data
+      load_remaining_metrics
+    rescue StandardError => e
+      Rails.logger.error "Dashboard metric error: #{e.message}"
     end
+
+    def load_simple_counts
+      @open_applications_count   = Application.active.count
+      @pending_services_count    = Application.where(status: :approved).count
+    end
+
+    def load_reporting_service_data
+      service_result = Applications::ReportingService.new.generate_index_data
+      return unless service_result.is_a?(BaseService::Result) && service_result.success?
+
+      service_result.data.to_h.each do |key, value|
+        next if %w[open_applications_count pending_services_count].include?(key.to_s)
+        next if key.to_s.blank? || value.nil?
+
+        instance_variable_set("@#{key}", value)
+      end
+    end
+
+    def load_remaining_metrics
+      @proofs_needing_review_count     = Application.where(income_proof_status: :not_reviewed)
+                                                    .or(Application.where(residency_proof_status: :not_reviewed))
+                                                    .distinct.count
+
+      @medical_certs_to_review_count   = Application.where.not(status: %i[rejected archived])
+                                                    .where(medical_certification_status: :received)
+                                                    .count
+
+      @training_requests_count         = training_requests_count
+    end
+
+    def training_requests_count
+      count = Notification.where(action: 'training_requested', notifiable_type: 'Application')
+                          .distinct.count(:notifiable_id)
+
+      return count unless count.zero?
+
+      Application.joins(:training_sessions)
+                .where(training_sessions: { status: %i[requested scheduled confirmed] })
+                .distinct.count
+    end
+
     ### scope / filtering ----------------------------------------------------------
 
     def base_scope
@@ -787,6 +774,7 @@ module Admin
         {}
       end
     end
+
     ### decoration -----------------------------------------------------------------
 
     def decorate_apps(apps, attachment_index)

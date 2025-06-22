@@ -42,6 +42,8 @@ gem 'thruster', require: false
 gem 'turbo-rails'
 # pagination capability
 gem 'pagy'
+# for grouping data by time periods
+gem 'groupdate'
 # ruby pdf generation library
 gem 'prawn', '~> 2.5'
 # pdf extraction, display, etc capability

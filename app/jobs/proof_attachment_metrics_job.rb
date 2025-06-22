@@ -2,7 +2,7 @@
 
 # Monitors proof submission failure rates and alerts administrators
 # when failure rates exceed acceptable thresholds
-# Scheduled via config/recurring.yml to run periodically  
+# Scheduled via config/recurring.yml to run periodically
 class ProofAttachmentMetricsJob < ApplicationJob
   queue_as :low
 
@@ -28,13 +28,13 @@ class ProofAttachmentMetricsJob < ApplicationJob
     successful_submissions = total_submissions - failed_submissions
 
     # Calculate success rate
-    success_rate = if total_submissions > 0
+    success_rate = if total_submissions.positive?
                      (successful_submissions.to_f / total_submissions * 100).round(1)
                    else
                      100.0
                    end
 
-    Rails.logger.info "Proof Submission Analysis (Last 24 Hours): " \
+    Rails.logger.info 'Proof Submission Analysis (Last 24 Hours): ' \
                       "Total: #{total_submissions}, " \
                       "Successful: #{successful_submissions}, " \
                       "Failed: #{failed_submissions}, " \
@@ -53,16 +53,17 @@ class ProofAttachmentMetricsJob < ApplicationJob
   def alert_administrators(success_rate, total, failed)
     Rails.logger.warn "High proof submission failure rate detected: #{success_rate}% (#{failed}/#{total})"
 
-    admins = User.where(type: 'Users::Administrator')
+    # Re-fetch system user and admins immediately before use to ensure they are current
+    current_system_user = User.system_user
+    current_admins = User.where(type: 'Users::Administrator')
+    Rails.logger.debug { "ProofAttachmentMetricsJob: Found #{current_admins.count} administrators." }
 
-    system_user = User.system_user
-
-    admins.find_each do |admin|
-      # Create notification through the proper system with system user as actor and notifiable
+    current_admins.find_each do |admin|
+      Rails.logger.debug { "ProofAttachmentMetricsJob: Attempting to create notification for admin #{admin.id}." }
       Notification.create!(
         recipient: admin,
-        actor: system_user,
-        notifiable: system_user,
+        actor: current_system_user,
+        notifiable: current_system_user,
         action: 'attachment_failure_warning',
         metadata: {
           success_rate: success_rate,
@@ -76,6 +77,6 @@ class ProofAttachmentMetricsJob < ApplicationJob
       Rails.logger.error "Failed to create failure warning notification for admin #{admin.id}: #{e.message}"
     end
 
-    Rails.logger.info "Created failure rate warnings for #{admins.count} administrators"
+    Rails.logger.info "Created failure rate warnings for #{current_admins.count} administrators"
   end
 end

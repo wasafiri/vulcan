@@ -10,7 +10,10 @@ class Product < ApplicationRecord
   has_many :voucher_transaction_products, dependent: :destroy
   has_many :voucher_transactions, through: :voucher_transaction_products
 
-  validates :name, :manufacturer, :model_number, :device_types, presence: true
+  validates :name, presence: true
+  validates :manufacturer, presence: true
+  validates :model_number, presence: true
+  validates :device_types, presence: true
   validates :documentation_url, format: { with: URI::DEFAULT_PARSER.make_regexp }, allow_blank: true
   validate :device_types_must_be_valid
 

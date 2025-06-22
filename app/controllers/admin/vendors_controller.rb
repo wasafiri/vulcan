@@ -11,7 +11,7 @@ module Admin
       @vendors = Users::Vendor.order(:business_name)
 
       # Filter by W9 status if provided
-      return unless params[:w9_status].present?
+      return if params[:w9_status].blank?
 
       @vendors = @vendors.where(w9_status: params[:w9_status])
     end

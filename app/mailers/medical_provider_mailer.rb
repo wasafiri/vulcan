@@ -9,7 +9,7 @@ class MedicalProviderMailer < ApplicationMailer
 
   # Proxy methods for NotificationService compatibility
   # These delegate to the existing methods with proper parameter mapping
-  
+
   def requested(notifiable, notification)
     # Map to request_certification method
     self.class.with(
@@ -39,45 +39,16 @@ class MedicalProviderMailer < ApplicationMailer
 
   # New method for approved certifications
   def certification_approved
-    template_name = 'medical_provider_certification_approved'
-    puts "DEBUG: certification_approved - Looking for template: #{template_name}" # Debug line
-    begin
-      text_template = EmailTemplate.find_by!(name: template_name, format: :text)
-      puts "DEBUG: certification_approved - Found template: #{text_template.inspect}" # Debug line
-    rescue ActiveRecord::RecordNotFound => e
-      Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
-      raise "Email template (text format) not found for #{template_name}"
-    end
+    template = load_email_template('medical_provider_certification_approved')
+    variables = build_approval_variables
+    log_debug_variables('certification_approved', variables)
 
-    # Prepare variables
-    application = params[:application]
-    notification = params[:notification]
-    constituent = application.user
+    subject, body = template.render(**variables)
+    log_rendered_output('certification_approved', subject, body)
 
-    variables = {
-      constituent_full_name: constituent.full_name,
-      application_id: application.id
-    }.compact
-    puts "DEBUG: certification_approved - Variables: #{variables.inspect}" # Debug line
-
-    # Render subject and body
-    rendered_subject, rendered_text_body = text_template.render(**variables)
-    puts "DEBUG: certification_approved - Rendered Subject: #{rendered_subject.inspect}" # Debug line
-    puts "DEBUG: certification_approved - Rendered Body: #{rendered_text_body.inspect}" # Debug line
-
-    # Send email
-    mail(
-      to: application.medical_provider_email,
-      from: 'info@mdmat.org',
-      reply_to: 'medical-certification@maryland.gov',
-      subject: rendered_subject,
-      message_stream: 'outbound'
-    ) do |format|
-      format.text { render plain: rendered_text_body.to_s }
-    end
+    send_approval_email(subject, body)
   rescue StandardError => e
-    Rails.logger.error("Failed to send certification approved email for application #{params[:application]&.id}: #{e.message}")
-    Rails.logger.error(e.backtrace.join("\n"))
+    log_certification_error('certification_approved', params[:application]&.medical_provider_email, e)
     raise e
   end
 
@@ -86,49 +57,16 @@ class MedicalProviderMailer < ApplicationMailer
   # @param rejection_reason [String] The reason for rejection
   # @param admin [User] The admin who rejected the certification
   def certification_rejected
-    template_name = 'medical_provider_certification_rejected'
-    puts "DEBUG: certification_rejected - Looking for template: #{template_name}" # Debug line
-    begin
-      text_template = EmailTemplate.find_by!(name: template_name, format: :text)
-      puts "DEBUG: certification_rejected - Found template: #{text_template.inspect}" # Debug line
-    rescue ActiveRecord::RecordNotFound => e
-      Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
-      raise "Email template (text format) not found for #{template_name}"
-    end
+    template = load_email_template('medical_provider_certification_rejected')
+    variables = build_rejection_variables
+    log_debug_variables('certification_rejected', variables)
 
-    # Prepare variables
-    application = params[:application]
-    rejection_reason = params[:rejection_reason]
+    subject, body = template.render(**variables)
+    log_rendered_output('certification_rejected', subject, body)
 
-    constituent = application.user
-    remaining_attempts = 8 - application.total_rejections
-
-    variables = {
-      constituent_full_name: constituent.full_name,
-      application_id: application.id,
-      rejection_reason: rejection_reason,
-      remaining_attempts: remaining_attempts
-    }.compact
-    puts "DEBUG: certification_rejected - Variables: #{variables.inspect}" # Debug line
-
-    # Render subject and body
-    rendered_subject, rendered_text_body = text_template.render(**variables)
-    puts "DEBUG: certification_rejected - Rendered Subject: #{rendered_subject.inspect}" # Debug line
-    puts "DEBUG: certification_rejected - Rendered Body: #{rendered_text_body.inspect}" # Debug line
-
-    # Send email
-    mail(
-      to: application.medical_provider_email,
-      from: 'info@mdmat.org',
-      reply_to: 'medical-certification@maryland.gov',
-      subject: rendered_subject,
-      message_stream: 'outbound'
-    ) do |format|
-      format.text { render plain: rendered_text_body.to_s }
-    end
+    send_rejection_email(subject, body)
   rescue StandardError => e
-    Rails.logger.error("Failed to send certification rejected email for application #{params[:application]&.id}: #{e.message}")
-    Rails.logger.error(e.backtrace.join("\n"))
+    log_certification_error('certification_rejected', params[:application]&.medical_provider_email, e)
     raise e
   end
 
@@ -137,77 +75,16 @@ class MedicalProviderMailer < ApplicationMailer
   # @param timestamp [String] ISO8601 timestamp of when the request was made
   # @param notification_id [Integer] ID of the notification record for tracking
   def request_certification
-    template_name = 'medical_provider_request_certification'
-    puts "DEBUG: request_certification - Looking for template: #{template_name}" # Debug line
-    begin
-      text_template = EmailTemplate.find_by!(name: template_name, format: :text)
-      puts "DEBUG: request_certification - Found template: #{text_template.inspect}" # Debug line
-    rescue ActiveRecord::RecordNotFound => e
-      Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
-      raise "Email template (text format) not found for #{template_name}"
-    end
+    template = load_email_template('medical_provider_request_certification')
+    variables = build_request_certification_variables
+    log_debug_variables('request_certification', variables)
 
-    # Prepare variables
-    application = params[:application]
-    timestamp = params[:timestamp]
-    notification_id = params[:notification_id]
+    subject, body = template.render(**variables)
+    log_rendered_output('request_certification', subject, body)
 
-    constituent = application.user
-    timestamp_formatted = (timestamp ? Time.iso8601(timestamp) : Time.current).strftime('%B %d, %Y at %I:%M %p %Z')
-    request_count = application.medical_certification_request_count || 1
-    request_count_message = request_count > 1 ? "This is a follow-up request (Request ##{request_count})" : ''
-    constituent_dob_formatted = constituent.date_of_birth&.strftime('%m/%d/%Y') || 'Not Provided'
-    # Basic address formatting, could be enhanced
-    constituent_address_formatted = [
-      constituent.physical_address_1,
-      constituent.physical_address_2,
-      "#{constituent.city}, #{constituent.state} #{constituent.zip_code}"
-    ].compact_blank.join("\n")
-    # Generate the download URL (assuming a route helper exists)
-    download_form_url = begin
-      medical_certification_form_url(application.signed_id(purpose: :medical_certification),
-                                     host: default_url_options[:host])
-    rescue StandardError
-      '#'
-    end
-
-    variables = {
-      constituent_full_name: constituent.full_name,
-      request_count_message: request_count_message,
-      timestamp_formatted: timestamp_formatted,
-      constituent_dob_formatted: constituent_dob_formatted,
-      constituent_address_formatted: constituent_address_formatted,
-      application_id: application.id,
-      download_form_url: download_form_url
-    }.compact
-    puts "DEBUG: request_certification - Variables: #{variables.inspect}" # Debug line
-
-    # Render subject and body
-    rendered_subject, rendered_text_body = text_template.render(**variables)
-    puts "DEBUG: request_certification - Rendered Subject: #{rendered_subject.inspect}" # Debug line
-    puts "DEBUG: request_certification - Rendered Body: #{rendered_text_body.inspect}" # Debug line
-
-    mail_options = {
-      to: application.medical_provider_email,
-      from: 'info@mdmat.org',
-      reply_to: 'medical-certification@maryland.gov',
-      subject: rendered_subject,
-      message_stream: 'outbound'
-    }
-
-    # Add notification message ID for tracking if available
-    if notification_id.present?
-      notification = Notification.find_by(id: notification_id)
-      mail_options[:message_id] = notification.message_id if notification&.message_id.present?
-    end
-
-    # Send email
-    mail(mail_options) do |format|
-      format.text { render plain: rendered_text_body.to_s }
-    end
+    send_request_certification_email(subject, body)
   rescue StandardError => e
-    Rails.logger.error("Failed to send request certification email for application #{params[:application]&.id}: #{e.message}")
-    Rails.logger.error(e.backtrace.join("\n"))
+    log_certification_error('request_certification', params[:application]&.medical_provider_email, e)
     raise e
   end
 
@@ -217,47 +94,201 @@ class MedicalProviderMailer < ApplicationMailer
   # @param error_type [Symbol] The type of error (:provider_not_found, :invalid_certification_request, etc.)
   # @param message [String] The error message
   def certification_submission_error
-    template_name = 'medical_provider_certification_submission_error'
-    puts "DEBUG: certification_submission_error - Looking for template: #{template_name}" # Debug line
-    begin
-      text_template = EmailTemplate.find_by!(name: template_name, format: :text)
-      puts "DEBUG: certification_submission_error - Found template: #{text_template.inspect}" # Debug line
-    rescue ActiveRecord::RecordNotFound => e
-      Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
-      raise "Email template (text format) not found for #{template_name}"
-    end
+    medical_provider, application, message = extract_submission_error_params
+    process_submission_error_email(medical_provider, application, message)
+  rescue StandardError => e
+    log_certification_error('certification_submission_error', params[:medical_provider]&.email, e)
+    raise e
+  end
 
-    # Prepare variables
-    medical_provider = params[:medical_provider]
-    application = params[:application]
-    message = params[:message]
+  private
 
-    variables = {
+  def load_email_template(template_name)
+    EmailTemplate.find_by!(name: template_name, format: :text)
+  rescue ActiveRecord::RecordNotFound => e
+    Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
+    raise "Email template (text format) not found for #{template_name}"
+  end
+
+  def build_submission_error_variables(medical_provider, application, message)
+    {
       medical_provider_email: medical_provider.email,
       error_message: message,
       constituent_full_name: application&.user&.full_name,
       application_id: application&.id
     }.compact
-    puts "DEBUG: certification_submission_error - Variables: #{variables.inspect}" # Debug line
+  end
 
-    # Render subject and body
-    rendered_subject, rendered_text_body = text_template.render(**variables)
-    puts "DEBUG: certification_submission_error - Rendered Subject: #{rendered_subject.inspect}" # Debug line
-    puts "DEBUG: certification_submission_error - Rendered Body: #{rendered_text_body.inspect}" # Debug line
+  def build_approval_variables
+    application = params[:application]
+    constituent = application.user
 
-    # Send email
+    {
+      constituent_full_name: constituent.full_name,
+      application_id: application.id
+    }.compact
+  end
+
+  def build_rejection_variables
+    application = params[:application]
+    rejection_reason = params[:rejection_reason]
+    constituent = application.user
+    remaining_attempts = 8 - application.total_rejections
+
+    {
+      constituent_full_name: constituent.full_name,
+      application_id: application.id,
+      rejection_reason: rejection_reason,
+      remaining_attempts: remaining_attempts
+    }.compact
+  end
+
+  def build_request_certification_variables
+    application = params[:application]
+    timestamp = params[:timestamp]
+    constituent = application.user
+
+    {
+      constituent_full_name: constituent.full_name,
+      request_count_message: format_request_count_message(application),
+      timestamp_formatted: format_request_timestamp(timestamp),
+      constituent_dob_formatted: format_constituent_dob(constituent),
+      constituent_address_formatted: format_constituent_address(constituent),
+      application_id: application.id,
+      download_form_url: build_download_form_url(application)
+    }.compact
+  end
+
+  def format_request_count_message(application)
+    request_count = application.medical_certification_request_count || 1
+    request_count > 1 ? "This is a follow-up request (Request ##{request_count})" : ''
+  end
+
+  def format_request_timestamp(timestamp)
+    time = timestamp ? Time.iso8601(timestamp) : Time.current
+    time.strftime('%B %d, %Y at %I:%M %p %Z')
+  end
+
+  def format_constituent_dob(constituent)
+    constituent.date_of_birth&.strftime('%m/%d/%Y') || 'Not Provided'
+  end
+
+  def format_constituent_address(constituent)
+    [
+      constituent.physical_address_1,
+      constituent.physical_address_2,
+      "#{constituent.city}, #{constituent.state} #{constituent.zip_code}"
+    ].compact_blank.join("\n")
+  end
+
+  def build_download_form_url(application)
+    medical_certification_form_url(
+      application.signed_id(purpose: :medical_certification),
+      host: default_url_options[:host]
+    )
+  rescue StandardError
+    '#'
+  end
+
+  def send_approval_email(subject, body)
+    application = params[:application]
+
+    mail(
+      to: application.medical_provider_email,
+      from: 'info@mdmat.org',
+      reply_to: 'medical-certification@maryland.gov',
+      subject: subject,
+      message_stream: 'outbound'
+    ) do |format|
+      format.text { render plain: body.to_s }
+    end
+  end
+
+  def send_rejection_email(subject, body)
+    application = params[:application]
+
+    mail(
+      to: application.medical_provider_email,
+      from: 'info@mdmat.org',
+      reply_to: 'medical-certification@maryland.gov',
+      subject: subject,
+      message_stream: 'outbound'
+    ) do |format|
+      format.text { render plain: body.to_s }
+    end
+  end
+
+  def send_request_certification_email(subject, body)
+    application = params[:application]
+    notification_id = params[:notification_id]
+
+    mail_options = build_request_mail_options(application, subject)
+    add_notification_tracking(mail_options, notification_id)
+
+    mail(mail_options) do |format|
+      format.text { render plain: body.to_s }
+    end
+  end
+
+  def build_request_mail_options(application, subject)
+    {
+      to: application.medical_provider_email,
+      from: 'info@mdmat.org',
+      reply_to: 'medical-certification@maryland.gov',
+      subject: subject,
+      message_stream: 'outbound'
+    }
+  end
+
+  def add_notification_tracking(mail_options, notification_id)
+    return if notification_id.blank?
+
+    notification = Notification.find_by(id: notification_id)
+    mail_options[:message_id] = notification.message_id if notification&.message_id.present?
+  end
+
+  def log_debug_variables(context, variables)
+    Rails.logger.debug { "DEBUG: #{context} - Variables: #{variables.inspect}" } unless Rails.env.production?
+  end
+
+  def log_rendered_output(context, subject, body)
+    Rails.logger.debug { "DEBUG: #{context} - Rendered Subject: #{subject.inspect}" } unless Rails.env.production?
+    Rails.logger.debug { "DEBUG: #{context} - Rendered Body: #{body.inspect}" } unless Rails.env.production?
+  end
+
+  def send_submission_error_email(medical_provider, subject, body)
     mail(
       to: medical_provider.email,
       from: 'info@mdmat.org',
       reply_to: 'medical-certification@maryland.gov',
-      subject: rendered_subject,
+      subject: subject,
       message_stream: 'outbound'
     ) do |format|
-      format.text { render plain: rendered_text_body.to_s }
+      format.text { render plain: body.to_s }
     end
-  rescue StandardError => e
-    Rails.logger.error("Failed to send certification submission error email to #{params[:medical_provider]&.email}: #{e.message}")
-    Rails.logger.error(e.backtrace.join("\n"))
-    raise e
+  end
+
+  def log_certification_error(context, recipient, error)
+    Rails.logger.error("Failed to send #{context} email to #{recipient}: #{error.message}")
+    Rails.logger.error(error.backtrace.join("\n"))
+  end
+
+  def extract_submission_error_params
+    [
+      params[:medical_provider],
+      params[:application],
+      params[:message]
+    ]
+  end
+
+  def process_submission_error_email(medical_provider, application, message)
+    template = load_email_template('medical_provider_certification_submission_error')
+    variables = build_submission_error_variables(medical_provider, application, message)
+    log_debug_variables('certification_submission_error', variables)
+
+    subject, body = template.render(**variables)
+    log_rendered_output('certification_submission_error', subject, body)
+
+    send_submission_error_email(medical_provider, subject, body)
   end
 end

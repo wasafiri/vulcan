@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 module Trainers
+  # Base controller for the trainers portal.
   class BaseController < ApplicationController
     include Pagy::Backend
     before_action :require_trainer
@@ -8,9 +9,9 @@ module Trainers
     private
 
     def require_trainer
-      return if current_user&.type == 'Users::Trainer' || current_user&.has_capability?(:can_train) || current_user&.admin?
+      return if current_user.admin? || current_user.capability?('can_train')
 
-      redirect_to root_path, alert: 'You must be a trainer to access this area'
+      redirect_to root_path, alert: 'You are not authorized to perform this action.'
     end
   end
 end

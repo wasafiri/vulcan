@@ -468,10 +468,11 @@ class ApplicationNotificationsMailer < ApplicationMailer
     threshold = base_fpl * (modifier / 100.0)
 
     # Letter generation using database templates
+    # Only generate letter if constituent is a User object (not a hash) and has letter preference
     communication_preference = constituent.is_a?(Hash) ? constituent[:communication_preference] : constituent.communication_preference
-    if communication_preference == 'letter'
-      constituent_first_name = constituent.is_a?(Hash) ? constituent[:first_name] : constituent.first_name
-      constituent_last_name = constituent.is_a?(Hash) ? constituent[:last_name] : constituent.last_name
+    if communication_preference == 'letter' && !constituent.is_a?(Hash)
+      constituent_first_name = constituent.first_name
+      constituent_last_name = constituent.last_name
 
       Letters::TextTemplateToPdfService.new(
         template_name: 'application_notifications_income_threshold_exceeded',

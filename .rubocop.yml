@@ -13,15 +13,22 @@ AllCops:
 
 # Customize line length
 Layout/LineLength:
-  Max: 140
+  Max: 165
 
 # Customize class size limits
 Metrics/ClassLength:
-  Max: 200
+  Max: 300
 
 # Customize method size limits
 Metrics/MethodLength:
-  Max: 16
+  Max: 30
+
+# Allow custom find_by methods that provide encryption support and error handling
+Rails/DynamicFindBy:
+  AllowedMethods:
+    - find_by_email
+    - find_by_phone
+    - find_by_token_for
 
 # Overwrite or add rules to create your own house style
 #

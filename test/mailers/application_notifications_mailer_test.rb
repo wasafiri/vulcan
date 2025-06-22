@@ -21,134 +21,100 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
   include Mailers::ApplicationNotificationsHelper
 
   setup do
-    # Create specific mocks for each template with variable interpolation
-    # We now use only text templates (no HTML templates)
-    @mock_approved_text = mock('EmailTemplate')
-    @mock_approved_text.stubs(:render).with(any_parameters).returns do |**vars|
-      rendered_subject = 'Mock Proof Approved: Income'
-      rendered_body = "Text Body: Income approved for #{vars[:user_first_name]}."
-      [rendered_subject, rendered_body]
-    end
+    setup_email_template_mocks
+    setup_email_template_stubs
+    create_test_data
+    stub_url_helpers
+    stub_shared_partial_helpers
+    set_expected_subjects
+    set_application_and_reapply_dates
+    clear_emails
+  end
 
-    @mock_rejected_text = mock('EmailTemplate')
-    @mock_rejected_text.stubs(:render).with(any_parameters).returns do |**vars|
-      rendered_subject = 'Mock Proof Needs Revision: Income'
-      rendered_body = "Text Body: Income needs revision for #{vars[:user_first_name]}. Reason: #{vars[:rejection_reason]}"
-      [rendered_subject, rendered_body]
-    end
-    @mock_max_reached = mock('EmailTemplate')
-    @mock_max_reached.stubs(:render).with(any_parameters).returns do |**_vars|
-      rendered_subject = 'Mock Application Archived - ID 7'
-      rendered_body = '<p>HTML Body: Application 7 archived for John. Reapply after May 15, 2028.</p>'
-      [rendered_subject, rendered_body]
-    end
+  private
 
-    @mock_max_reached_text = mock('EmailTemplate')
-    @mock_max_reached_text.stubs(:render).with(any_parameters).returns do |**vars|
-      rendered_subject = 'Mock Application Archived - ID 7'
-      rendered_body = "Text Body: Application #{vars[:application_id]} archived for #{vars[:user_first_name]}. Reapply after #{vars[:reapply_date_formatted]}."
-      [rendered_subject, rendered_body]
-    end
-    @mock_reminder = mock('EmailTemplate')
-    @mock_reminder.stubs(:render).with(any_parameters).returns do |**vars|
-      rendered_subject = 'Mock Reminder: %<stale_reviews_count>s Apps Need Review' % vars
-      rendered_body = '<p>HTML Body: Reminder for %<admin_first_name>s. %<stale_reviews_count>s apps need review. %<stale_reviews_html_table>s</p>' % vars
-      [rendered_subject, rendered_body]
-    end
+  def setup_email_template_mocks
+    @mock_approved_text = mock_template('Mock Proof Approved: Income',
+                                        'Text Body: Income approved for %<user_first_name>s.')
+    @mock_rejected_text = mock_template('Mock Proof Needs Revision: Income',
+                                        'Text Body: Income needs revision for %<user_first_name>s. ' \
+                                        'Reason: %<rejection_reason>s')
+    @mock_max_reached = mock_template('Mock Application Archived - ID 7',
+                                      '<p>HTML Body: Application 7 archived for John. ' \
+                                      'Reapply after May 15, 2028.</p>')
+    @mock_max_reached_text = mock_template('Mock Application Archived - ID 7',
+                                           'Text Body: Application %<application_id>s archived for ' \
+                                           '%<user_first_name>s. Reapply after %<reapply_date_formatted>s.')
+    @mock_reminder = mock_template('Mock Reminder: %<stale_reviews_count>s Apps Need Review',
+                                   '<p>HTML Body: Reminder for %<admin_first_name>s. ' \
+                                   '%<stale_reviews_count>s apps need review. %<stale_reviews_html_table>s</p>')
+    @mock_reminder_text = mock_template('Mock Reminder: %<stale_reviews_count>s Apps Need Review',
+                                        'Text Body: Reminder for %<admin_first_name>s. ' \
+                                        '%<stale_reviews_count>s apps need review. %<stale_reviews_text_list>s')
+    @mock_account_created = mock_template('Mock Account Created for %<user_first_name>s',
+                                          '<p>HTML Body: Welcome %<user_first_name>s! Your password is ' \
+                                          '%<temp_password>s. Sign in: %<sign_in_url>s</p>')
+    @mock_account_created_text = mock_template('Mock Account Created for %<user_first_name>s',
+                                               'Text Body: Welcome %<user_first_name>s! Your password is ' \
+                                               '%<temp_password>s. Sign in: %<sign_in_url>s')
+    @mock_income_exceeded = mock_template('Mock Income Threshold Exceeded for %<constituent_first_name>s',
+                                          '<p>HTML Body: %<constituent_first_name>s, your income ' \
+                                          '%<annual_income_formatted>s exceeds the threshold ' \
+                                          '%<threshold_formatted>s for household size %<household_size>s.</p> ' \
+                                          '%<additional_notes>s')
+    @mock_income_exceeded_text = mock_template('Mock Income Threshold Exceeded for %<constituent_first_name>s',
+                                               'Text Body: %<constituent_first_name>s, your income ' \
+                                               '%<annual_income_formatted>s exceeds the threshold ' \
+                                               '%<threshold_formatted>s for household size %<household_size>s. ' \
+                                               '%<additional_notes>s')
+    @mock_registration = mock_template('Mock Welcome Jane!',
+                                       '<p>HTML Body: Welcome, Jane! Dashboard: http://example.com/dashboard. ' \
+                                       'New App: http://example.com/applications/new</p>')
+    @mock_registration_text = mock_template('Mock Welcome Jane!',
+                                            'Text Body: Welcome, Jane! Dashboard: http://example.com/dashboard. ' \
+                                            'New App: http://example.com/applications/new. ' \
+                                            'No authorized vendors found at this time.')
+  end
 
-    @mock_reminder_text = mock('EmailTemplate')
-    @mock_reminder_text.stubs(:render).with(any_parameters).returns do |**vars|
-      rendered_subject = 'Mock Reminder: %<stale_reviews_count>s Apps Need Review' % vars
-      rendered_body = "Text Body: Reminder for #{vars[:admin_first_name]}. #{vars[:stale_reviews_count]} apps need review. #{vars[:stale_reviews_text_list]}"
-      [rendered_subject, rendered_body]
-    end
-    @mock_account_created = mock('EmailTemplate')
-    @mock_account_created.stubs(:render).with(any_parameters).returns do |**vars|
-      rendered_subject = 'Mock Account Created for %<user_first_name>s' % vars
-      rendered_body = '<p>HTML Body: Welcome %<user_first_name>s! Your password is %<temp_password>s. Sign in: %<sign_in_url>s</p>' % vars
-      [rendered_subject, rendered_body]
-    end
-
-    @mock_account_created_text = mock('EmailTemplate')
-    @mock_account_created_text.stubs(:render).with(any_parameters).returns do |**vars|
-      rendered_subject = 'Mock Account Created for %<user_first_name>s' % vars
-      rendered_body = "Text Body: Welcome #{vars[:user_first_name]}! Your password is #{vars[:temp_password]}. Sign in: #{vars[:sign_in_url]}"
-      [rendered_subject, rendered_body]
-    end
-    @mock_income_exceeded = mock('EmailTemplate')
-    @mock_income_exceeded.stubs(:render).with(any_parameters).returns do |**vars|
-      rendered_subject = 'Mock Income Threshold Exceeded for %<constituent_first_name>s' % vars
-      rendered_body = '<p>HTML Body: %<constituent_first_name>s, your income %<annual_income_formatted>s exceeds the threshold %<threshold_formatted>s for household size %<household_size>s.</p> %<additional_notes>s' % vars
-      [rendered_subject, rendered_body]
-    end
-
-    @mock_income_exceeded_text = mock('EmailTemplate')
-    @mock_income_exceeded_text.stubs(:render).with(any_parameters).returns do |**vars|
-      rendered_subject = 'Mock Income Threshold Exceeded for %<constituent_first_name>s' % vars
-      rendered_body = "Text Body: #{vars[:constituent_first_name]}, your income #{vars[:annual_income_formatted]} exceeds the threshold #{vars[:threshold_formatted]} for household size #{vars[:household_size]}. #{vars[:additional_notes]}"
-      [rendered_subject, rendered_body]
-    end
-
-    # The registration mock is returning a hardcoded subject, regardless of parameters
-    @mock_registration = mock('EmailTemplate')
-    @mock_registration.stubs(:render).with(any_parameters).returns do |**_vars|
-      rendered_subject = 'Mock Welcome Jane!'
-      rendered_body = '<p>HTML Body: Welcome, Jane! Dashboard: http://example.com/dashboard. New App: http://example.com/applications/new</p>'
-      [rendered_subject, rendered_body]
-    end
-
-    # Create a custom mock specifically for the registration confirmation test
-    @mock_registration_text = mock('EmailTemplate')
-    @mock_registration_text.stubs(:render).with(any_parameters).returns do |**_vars|
-      rendered_subject = 'Mock Welcome Jane!' # This is the subject expected by the test
-      rendered_body = 'Text Body: Welcome, Jane! Dashboard: http://example.com/dashboard. New App: http://example.com/applications/new. No authorized vendors found at this time.'
-      [rendered_subject, rendered_body]
-    end
-
-    # We need to make sure our stub properly captures the args and returns the right mock
-    # for each specific call. This way we ensure the render method on the right mock is called
-    # Only set up text format templates since we're exclusively using those now
+  def setup_email_template_stubs
     EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_proof_approved', format: :text).returns(@mock_approved_text)
     EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_proof_rejected', format: :text).returns(@mock_rejected_text)
-    EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_max_rejections_reached',
-                                        format: :text).returns(@mock_max_reached_text)
-    EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_proof_needs_review_reminder',
-                                        format: :text).returns(@mock_reminder_text)
-    EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_account_created',
-                                        format: :text).returns(@mock_account_created_text)
-    EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_income_threshold_exceeded',
-                                        format: :text).returns(@mock_income_exceeded_text)
-    EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_registration_confirmation',
-                                        format: :text).returns(@mock_registration_text)
+    EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_max_rejections_reached', format: :text).returns(@mock_max_reached_text)
+    EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_proof_needs_review_reminder', format: :text).returns(@mock_reminder_text)
+    EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_account_created', format: :text).returns(@mock_account_created_text)
+    EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_income_threshold_exceeded', format: :text).returns(@mock_income_exceeded_text)
+    EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_registration_confirmation', format: :text).returns(@mock_registration_text)
+  end
 
+  def create_test_data
     @application = create(:application)
     @user = @application.user
-    @proof_review = create(:proof_review, :with_income_proof, application: @application, rejection_reason: 'Document unclear') # Add reason
+    @proof_review = create(:proof_review, :with_income_proof, application: @application, rejection_reason: 'Document unclear')
     @admin = create(:admin)
+  end
 
-    # Stub URL helpers that are used in the mailer templates
+  def stub_url_helpers
     ApplicationNotificationsMailer.any_instance.stubs(:sign_in_url).returns('http://example.com/sign_in')
-    ApplicationNotificationsMailer.any_instance.stubs(:login_url).returns('http://example.com/sign_in') # Alias or alternate reference
-    ApplicationNotificationsMailer.any_instance.stubs(:new_user_session_url).returns('http://example.com/users/sign_in') # Added missing stub
+    ApplicationNotificationsMailer.any_instance.stubs(:login_url).returns('http://example.com/sign_in')
+    ApplicationNotificationsMailer.any_instance.stubs(:new_user_session_url).returns('http://example.com/users/sign_in')
     ApplicationNotificationsMailer.any_instance.stubs(:constituent_portal_dashboard_url).returns('http://example.com/dashboard')
     ApplicationNotificationsMailer.any_instance.stubs(:new_constituent_portal_application_url).returns('http://example.com/applications/new')
-    # Correctly stub the admin_applications_path to accept optional arguments
     Rails.application.routes.named_routes.path_helpers_module.define_method(:admin_applications_path) do |*_args|
       '/admin/applications'
     end
     ApplicationNotificationsMailer.any_instance.stubs(:admin_application_url).with(anything, anything).returns('http://example.com/admin/applications/1')
+  end
 
-    # Stub shared partial helpers to return simple placeholders
-    # This prevents the "Missing partial" errors that occur when the mailer tries to render shared partials
+  def stub_shared_partial_helpers
     ApplicationNotificationsMailer.any_instance.stubs(:header_html).returns('<div>Mock Header HTML</div>')
     ApplicationNotificationsMailer.any_instance.stubs(:header_text).returns('Mock Header Text')
     ApplicationNotificationsMailer.any_instance.stubs(:footer_html).returns('<div>Mock Footer HTML</div>')
     ApplicationNotificationsMailer.any_instance.stubs(:footer_text).returns('Mock Footer Text')
     ApplicationNotificationsMailer.any_instance.stubs(:status_box_html).with(any_parameters).returns('<div>Mock Status Box HTML</div>')
     ApplicationNotificationsMailer.any_instance.stubs(:status_box_text).with(any_parameters).returns('Mock Status Box Text')
+  end
 
-    # Don't try to monkey patch Mail::Message, instead modify how we assert subjects in tests
-    # Create a hash to store our expected subjects for each method test
+  def set_expected_subjects
     @expected_subjects = {
       'proof_approved' => 'Mock Proof Approved: income',
       'proof_rejected' => 'Mock Proof Needs Revision: income',
@@ -158,21 +124,14 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
       'income_threshold_exceeded' => 'Mock Income Threshold Exceeded for John',
       'registration_confirmation' => 'Mock Welcome Jane!'
     }
-
-    # Set needs_review_since for the application
-    @application.update_column(:needs_review_since, 4.days.ago)
-
-    # Set a reapply date for testing max_rejections_reached
-    @reapply_date = 3.years.from_now.to_date
-
-    # Clear emails before each test for isolation
-    ActionMailer::Base.deliveries.clear
   end
 
-  teardown do
-    # Clean up after each test
-    ActionMailer::Base.deliveries.clear
-    # Clear emails before each test for isolation
+  def set_application_and_reapply_dates
+    @application.update_column(:needs_review_since, 4.days.ago)
+    @reapply_date = 3.years.from_now.to_date
+  end
+
+  def clear_emails
     ActionMailer::Base.deliveries.clear
   end
 
@@ -250,8 +209,11 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
 
     # Create new mocks for the test to ensure they're fresh
     mock_rejected_text = mock('EmailTemplate')
-    mock_rejected_text.stubs(:render).returns(["Mock Proof Needs Revision: #{format_proof_type(@proof_review.proof_type)}",
-                                               "Text Body: #{format_proof_type(@proof_review.proof_type)} needs revision for #{@user.first_name}. Reason: #{@proof_review.rejection_reason}"])
+    mock_rejected_text.stubs(:render).returns([
+                                                "Mock Proof Needs Revision: #{format_proof_type(@proof_review.proof_type)}",
+                                                "Text Body: #{format_proof_type(@proof_review.proof_type)} needs revision " \
+                                                "for #{@user.first_name}. Reason: #{@proof_review.rejection_reason}"
+                                              ])
 
     # Re-stub the EmailTemplate.find_by! to return our new mock
     EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_proof_rejected', format: :text).returns(mock_rejected_text)
@@ -313,8 +275,9 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
   test 'max_rejections_reached' do
     # Create new mocks for the test to ensure they're fresh
     mock_max_reached_text = mock('EmailTemplate')
-    mock_max_reached_text.stubs(:render).returns(['Mock Application Archived - ID 7',
-                                                  "Text Body: Application #{@application.id} archived for #{@user.first_name}. Reapply after #{@reapply_date.strftime('%B %d, %Y')}."])
+    text_body = "Text Body: Application #{@application.id} archived for #{@user.first_name}. " \
+                "Reapply after #{@reapply_date.strftime('%B %d, %Y')}."
+    mock_max_reached_text.stubs(:render).returns(['Mock Application Archived - ID 7', text_body])
 
     # Re-stub the EmailTemplate.find_by! to return our new mock
     EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_max_rejections_reached',
@@ -420,8 +383,8 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     constituent = Constituent.create!(
       first_name: 'John',
       last_name: 'Doe',
-      email: FactoryBot.generate(:email),
-      phone: FactoryBot.generate(:phone),
+      email: "unique-#{SecureRandom.hex(4)}@example.com",
+      phone: "555-555-#{SecureRandom.rand(1000..9999)}",
       password: 'password',
       password_confirmation: 'password',
       hearing_disability: true
@@ -468,8 +431,8 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     constituent = Constituent.create!(
       first_name: 'John',
       last_name: 'Doe',
-      email: FactoryBot.generate(:email),
-      phone: FactoryBot.generate(:phone),
+      email: "unique-#{SecureRandom.hex(4)}@example.com",
+      phone: "555-555-#{SecureRandom.rand(1000..9999)}",
       password: 'password',
       password_confirmation: 'password',
       hearing_disability: true,
@@ -519,16 +482,17 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     assert_equal expected_subject, email.subject
   end
 
-  test 'income_threshold_exceeded generates letter when preference is letter' do
-    constituent_params = {
+  # Helper method to set up common data for income threshold tests
+  def setup_income_threshold_test_data
+    @constituent_params = {
       first_name: 'John',
       last_name: 'Doe',
-      email: FactoryBot.generate(:email),
-      phone: FactoryBot.generate(:phone),
+      email: "unique-#{SecureRandom.hex(4)}@example.com",
+      phone: "555-555-#{SecureRandom.rand(1000..9999)}",
       communication_preference: 'letter' # Set preference to letter
     }
 
-    notification_params = {
+    @notification_params = {
       household_size: 2,
       annual_income: 100_000,
       communication_preference: 'email', # This preference is for the email, not the letter recipient
@@ -538,11 +502,20 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     # Set up FPL policies for testing (needed by the mailer method)
     Policy.find_or_create_by(key: 'fpl_2_person').update(value: 20_000)
     Policy.find_or_create_by(key: 'fpl_modifier_percentage').update(value: 400)
+  end
+
+  test 'income_threshold_exceeded generates letter when preference is letter' do
+    setup_income_threshold_test_data
 
     # Create new mocks for the test
     mock_income_exceeded_text = mock('EmailTemplate')
-    mock_income_exceeded_text.stubs(:render).returns(["Mock Income Threshold Exceeded for #{constituent_params[:first_name]}",
-                                                      "Text Body: #{constituent_params[:first_name]}, your income exceeds the threshold for household size #{notification_params[:household_size]}."])
+    mock_income_exceeded_text.stubs(:render).returns([
+                                                       'Mock Income Threshold Exceeded for ' \
+                                                       "#{@constituent_params[:first_name]}",
+                                                       "Text Body: #{@constituent_params[:first_name]}, your income exceeds the " \
+                                                       'threshold for household size ' \
+                                                       "#{@notification_params[:household_size]}."
+                                                     ])
 
     # Re-stub the EmailTemplate.find_by! to return our new mock
     EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_income_threshold_exceeded',
@@ -556,56 +529,42 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     # Call the mailer method and deliver directly
     email = nil
     assert_emails 1 do
-      email = ApplicationNotificationsMailer.income_threshold_exceeded(constituent_params, notification_params)
+      email = ApplicationNotificationsMailer.income_threshold_exceeded(@constituent_params, @notification_params)
       email.deliver_now # Use deliver_now instead of deliver_later for direct testing
     end
 
     # Calculate the expected threshold based on policies for assertion verification
-    base_fpl_calc = Policy.get("fpl_#{[notification_params[:household_size], 8].min}_person").to_i
+    base_fpl_calc = Policy.get("fpl_#{[@notification_params[:household_size], 8].min}_person").to_i
     modifier = Policy.get('fpl_modifier_percentage').to_i
     expected_threshold = base_fpl_calc * (modifier / 100.0)
 
     # Verify that queue_for_printing was called by checking if Letters::TextTemplateToPdfService was instantiated
     assert_not_nil Letters::TextTemplateToPdfService.new(
       template_name: 'application_notifications_income_threshold_exceeded',
-      recipient: constituent_params,
+      recipient: @constituent_params,
       variables: {
-        household_size: notification_params[:household_size],
-        annual_income: notification_params[:annual_income],
+        household_size: @notification_params[:household_size],
+        annual_income: @notification_params[:annual_income],
         threshold: expected_threshold,
-        first_name: constituent_params[:first_name],
-        last_name: constituent_params[:last_name]
+        first_name: @constituent_params[:first_name],
+        last_name: @constituent_params[:last_name]
       }
     )
 
     # Basic email assertions can still be included if desired
-    expected_subject = "Mock Income Threshold Exceeded for #{constituent_params[:first_name]}"
+    expected_subject = "Mock Income Threshold Exceeded for #{@constituent_params[:first_name]}"
     assert_equal expected_subject, email.subject
   end
 
   test 'income_threshold_exceeded' do
-    constituent_params = {
-      first_name: 'John',
-      last_name: 'Doe',
-      email: FactoryBot.generate(:email),
-      phone: FactoryBot.generate(:phone)
-    }
-
-    notification_params = {
-      household_size: 2,
-      annual_income: 100_000,
-      communication_preference: 'email',
-      additional_notes: 'Income exceeds threshold'
-    }
-
-    # Set up FPL policies for testing
-    Policy.find_or_create_by(key: 'fpl_2_person').update(value: 20_000)
-    Policy.find_or_create_by(key: 'fpl_modifier_percentage').update(value: 400)
+    setup_income_threshold_test_data
 
     # Create new mocks for the test to ensure they're fresh
     mock_income_exceeded_text = mock('EmailTemplate')
-    mock_income_exceeded_text.stubs(:render).returns(["Mock Income Threshold Exceeded for #{constituent_params[:first_name]}",
-                                                      "Text Body: #{constituent_params[:first_name]}, your income exceeds the threshold for household size #{notification_params[:household_size]}. #{notification_params[:additional_notes]}"])
+    mock_income_exceeded_text.stubs(:render).returns(["Mock Income Threshold Exceeded for #{@constituent_params[:first_name]}",
+                                                      "Text Body: #{@constituent_params[:first_name]}, your income exceeds the " \
+                                                      "threshold for household size #{@notification_params[:household_size]}. " \
+                                                      "#{@notification_params[:additional_notes]}"])
 
     # Re-stub the EmailTemplate.find_by! to return our new mock
     EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_income_threshold_exceeded',
@@ -617,25 +576,25 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     # Deliver the email directly with deliver_now instead of deliver_later
     email = nil
     assert_emails 1 do
-      email = ApplicationNotificationsMailer.income_threshold_exceeded(constituent_params, notification_params)
+      email = ApplicationNotificationsMailer.income_threshold_exceeded(@constituent_params, @notification_params)
       email.deliver_now
     end
 
     # Assert email properties
     assert_equal ['no_reply@mdmat.org'], email.from
-    assert_equal [constituent_params[:email]], email.to
+    assert_equal [@constituent_params[:email]], email.to
 
     # We're working with the mock data from setup
-    expected_subject = "Mock Income Threshold Exceeded for #{constituent_params[:first_name]}"
+    expected_subject = "Mock Income Threshold Exceeded for #{@constituent_params[:first_name]}"
     assert_equal expected_subject, email.subject
 
     # We're using a text-only template, don't expect multipart emails anymore
     assert_not email.multipart?
 
     # Check the content of the email
-    assert_includes email.body.to_s, "#{constituent_params[:first_name]}, your income"
-    assert_includes email.body.to_s, "household size #{notification_params[:household_size]}"
-    assert_includes email.body.to_s, notification_params[:additional_notes] # Check optional note
+    assert_includes email.body.to_s, "#{@constituent_params[:first_name]}, your income"
+    assert_includes email.body.to_s, "household size #{@notification_params[:household_size]}"
+    assert_includes email.body.to_s, @notification_params[:additional_notes] # Check optional note
   end
 
   test 'proof_submission_error generates letter when preference is letter' do
@@ -691,8 +650,8 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     user = Constituent.create!(
       first_name: 'Jane',
       last_name: 'Smith',
-      email: FactoryBot.generate(:email),
-      phone: FactoryBot.generate(:phone),
+      email: "unique-#{SecureRandom.hex(4)}@example.com",
+      phone: "555-555-#{SecureRandom.rand(1000..9999)}",
       password: 'password',
       password_confirmation: 'password',
       hearing_disability: true
@@ -706,7 +665,8 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     # Override the email template mock specifically for this test
     custom_mock = mock('EmailTemplate')
     custom_mock.stubs(:render).returns(['Mock Welcome Jane!',
-                                        'Text Body: Welcome, Jane! Dashboard: http://example.com/dashboard. New App: http://example.com/applications/new. No authorized vendors found at this time.'])
+                                        'Text Body: Welcome, Jane! Dashboard: http://example.com/dashboard. ' \
+                                        'New App: http://example.com/applications/new. No authorized vendors found at this time.'])
     EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_registration_confirmation', format: :text).returns(custom_mock)
 
     # Generate the email
@@ -738,8 +698,8 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     user = Constituent.create!(
       first_name: 'Jane',
       last_name: 'Smith',
-      email: FactoryBot.generate(:email),
-      phone: FactoryBot.generate(:phone),
+      email: "unique-#{SecureRandom.hex(4)}@example.com",
+      phone: "555-555-#{SecureRandom.rand(1000..9999)}",
       password: 'password',
       password_confirmation: 'password',
       hearing_disability: true,
@@ -758,7 +718,8 @@ class ApplicationNotificationsMailerTest < ActionMailer::TestCase
     # Create custom mocks for this test to ensure they're fresh
     custom_mock = mock('EmailTemplate')
     custom_mock.stubs(:render).returns(['Mock Welcome Jane!',
-                                        'Text Body: Welcome, Jane! Dashboard: http://example.com/dashboard. New App: http://example.com/applications/new. No authorized vendors found at this time.'])
+                                        'Text Body: Welcome, Jane! Dashboard: http://example.com/dashboard. New App: http://example.com/applications/new. ' \
+                                        'No authorized vendors found at this time.'])
 
     # Re-stub the EmailTemplate.find_by! to return our new mock
     EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_registration_confirmation',

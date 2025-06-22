@@ -12,7 +12,9 @@ class ProofReview < ApplicationRecord
   enum :submission_method, { web: 0, email: 1, scanned: 2, paper: 3 }, prefix: true
 
   # Validations
-  validates :proof_type, :status, :reviewed_at, presence: true
+  validates :proof_type, presence: true
+  validates :status, presence: true
+  validates :reviewed_at, presence: true
   validates :rejection_reason, presence: true, if: :status_rejected?
   validate :admin_must_be_admin_type
   validate :application_must_be_active

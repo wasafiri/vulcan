@@ -67,40 +67,70 @@ module Admin
     end
 
     def apply_filters(scope)
-      scope = case params[:filter]
-              when 'active'
-                scope.where(status: :active)
-              when 'expiring_soon'
-                scope.expiring_soon
-              when 'redeemed'
-                scope.where(status: :redeemed)
-              when 'unassigned'
-                scope.where(status: :active, vendor_id: nil)
-              else
-                params[:filter].present? ? scope : scope.where(status: :active)
-              end
+      scope = apply_status_filter(scope)
+      scope = apply_additional_filters(scope)
+      scope = apply_date_range_filter(scope)
+      scope
+    end
 
+    def apply_status_filter(scope)
+      case params[:filter]
+      when 'active'
+        scope.where(status: :active)
+      when 'expiring_soon'
+        scope.expiring_soon
+      when 'redeemed'
+        scope.where(status: :redeemed)
+      when 'unassigned'
+        scope.where(status: :active, vendor_id: nil)
+      else
+        params[:filter].present? ? scope : scope.where(status: :active)
+      end
+    end
+
+    def apply_additional_filters(scope)
       scope = scope.where(status: params[:status]) if params[:status].present?
       scope = scope.where(vendor_id: params[:vendor_id]) if params[:vendor_id].present?
-
-      if params[:date_range].present?
-        case params[:date_range]
-        when 'today'
-          scope = scope.where(created_at: Time.current.beginning_of_day..Time.current.end_of_day)
-        when 'week'
-          scope = scope.where(created_at: 1.week.ago.beginning_of_day..Time.current.end_of_day)
-        when 'month'
-          scope = scope.where(created_at: 1.month.ago.beginning_of_day..Time.current.end_of_day)
-        when 'custom'
-          if params[:start_date].present? && params[:end_date].present?
-            start_date = Date.parse(params[:start_date])
-            end_date   = Date.parse(params[:end_date])
-            scope = scope.where(created_at: start_date.beginning_of_day..end_date.end_of_day)
-          end
-        end
-      end
-
       scope
+    end
+
+    def apply_date_range_filter(scope)
+      return scope unless params[:date_range].present?
+
+      case params[:date_range]
+      when 'today'
+        apply_today_filter(scope)
+      when 'week'
+        apply_week_filter(scope)
+      when 'month'
+        apply_month_filter(scope)
+      when 'custom'
+        apply_custom_date_filter(scope)
+      else
+        scope
+      end
+    end
+
+    def apply_today_filter(scope)
+      scope.where(created_at: Time.current.beginning_of_day..Time.current.end_of_day)
+    end
+
+    def apply_week_filter(scope)
+      scope.where(created_at: 1.week.ago.beginning_of_day..Time.current.end_of_day)
+    end
+
+    def apply_month_filter(scope)
+      scope.where(created_at: 1.month.ago.beginning_of_day..Time.current.end_of_day)
+    end
+
+    def apply_custom_date_filter(scope)
+      return scope unless params[:start_date].present? && params[:end_date].present?
+
+      start_date = Date.parse(params[:start_date])
+      end_date = Date.parse(params[:end_date])
+      scope.where(created_at: start_date.beginning_of_day..end_date.end_of_day)
+    rescue Date::Error
+      scope # Return unmodified scope if date parsing fails
     end
 
     def send_vouchers_csv(vouchers)

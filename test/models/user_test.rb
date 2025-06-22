@@ -108,24 +108,24 @@ class UserTest < ActiveSupport::TestCase
     assert_empty(@guardian_user.guardians)
   end
 
-  test 'is_guardian? returns true if user has dependents' do
+  test 'guardian? returns true if user has dependents' do
     GuardianRelationship.create!(guardian_user: @guardian_user, dependent_user: @dependent_user1, relationship_type: 'Parent')
-    assert(@guardian_user.is_guardian?)
+    assert(@guardian_user.guardian?)
   end
 
-  test 'is_guardian? returns false if user has no dependents' do
-    assert_not(@dependent_user1.is_guardian?) # A dependent is not a guardian in this context
-    assert_not(create(:constituent).is_guardian?) # A new user is not a guardian
+  test 'guardian? returns false if user has no dependents' do
+    assert_not(@dependent_user1.guardian?) # A dependent is not a guardian in this context
+    assert_not(create(:constituent).guardian?) # A new user is not a guardian
   end
 
-  test 'is_dependent? returns true if user has guardians' do
+  test 'dependent? returns true if user has guardians' do
     GuardianRelationship.create!(guardian_user: @guardian_user, dependent_user: @dependent_user1, relationship_type: 'Parent')
-    assert(@dependent_user1.is_dependent?)
+    assert(@dependent_user1.dependent?)
   end
 
-  test 'is_dependent? returns false if user has no guardians' do
-    assert_not(@guardian_user.is_dependent?) # A guardian is not a dependent in this context
-    assert_not(create(:constituent).is_dependent?) # A new user is not a dependent
+  test 'dependent? returns false if user has no guardians' do
+    assert_not(@guardian_user.dependent?) # A guardian is not a dependent in this context
+    assert_not(create(:constituent).dependent?) # A new user is not a dependent
   end
 
   test 'destroying a guardian user destroys their guardian_relationships_as_guardian' do
@@ -147,11 +147,11 @@ class UserTest < ActiveSupport::TestCase
   test 'logs profile update when user updates their own profile' do
     # Clear Current.user to simulate self-update
     Current.user = nil
-    
+
     # Store the original values before update
     original_first_name = @existing_constituent.first_name
     original_email = @existing_constituent.email
-    
+
     assert_difference('Event.count', 1) do
       @existing_constituent.update!(first_name: 'Updated Name', email: 'updated@example.com')
     end
@@ -161,7 +161,7 @@ class UserTest < ActiveSupport::TestCase
     assert_equal @existing_constituent.id, event.user_id
     assert_equal @existing_constituent.id, event.metadata['user_id']
     assert_equal @existing_constituent.id, event.metadata['updated_by']
-    
+
     # Check that changes are recorded
     changes = event.metadata['changes']
     assert_equal 'Updated Name', changes['first_name']['new']
@@ -174,17 +174,17 @@ class UserTest < ActiveSupport::TestCase
     # Set Current.user to guardian to simulate guardian update
     Current.user = @guardian_user
     unique_phone = "555-#{rand(100..999)}-#{rand(1000..9999)}"
-    
+
     assert_difference('Event.count', 1) do
       @dependent_user1.update!(first_name: 'Updated Dependent', phone: unique_phone)
     end
 
     event = Event.last
     assert_equal 'profile_updated_by_guardian', event.action
-    assert_equal @guardian_user.id, event.user_id  # Actor is the guardian
-    assert_equal @dependent_user1.id, event.metadata['user_id']  # Target is the dependent
+    assert_equal @guardian_user.id, event.user_id # Actor is the guardian
+    assert_equal @dependent_user1.id, event.metadata['user_id'] # Target is the dependent
     assert_equal @guardian_user.id, event.metadata['updated_by']
-    
+
     # Check that changes are recorded
     changes = event.metadata['changes']
     assert_equal 'Updated Dependent', changes['first_name']['new']
@@ -210,11 +210,11 @@ class UserTest < ActiveSupport::TestCase
 
   test 'logs multiple field changes in single event' do
     Current.user = nil
-    
+
     # Generate unique values to avoid conflicts
     unique_phone = "555-#{rand(100..999)}-#{rand(1000..9999)}"
     unique_email = "newemail.#{SecureRandom.hex(4)}@example.com"
-    
+
     assert_difference('Event.count', 1) do
       @existing_constituent.update!(
         first_name: 'New First',
@@ -230,7 +230,7 @@ class UserTest < ActiveSupport::TestCase
 
     event = Event.last
     changes = event.metadata['changes']
-    
+
     # Verify all changed fields are recorded
     assert_equal 'New First', changes['first_name']['new']
     assert_equal 'New Last', changes['last_name']['new']
@@ -245,23 +245,23 @@ class UserTest < ActiveSupport::TestCase
   test 'saved_changes_to_profile_fields? returns true when profile fields change' do
     @existing_constituent.first_name = 'Changed Name'
     @existing_constituent.save!
-    
+
     assert @existing_constituent.send(:saved_changes_to_profile_fields?)
   end
 
   test 'saved_changes_to_profile_fields? returns false when no profile fields change' do
     @existing_constituent.status = :suspended
     @existing_constituent.save!
-    
+
     assert_not @existing_constituent.send(:saved_changes_to_profile_fields?)
   end
 
   test 'profile change event includes timestamp' do
     Current.user = nil
-    
+
     freeze_time do
       @existing_constituent.update!(first_name: 'Timestamped Update')
-      
+
       event = Event.last
       assert_equal Time.current.iso8601, event.metadata['timestamp']
     end
@@ -270,8 +270,8 @@ class UserTest < ActiveSupport::TestCase
   test 'handles nil values in profile changes' do
     # Set a field to nil - use a unique phone number to avoid conflicts
     unique_phone = "555-#{rand(100..999)}-#{rand(1000..9999)}"
-    @existing_constituent.update!(phone: unique_phone)  # Set initial value
-    
+    @existing_constituent.update!(phone: unique_phone) # Set initial value
+
     Current.user = nil
     assert_difference('Event.count', 1) do
       @existing_constituent.update!(phone: nil)
@@ -286,7 +286,7 @@ class UserTest < ActiveSupport::TestCase
   test 'handles blank to value changes' do
     # Start with blank value
     user = create(:constituent, physical_address_1: nil)
-    
+
     Current.user = nil
     assert_difference('Event.count', 1) do
       user.update!(physical_address_1: '123 Main St')

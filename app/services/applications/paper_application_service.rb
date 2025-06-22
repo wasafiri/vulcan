@@ -4,6 +4,7 @@ module Applications
   # This service handles paper application submissions by administrators
   # It follows the same patterns as ConstituentPortal for file uploads
   class PaperApplicationService < BaseService
+    include Rails.application.routes.url_helpers
     attr_reader :params, :admin, :application, :constituent, :errors, :guardian_user_for_app
 
     def initialize(params:, admin:)
@@ -18,6 +19,7 @@ module Applications
     end
 
     def create
+      Current.paper_context = true
       ActiveRecord::Base.transaction do
         return failure('Constituent processing failed') unless process_constituent
         return failure('Application creation failed') unless create_application
@@ -30,6 +32,8 @@ module Applications
       log_error(e, 'Failed to create paper application')
       @errors << e.message
       false
+    ensure
+      Current.paper_context = nil
     end
 
     def update(application)
@@ -121,62 +125,77 @@ module Applications
 
     def process_accept_proof(type)
       Rails.logger.debug { "Accepting #{type} proof" }
-
-      # Determine if a file is being uploaded
-      file_present = params["#{type}_proof"].present? || params["#{type}_proof_signed_id"].present?
+      file_present = proof_file_present?(type)
 
       if Current.paper_context? && !file_present
-        # Scenario: Paper application where admin is marking proof as accepted without a digital upload
-        Rails.logger.debug { "Paper context: Marking #{type} proof as approved without file attachment." }
-        @application.update!(
-          "#{type}_proof_status" => Application.public_send("#{type}_proof_statuses")['approved']
-        )
-        
-        # Create audit event for the proof submission in paper context
-        AuditEventService.log(
-          action: 'proof_submitted',
-          actor: @admin,
-          auditable: @application,
-          metadata: {
-            proof_type: type.to_s,
-            submission_method: 'paper',
-            status: 'approved',
-            has_attachment: false
-          }
-        )
-        
-        true
+        approve_proof_without_file(type)
       elsif file_present
-        # Scenario: Digital upload or paper application with a digital upload
-        blob_or_file = params["#{type}_proof"].presence || params["#{type}_proof_signed_id"].presence
-
-        result = ProofAttachmentService.attach_proof({
-                                                       application: @application,
-                                                       proof_type: type,
-                                                       blob_or_file: blob_or_file,
-                                                       status: :approved,
-                                                       admin: @admin,
-                                                       submission_method: :paper,
-                                                       metadata: {}
-        })
-
-        unless result[:success]
-          add_error("Error processing #{type} proof: #{result[:error]&.message}")
-          return false
-        end
-
-        # Persist approved status for paper applications, including when attach_proof is stubbed
-        @application.update!(
-          "#{type}_proof_status" => Application.public_send("#{type}_proof_statuses")['approved']
-        )
-        Rails.logger.debug { "Successfully attached #{type} proof for application #{@application.id}" }
-        true
+        attach_and_approve_proof(type)
       else
-        # Fallback for non-paper context or if no file is provided when expected
-        Rails.logger.debug { "No file or signed_id provided for #{type} and not in paper context." }
-        add_error("Please upload a file for #{type} proof")
-        false
+        handle_missing_proof_file(type)
       end
+    end
+
+    def proof_file_present?(type)
+      params["#{type}_proof"].present? || params["#{type}_proof_signed_id"].present?
+    end
+
+    def approve_proof_without_file(type)
+      Rails.logger.debug { "Paper context: Marking #{type} proof as approved without file attachment." }
+
+      update_proof_status(type, 'approved')
+      log_paper_proof_submission(type)
+
+      true
+    end
+
+    def attach_and_approve_proof(type)
+      blob_or_file = params["#{type}_proof"].presence || params["#{type}_proof_signed_id"].presence
+
+      result = ProofAttachmentService.attach_proof(
+        application: @application,
+        proof_type: type,
+        blob_or_file: blob_or_file,
+        status: :approved,
+        admin: @admin,
+        submission_method: :paper,
+        metadata: {}
+      )
+
+      unless result[:success]
+        add_error("Error processing #{type} proof: #{result[:error]&.message}")
+        return false
+      end
+
+      update_proof_status(type, 'approved')
+      Rails.logger.debug { "Successfully attached #{type} proof for application #{@application.id}" }
+      true
+    end
+
+    def handle_missing_proof_file(type)
+      Rails.logger.debug { "No file or signed_id provided for #{type} and not in paper context." }
+      add_error("Please upload a file for #{type} proof")
+      false
+    end
+
+    def update_proof_status(type, status)
+      @application.update!(
+        "#{type}_proof_status" => Application.public_send("#{type}_proof_statuses")[status]
+      )
+    end
+
+    def log_paper_proof_submission(type)
+      AuditEventService.log(
+        action: 'proof_submitted',
+        actor: @admin,
+        auditable: @application,
+        metadata: {
+          proof_type: type.to_s,
+          submission_method: 'paper',
+          status: 'approved',
+          has_attachment: false
+        }
+      )
     end
 
     def process_reject_proof(type)
@@ -208,146 +227,172 @@ module Applications
 
     def process_constituent
       guardian_id = params[:guardian_id]
-      # new_guardian_attributes are passed by the controller if a new guardian is to be created
       new_guardian_attrs = params[:new_guardian_attributes]
-      # The controller now maps dependent_attributes into params[:constituent] for guardian scenarios
-      # and self-applicant attributes also into params[:constituent] for self-applications.
       applicant_data_for_constituent = params[:constituent]
       relationship_type = params[:relationship_type]
-      
 
-
-      # Determine if this is a guardian scenario
-      # It's a guardian scenario if a guardian_id is provided OR new_guardian_attributes are provided,
-      # AND applicant_data_for_constituent (which holds dependent data in this case) is present.
-      is_guardian_scenario = (guardian_id.present? || attributes_present?(new_guardian_attrs)) &&
-                             attributes_present?(applicant_data_for_constituent) &&
-                             params[:applicant_type] == 'dependent' # Explicitly check applicant_type
-
-      if is_guardian_scenario
-        # Scenario: Guardian applying for a dependent
-        if guardian_id.present?
-          @guardian_user_for_app = User.find_by(id: guardian_id)
-          return add_error("Selected guardian with ID #{guardian_id} not found.") unless @guardian_user_for_app
-        elsif attributes_present?(new_guardian_attrs)
-          @guardian_user_for_app = find_or_create_user(new_guardian_attrs, is_managing_adult: true)
-          return false unless @guardian_user_for_app&.persisted?
-        else
-          # This path should ideally not be reached if controller logic is correct
-          return add_error('Guardian information missing or incomplete for dependent application.')
-        end
-
-        # Make a deep copy of the hash to avoid modifying the original object
-        applicant_data_for_constituent = applicant_data_for_constituent.deep_dup
-
-        # Check if we should use guardian's email for dependent
-        # Support both parameter names for backward compatibility:
-        # - use_guardian_email: New explicit parameter name
-        # - use_guardian_address: Legacy parameter name that also implies using guardian's email
-
-        # Debug the parameters to understand how they're coming through
-        Rails.logger.debug do
-          "[PAPER_APP] Guardian email check, params: use_guardian_email=#{params[:use_guardian_email].inspect}, use_guardian_address=#{params[:use_guardian_address].inspect}, use_guardian_phone=#{params[:use_guardian_phone].inspect}"
-        end
-        Rails.logger.debug { "[PAPER_APP] Dependent email value in form: #{applicant_data_for_constituent[:email].inspect}" }
-        Rails.logger.debug { "[PAPER_APP] Dependent phone value in form: #{applicant_data_for_constituent[:phone].inspect}" }
-
-        # Handle contact strategy for dependent using new radio button approach
-        determine_dependent_contact_strategy(applicant_data_for_constituent)
-
-        # Process dependent (the actual applicant) using applicant_data_for_constituent
-        @constituent = find_or_create_user(applicant_data_for_constituent, is_managing_adult: false)
-        return false unless @constituent&.persisted?
-
-        # Create GuardianRelationship
-        return add_error('Relationship type is required when applying for a dependent.') if relationship_type.blank?
-
-        begin
-          GuardianRelationship.create!(
-            guardian_user: @guardian_user_for_app,
-            dependent_user: @constituent,
-            relationship_type: relationship_type
-          )
-        rescue ActiveRecord::RecordInvalid => e
-          return add_error("Failed to create guardian relationship: #{e.message}")
-        end
-
-        # Check for active application on the dependent
-        if @constituent.applications.where.not(status: :archived).exists?
-          add_error('This dependent already has an active or pending application.')
-          return false
-        end
-
-      elsif attributes_present?(applicant_data_for_constituent) && params[:applicant_type] != 'dependent'
-        # Scenario: Adult applying for themselves (applicant_type is 'guardian' or nil/other)
-        @constituent = find_or_create_user(applicant_data_for_constituent, is_managing_adult: false)
-        return false unless @constituent&.persisted?
-
-        # Check for active application
-        if @constituent.applications.where.not(status: :archived).exists?
-          add_error('This constituent already has an active or pending application.')
-          return false
-        end
-        @guardian_user_for_app = nil # Explicitly nil for self-applicants
+      if guardian_scenario?(guardian_id, new_guardian_attrs, applicant_data_for_constituent)
+        process_guardian_scenario(guardian_id, new_guardian_attrs, applicant_data_for_constituent, relationship_type)
+      elsif self_applicant_scenario?(applicant_data_for_constituent)
+        process_self_applicant_scenario(applicant_data_for_constituent)
       else
-        # Neither a valid guardian scenario nor a valid self-applicant scenario.
-        return add_error('Sufficient constituent or guardian/dependent parameters missing or incomplete.')
+        add_error('Sufficient constituent or guardian/dependent parameters missing or incomplete.')
+        false
       end
-      true # If all checks pass
+    end
+
+    def guardian_scenario?(guardian_id, new_guardian_attrs, applicant_data_for_constituent)
+      (guardian_id.present? || attributes_present?(new_guardian_attrs)) &&
+        attributes_present?(applicant_data_for_constituent) &&
+        params[:applicant_type] == 'dependent'
+    end
+
+    def self_applicant_scenario?(applicant_data_for_constituent)
+      attributes_present?(applicant_data_for_constituent) && params[:applicant_type] != 'dependent'
+    end
+
+    def process_guardian_scenario(guardian_id, new_guardian_attrs, applicant_data_for_constituent, relationship_type)
+      return false unless setup_guardian_user(guardian_id, new_guardian_attrs)
+
+      applicant_data_for_constituent = applicant_data_for_constituent.deep_dup
+      log_guardian_scenario_debug(applicant_data_for_constituent)
+      determine_dependent_contact_strategy(applicant_data_for_constituent)
+
+      return false unless create_dependent_user(applicant_data_for_constituent)
+      return false unless create_guardian_relationship(relationship_type)
+      return false unless validate_no_active_application('dependent')
+
+      true
+    end
+
+    def process_self_applicant_scenario(applicant_data_for_constituent)
+      @constituent = find_or_create_user(applicant_data_for_constituent, is_managing_adult: false)
+      return false unless @constituent&.persisted?
+
+      @guardian_user_for_app = nil
+      validate_no_active_application('constituent')
+    end
+
+    def setup_guardian_user(guardian_id, new_guardian_attrs)
+      if guardian_id.present?
+        @guardian_user_for_app = User.find_by(id: guardian_id)
+        return add_error("Selected guardian with ID #{guardian_id} not found.") unless @guardian_user_for_app
+      elsif attributes_present?(new_guardian_attrs)
+        @guardian_user_for_app = find_or_create_user(new_guardian_attrs, is_managing_adult: true)
+        return false unless @guardian_user_for_app&.persisted?
+      else
+        return add_error('Guardian information missing or incomplete for dependent application.')
+      end
+      true
+    end
+
+    def log_guardian_scenario_debug(applicant_data_for_constituent)
+      Rails.logger.debug do
+        '[PAPER_APP] Guardian email check, params: ' \
+          "use_guardian_email=#{params[:use_guardian_email].inspect}, " \
+          "use_guardian_address=#{params[:use_guardian_address].inspect}, " \
+          "use_guardian_phone=#{params[:use_guardian_phone].inspect}"
+      end
+      Rails.logger.debug { "[PAPER_APP] Dependent email: #{applicant_data_for_constituent[:email].inspect}" }
+      Rails.logger.debug { "[PAPER_APP] Dependent phone: #{applicant_data_for_constituent[:phone].inspect}" }
+    end
+
+    def create_dependent_user(applicant_data_for_constituent)
+      @constituent = find_or_create_user(applicant_data_for_constituent, is_managing_adult: false)
+      @constituent&.persisted?
+    end
+
+    def create_guardian_relationship(relationship_type)
+      return add_error('Relationship type is required when applying for a dependent.') if relationship_type.blank?
+
+      GuardianRelationship.create!(
+        guardian_user: @guardian_user_for_app,
+        dependent_user: @constituent,
+        relationship_type: relationship_type
+      )
+      true
+    rescue ActiveRecord::RecordInvalid => e
+      add_error("Failed to create guardian relationship: #{e.message}")
+      false
+    end
+
+    def validate_no_active_application(user_type)
+      return true unless @constituent.applications.where.not(status: :archived).exists?
+
+      error_message = case user_type
+                      when 'dependent'
+                        'This dependent already has an active or pending application.'
+                      else
+                        'This constituent already has an active or pending application.'
+                      end
+      add_error(error_message)
+      false
     end
 
     def find_or_create_user(attrs, is_managing_adult:)
-      user = nil
-      # Enhanced logging for debugging
-      Rails.logger.info { "[PAPER_APP] Finding or creating user with attributes: #{attrs.slice(:email, :first_name, :last_name).inspect}" }
+      Rails.logger.info { "[PAPER_APP] Finding or creating user: #{attrs.slice(:email, :first_name, :last_name).inspect}" }
 
-      # If this is a dependent, check if it's using guardian's contact info
+      existing_user_lookup(attrs, is_managing_adult) || create_new_user(attrs, is_managing_adult: is_managing_adult)
+    end
+
+    def existing_user_lookup(attrs, is_managing_adult)
       is_dependent = !is_managing_adult && @guardian_user_for_app
 
-      # For dependents, we now use system-generated emails/phones so no uniqueness conflicts
-      # Try to find existing user first (but skip for dependents with system emails)
-      if attrs[:email].present? && !attrs[:email].include?('@system.matvulcan.local')
-        # Not a dependent using guardian's contact info, so try to find an existing user
-        Rails.logger.info { "[PAPER_APP] Looking up user by email: #{attrs[:email]}" }
-        user = User.find_by_email(attrs[:email])
-        if user
-          # Never return the guardian as a dependent
-          if is_dependent && user.id == @guardian_user_for_app&.id
-            Rails.logger.warn { '[PAPER_APP] Found user that matches guardian ID. Will create new user instead.' }
-          else
-            Rails.logger.info { "[PAPER_APP] Found existing user with email: #{user.email}, id: #{user.id}" }
-            return user # Return existing user that isn't the guardian
-          end
-        end
-      elsif attrs[:phone].present?
-        # Ensure phone is formatted for lookup if needed
-        formatted_phone = User.new(phone: attrs[:phone]).phone # Use formatted phone for lookup
-        Rails.logger.info { "[PAPER_APP] Looking up user by phone: #{formatted_phone}" }
-        user = User.find_by_phone(formatted_phone)
-        if user
-          # Never return the guardian as a dependent
-          if is_dependent && user.id == @guardian_user_for_app&.id
-            Rails.logger.warn { '[PAPER_APP] Found user with same phone as guardian. Will create new user instead.' }
-          else
-            Rails.logger.info { "[PAPER_APP] Found existing user with phone: #{user.phone}, id: #{user.id}" }
-            return user # Return existing user that isn't the guardian
-          end
-        end
+      user = find_user_by_email(attrs, is_dependent) || find_user_by_phone(attrs, is_dependent)
+
+      return user if user_valid_for_context?(user, is_dependent)
+
+      validate_dependent_email_requirement(attrs, is_managing_adult) unless is_managing_adult
+      nil
+    end
+
+    def find_user_by_email(attrs, _is_dependent)
+      return nil unless attrs[:email].present? && attrs[:email].exclude?('@system.matvulcan.local')
+
+      Rails.logger.info { "[PAPER_APP] Looking up user by email: #{attrs[:email]}" }
+      User.find_by_email(attrs[:email])
+    end
+
+    def find_user_by_phone(attrs, _is_dependent)
+      return nil if attrs[:phone].blank?
+
+      formatted_phone = User.new(phone: attrs[:phone]).phone
+      Rails.logger.info { "[PAPER_APP] Looking up user by phone: #{formatted_phone}" }
+      User.find_by_phone(formatted_phone)
+    end
+
+    def user_valid_for_context?(user, is_dependent)
+      return false unless user
+
+      if is_dependent && user.id == @guardian_user_for_app&.id
+        Rails.logger.warn { '[PAPER_APP] Found user that matches guardian ID. Will create new user instead.' }
+        return false
       end
 
-      # If we're creating a dependent and there's no email, this is a critical error
-      # that would fail validation - add better debugging and error messages
-      if !is_managing_adult && attrs[:email].blank?
-        Rails.logger.error { "[PAPER_APP] CRITICAL: Attempting to create dependent without email. Full attributes: #{attrs.inspect}" }
-        # Include more helpful messaging for the error
-        guardian_info = @guardian_user_for_app ? "Guardian info: #{@guardian_user_for_app.id}/#{@guardian_user_for_app.email}" : 'No guardian selected'
-        strategy_info = "email_strategy=#{params[:email_strategy].inspect}, phone_strategy=#{params[:phone_strategy].inspect}, address_strategy=#{params[:address_strategy].inspect}"
-        add_error("Cannot create dependent: Email is required. Please ensure either a dedicated email is provided for the dependent, or email strategy is set to 'guardian'. #{guardian_info}. Form params: #{strategy_info}")
-        return nil
-      end
+      Rails.logger.info { "[PAPER_APP] Found existing user: #{user.email}, id: #{user.id}" }
+      true
+    end
 
-      # Create new user if not found
-      create_new_user(attrs, is_managing_adult: is_managing_adult)
+    def validate_dependent_email_requirement(attrs, is_managing_adult)
+      return if is_managing_adult || attrs[:email].present?
+
+      Rails.logger.error { "[PAPER_APP] CRITICAL: Attempting to create dependent without email: #{attrs.inspect}" }
+
+      guardian_info = if @guardian_user_for_app
+                        "Guardian info: #{@guardian_user_for_app.id}/#{@guardian_user_for_app.email}"
+                      else
+                        'No guardian selected'
+                      end
+
+      strategy_info = build_strategy_debug_info
+
+      add_error("Cannot create dependent: Email is required. Please ensure either a dedicated email is provided for the dependent, or email strategy isset to 'guardian'. #{guardian_info}. Form params: #{strategy_info}")
+    end
+
+    def build_strategy_debug_info
+      "email_strategy=#{params[:email_strategy].inspect}, " \
+        "phone_strategy=#{params[:phone_strategy].inspect}, " \
+        "address_strategy=#{params[:address_strategy].inspect}"
     end
 
     def create_new_user(attrs, is_managing_adult:)
@@ -407,70 +452,102 @@ module Applications
     def determine_dependent_contact_strategy(applicant_data_for_constituent)
       return unless @guardian_user_for_app
 
-      # Handle email strategy
-      case params[:email_strategy]
-      when 'guardian'
-        # Dependent shares guardian's email
-        Rails.logger.info { "[PAPER_APP] Dependent will share guardian's email (#{@guardian_user_for_app.email})" }
-        applicant_data_for_constituent[:dependent_email] = @guardian_user_for_app.email
-        applicant_data_for_constituent[:email] = "dependent-#{SecureRandom.uuid}@system.matvulcan.local"
-      when 'dependent'
-        # Dependent has their own email
-        if applicant_data_for_constituent[:dependent_email].present?
-          Rails.logger.info { "[PAPER_APP] Dependent will use their own email (#{applicant_data_for_constituent[:dependent_email]})" }
-          applicant_data_for_constituent[:email] = applicant_data_for_constituent[:dependent_email]
-        else
-          Rails.logger.warn { '[PAPER_APP] Email strategy is "dependent" but no dependent_email provided, falling back to guardian email' }
-          # Fall back to guardian's email when dependent_email is blank
-          applicant_data_for_constituent[:dependent_email] = @guardian_user_for_app.email
-          applicant_data_for_constituent[:email] = "dependent-#{SecureRandom.uuid}@system.matvulcan.local"
-        end
-      else
-        # Default to guardian's email if no strategy specified
-        Rails.logger.info { '[PAPER_APP] No email strategy specified, defaulting to guardian email' }
-        applicant_data_for_constituent[:dependent_email] = @guardian_user_for_app.email
-        applicant_data_for_constituent[:email] = "dependent-#{SecureRandom.uuid}@system.matvulcan.local"
-      end
+      apply_email_strategy(applicant_data_for_constituent)
+      apply_phone_strategy(applicant_data_for_constituent)
+      apply_address_strategy(applicant_data_for_constituent)
+    end
 
-      # Handle phone strategy  
-      case params[:phone_strategy]
-      when 'guardian'
-        # Dependent shares guardian's phone
-        Rails.logger.info { "[PAPER_APP] Dependent will share guardian's phone (#{@guardian_user_for_app.phone})" }
-        applicant_data_for_constituent[:dependent_phone] = @guardian_user_for_app.phone
-        applicant_data_for_constituent[:phone] = "000-000-#{rand(1000..9999)}"
-      when 'dependent'
-        # Dependent has their own phone
-        if applicant_data_for_constituent[:dependent_phone].present?
-          Rails.logger.info { "[PAPER_APP] Dependent will use their own phone (#{applicant_data_for_constituent[:dependent_phone]})" }
-          applicant_data_for_constituent[:phone] = applicant_data_for_constituent[:dependent_phone]
-        else
-          Rails.logger.warn { '[PAPER_APP] Phone strategy is "dependent" but no dependent_phone provided, falling back to guardian phone' }
-          # Fall back to guardian's phone when dependent_phone is blank
-          applicant_data_for_constituent[:dependent_phone] = @guardian_user_for_app.phone
-          applicant_data_for_constituent[:phone] = "000-000-#{rand(1000..9999)}"
-        end
-      else
-        # Default to guardian's phone if no strategy specified
-        Rails.logger.info { '[PAPER_APP] No phone strategy specified, defaulting to guardian phone' }
-        applicant_data_for_constituent[:dependent_phone] = @guardian_user_for_app.phone
-        applicant_data_for_constituent[:phone] = "000-000-#{rand(1000..9999)}"
-      end
+    def apply_email_strategy(applicant_data)
+      strategy = params[:email_strategy]
 
-      # Handle address strategy (optional - defaults to guardian's address)
-      case params[:address_strategy]
+      case strategy
+      when 'guardian'
+        guardian_email_strategy(applicant_data)
       when 'dependent'
-        # Dependent has their own address - no action needed, use provided address fields
+        dependent_email_strategy(applicant_data)
+      else
+        default_email_strategy(applicant_data)
+      end
+    end
+
+    def apply_phone_strategy(applicant_data)
+      strategy = params[:phone_strategy]
+
+      case strategy
+      when 'guardian'
+        guardian_phone_strategy(applicant_data)
+      when 'dependent'
+        dependent_phone_strategy(applicant_data)
+      else
+        default_phone_strategy(applicant_data)
+      end
+    end
+
+    def apply_address_strategy(applicant_data)
+      if params[:address_strategy] == 'dependent'
         Rails.logger.info { '[PAPER_APP] Dependent will use their own address' }
       else
-        # Default to guardian's address - copy from guardian
-        Rails.logger.info { '[PAPER_APP] Dependent will use guardian address' }
-        applicant_data_for_constituent[:physical_address_1] = @guardian_user_for_app.physical_address_1
-        applicant_data_for_constituent[:physical_address_2] = @guardian_user_for_app.physical_address_2
-        applicant_data_for_constituent[:city] = @guardian_user_for_app.city
-        applicant_data_for_constituent[:state] = @guardian_user_for_app.state
-        applicant_data_for_constituent[:zip_code] = @guardian_user_for_app.zip_code
+        copy_guardian_address(applicant_data)
       end
+    end
+
+    def guardian_email_strategy(applicant_data)
+      Rails.logger.info { "[PAPER_APP] Dependent will share guardian's email (#{@guardian_user_for_app.email})" }
+      applicant_data[:dependent_email] = @guardian_user_for_app.email
+      applicant_data[:email] = generate_system_email
+    end
+
+    def dependent_email_strategy(applicant_data)
+      if applicant_data[:dependent_email].present?
+        Rails.logger.info { "[PAPER_APP] Dependent will use their own email (#{applicant_data[:dependent_email]})" }
+        applicant_data[:email] = applicant_data[:dependent_email]
+      else
+        Rails.logger.warn { '[PAPER_APP] Email strategy is "dependent" but no dependent_email provided, falling back to guardian email' }
+        guardian_email_strategy(applicant_data)
+      end
+    end
+
+    def default_email_strategy(applicant_data)
+      Rails.logger.info { '[PAPER_APP] No email strategy specified, defaulting to guardian email' }
+      guardian_email_strategy(applicant_data)
+    end
+
+    def guardian_phone_strategy(applicant_data)
+      Rails.logger.info { "[PAPER_APP] Dependent will share guardian's phone (#{@guardian_user_for_app.phone})" }
+      applicant_data[:dependent_phone] = @guardian_user_for_app.phone
+      applicant_data[:phone] = generate_system_phone
+    end
+
+    def dependent_phone_strategy(applicant_data)
+      if applicant_data[:dependent_phone].present?
+        Rails.logger.info { "[PAPER_APP] Dependent will use their own phone (#{applicant_data[:dependent_phone]})" }
+        applicant_data[:phone] = applicant_data[:dependent_phone]
+      else
+        Rails.logger.warn { '[PAPER_APP] Phone strategy is "dependent" but no dependent_phone provided, falling back to guardian phone' }
+        guardian_phone_strategy(applicant_data)
+      end
+    end
+
+    def default_phone_strategy(applicant_data)
+      Rails.logger.info { '[PAPER_APP] No phone strategy specified, defaulting to guardian phone' }
+      guardian_phone_strategy(applicant_data)
+    end
+
+    def copy_guardian_address(applicant_data)
+      Rails.logger.info { '[PAPER_APP] Dependent will use guardian address' }
+      applicant_data[:physical_address_1] = @guardian_user_for_app.physical_address_1
+      applicant_data[:physical_address_2] = @guardian_user_for_app.physical_address_2
+      applicant_data[:city] = @guardian_user_for_app.city
+      applicant_data[:state] = @guardian_user_for_app.state
+      applicant_data[:zip_code] = @guardian_user_for_app.zip_code
+    end
+
+    def generate_system_email
+      "dependent-#{SecureRandom.uuid}@system.matvulcan.local"
+    end
+
+    def generate_system_phone
+      "000-000-#{rand(1000..9999)}"
     end
 
     def create_application
@@ -479,7 +556,7 @@ module Applications
 
       begin
         application_attrs = params[:application]
-        return add_error('Application params missing') unless application_attrs.present?
+        return add_error('Application params missing') if application_attrs.blank?
 
         # Validate income thresholds
         unless income_within_threshold?(application_attrs[:household_size], application_attrs[:annual_income])
@@ -574,81 +651,105 @@ module Applications
     end
 
     def send_notifications
-      if @constituent.communication_preference == 'email'
-        # Send emails as before
-        @application.proof_reviews.reload.each do |review|
-          ApplicationNotificationsMailer.proof_rejected(@application, review).deliver_later if review.status_rejected?
-        end
+      send_proof_rejection_notifications
+      send_account_creation_notifications
+    end
 
-        # Send account creation email for new constituents
-        # Handle multiple new users (guardian and/or dependent)
-        [@guardian_user_for_app, @constituent].compact.uniq.each do |user_account|
-          next unless user_account.present? && user_account.created_at >= 5.minutes.ago && @temp_password_for_new_user&.key?(user_account.id)
+    def send_proof_rejection_notifications
+      @application.proof_reviews.reload.each do |review|
+        next unless review.status_rejected?
 
-          temp_password = @temp_password_for_new_user[user_account.id]
-          # User might have been created without password if found by email/phone, ensure it's set if new
-          user_account.update(password: temp_password, password_confirmation: temp_password) if user_account.password_digest.blank?
-          ApplicationNotificationsMailer.account_created(user_account, temp_password).deliver_later
-        end
-      else
-        # Generate letters for printing instead
-        [@guardian_user_for_app, @constituent].compact.uniq.each do |user_account|
-          next unless user_account.present? && user_account.created_at >= 5.minutes.ago && @temp_password_for_new_user&.key?(user_account.id)
-
-          temp_password = @temp_password_for_new_user[user_account.id]
-          user_account.update(password: temp_password, password_confirmation: temp_password) if user_account.password_digest.blank?
-
-          Letters::TextTemplateToPdfService.new(
-            template_name: 'application_notifications_account_created',
-            recipient: user_account,
-            variables: {
-              constituent_first_name: user_account.first_name,
-              constituent_email: user_account.email, # This might be blank for paper apps
-              temp_password: temp_password, # Make sure this is available
-              sign_in_url: new_session_url, # Assuming new_session_url helper exists
-              # Shared partial variables for text template
-              header_text: Mailers::SharedPartialHelpers.header_text(
-                title: 'Your Maryland Accessible Telecommunications Account',
-                logo_url: ActionController::Base.helpers.asset_path('logo.png',
-                                                                    host: Rails.application.config.action_mailer.default_url_options[:host])
-              ),
-              footer_text: Mailers::SharedPartialHelpers.footer_text(
-                contact_email: Policy.get('support_email') || 'support@example.com',
-                website_url: root_url(host: Rails.application.config.action_mailer.default_url_options[:host]),
-                show_automated_message: true
-              )
-            }
-          ).queue_for_printing
-        end
-
-        # Proof rejection letters using  TextTemplateToPdfService with database templates
-        @application.proof_reviews.reload.each do |review|
-          next unless review.status_rejected?
-
-          Letters::TextTemplateToPdfService.new(
-            template_name: 'application_notifications_proof_rejected',
-            recipient: @constituent,
-            variables: {
-              constituent_full_name: @constituent.full_name, # Assuming User model has a full_name method
-              organization_name: Policy.get('organization_name') || 'MAT Program', # Use Policy for organization name
-              proof_type_formatted: review.proof_type.humanize,
-              rejection_reason: review.rejection_reason || 'Document did not meet requirements',
-              # Shared partial variables for text template
-              header_text: Mailers::SharedPartialHelpers.header_text(
-                title: 'Document Verification Follow-up Required',
-                logo_url: ActionController::Base.helpers.asset_path('logo.png',
-                                                                    host: Rails.application.config.action_mailer.default_url_options[:host])
-              ),
-              footer_text: Mailers::SharedPartialHelpers.footer_text(
-                contact_email: Policy.get('support_email') || 'support@example.com',
-                website_url: root_url(host: Rails.application.config.action_mailer.default_url_options[:host]),
-                show_automated_message: true
-              )
-              # Omitting optional variables for now
-            }
-          ).queue_for_printing
-        end
+        send_notification_by_preference(
+          type: :proof_rejected,
+          recipient: @constituent,
+          notifiable: review,
+          template_name: 'application_notifications_proof_rejected',
+          template_variables: proof_rejection_template_variables(review)
+        )
       end
+    end
+
+    def send_account_creation_notifications
+      new_user_accounts.each do |user_account|
+        temp_password = @temp_password_for_new_user[user_account.id]
+        ensure_user_password(user_account, temp_password)
+
+        send_notification_by_preference(
+          type: :account_created,
+          recipient: user_account,
+          notifiable: @application,
+          template_name: 'application_notifications_account_created',
+          template_variables: account_creation_template_variables(user_account, temp_password),
+          temp_password: temp_password
+        )
+      end
+    end
+
+    def send_notification_by_preference(type:, recipient:, notifiable:, template_name:, template_variables:, temp_password: nil)
+      if recipient.communication_preference == 'email'
+        send_email_notification(type, recipient, notifiable, temp_password)
+      else
+        send_letter_notification(template_name, recipient, template_variables)
+      end
+    end
+
+    def send_email_notification(type, recipient, notifiable, temp_password = nil)
+      case type
+      when :proof_rejected
+        # The `proof_rejected` mailer expects `application` and `proof_review`
+        ApplicationNotificationsMailer.proof_rejected(@application, notifiable).deliver_later
+      when :account_created
+        # The `account_created` mailer expects `constituent` and `temp_password`
+        ApplicationNotificationsMailer.account_created(recipient, temp_password).deliver_later
+      else
+        Rails.logger.warn "PaperApplicationService: No mailer action configured for type '#{type}'"
+      end
+    end
+
+    def send_letter_notification(template_name, recipient, variables)
+      Letters::TextTemplateToPdfService.new(
+        template_name: template_name,
+        recipient: recipient,
+        variables: variables
+      ).queue_for_printing
+    end
+
+    def new_user_accounts
+      [@guardian_user_for_app, @constituent].compact.uniq.select do |user_account|
+        recently_created?(user_account) && temp_password?(user_account)
+      end
+    end
+
+    def recently_created?(user_account)
+      user_account.present? && user_account.created_at >= 5.minutes.ago
+    end
+
+    def temp_password?(user_account)
+      @temp_password_for_new_user&.key?(user_account.id)
+    end
+
+    def ensure_user_password(user_account, temp_password)
+      return if user_account.password_digest.present?
+
+      user_account.update(password: temp_password, password_confirmation: temp_password)
+    end
+
+    def account_creation_template_variables(user_account, temp_password)
+      {
+        constituent_first_name: user_account.first_name,
+        constituent_email: user_account.email,
+        temp_password: temp_password,
+        sign_in_url: sign_in_url(host: Rails.application.config.action_mailer.default_url_options[:host])
+      }
+    end
+
+    def proof_rejection_template_variables(review)
+      {
+        constituent_full_name: @constituent.full_name,
+        organization_name: Policy.get('organization_name') || 'MAT Program',
+        proof_type_formatted: review.proof_type.humanize,
+        rejection_reason: review.rejection_reason || 'Document did not meet requirements'
+      }
     end
 
     def income_within_threshold?(household_size, annual_income)

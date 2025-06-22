@@ -11,7 +11,10 @@ class EmailTemplate < ApplicationRecord
 
   # Ensure name is unique within the scope of its format (e.g., 'welcome.html' and 'welcome.text' are distinct)
   validates :name, presence: true, uniqueness: { scope: :format }
-  validates :subject, :body, :format, :description, presence: true
+  validates :subject, presence: true
+  validates :body, presence: true
+  validates :format, presence: true
+  validates :description, presence: true
   validates :version, presence: true, numericality: { only_integer: true, greater_than_or_equal_to: 1 }
   validate :validate_variables_in_body
 

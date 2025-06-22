@@ -58,20 +58,27 @@ class AuditEventService < BaseService
          .any? { |event| create_event_fingerprint(event.action, event.metadata) == fingerprint }
   end
 
-  private
-
   # Create a fingerprint that distinguishes between meaningfully different events
   def self.create_event_fingerprint(action, metadata)
     base = action.to_s
-    
+
     # For proof submission events, include proof_type and submission_method
     if action.to_s.include?('proof_submitted') || action.to_s.include?('proof_attached')
       proof_type = metadata['proof_type'] || metadata[:proof_type]
       submission_method = metadata['submission_method'] || metadata[:submission_method]
-      return "#{base}_#{proof_type}_#{submission_method}" if proof_type && submission_method
+      blob_id = metadata['blob_id'] || metadata[:blob_id]
+
+      # Include blob_id for proof attachment events to ensure we only create one event per actual attachment
+      if action.to_s.include?('proof_attached') && blob_id
+        return "#{base}_#{proof_type}_blob_#{blob_id}"
+      elsif proof_type && submission_method
+        return "#{base}_#{proof_type}_#{submission_method}"
+      end
     end
-    
+
     # For other events, use just the base action
     base
   end
+
+  private_class_method :create_event_fingerprint
 end
