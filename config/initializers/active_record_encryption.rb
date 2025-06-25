@@ -9,10 +9,22 @@ Rails.application.configure do
   # and Rails will handle the translation to encrypted columns transparently
   config.active_record.encryption.extend_queries = false
 
-  # Configure encryption keys from credentials
-  config.active_record.encryption.primary_key = Rails.application.credentials.active_record_encryption.primary_key
-  config.active_record.encryption.deterministic_key = Rails.application.credentials.active_record_encryption.deterministic_key
-  config.active_record.encryption.key_derivation_salt = Rails.application.credentials.active_record_encryption.key_derivation_salt
+  # Configure encryption keys from credentials (with fallback for missing credentials)
+  encryption_config = Rails.application.credentials.active_record_encryption
+
+  if encryption_config.present?
+    config.active_record.encryption.primary_key = encryption_config.primary_key
+    config.active_record.encryption.deterministic_key = encryption_config.deterministic_key
+    config.active_record.encryption.key_derivation_salt = encryption_config.key_derivation_salt
+  else
+    # Generate temporary keys for development/test environments when credentials are missing
+    # In production, you should properly configure these in credentials
+    Rails.logger.warn '[ENCRYPTION] Active Record encryption credentials not found. Using temporary keys.'
+
+    config.active_record.encryption.primary_key = ActiveRecord::Encryption.generate_random_key
+    config.active_record.encryption.deterministic_key = ActiveRecord::Encryption.generate_random_key
+    config.active_record.encryption.key_derivation_salt = ActiveRecord::Encryption.generate_random_key
+  end
 
   # Enable support for unencrypted data during transition
   # This allows reading both encrypted and unencrypted data
