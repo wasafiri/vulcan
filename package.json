@@ -2,8 +2,8 @@
   "name": "app",
   "private": true,
   "engines": {
-    "node": "22.14.0",
-    "yarn": "1.22.22"
+    "node": ">=18.0.0",
+    "yarn": ">=1.22.0"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
