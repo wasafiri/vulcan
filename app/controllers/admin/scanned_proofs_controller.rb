@@ -143,10 +143,6 @@ module Admin
       )
     end
 
-    # REMOVED: create_audit_trail method
-    # This method was creating duplicate #{proof_type}_proof_attached events
-    # ProofAttachmentService is now the single source of truth for attachment events
-
     def notify_constituent
       ApplicationNotificationsMailer.proof_received(
         @application,

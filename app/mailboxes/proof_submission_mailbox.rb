@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # ProofSubmissionMailbox processes inbound emails containing proof documents
-# 
+#
 # PROCESSING FLOW:
 # 1. Email arrives and is routed here by ApplicationMailbox
 # 2. BEFORE_PROCESSING CALLBACKS run in order (ANY can bounce the email):
@@ -34,7 +34,7 @@ class ProofSubmissionMailbox < ApplicationMailbox
   def process
     # NOTE: This method only runs if ALL before_processing callbacks pass
     Rails.logger.info "PROOF SUBMISSION MAILBOX PROCESSING: Email from #{mail.from&.first} with subject '#{mail.subject}'"
-    
+
     # Create an audit record for the submission
     create_audit_record
 
@@ -49,8 +49,8 @@ class ProofSubmissionMailbox < ApplicationMailbox
 
     # Notify admin of new proof submission
     notify_admin
-    
-    Rails.logger.info "PROOF SUBMISSION MAILBOX COMPLETE: Successfully processed email"
+
+    Rails.logger.info 'PROOF SUBMISSION MAILBOX COMPLETE: Successfully processed email'
   end
 
   private
@@ -105,8 +105,8 @@ class ProofSubmissionMailbox < ApplicationMailbox
                                                      email_subject: mail.subject,
                                                      email_from: mail.from.first,
                                                      inbound_email_id: inbound_email.id
-      }
-    })
+                                                   }
+                                                 })
 
     if result[:success]
       # ProofAttachmentService already handled the attachment, audit events, and notifications
@@ -200,7 +200,7 @@ class ProofSubmissionMailbox < ApplicationMailbox
   def bounce_with_notification(error_type, message)
     # BOUNCE PROCESSING: This method halts all email processing
     Rails.logger.info "MAILBOX BOUNCE: #{error_type} - #{message} (from: #{mail.from&.first}, inbound_email: #{inbound_email.id})"
-    
+
     # Record the bounce event with detailed context
     # IMPORTANT: Handle transaction/race condition issues with system_user creation
     # In test environments, User.system_user might be created in a different transaction
@@ -219,7 +219,7 @@ class ProofSubmissionMailbox < ApplicationMailbox
         event_user = User.system_user
       end
     end
-    
+
     Event.create!(
       user: event_user,
       action: "proof_submission_#{error_type}",
@@ -245,7 +245,7 @@ class ProofSubmissionMailbox < ApplicationMailbox
 
     # Mark inbound email as bounced for tracking
     inbound_email.update!(status: 'bounced')
-    
+
     Rails.logger.info "MAILBOX BOUNCE COMPLETE: Email #{inbound_email.id} marked as bounced, notification sent"
 
     # Halt all further processing - this prevents process() from running

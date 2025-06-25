@@ -377,7 +377,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
   def account_created(constituent, temp_password)
     # Guard against nil constituent
     if constituent.nil?
-      Rails.logger.error("ApplicationNotificationsMailer#account_created called with nil constituent")
+      Rails.logger.error('ApplicationNotificationsMailer#account_created called with nil constituent')
       return
     end
 
@@ -415,7 +415,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
       ActionController::Base.helpers.asset_path('logo.png', host: default_url_options[:host])
     rescue StandardError
       nil
-    end # Placeholder
+    end
 
     variables = {
       constituent_first_name: constituent.first_name,
@@ -457,36 +457,22 @@ class ApplicationNotificationsMailer < ApplicationMailer
   end
 
   def income_threshold_exceeded(constituent_params, notification_params)
-    # Use hashes directly instead of OpenStruct for better performance
-    constituent = constituent_params # Use local var
-    notification = notification_params # Use local var
+    # Delegate business logic to the dedicated service
+    result = Notifications::IncomeThresholdService.call(constituent_params, notification_params)
 
-    # Calculate the threshold
-    household_size = notification.is_a?(Hash) ? notification[:household_size].to_i : notification.household_size.to_i
-    base_fpl = Policy.get("fpl_#{[household_size, 8].min}_person").to_i
-    modifier = Policy.get('fpl_modifier_percentage').to_i
-    threshold = base_fpl * (modifier / 100.0)
-
-    # Letter generation using database templates
-    # Only generate letter if constituent is a User object (not a hash) and has letter preference
-    communication_preference = constituent.is_a?(Hash) ? constituent[:communication_preference] : constituent.communication_preference
-    if communication_preference == 'letter' && !constituent.is_a?(Hash)
-      constituent_first_name = constituent.first_name
-      constituent_last_name = constituent.last_name
-
-      Letters::TextTemplateToPdfService.new(
-        template_name: 'application_notifications_income_threshold_exceeded',
-        recipient: constituent,
-        variables: {
-          household_size: household_size,
-          annual_income: notification.is_a?(Hash) ? notification[:annual_income] : notification.annual_income,
-          threshold: threshold,
-          first_name: constituent_first_name,
-          last_name: constituent_last_name
-        }
-      ).queue_for_printing
+    unless result.success?
+      constituent_id = constituent_params.is_a?(Hash) ? constituent_params[:id] : constituent_params&.id
+      Rails.logger.error("Failed to prepare income threshold data for constituent #{constituent_id}: #{result.error_message}")
+      raise result.error_message
     end
 
+    # Extract prepared data
+    constituent = result.data[:constituent]
+    notification = result.data[:notification]
+    threshold_data = result.data[:threshold_data]
+    threshold = result.data[:threshold]
+
+    # Prepare email template variables
     template_name = 'application_notifications_income_threshold_exceeded'
     begin
       text_template = EmailTemplate.find_by!(name: template_name, format: :text)
@@ -495,13 +481,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
       raise "Email templates not found for #{template_name}"
     end
 
-    # Prepare variables
-    # Removed unused variable `recipient_email`
-    constituent_first_name = constituent.is_a?(Hash) ? constituent[:first_name] : constituent.first_name
-    annual_income = notification.is_a?(Hash) ? notification[:annual_income] : notification.annual_income
-    additional_notes = notification.is_a?(Hash) ? notification[:additional_notes] : notification.additional_notes # Optional
-
-    # Placeholders for common elements
+    # Build template variables using mailer helpers
     header_title = 'Important Information About Your MAT Application'
     footer_contact_email = Policy.get('support_email') || 'support@example.com'
     footer_website_url = root_url(host: default_url_options[:host])
@@ -512,44 +492,40 @@ class ApplicationNotificationsMailer < ApplicationMailer
       nil
     end
 
-    # Status box details
     status_box_title = 'Application Status: Income Threshold Exceeded'
     status_box_message = "Based on the information provided, your household income exceeds the program's limit."
 
     variables = {
-      constituent_first_name: constituent_first_name,
-      household_size: household_size,
-      annual_income_formatted: ActionController::Base.helpers.number_to_currency(annual_income),
+      constituent_first_name: constituent[:first_name],
+      household_size: threshold_data[:household_size],
+      annual_income_formatted: ActionController::Base.helpers.number_to_currency(notification[:annual_income]),
       threshold_formatted: ActionController::Base.helpers.number_to_currency(threshold),
-
       header_text: header_text(title: header_title, logo_url: header_logo_url),
       status_box_text: status_box_text(status: 'error', title: status_box_title, message: status_box_message),
-      footer_text: footer_text(contact_email: footer_contact_email, website_url: footer_website_url,
-                               organization_name: Policy.get('organization_name') || 'Maryland Accessible Telecommunications',
-                               show_automated_message: footer_show_automated_message),
-      additional_notes: additional_notes, # Optional
-      header_logo_url: header_logo_url, # Optional
-      header_subtitle: nil # Optional
+      footer_text: footer_text(
+        contact_email: footer_contact_email,
+        website_url: footer_website_url,
+        organization_name: Policy.get('organization_name') || 'Maryland Accessible Telecommunications',
+        show_automated_message: footer_show_automated_message
+      ),
+      additional_notes: notification[:additional_notes],
+      header_logo_url: header_logo_url,
+      header_subtitle: nil
     }.compact
 
-    # Render subject and bodies
+    # Render subject and body
     rendered_subject, rendered_text_body = text_template.render(**variables)
 
-    # Extract the email from constituent (either hash or object)
-    recipient_email = constituent.is_a?(Hash) ? constituent[:email] : constituent.email
-
-    # Important: When using deliver_later, ActionMailer serializes the mail parameters
-    # but doesn't preserve values set on the message object after it's created.
-    # To ensure the subject is correct, we need to pass it directly to the mail method.
+    # Send email
     mail(
-      to: recipient_email,
-      subject: rendered_subject, # Subject is guaranteed to be used
+      to: constituent[:email],
+      subject: rendered_subject,
       message_stream: 'notifications'
     ) do |format|
       format.text { render plain: rendered_text_body }
     end
   rescue StandardError => e
-    constituent_id = constituent.is_a?(Hash) ? constituent[:id] : constituent&.id
+    constituent_id = constituent_params.is_a?(Hash) ? constituent_params[:id] : constituent_params&.id
     Rails.logger.error("Failed to send income threshold exceeded email for constituent #{constituent_id}: #{e.message}")
     Rails.logger.error(e.backtrace.join("\n"))
     raise e
@@ -727,11 +703,11 @@ class ApplicationNotificationsMailer < ApplicationMailer
 
   def proof_received(application, proof_type)
     user = application.user
-    
+
     # For now, reuse the proof_approved template since the functionality is similar
     # This can be customized later with a dedicated proof_received template if needed
     template_name = 'application_notifications_proof_approved'
-    
+
     begin
       text_template = EmailTemplate.find_by!(name: template_name, format: :text)
     rescue ActiveRecord::RecordNotFound => e
@@ -742,7 +718,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
     # Prepare variables (similar to proof_approved but simpler)
     organization_name = Policy.get('organization_name') || 'MAT Program'
     proof_type_formatted = format_proof_type(proof_type)
-    
+
     # Common elements
     header_title = "Document Received: #{proof_type_formatted.capitalize}"
     footer_contact_email = Policy.get('support_email') || 'support@example.com'
@@ -768,7 +744,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
 
     # Render subject and body
     rendered_subject, rendered_text_body = text_template.render(**variables)
-    
+
     # Customize the subject to be more appropriate for "received" vs "approved"
     rendered_subject = rendered_subject.gsub(/approved/i, 'received').gsub(/Approved/i, 'Received')
 

@@ -84,11 +84,6 @@ module ConstituentPortal
     # Common Utility Methods
     #----------------------------------------------------------------------
 
-    # Safely cast a value to boolean - now provided by ParamCasting concern
-    # @param value [Object] The value to cast
-    # @return [Boolean] The safely cast boolean value
-    # NOTE: This method is now provided by the ParamCasting concern
-
     # Log a debug message in development or test environment
     # @param message [String] The message to log
     def log_debug(message)
@@ -784,7 +779,7 @@ module ConstituentPortal
         policy = Policy.find_by(key: "fpl_#{size}_person")
         thresholds[size.to_s] = policy&.value.to_i
       end
-      modifier = Policy.find_by(key: 'fpl_modifier_percentage')&.value.to_i || 400
+      modifier = Policy.find_by(key: 'fpl_modifier_percentage')&.value&.to_i || 400
       render json: { thresholds: thresholds, modifier: modifier }
     end
 
@@ -1194,10 +1189,10 @@ module ConstituentPortal
     end
 
     def submission_params
-      params.require(:application).permit(
-        :terms_accepted,
-        :information_verified,
-        :medical_release_authorized
+      params.expect(
+        application: %i[terms_accepted
+                        information_verified
+                        medical_release_authorized]
       )
     end
 
@@ -1295,7 +1290,7 @@ module ConstituentPortal
                       :state,
                       :zip_code,
                       # Permit nested attributes directly
-                      medical_provider_attributes: %i[name phone fax email]]
+                      { medical_provider_attributes: %i[name phone fax email] }]
       )
       # Remove the key transformation logic
       # Return params with nested attributes if present

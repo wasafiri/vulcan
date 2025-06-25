@@ -7,11 +7,10 @@
 # 2. Direct upload for client-side uploading to S3
 # 3. Proof resubmission (after rejection)
 #
-# Note: While this controller handles the UI and workflow for proof submission,
+# Note: This controller handles the UI and workflow for proof submission, and
 # the actual attachment is delegated to ProofAttachmentService to maintain
 # consistency with the paper application submission path. Both constituent portal
-# and paper submissions use ProofAttachmentService as the single source of truth
-# for proof attachments.
+# and paper submissions use ProofAttachmentService as the single source of truth for proof attachments.
 module ConstituentPortal
   module Proofs
     class ProofsController < ApplicationController
@@ -68,7 +67,7 @@ module ConstituentPortal
       private
 
       def blob_params
-        params.require(:blob).permit(:filename, :byte_size, :checksum, :content_type, metadata: {})
+        params.expect(blob: [:filename, :byte_size, :checksum, :content_type, metadata: {}])
       end
 
       def direct_upload_json(blob)
@@ -93,8 +92,6 @@ module ConstituentPortal
           # the ID comes through as :id
           application_id = params[:id]
         end
-
-
 
         if application_id.blank?
           Rails.logger.error "Application ID is nil or empty in params: #{params.inspect}"
@@ -159,9 +156,7 @@ module ConstituentPortal
         is_resubmitting = (@application.income_proof_status_rejected? && params[:proof_type] == 'income') ||
                           (@application.residency_proof_status_rejected? && params[:proof_type] == 'residency')
 
-        if is_resubmitting
-          Rails.logger.info "Resubmitting previously rejected #{params[:proof_type]} proof for application #{@application.id}"
-        end
+        Rails.logger.info "Resubmitting previously rejected #{params[:proof_type]} proof for application #{@application.id}" if is_resubmitting
 
         # Set Current attribute to communicate resubmission status to validation layer
         Current.resubmitting_proof = is_resubmitting

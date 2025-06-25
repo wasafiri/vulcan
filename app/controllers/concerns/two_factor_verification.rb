@@ -28,15 +28,6 @@ module TwoFactorVerification
     TwoFactorAuth.complete_authentication(session)
   end
 
-  # These methods already call the TwoFactorAuth module directly
-  # def log_verification_success(user_id, type)
-  #   TwoFactorAuth.log_verification_success(user_id, type)
-  # end
-  #
-  # def log_verification_failure(user_id, type, error)
-  #   TwoFactorAuth.log_verification_failure(user_id, type, error)
-  # end
-
   # Updated log calls within verification methods to pass context hash
   def log_verification_success(user_id, type, context = {})
     TwoFactorAuth.log_verification_success(user_id, type, context)
@@ -118,15 +109,13 @@ module TwoFactorVerification
     return [false, 'Credential not found'] if credential.nil?
 
     # Check expiration
-    if credential.code_digest.blank? || credential.code_expires_at < Time.current
-      return [false, 'Code expired']
-    end
+    return [false, 'Code expired'] if credential.code_digest.blank? || credential.code_expires_at < Time.current
 
     # Verify code using the model method
     if credential.verify_code(code)
       clear_challenge
       log_verification_success(current_user.id, :sms, credential_id: credential.id)
-      return [true, 'Verification successful']
+      [true, 'Verification successful']
     else
       log_verification_failure(current_user.id, :sms, 'Invalid code', credential_id: credential.id)
       [false, TwoFactorAuth::ERROR_MESSAGES[:invalid_code]]
