@@ -315,14 +315,8 @@ class TwoFactorAuthenticationsController < ApplicationController
     when 'webauthn'
       render 'webauthn_credentials/new'
     when 'totp'
-      # Use the secret from params if provided (for redirects after failed verification),
-      # otherwise generate a new one. Validate secret to prevent XSS.
-      if params[:secret].present?
-        @secret = validate_base32_secret(params[:secret])
-        @secret = ROTP::Base32.random if @secret.nil? # Fallback if validation fails
-      else
-        @secret = ROTP::Base32.random
-      end
+      # Generate or retrieve validated secret - never use params directly
+      @secret = get_validated_totp_secret(params[:secret])
 
       # Store the secret in the session
       store_challenge(
@@ -331,15 +325,8 @@ class TwoFactorAuthenticationsController < ApplicationController
         { secret: @secret }
       )
 
-      # Generate QR code
-      @totp_uri = ROTP::TOTP.new(@secret, issuer: 'MatVulcan').provisioning_uri(current_user.email)
-      @qr_code = RQRCode::QRCode.new(@totp_uri).as_svg(
-        color: '000',
-        shape_rendering: 'crispEdges',
-        module_size: 4,
-        standalone: true,
-        use_path: true
-      )
+      # Generate QR code with validated secret
+      generate_totp_qr_code
 
       render 'totp_credentials/new'
     when 'sms'
@@ -360,10 +347,10 @@ class TwoFactorAuthenticationsController < ApplicationController
       begin
         # Use require to ensure the nested hash exists and permit its contents
         # This nested hash contains the correct 'type' ('public-key')
-        nested_params = params.require(:two_factor_authentication).permit(
-          :id, :rawId, :type, :authenticatorAttachment,
-          response: [:clientDataJSON, :attestationObject, { transports: [] }],
-          clientExtensionResults: {} # Permit all client extensions
+        nested_params = params.expect(
+          two_factor_authentication: [:id, :rawId, :type, :authenticatorAttachment,
+                                      { response: [:clientDataJSON, :attestationObject, { transports: [] }],
+                                        clientExtensionResults: {} }] # Permit all client extensions
         )
 
         # Log the permitted nested params being passed to from_create for debugging
@@ -786,5 +773,30 @@ class TwoFactorAuthenticationsController < ApplicationController
     secret
   rescue ArgumentError, ROTP::Base32::Base32Error
     nil
+  end
+
+  # Get a validated TOTP secret, never using params directly
+  def get_validated_totp_secret(param_secret)
+    # Use the secret from params if provided (for redirects after failed verification),
+    # otherwise generate a new one. Always validate secret to prevent XSS.
+    if param_secret.present?
+      validated_secret = validate_base32_secret(param_secret)
+      validated_secret || ROTP::Base32.random # Fallback if validation fails
+    else
+      ROTP::Base32.random
+    end
+  end
+
+  # Generate QR code with validated secret only
+  def generate_totp_qr_code
+    # Only use the validated @secret instance variable
+    @totp_uri = ROTP::TOTP.new(@secret, issuer: 'MatVulcan').provisioning_uri(current_user.email)
+    @qr_code = RQRCode::QRCode.new(@totp_uri).as_svg(
+      color: '000',
+      shape_rendering: 'crispEdges',
+      module_size: 4,
+      standalone: true,
+      use_path: true
+    )
   end
 end
