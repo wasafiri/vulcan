@@ -4,7 +4,11 @@ require 'test_helper'
 
 module Applications
   class FilterServiceTest < ActiveSupport::TestCase
+    include PaperApplicationContextHelpers
+    
     setup do
+      # Set up context to skip proof validations during test setup
+      setup_paper_application_context
       # Create users for testing guardian relationships with disabilities selected
       @guardian = create(:user,
                          first_name: 'Guardian',
@@ -57,6 +61,11 @@ module Applications
 
       # This setup might still be needed depending on what it does beyond basic attachment mocking
       setup_attachment_mocks_for_audit_logs
+    end
+
+    teardown do
+      # Clean up context after each test
+      teardown_paper_application_context
     end
 
     test 'applies no filters when params are empty' do

@@ -21,22 +21,18 @@ class ProofAttachmentServiceTest < ActiveSupport::TestCase
                           household_size: 2,
                           annual_income: 15_000)
 
-    # Create a simple text file for testing instead of requiring PDF
-    @test_file = Tempfile.new(['income_proof', '.txt'])
-    @test_file.write('This is test income proof content')
-    @test_file.rewind
-
+    # Use a real PDF file from test fixtures
+    pdf_file_path = Rails.root.join('test/fixtures/files/income_proof.pdf')
     @test_file_upload = ActionDispatch::Http::UploadedFile.new(
-      tempfile: @test_file,
-      filename: 'income_proof.txt',
-      type: 'text/plain'
+      tempfile: File.open(pdf_file_path),
+      filename: 'income_proof.pdf',
+      type: 'application/pdf'
     )
   end
 
   teardown do
-    # Clean up the test file
-    @test_file.close
-    @test_file.unlink
+    # Clean up the test file if it was opened
+    @test_file_upload.tempfile.close if @test_file_upload&.tempfile&.respond_to?(:close)
   end
 
   test 'attach_proof successfully attaches a proof and updates status' do

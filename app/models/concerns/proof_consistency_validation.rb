@@ -14,7 +14,22 @@ module ProofConsistencyValidation
 
   # Helper method to check if proof validation should be skipped
   def skip_proof_validation?
-    Current.paper_context?
+    # Skip during paper application processing
+    return true if Current.paper_context?
+    
+    # Skip during service operations that manage their own consistency
+    return true if Current.proof_attachment_service_context?
+    
+    # Skip during administrative actions like purging proofs
+    return true if Current.skip_proof_validation?
+    
+    # Skip for new records (attachments handled during creation)
+    return true if new_record?
+    
+    # Skip for draft applications
+    return true if status_draft?
+    
+    false
   end
 
   private
@@ -28,8 +43,11 @@ module ProofConsistencyValidation
   end
 
   def check_proof_consistency(proof_sym, status, attachment)
-    return unless status.in?(%w[approved rejected]) && !attachment.attached?
+    # Only validate approved proofs must have attachments
+    # Rejected proofs can exist without attachments (paper applications)
+    # or can be in the process of resubmission
+    return unless status == 'approved' && !attachment.attached?
 
-    errors.add(proof_sym, "must be attached if status is #{status}")
+    errors.add(proof_sym, "must be attached when status is #{status}")
   end
 end

@@ -143,22 +143,9 @@ module Admin
       )
     end
 
-    def create_audit_trail
-      # Store additional file info in the metadata column
-      metadata = {
-        user_agent: request.user_agent,
-        filename: params[:file].original_filename,
-        file_size: params[:file].size,
-        content_type: params[:file].content_type
-      }
-
-      AuditEventService.log(
-        action: "#{params[:proof_type]}_proof_attached",
-        auditable: @application,
-        actor: current_user,
-        metadata: metadata
-      )
-    end
+    # REMOVED: create_audit_trail method
+    # This method was creating duplicate #{proof_type}_proof_attached events
+    # ProofAttachmentService is now the single source of truth for attachment events
 
     def notify_constituent
       ApplicationNotificationsMailer.proof_received(

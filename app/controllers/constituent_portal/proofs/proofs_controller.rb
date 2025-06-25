@@ -39,45 +39,25 @@ module ConstituentPortal
       end
 
       def resubmit
-        Rails.logger.debug { "RESUBMIT PROOF: application_id=#{params[:application_id]}, proof_type=#{params[:proof_type]}" }
-
         # The before_action has already run authorize_proof_access!
         # We need to return if it failed to prevent a double render error
         return if performed?
 
-        Rails.logger.debug 'RESUBMIT: PROOF ACCESS AUTHORIZED' # Renamed for consistency
-
-        # Add log before transaction
-        Rails.logger.debug 'RESUBMIT: Starting transaction'
-        ActiveRecord::Base.transaction do
-          # Add log before attach_and_update_proof
-          Rails.logger.debug 'RESUBMIT: Calling attach_and_update_proof'
-          attach_and_update_proof
-          # Add log after attach_and_update_proof
-          Rails.logger.debug 'RESUBMIT: Finished attach_and_update_proof' # Renamed for clarity
-
-          # Add log before track_submission
-          Rails.logger.debug 'RESUBMIT: Calling track_submission'
-          track_submission
-          # Add log after track_submission
-          Rails.logger.debug 'RESUBMIT: Finished track_submission' # Renamed for clarity
-        end
-        # Add log after transaction, before redirect
-        Rails.logger.debug 'RESUBMIT: Transaction complete, preparing redirect'
+        # ProofAttachmentService manages its own transactions, so we don't need an outer transaction
+        # This prevents nested transaction issues that can cause attachment rollbacks
+        attach_and_update_proof
+        track_submission
 
         # Set flash and keep it through redirects
         flash[:notice] = 'Proof submitted successfully'
         flash.keep(:notice)
         redirect_to constituent_portal_application_path(@application)
       rescue RateLimit::ExceededError
-        # Add log for rate limit error
-        Rails.logger.debug 'RESUBMIT: Rate limit exceeded'
         # Set flash and keep it through redirects
         flash[:alert] = 'Please wait before submitting another proof'
         flash.keep(:alert)
         redirect_to constituent_portal_application_path(@application)
       rescue StandardError => e
-        Rails.logger.debug 'RESUBMIT: StandardError caught'
         unless Rails.env.test?
           Rails.logger.error "ERROR IN RESUBMIT: #{e.class.name}: #{e.message}"
           Rails.logger.error e.backtrace.join("\n")
@@ -114,7 +94,7 @@ module ConstituentPortal
           application_id = params[:id]
         end
 
-        Rails.logger.info "Looking for application with ID: #{application_id.inspect}, params: #{params.inspect}"
+
 
         if application_id.blank?
           Rails.logger.error "Application ID is nil or empty in params: #{params.inspect}"
@@ -154,13 +134,8 @@ module ConstituentPortal
       end
 
       def authorize_proof_access!
-        # Log the status seen by the filter
-        Rails.logger.debug do
-          "AUTHORIZE_PROOF_ACCESS: Checking app ##{@application&.id}, income_status=#{@application&.income_proof_status}"
-        end
         return if valid_proof_type? && can_modify_proof?
 
-        Rails.logger.debug { 'AUTHORIZE_PROOF_ACCESS: FAILED - Redirecting' } # Log failure
         redirect_to constituent_portal_application_path(@application),
                     alert: 'Invalid proof type or status'
         return false # Add explicit return to halt execution

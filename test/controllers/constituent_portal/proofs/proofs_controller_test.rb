@@ -12,11 +12,8 @@ class ConstituentProofsSubmissionTest < ActionDispatch::IntegrationTest
     # Use factories instead of fixtures
     @user = create(:constituent)
 
-    # Create application with rejected income proof
-    @application = create(:application,
-                          user: @user,
-                          income_proof_status: :rejected,
-                          needs_review_since: nil)
+    # Create application with rejected income proof using the paper trait
+    @application = create(:application, :paper_rejected_proofs, user: @user)
 
     @valid_pdf = fixture_file_upload('test/fixtures/files/medical_certification_valid.pdf', 'application/pdf')
 

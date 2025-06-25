@@ -2,6 +2,9 @@
 
 class Policy < ApplicationRecord
   validates :key, presence: true, uniqueness: true
+  # IMPORTANT: Policy values are INTEGER ONLY - cannot store strings like emails
+  # If you need to store string values, use a different approach (environment variables, constants, etc.)
+  # This validation will cause failures if you try to store non-integer values
   validates :value, presence: true, numericality: { only_integer: true }
   validates :value, numericality: {
     greater_than: 0,
@@ -48,6 +51,10 @@ class Policy < ApplicationRecord
   end
 
   def self.get(key)
+    # IMPORTANT: This method performs a REAL DATABASE QUERY, not a simple method call
+    # Stubbing Policy.get() in tests will NOT work because find_by() hits the database
+    # Tests must create actual Policy records in the database instead of stubbing
+    # Example: Policy.find_or_create_by!(key: 'max_proof_rejections') { |p| p.value = 3 }
     find_by(key: key)&.value
   end
 

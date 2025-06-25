@@ -8,18 +8,33 @@ class ProofAttachmentMetricsJobTest < ActiveJob::TestCase
     Notification.delete_all
     Event.delete_all
 
-    # Clear only admin users to ensure clean test environment for notifications
-    # Handle foreign key constraints by clearing dependent records first
-    ProofReview.where(admin: User.where(type: 'Users::Administrator')).delete_all
-    User.where(type: 'Users::Administrator').delete_all
+    # Clear dependent records first to avoid foreign key violations
+    ProofReview.delete_all
+    Application.delete_all
+    GuardianRelationship.delete_all
+    WebauthnCredential.delete_all
+    TotpCredential.delete_all
+    SmsCredential.delete_all
+    Session.delete_all
+    RoleCapability.delete_all
+    Invoice.delete_all
 
-    # Create test application and admins using factories instead of fixtures
-    @application = create(:application, skip_proofs: true) # Skip default proof attachments
+    # Clear all users to ensure a completely clean slate for system_user and admins
+    # This is an aggressive cleanup but ensures no stale user IDs
+    User.delete_all
+    
+    # Clear the cached system user to prevent stale references
+    User.instance_variable_set(:@system_user, nil)
 
-    # Create multiple admins to test notification distribution
+    # Explicitly create the system user and other admins to control their IDs and state
+    @system_user = User.system_user # This will create it if it doesn't exist
     @admin1 = create(:admin)
     @admin2 = create(:admin)
     @admin3 = create(:admin)
+
+    # Create test application
+    # Ensure application is created AFTER all associated records are cleared
+    @application = create(:application, skip_proofs: true) # Skip default proof attachments
 
     # Create some successful events using the actions the job actually looks for
     # Spread them out more to avoid deduplication and make each unique

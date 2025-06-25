@@ -1,13 +1,40 @@
 # frozen_string_literal: true
 
+# ProofSubmissionMailbox processes inbound emails containing proof documents
+# 
+# PROCESSING FLOW:
+# 1. Email arrives and is routed here by ApplicationMailbox
+# 2. BEFORE_PROCESSING CALLBACKS run in order (ANY can bounce the email):
+#    - ensure_constituent: Bounces if sender email not found in users table
+#    - ensure_active_application: Bounces if no active application found
+#    - check_rate_limit: Bounces if rate limit exceeded
+#    - check_max_rejections: Bounces if max rejection limit reached
+#    - validate_attachments: Bounces if no attachments or invalid attachments
+# 3. If ALL callbacks pass, process() method runs to attach proofs
+# 4. If ANY callback fails, bounce_with_notification() is called which:
+#    - Creates audit event
+#    - Sends error email to sender
+#    - Marks inbound_email as 'bounced'
+#    - Throws :bounce to halt processing
+#
+# TESTING NOTES:
+# - Tests must stub ALL before_processing callbacks or provide valid test data
+# - A bounced email will never reach the process() method
+# - Check inbound_email.status to see if email was bounced vs processed
+
 class ProofSubmissionMailbox < ApplicationMailbox
-  before_processing :ensure_constituent
-  before_processing :ensure_active_application
-  before_processing :check_rate_limit
-  before_processing :check_max_rejections
-  before_processing :validate_attachments
+  # CRITICAL: These callbacks run BEFORE process() and can bounce the email
+  # If ANY callback calls bounce_with_notification(), processing stops immediately
+  before_processing :ensure_constituent        # Bounces if sender not found
+  before_processing :ensure_active_application # Bounces if no active app
+  before_processing :check_rate_limit          # Bounces if rate limited
+  before_processing :check_max_rejections      # Bounces if max rejections hit
+  before_processing :validate_attachments      # Bounces if no/invalid attachments
 
   def process
+    # NOTE: This method only runs if ALL before_processing callbacks pass
+    Rails.logger.info "PROOF SUBMISSION MAILBOX PROCESSING: Email from #{mail.from&.first} with subject '#{mail.subject}'"
+    
     # Create an audit record for the submission
     create_audit_record
 
@@ -22,6 +49,8 @@ class ProofSubmissionMailbox < ApplicationMailbox
 
     # Notify admin of new proof submission
     notify_admin
+    
+    Rails.logger.info "PROOF SUBMISSION MAILBOX COMPLETE: Successfully processed email"
   end
 
   private
@@ -133,6 +162,9 @@ class ProofSubmissionMailbox < ApplicationMailbox
   end
 
   def check_max_rejections
+    # IMPORTANT: This Policy.get() call hits the database - ensure 'max_proof_rejections' exists in seeds.rb
+    # If this returns nil, the bounce logic will not work as expected
+    # Debug: Check Policy.find_by(key: 'max_proof_rejections') in rails console
     max_rejections = Policy.get('max_proof_rejections')
     return unless max_rejections.present? && application.total_rejections.present?
     return unless application.total_rejections >= max_rejections
@@ -166,30 +198,57 @@ class ProofSubmissionMailbox < ApplicationMailbox
   end
 
   def bounce_with_notification(error_type, message)
-    # record the bounce event
+    # BOUNCE PROCESSING: This method halts all email processing
+    Rails.logger.info "MAILBOX BOUNCE: #{error_type} - #{message} (from: #{mail.from&.first}, inbound_email: #{inbound_email.id})"
+    
+    # Record the bounce event with detailed context
+    # IMPORTANT: Handle transaction/race condition issues with system_user creation
+    # In test environments, User.system_user might be created in a different transaction
+    # context, leading to foreign key constraint violations when creating Events
+    # This robust approach ensures we always have a valid user for event creation
+    event_user = constituent
+    if event_user.nil?
+      begin
+        event_user = User.system_user
+        # Double-check the user exists and is persisted
+        event_user.reload if event_user.persisted?
+      rescue ActiveRecord::RecordNotFound => e
+        Rails.logger.warn "System user not found during bounce: #{e.message}. Creating new system user."
+        # Clear the memoized value and try again
+        User.instance_variable_set(:@system_user, nil)
+        event_user = User.system_user
+      end
+    end
+    
     Event.create!(
-      user: constituent || User.system_user,
+      user: event_user,
       action: "proof_submission_#{error_type}",
       metadata: {
         application_id: application&.id,
         error: message,
-        inbound_email_id: inbound_email.id
+        error_type: error_type,
+        inbound_email_id: inbound_email.id,
+        sender_email: mail.from&.first,
+        email_subject: mail.subject,
+        bounce_timestamp: Time.current.iso8601
       }
     )
 
-    # send the actual bounce email
-    mail = ApplicationNotificationsMailer.proof_submission_error(
+    # Send error notification to sender with clear explanation
+    bounce_mail = ApplicationNotificationsMailer.proof_submission_error(
       constituent,
       application,
       error_type,
-      message
+      "Email processing failed: #{message}"
     )
-    mail.deliver_now
+    bounce_mail.deliver_now
 
-    # update the inbound email status to bounced
+    # Mark inbound email as bounced for tracking
     inbound_email.update!(status: 'bounced')
+    
+    Rails.logger.info "MAILBOX BOUNCE COMPLETE: Email #{inbound_email.id} marked as bounced, notification sent"
 
-    # halt further inbound_email processing
+    # Halt all further processing - this prevents process() from running
     throw :bounce
   end
 

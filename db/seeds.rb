@@ -131,6 +131,13 @@ end
 
 def create_policies
   seed_puts 'Creating policies...'
+  # IMPORTANT: All policy keys used in the application MUST be defined here
+  # If a policy is missing from this list, Policy.get('key') will return nil
+  # This causes unexpected behavior in mailboxes, controllers, and other logic
+  # Common missing policies that cause test failures:
+  # - max_proof_rejections (used by ProofSubmissionMailbox)
+  # - proof_submission_rate_limit_* (used by rate limiting)
+  # - support_email (NOTE: Cannot be stored here - integers only!)
   policies = {
     'fpl_modifier_percentage' => 400,
     'fpl_1_person' => 15_650,
@@ -146,6 +153,7 @@ def create_policies
     'proof_submission_rate_limit_web' => 5,
     'proof_submission_rate_limit_email' => 10,
     'proof_submission_rate_period' => 1,
+    'max_proof_rejections' => 3,
     # Voucher policies
     'voucher_value_hearing_disability' => 500,
     'voucher_value_vision_disability' => 500,

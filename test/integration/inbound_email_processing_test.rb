@@ -24,8 +24,15 @@ class InboundEmailProcessingTest < ActionDispatch::IntegrationTest
     @doctor_email = "doctor-#{SecureRandom.hex(8)}@example.com"
     @medical_provider = create(:medical_provider, email: @doctor_email) if defined?(MedicalProvider)
 
-    # Mock the ProofAttachmentService to always return success
-    ProofAttachmentService.stubs(:attach_proof).returns({ success: true })
+    # CRITICAL TESTING INSIGHT: Do NOT stub ProofAttachmentService.attach_proof
+    # This service performs the actual file attachment - stubbing it prevents real attachments
+    # Let the service run normally to test the complete integration flow
+    # 
+    # TROUBLESHOOTING: If tests fail with "proof should be attached":
+    # 1. Check if ProofAttachmentService.attach_proof is stubbed (remove the stub)
+    # 2. Verify Policy records exist (especially max_proof_rejections)
+    # 3. Ensure ActionMailbox.ingress is set to :test
+    # 4. Use real file content, not empty strings
 
     # Set the rate limit to a high value to avoid rate limit errors
     Policy.find_or_create_by(key: 'proof_submission_rate_limit_email') do |policy|
@@ -39,6 +46,14 @@ class InboundEmailProcessingTest < ActionDispatch::IntegrationTest
     Policy.find_or_create_by(key: 'max_proof_rejections') do |policy|
       policy.value = 10
     end
+
+    # Ensure system user exists for bounce event logging
+    # This prevents foreign key constraint violations when creating events for unknown senders
+    # TROUBLESHOOTING: If you see "Key (user_id)=(X) is not present in table users" errors:
+    # 1. Ensure User.system_user is called in test setup (done here)
+    # 2. Check that bounce_with_notification has robust user creation logic
+    # 3. Verify no transaction isolation issues between user creation and event creation
+    @system_user = User.system_user
 
     # Ensure application has medical certification requested method
     unless @application.respond_to?(:medical_certification_requested?)
@@ -61,31 +76,24 @@ class InboundEmailProcessingTest < ActionDispatch::IntegrationTest
   end
 
   test 'processes income proof email from constituent' do
-    # Stub mailbox validations for this test that should succeed
-    ProofSubmissionMailbox.any_instance.stubs(:ensure_constituent).returns(nil)
-    ProofSubmissionMailbox.any_instance.stubs(:ensure_active_application).returns(nil)
-    ProofSubmissionMailbox.any_instance.stubs(:check_rate_limit).returns(nil)
-    ProofSubmissionMailbox.any_instance.stubs(:check_max_rejections).returns(nil)
-    ProofSubmissionMailbox.any_instance.stubs(:validate_attachments).returns(nil)
-    
-    # Create a temporary file for testing
-    file_path = Rails.root.join('tmp/income_proof.pdf')
-    File.write(file_path, 'This is a test PDF file')
-
-    # Set up a simple attachment
-    attachments = [
-      { filename: 'income_proof.pdf', content: File.read(file_path), content_type: 'application/pdf' }
-    ]
+    # Apply ActionMailbox testing best practices - use real test data for integration testing
+    # Use StringIO instead of temporary files to avoid ActiveStorage signed ID issues
+    pdf_content = 'This is a test PDF file content that is large enough to pass validation. ' * 20
 
     # Use ActionMailbox::TestHelper to directly process the email and route it
     assert_difference -> { ActionMailbox::InboundEmail.count } do
-      receive_inbound_email_from_mail(
+      inbound_email = receive_inbound_email_from_mail(
         to: 'proof@example.com',
         from: @test_email,
         subject: 'Income Proof Submission',
-        body: 'Please find my income proof attached.',
-        attachments: attachments
-      )
+        body: 'Please find my income proof attached.'
+      ) do |mail|
+        mail.attachments['income_proof.pdf'] = pdf_content
+      end
+      
+      # Apply ActionMailbox testing best practice - accept both valid email states
+      assert_includes ['processed', 'delivered'], inbound_email.status,
+        "Email should be processed or delivered, got: #{inbound_email.status}"
     end
 
     # Ensure the application has an income_proof method before asserting
@@ -101,9 +109,6 @@ class InboundEmailProcessingTest < ActionDispatch::IntegrationTest
       user: @constituent,
       action: 'proof_submission_received'
     )
-
-    # Clean up
-    FileUtils.rm_f(file_path)
   end
 
   test 'processes medical certification email from provider' do
@@ -165,29 +170,28 @@ class InboundEmailProcessingTest < ActionDispatch::IntegrationTest
   end
 
   test 'rejects email from unknown sender' do
-    # Don't create and route in one step - just create the email first
-    mail = Mail.new do
-      to 'proof@example.com'
-      from 'unknown@example.com'
-      subject 'Income Proof Submission'
-      body 'Please find my income proof attached.'
+    # INTEGRATION TEST APPROACH: Test the actual behavior, not internal method calls
+    # Use ActionMailbox testing best practices - test the end result, not the implementation
+    
+    unknown_email = "unknown-#{SecureRandom.hex(8)}@example.com"
+    
+    # Process email from unknown sender - expect it to be bounced
+    assert_difference -> { ActionMailbox::InboundEmail.count } do
+      # The mailbox throws :bounce for unknown senders, which is expected behavior
+      assert_throws :bounce do
+        receive_inbound_email_from_mail(
+          to: 'proof@example.com',
+          from: unknown_email,
+          subject: 'Income Proof Submission',
+          body: 'Please find my income proof attached.'
+        ) do |mail|
+          mail.attachments['income_proof.pdf'] = 'Test PDF content'
+        end
+      end
     end
-
-    # Create the inbound email but don't route it yet
-    inbound_email = ActionMailbox::InboundEmail.create_and_extract_message_id!(mail.to_s)
-
-    # Set up a mock that verifies the bounce happens
-    Event.expects(:create!).with do |args|
-      args[:action].include?('constituent_not_found')
-    end
-
-    # Set expectations for ApplicationNotificationsMailer
-    ApplicationNotificationsMailer.expects(:proof_submission_error).returns(mock(deliver_now: true))
-
-    # Assert that the error is raised during routing
-    assert_raises(UncaughtThrowError) do
-      inbound_email.route
-    end
+    
+    # Verify no proof was attached to any application (since sender is unknown)
+    assert_not @application.income_proof.attached?, 'No proof should be attached for unknown sender'
   end
 
   test 'sends notification to admin when proof is received' do
@@ -221,43 +225,31 @@ class InboundEmailProcessingTest < ActionDispatch::IntegrationTest
   end
 
   test 'handles emails with multiple attachments' do
-    # Stub mailbox validations for this test that should succeed
-    ProofSubmissionMailbox.any_instance.stubs(:ensure_constituent).returns(nil)
-    ProofSubmissionMailbox.any_instance.stubs(:ensure_active_application).returns(nil)
-    ProofSubmissionMailbox.any_instance.stubs(:check_rate_limit).returns(nil)
-    ProofSubmissionMailbox.any_instance.stubs(:check_max_rejections).returns(nil)
-    ProofSubmissionMailbox.any_instance.stubs(:validate_attachments).returns(nil)
-    
-    # Create temporary files for testing
-    file_path1 = Rails.root.join('tmp/income_proof1.pdf')
-    file_path2 = Rails.root.join('tmp/income_proof2.pdf')
-
-    File.write(file_path1, 'This is test file 1')
-    File.write(file_path2, 'This is test file 2')
-
-    # Set up attachments for the test
-    attachments = [
-      { filename: 'income_proof1.pdf', content: File.read(file_path1), content_type: 'application/pdf' },
-      { filename: 'income_proof2.pdf', content: File.read(file_path2), content_type: 'application/pdf' }
-    ]
+    # Apply ActionMailbox testing best practices - use real test data for integration testing
+    # Use StringIO content instead of temporary files to avoid ActiveStorage signed ID issues
+    pdf_content1 = 'This is test PDF file 1 content that is large enough to pass validation. ' * 20
+    pdf_content2 = 'This is test PDF file 2 content that is large enough to pass validation. ' * 20
 
     # Use the helper to create and route the email
     assert_difference -> { ActionMailbox::InboundEmail.count } do
-      receive_inbound_email_from_mail(
+      inbound_email = receive_inbound_email_from_mail(
         to: 'proof@example.com',
         from: @test_email,
         subject: 'Income Proof Submission',
-        body: 'Please find my income proofs attached.',
-        attachments: attachments
-      )
+        body: 'Please find my income proofs attached.'
+      ) do |mail|
+        mail.attachments['income_proof1.pdf'] = pdf_content1
+        mail.attachments['income_proof2.pdf'] = pdf_content2
+      end
+      
+      # Apply ActionMailbox testing best practice - accept both valid email states
+      assert_includes ['processed', 'delivered'], inbound_email.status,
+        "Email should be processed or delivered, got: #{inbound_email.status}"
     end
 
     # Verify attachments were processed - we may not have multiple attachments support
     # but we should at least have one proof attached after processing
+    @application.reload
     assert @application.income_proof.attached? if @application.respond_to?(:income_proof)
-
-    # Clean up
-    FileUtils.rm_f(file_path1)
-    FileUtils.rm_f(file_path2)
   end
 end

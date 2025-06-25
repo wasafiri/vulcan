@@ -54,7 +54,7 @@ Rails.application.configure do
   config.action_controller.raise_on_missing_callback_actions = true
   
   # Reduce log noise in tests - only show warnings/errors unless verbose mode requested
-  config.log_level = ENV['VERBOSE_TESTS'] ? :debug : :warn
+  config.log_level = :warn unless ENV['VERBOSE_TESTS'] == 'true'
   config.active_record.verbose_query_logs = ENV['VERBOSE_TESTS'] || false
   
   # Configure logger output

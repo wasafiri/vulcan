@@ -10,9 +10,9 @@ FactoryBot.define do
 
     # Base status fields with default values
     status { :in_progress }
-    income_proof_status { :not_reviewed } # Add default value
-    residency_proof_status { :not_reviewed } # Add default value
-    medical_certification_status { :not_requested } # Valid enum value
+    income_proof_status { :not_reviewed }
+    residency_proof_status { :not_reviewed }
+    medical_certification_status { :not_requested }
 
     # Other required fields
     application_date { Time.current }
@@ -30,155 +30,12 @@ FactoryBot.define do
       use_mock_attachments { false } # Whether to use mock_attached_file instead of real attachments
     end
 
-    # Attachment traits that use the standardized mock_attached_file approach
-    trait :with_mocked_income_proof do
-      after(:build) do |application|
-        income_proof_mock = mock_attached_file(filename: 'income.pdf')
-        application.stubs(:income_proof_attached?).returns(true)
-        application.stubs(:income_proof).returns(income_proof_mock)
-      end
-    end
-
-    trait :with_mocked_residency_proof do
-      after(:build) do |application|
-        residency_proof_mock = mock_attached_file(filename: 'residency.pdf')
-        application.stubs(:residency_proof_attached?).returns(true)
-        application.stubs(:residency_proof).returns(residency_proof_mock)
-      end
-    end
-
-    trait :with_mocked_medical_certification do
-      after(:build) do |application|
-        medical_certification_mock = mock_attached_file(filename: 'medical_certification.pdf')
-        application.stubs(:medical_certification_attached?).returns(true)
-        application.stubs(:medical_certification).returns(medical_certification_mock)
-      end
-    end
-
-    trait :with_all_mocked_attachments do
-      with_mocked_income_proof
-      with_mocked_residency_proof
-      with_mocked_medical_certification
-    end
-
-    # Real attachment traits that use actual file attachments (not mocks)
-    # These are more suitable for integration/system tests where actual file processing is needed
-    trait :with_real_income_proof do
-      after(:build) do |application|
-        # Use the module method from ActiveStorageTestHelper
-        if ActiveStorageTestHelper.instance_methods.include?(:attach_income_proof)
-          ActiveStorageTestHelper.new.attach_income_proof(application)
-        else
-          application.income_proof.attach(
-            io: StringIO.new('income proof content'),
-            filename: 'income.pdf',
-            content_type: 'application/pdf'
-          )
-        end
-      end
-    end
-
-    trait :with_real_residency_proof do
-      after(:build) do |application|
-        # Use the module method from ActiveStorageTestHelper
-        if ActiveStorageTestHelper.instance_methods.include?(:attach_residency_proof)
-          ActiveStorageTestHelper.new.attach_residency_proof(application)
-        else
-          application.residency_proof.attach(
-            io: StringIO.new('residency proof content'),
-            filename: 'residency.pdf',
-            content_type: 'application/pdf'
-          )
-        end
-      end
-    end
-
-    trait :with_real_medical_certification do
-      after(:build) do |application|
-        # Use the module method from ActiveStorageTestHelper
-        if ActiveStorageTestHelper.instance_methods.include?(:attach_medical_certification)
-          ActiveStorageTestHelper.new.attach_medical_certification(application)
-        else
-          application.medical_certification.attach(
-            io: StringIO.new('medical certification content'),
-            filename: 'medical_certification.pdf',
-            content_type: 'application/pdf'
-          )
-        end
-      end
-    end
-
-    trait :with_all_real_attachments do
-      with_real_income_proof
-      with_real_residency_proof
-      with_real_medical_certification
-    end
-
-    after(:build) do |application, evaluator|
-      # Skip attachment during tests unless explicitly requested
-      next if evaluator.skip_proofs
-
-      # Set the thread variable to disable callbacks during factory creation
-      original_context = Thread.current[:paper_application_context]
-      Thread.current[:paper_application_context] = true
-
-      # Attach known good PDF files using direct SQL to bypass callbacks
-      begin
-        # Create the blobs directly
-        income_blob = ActiveStorage::Blob.create_and_upload!(
-          io: Rails.root.join('test/fixtures/files/income_proof.pdf').open,
-          filename: 'income_proof.pdf',
-          content_type: 'application/pdf'
-        )
-
-        # Ensure the blob has a created_at timestamp
-        income_blob.update_column(:created_at, 2.minutes.ago) if income_blob.created_at.nil?
-
-        residency_blob = ActiveStorage::Blob.create_and_upload!(
-          io: Rails.root.join('test/fixtures/files/residency_proof.pdf').open,
-          filename: 'residency_proof.pdf',
-          content_type: 'application/pdf'
-        )
-
-        # Ensure the blob has a created_at timestamp
-        residency_blob.update_column(:created_at, 2.minutes.ago) if residency_blob.created_at.nil?
-
-        # Create attachment records directly without callbacks
-        if application.persisted?
-          # Create attachments via direct SQL if the application is already persisted
-          ActiveStorage::Attachment.insert_all([
-                                                 {
-                                                   name: 'income_proof',
-                                                   record_type: 'Application',
-                                                   record_id: application.id,
-                                                   blob_id: income_blob.id,
-                                                   created_at: Time.current
-                                                 },
-                                                 {
-                                                   name: 'residency_proof',
-                                                   record_type: 'Application',
-                                                   record_id: application.id,
-                                                   blob_id: residency_blob.id,
-                                                   created_at: Time.current
-                                                 }
-                                               ])
-        else
-          # Use regular attach for non-persisted applications
-          application.income_proof.attach(income_blob)
-          application.residency_proof.attach(residency_blob)
-        end
-      ensure
-        # Restore the thread variable
-        Thread.current[:paper_application_context] = original_context
-      end
-    end
-
+    # Simple traits for different application states
     trait :completed do
-      household_size { 4 }
-      annual_income  { 50_000 }
       status { :approved }
       income_proof_status { :approved }
       residency_proof_status { :approved }
+      medical_certification_status { :approved }
       terms_accepted { true }
       information_verified { true }
       medical_release_authorized { true }
@@ -188,8 +45,6 @@ FactoryBot.define do
     end
 
     trait :rejected do
-      household_size { 2 }
-      annual_income  { 300_000 }
       status { :rejected }
       income_proof_status { :rejected }
       residency_proof_status { :rejected }
@@ -202,8 +57,6 @@ FactoryBot.define do
     end
 
     trait :archived do
-      household_size { 4 }
-      annual_income  { 50_000 }
       status { :archived }
       income_proof_status { :approved }
       residency_proof_status { :approved }
@@ -214,43 +67,106 @@ FactoryBot.define do
       last_activity_at { 8.years.ago }
     end
 
-    trait :in_progress_with_rejected_proofs do
-      household_size { 4 }
-      annual_income  { 50_000 }
-      status { :in_progress }
+    trait :with_rejected_proofs do
+      status { :needs_information }
       income_proof_status { :rejected }
       residency_proof_status { :rejected }
       needs_review_since { Time.current }
       last_activity_at { Time.current }
+      
+      # This trait represents the constituent portal scenario where
+      # proofs were uploaded and then rejected by admin review
+      after(:create) do |application|
+        # Attach sample proofs to represent the uploaded-then-rejected scenario
+        application.income_proof.attach(
+          io: Rails.root.join('test/fixtures/files/medical_certification_valid.pdf').open,
+          filename: 'income_proof.pdf',
+          content_type: 'application/pdf'
+        )
+        application.residency_proof.attach(
+          io: Rails.root.join('test/fixtures/files/medical_certification_valid.pdf').open,
+          filename: 'residency_proof.pdf', 
+          content_type: 'application/pdf'
+        )
+      end
+    end
 
-      # Use the same PDF files as the base factory - the status is what matters
-      # No need to override attachment behavior
+    trait :paper_rejected_proofs do
+      status { :needs_information }
+      
+      # This trait represents the paper application scenario where
+      # admin rejected proofs without uploading them (paper workflow)
+      after(:create) do |application|
+        # Use update_columns to bypass validations for this specific paper scenario
+        application.update_columns(
+          income_proof_status: Application.income_proof_statuses[:rejected],
+          residency_proof_status: Application.residency_proof_statuses[:rejected],
+          needs_review_since: nil
+        )
+      end
     end
 
     trait :with_approved_proofs do
       income_proof_status { :approved }
       residency_proof_status { :approved }
-      # Use the same PDF files as the base factory
     end
 
-    trait :in_progress_with_approved_proofs do
-      household_size { 4 }
-      annual_income  { 50_000 }
-      status { :in_progress }
-      income_proof_status { :approved }
-      residency_proof_status { :approved }
-      last_activity_at { Time.current }
-      # Use the same PDF files as the base factory
+    # Clean attachment traits using real files
+    trait :with_income_proof do
+      after(:create) do |application|
+        application.income_proof.attach(
+          io: Rails.root.join('test/fixtures/files/medical_certification_valid.pdf').open,
+          filename: 'income_proof.pdf',
+          content_type: 'application/pdf'
+        )
+      end
+    end
+
+    trait :with_residency_proof do
+      after(:create) do |application|
+        application.residency_proof.attach(
+          io: Rails.root.join('test/fixtures/files/medical_certification_valid.pdf').open,
+          filename: 'residency_proof.pdf',
+          content_type: 'application/pdf'
+        )
+      end
+    end
+
+    trait :with_medical_certification do
+      after(:create) do |application|
+        application.medical_certification.attach(
+          io: Rails.root.join('test/fixtures/files/medical_certification_valid.pdf').open,
+          filename: 'medical_certification.pdf',
+          content_type: 'application/pdf'
+        )
+      end
+    end
+
+    trait :with_all_proofs do
+      with_income_proof
+      with_residency_proof
+      with_medical_certification
     end
 
     trait :in_progress_with_pending_proofs do
-      household_size { 4 }
-      annual_income  { 50_000 }
       status { :in_progress }
       income_proof_status { :not_reviewed }
       residency_proof_status { :not_reviewed }
-      last_activity_at { Time.current }
-      # Use the same PDF files as the base factory
+      needs_review_since { Time.current }
+      
+      after(:create) do |application|
+        # Attach proofs that need review
+        application.income_proof.attach(
+          io: Rails.root.join('test/fixtures/files/medical_certification_valid.pdf').open,
+          filename: 'income_proof.pdf',
+          content_type: 'application/pdf'
+        )
+        application.residency_proof.attach(
+          io: Rails.root.join('test/fixtures/files/medical_certification_valid.pdf').open,
+          filename: 'residency_proof.pdf',
+          content_type: 'application/pdf'
+        )
+      end
     end
 
     # This trait creates an application for a dependent, managed by a guardian.
