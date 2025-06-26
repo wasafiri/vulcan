@@ -41,6 +41,8 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: vulcan_test
+          DATABASE_USERNAME: postgres
+          DATABASE_PASSWORD: postgres
         ports:
           - 5432:5432
         options: >-
@@ -69,6 +71,8 @@ jobs:
           PGUSER: postgres
           PGPASSWORD: postgres
           PGDATABASE: vulcan_test
+          DATABASE_USERNAME: postgres
+          DATABASE_PASSWORD: postgres
         run: |
           bin/rails db:test:prepare
 
@@ -79,6 +83,8 @@ jobs:
           PGUSER: postgres
           PGPASSWORD: postgres
           PGDATABASE: vulcan_test
+          DATABASE_USERNAME: postgres
+          DATABASE_PASSWORD: postgres
         run: |
           bin/rails test test:system
 
