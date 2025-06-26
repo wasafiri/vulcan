@@ -21,9 +21,9 @@ Rails.application.configure do
     # In production, you should properly configure these in credentials
     Rails.logger.warn '[ENCRYPTION] Active Record encryption credentials not found. Using temporary keys.'
 
-    config.active_record.encryption.primary_key = ActiveRecord::Encryption.generate_random_key
-    config.active_record.encryption.deterministic_key = ActiveRecord::Encryption.generate_random_key
-    config.active_record.encryption.key_derivation_salt = ActiveRecord::Encryption.generate_random_key
+    config.active_record.encryption.primary_key = SecureRandom.hex(32)
+    config.active_record.encryption.deterministic_key = SecureRandom.hex(32)
+    config.active_record.encryption.key_derivation_salt = SecureRandom.hex(32)
   end
 
   # Enable support for unencrypted data during transition
