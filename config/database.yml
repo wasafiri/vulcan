@@ -10,7 +10,9 @@ development:
     host: localhost
     port: 5432
     username: <%= ENV.fetch("DATABASE_USERNAME", "postgres") %>
-    password: <%= ENV.fetch("DATABASE_PASSWORD", "") %>
+    <% if ENV["DATABASE_PASSWORD"].present? %>
+    password: <%= ENV["DATABASE_PASSWORD"] %>
+    <% end %>
     pool: 5
     timeout: 5000
   queue:
@@ -24,7 +26,9 @@ test:
     host: localhost
     port: 5432
     username: <%= ENV.fetch("DATABASE_USERNAME", "postgres") %>
-    password: <%= ENV.fetch("DATABASE_PASSWORD", "") %>
+    <% if ENV["DATABASE_PASSWORD"].present? %>
+    password: <%= ENV["DATABASE_PASSWORD"] %>
+    <% end %>
     pool: 5
     timeout: 5000
   queue:
