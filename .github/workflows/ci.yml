@@ -36,12 +36,7 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       RAILS_ENV: test
-      PGHOST: localhost
-      PGUSER: postgres
-      PGPASSWORD: postgres
-      PGDATABASE: vulcan_test
-      DATABASE_USERNAME: postgres
-      DATABASE_PASSWORD: postgres
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/vulcan_test
     services:
       postgres:
         image: postgres:17
@@ -73,26 +68,10 @@ jobs:
           bundler-cache: true
 
       - name: Setup Database
-        env:
-          RAILS_ENV: test
-          PGHOST: localhost
-          PGUSER: postgres
-          PGPASSWORD: postgres
-          PGDATABASE: vulcan_test
-          DATABASE_USERNAME: postgres
-          DATABASE_PASSWORD: postgres
         run: |
           bin/rails db:test:prepare
 
       - name: Run tests
-        env:
-          RAILS_ENV: test
-          PGHOST: localhost
-          PGUSER: postgres
-          PGPASSWORD: postgres
-          PGDATABASE: vulcan_test
-          DATABASE_USERNAME: ${{ env.DATABASE_USERNAME }}
-          DATABASE_PASSWORD: ${{ env.DATABASE_PASSWORD }}
         run: |
           bin/rails test test:system
 
