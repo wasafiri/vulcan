@@ -37,6 +37,8 @@ jobs:
     env:
       RAILS_ENV: test
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/vulcan_test
+      PGUSER: postgres
+      PGPASSWORD: postgres
     services:
       postgres:
         image: postgres:17
