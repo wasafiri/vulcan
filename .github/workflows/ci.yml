@@ -71,6 +71,13 @@ jobs:
           ruby-version: .ruby-version
           bundler-cache: true
 
+      - name: Debug env
+        run: env | grep -E 'DATABASE|PG'
+
+      - name: Show resolved database.yml
+        run: |
+          ruby -r yaml -r erb -e 'puts YAML.safe_load(ERB.new(File.read("config/database.yml")).result, aliases: true)["test"]'
+
       - name: Setup Database
         run: |
           bin/rails db:test:prepare
@@ -86,6 +93,3 @@ jobs:
           name: screenshots
           path: ${{ github.workspace }}/tmp/screenshots
           if-no-files-found: ignore
-
-      - name: Debug env
-        run: env | grep -E 'DATABASE|PG'
