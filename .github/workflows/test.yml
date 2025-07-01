@@ -48,7 +48,7 @@ jobs:
         with:
           bundler-cache: true
           
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
@@ -56,24 +56,25 @@ jobs:
           
       - name: Install dependencies
         run: |
-          yarn install
+          yarn install --frozen-lockfile
           bundle install
           
       - name: Ensure builds directory exists
         run: mkdir -p app/assets/builds
           
-      - name: Build assets
-        run: |
-          yarn run build
-          yarn run build:css
+      - name: Build JavaScript assets
+        run: yarn run build
+          
+      - name: Build CSS assets
+        run: yarn run build:css
           
       - name: Verify assets were built
         run: |
           echo "Checking for built assets..."
           ls -la app/assets/builds/
-          test -f app/assets/builds/application.js || (echo "application.js not found" && exit 1)
-          test -f app/assets/builds/application.css || (echo "application.css not found" && exit 1)
-          echo "Assets verified successfully"
+          test -f app/assets/builds/application.js || (echo "ERROR: application.js not found" && exit 1)
+          test -f app/assets/builds/application.css || (echo "ERROR: application.css not found" && exit 1)
+          echo "✅ Assets verified successfully"
           
       - name: Setup database
         run: bin/rails db:prepare
