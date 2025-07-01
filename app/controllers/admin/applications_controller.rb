@@ -452,8 +452,7 @@ module Admin
       @audit_logs = audit_log_builder.build_audit_logs
     end
 
-    # --- Other Private Helpers ---
-
+    # Other Private Helpers
     def load_notifications
       Notification
         .select('id, recipient_id, actor_id, notifiable_id, notifiable_type, action, read_at, ' \
@@ -569,11 +568,7 @@ module Admin
       Current.set(request, current_user)
     end
 
-    ### metrics --------------------------------------------------------------------
-    # Dashboard metrics loading is now handled by the DashboardMetricsLoading concern
-
-    ### scope / filtering ----------------------------------------------------------
-
+    ### scope / filtering
     def filtered_scope(scope)
       result = Applications::FilterService.new(scope, params).apply_filters
       if result.is_a?(BaseService::Result)
@@ -587,8 +582,7 @@ module Admin
       scope
     end
 
-    ### pagination -----------------------------------------------------------------
-
+    ### pagination
     def paginate(scope)
       pagy(scope, items: 20)
     rescue StandardError => e

@@ -11,7 +11,7 @@ require 'test_helper'
 # - Integration authentication with headers
 # - Authentication session isolation
 
-if ENV['CI'] || ENV['RUN_SMOKE_TESTS']
+if ENV['CI']
   class AuthenticationHelperSmokeTest < ActionDispatch::IntegrationTest
     include AuthenticationTestHelper
     # No need for this in IntegrationTest: include SystemTestAuthentication
@@ -83,7 +83,7 @@ if ENV['CI'] || ENV['RUN_SMOKE_TESTS']
       user = create(:user, password: 'password123', verified: true)
 
       # Sign in using the integration helper
-      sign_in(user)
+      sign_in_for_integration_test(user)
 
       # Make a real request and verify it succeeds
       get '/'
@@ -112,7 +112,7 @@ if ENV['CI'] || ENV['RUN_SMOKE_TESTS']
       user2 = create(:user, password: 'password123', verified: true)
 
       # Sign in as first user
-      sign_in(user1)
+      sign_in_for_integration_test(user1)
 
       # Verify thread-local storage
       assert_equal user1.id.to_s, Thread.current[:test_user_id].to_s
@@ -128,7 +128,7 @@ if ENV['CI'] || ENV['RUN_SMOKE_TESTS']
       assert_nil Thread.current[:test_user_id]
 
       # Sign in as second user
-      sign_in(user2)
+      sign_in_for_integration_test(user2)
 
       # Verify thread-local now has second user
       assert_equal user2.id.to_s, Thread.current[:test_user_id].to_s
