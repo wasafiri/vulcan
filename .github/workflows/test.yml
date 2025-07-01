@@ -54,33 +54,34 @@ jobs:
           node-version: '18'
           cache: 'yarn'
           
-      - name: Install dependencies
-        run: |
-          yarn install --frozen-lockfile
-          bundle install
-          
+      - name: Install JavaScript dependencies
+        run: yarn install --frozen-lockfile
+        
       - name: Ensure builds directory exists
         run: mkdir -p app/assets/builds
-          
+        
       - name: Build JavaScript assets
         run: yarn run build
-          
+        
       - name: Build CSS assets
         run: yarn run build:css
-          
+        
       - name: Verify assets were built
         run: |
           echo "Checking for built assets..."
           ls -la app/assets/builds/
-          test -f app/assets/builds/application.js || (echo "ERROR: application.js not found" && exit 1)
-          test -f app/assets/builds/application.css || (echo "ERROR: application.css not found" && exit 1)
-          echo "✅ Assets verified successfully"
+          if [ ! -f "app/assets/builds/application.css" ]; then
+            echo "ERROR: application.css was not built!"
+            exit 1
+          fi
+          if [ ! -f "app/assets/builds/application.js" ]; then
+            echo "ERROR: application.js was not built!"
+            exit 1
+          fi
+          echo "Assets built successfully!"
           
-      - name: Setup database
-        run: bin/rails db:prepare
+      - name: Prepare database
+        run: bin/rails db:test:prepare
         
-      - name: Run standard tests
-        run: bin/rails test
-        
-      - name: Run system tests
-        run: bin/rails test:system
+      - name: Run tests
+        run: bin/rails test test:system
