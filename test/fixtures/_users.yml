@@ -197,7 +197,6 @@ constituent_alex:
   timezone: "Eastern Time (US & Canada)"
   locale: en
   email_verified: true
-  guardian_relationship: parent
   status: active
 
 constituent_john:
@@ -216,7 +215,6 @@ constituent_john:
   timezone: "Eastern Time (US & Canada)"
   locale: en
   email_verified: true
-  guardian_relationship: parent
   status: active
 
 constituent_jane:
@@ -235,7 +233,6 @@ constituent_jane:
   timezone: "Eastern Time (US & Canada)"
   locale: en
   email_verified: true
-  guardian_relationship: parent
   status: active
 
 constituent_kenneth:
@@ -254,7 +251,6 @@ constituent_kenneth:
   timezone: "Eastern Time (US & Canada)"
   locale: en
   email_verified: true
-  guardian_relationship: parent
   status: active
 
 constituent_wilbur:
@@ -291,7 +287,6 @@ constituent_steven:
   timezone: "Eastern Time (US & Canada)"
   locale: en
   email_verified: true
-  guardian_relationship: parent
   status: active
 
 constituent_mark:
@@ -310,7 +305,6 @@ constituent_mark:
   timezone: "Eastern Time (US & Canada)"
   locale: en
   email_verified: true
-  guardian_relationship: parent
   status: active
 
 constituent_rex:
@@ -329,7 +323,6 @@ constituent_rex:
   timezone: "Eastern Time (US & Canada)"
   locale: en
   email_verified: true
-  guardian_relationship: parent
   status: active
 
 one:

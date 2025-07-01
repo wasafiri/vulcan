@@ -3,6 +3,8 @@
 require 'test_helper'
 
 class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
+  fixtures :all # Load all fixtures for system tests
+  
   include SystemTestAuthentication # Include authentication helper
   include SystemTestHelpers # Include helpers for working with Cuprite
 
@@ -29,8 +31,8 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
       'no-sandbox': nil,                      # Required for running in CI environments
       headless: true # Explicitly set headless mode
     }
-    # Disable JavaScript for debugging purposes
-    driver_options.js_enabled = false
+    # Enable JavaScript for proper functionality
+    driver_options.js_enabled = true
     # Enable BiDi for WebSocket-based browser control
     driver_options.web_socket_url = true if driver_options.respond_to?(:web_socket_url=)
   end
