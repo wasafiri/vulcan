@@ -59,10 +59,21 @@ jobs:
           yarn install
           bundle install
           
+      - name: Ensure builds directory exists
+        run: mkdir -p app/assets/builds
+          
       - name: Build assets
         run: |
           yarn run build
           yarn run build:css
+          
+      - name: Verify assets were built
+        run: |
+          echo "Checking for built assets..."
+          ls -la app/assets/builds/
+          test -f app/assets/builds/application.js || (echo "application.js not found" && exit 1)
+          test -f app/assets/builds/application.css || (echo "application.css not found" && exit 1)
+          echo "Assets verified successfully"
           
       - name: Setup database
         run: bin/rails db:prepare
