@@ -88,7 +88,7 @@ module VendorPortal
 
       # Create a mock transaction for the controller to build upon
       # The controller creates its own transaction, so we stub the save method
-      mock_transaction = VoucherTransaction.new(voucher: @voucher, vendor: @vendor, amount: 100.0)
+      VoucherTransaction.new(voucher: @voucher, vendor: @vendor, amount: 100.0)
       VoucherTransaction.any_instance.stubs(:save).returns(true) # Stub save to succeed
 
       # Process redemption using the confirmed correct path helper

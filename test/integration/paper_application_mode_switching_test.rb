@@ -12,19 +12,19 @@ class PaperApplicationModeSwitchingTest < ActionDispatch::IntegrationTest
     Policy.find_or_create_by!(key: 'fpl_2_person') { |policy| policy.value = '21150' }
     Policy.find_or_create_by!(key: 'fpl_modifier_percentage') { |policy| policy.value = '400' }
 
-    # Create sample proofs for testing using ActiveStorage::Blob.create_and_upload!
-    income_file = fixture_file_upload('test/fixtures/files/sample.pdf', 'application/pdf')
+    # Create sample proofs for testing using file content directly
+    sample_pdf_content = File.read(Rails.root.join('test/fixtures/files/sample.pdf'))
+    
     @income_blob = ActiveStorage::Blob.create_and_upload!(
-      io: income_file,
-      filename: income_file.original_filename,
-      content_type: income_file.content_type
+      io: StringIO.new(sample_pdf_content),
+      filename: 'income_proof.pdf',
+      content_type: 'application/pdf'
     )
 
-    residency_file = fixture_file_upload('test/fixtures/files/sample.pdf', 'application/pdf')
     @residency_blob = ActiveStorage::Blob.create_and_upload!(
-      io: residency_file,
-      filename: residency_file.original_filename,
-      content_type: residency_file.content_type
+      io: StringIO.new(sample_pdf_content),
+      filename: 'residency_proof.pdf',
+      content_type: 'application/pdf'
     )
   end
 
@@ -147,7 +147,7 @@ class PaperApplicationModeSwitchingTest < ActionDispatch::IntegrationTest
     # We should also have a proof review for the approved residency proof
     # The ProofReviewer service creates a proof review with status 'approved' when approving a proof
     residency_approved_reviews = application.proof_reviews.where(proof_type: :residency, status: :approved)
-    puts "DEBUG: Residency approved reviews: #{residency_approved_reviews.map { |pr| pr.inspect }.join(', ')}"
+    puts "DEBUG: Residency approved reviews: #{residency_approved_reviews.map(&:inspect).join(', ')}"
 
     # Check if we have any approved residency proof reviews
     assert residency_approved_reviews.exists?, 'Should have at least one approved residency proof review'

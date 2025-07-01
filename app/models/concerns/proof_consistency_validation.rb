@@ -16,19 +16,19 @@ module ProofConsistencyValidation
   def skip_proof_validation?
     # Skip during paper application processing
     return true if Current.paper_context?
-    
+
     # Skip during service operations that manage their own consistency
     return true if Current.proof_attachment_service_context?
-    
+
     # Skip during administrative actions like purging proofs
     return true if Current.skip_proof_validation?
-    
+
     # Skip for new records (attachments handled during creation)
     return true if new_record?
-    
+
     # Skip for draft applications
     return true if status_draft?
-    
+
     false
   end
 

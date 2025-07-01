@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module PaperApplicationContextHelpers
   def setup_paper_application_context
     Thread.current[:paper_application_context] = true
@@ -22,4 +24,4 @@ module PaperApplicationContextHelpers
       end
     end
   end
-end 
+end

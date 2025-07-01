@@ -4,7 +4,7 @@
 class AuditEventService < BaseService
   # Time window for preventing duplicate event creation.
   # Reduced to 2 seconds to prevent only accidental duplicates (double-clicks)
-  # while allowing legitimate events. EventDeduplicationService handles 
+  # while allowing legitimate events. EventDeduplicationService handles
   # sophisticated business-logic deduplication for display purposes.
   DEDUP_WINDOW = 2.seconds
 
@@ -52,9 +52,9 @@ class AuditEventService < BaseService
   def self.recent_duplicate_exists?(action:, auditable:, metadata: {})
     # Create a fingerprint that includes meaningful metadata differences
     fingerprint = create_event_fingerprint(action, metadata)
-    
+
     Event.where(action: action.to_s, auditable: auditable)
-         .where('created_at >= ?', DEDUP_WINDOW.ago)
+         .where(created_at: DEDUP_WINDOW.ago..)
          .any? { |event| create_event_fingerprint(event.action, event.metadata) == fingerprint }
   end
 

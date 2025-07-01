@@ -58,7 +58,7 @@
       <h2 class="text-xl font-semibold mb-2">Disability Information</h2>
       <p><strong>Self-Certified Disability:</strong> <%= @application.self_certify_disability ? "Yes" : "No" %></p>
       
-      <% if @application.user.has_disability_selected? %>
+      <% if @application.user.disability_selected? %>
         <p><strong>Disability Types:</strong> 
           <% 
             disability_types = []

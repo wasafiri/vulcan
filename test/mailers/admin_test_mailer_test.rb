@@ -34,7 +34,7 @@ class AdminTestMailerTest < ActionMailer::TestCase
     assert_equal "[TEST] #{@subject} (Template: #{@template_name})", email.subject
 
     # Check content
-    assert_equal "#{@body}", email.body.to_s.strip
+    assert_equal @body.to_s, email.body.to_s.strip
   end
 
   test 'test_email respects custom recipient_email' do

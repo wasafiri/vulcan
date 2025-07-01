@@ -25,7 +25,7 @@ module ConstituentPortal
       # Process each deduplicated submission audit
       deduplicated_submissions.each do |event|
         is_initial = is_initial_submission?(application, event)
-        activities << from_submission_event(event, is_initial)
+        activities << from_submission_event(event, is_initial: is_initial)
       end
 
       # Sort by creation time (oldest first) and return
@@ -38,7 +38,7 @@ module ConstituentPortal
     end
 
     # Create an activity from a proof submission event
-    def self.from_submission_event(event, is_initial = false)
+    def self.from_submission_event(event, is_initial: false)
       proof_type = event.metadata['proof_type']
       submission_method = event.metadata['submission_method'] || 'web'
       new(
@@ -54,9 +54,7 @@ module ConstituentPortal
     def self.from_proof_review(review)
       activity_type = review.status_approved? ? :approval : :rejection
 
-      details = if review.status_rejected? && (review.rejection_reason.present? || review.notes.present?)
-                  review.rejection_reason.presence || review.notes
-                end
+      details = (review.rejection_reason.presence || review.notes if review.status_rejected? && (review.rejection_reason.present? || review.notes.present?))
 
       new(
         source: review,

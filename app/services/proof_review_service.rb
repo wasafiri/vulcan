@@ -46,21 +46,49 @@ class ProofReviewService < BaseService
   # Handles potential errors and returns a structured result.
   # @return [BaseService::Result] Success or failure result.
   def execute_review
-    Rails.logger.info "ProofReviewService: Starting review for Application ##{application.id}, Proof: #{proof_type}, Status: #{status}"
+    log_review_start
+
     begin
-      reviewer = Applications::ProofReviewer.new(application, admin_user)
-      reviewer.review(
-        proof_type: proof_type,
-        status: status,
-        rejection_reason: params[:rejection_reason],
-        notes: params[:notes]
-      )
-      Rails.logger.info "ProofReviewService: Review successful for Application ##{application.id}"
-      success("#{proof_type.capitalize} proof #{status} successfully.")
+      perform_review
+      log_review_success
+      success(success_message)
     rescue StandardError => e
       log_review_error(e)
       failure("Proof review failed: #{e.message}")
     end
+  end
+
+  # Performs the actual proof review by creating and calling the reviewer.
+  def perform_review
+    reviewer = Applications::ProofReviewer.new(application, admin_user)
+    reviewer.review(**review_params)
+  end
+
+  # Returns the parameters needed for the review.
+  # @return [Hash] Review parameters
+  def review_params
+    {
+      proof_type: proof_type,
+      status: status,
+      rejection_reason: params[:rejection_reason],
+      notes: params[:notes]
+    }
+  end
+
+  # Returns the success message for the review.
+  # @return [String] Success message
+  def success_message
+    "#{proof_type.capitalize} proof #{status} successfully."
+  end
+
+  # Logs the start of the review process.
+  def log_review_start
+    Rails.logger.info "ProofReviewService: Starting review for Application ##{application.id}, Proof: #{proof_type}, Status: #{status}"
+  end
+
+  # Logs successful completion of the review.
+  def log_review_success
+    Rails.logger.info "ProofReviewService: Review successful for Application ##{application.id}"
   end
 
   # Logs detailed information about review errors.
@@ -70,6 +98,4 @@ class ProofReviewService < BaseService
     Rails.logger.error error.backtrace.join("\n")
     # Consider sending to an error tracking service like Honeybadger here
   end
-
-
 end

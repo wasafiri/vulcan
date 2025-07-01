@@ -32,7 +32,7 @@ class ProofAttachmentServiceTest < ActiveSupport::TestCase
 
   teardown do
     # Clean up the test file if it was opened
-    @test_file_upload.tempfile.close if @test_file_upload&.tempfile&.respond_to?(:close)
+    @test_file_upload.tempfile.close if @test_file_upload&.tempfile.respond_to?(:close)
   end
 
   test 'attach_proof successfully attaches a proof and updates status' do
@@ -48,7 +48,7 @@ class ProofAttachmentServiceTest < ActiveSupport::TestCase
                                                    admin: @admin,
                                                    submission_method: :paper,
                                                    metadata: { ip_address: '127.0.0.1' }
-    })
+                                                 })
 
     assert result[:success], 'Expected attach_proof to succeed'
     assert_not_nil result[:duration_ms], 'Expected duration to be tracked'
@@ -91,7 +91,7 @@ class ProofAttachmentServiceTest < ActiveSupport::TestCase
                                                    admin: @admin,
                                                    submission_method: :paper,
                                                    metadata: { ip_address: '127.0.0.1' }
-    })
+                                                 })
 
     assert_not result[:success], 'Expected attach_proof to fail'
     assert_not_nil result[:error], 'Expected error to be captured'

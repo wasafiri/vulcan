@@ -7,13 +7,13 @@ if defined?(Capybara::Cuprite)
   # Patch Capybara::Cuprite::Node to silence warnings about options
   module CapybaraCupriteNodePatch
     def set(value, options = {})
-      if !options.empty?
+      if options.empty?
+        # Call the original method as normal
+        original_set(value, options)
+      else
         # Silence the warning by not displaying it
         # The original method in Cuprite will show a warning for non-empty options
         original_set(value)
-      else
-        # Call the original method as normal
-        original_set(value, options)
       end
     end
   end

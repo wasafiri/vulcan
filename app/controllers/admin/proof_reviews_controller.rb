@@ -2,6 +2,10 @@
 
 module Admin
   class ProofReviewsController < ApplicationController
+    # ApplicationDataLoading concern: Provides optimized methods for loading applications and attachments
+    # Key benefits: Preloads attachment metadata, avoids N+1 queries, optimizes for proof review workflows
+    include ApplicationDataLoading
+    
     before_action :authenticate_user!
     before_action :require_admin!
     before_action :set_application
@@ -55,7 +59,10 @@ module Admin
     private
 
     def set_application
-      @application = Application.find(params[:application_id])
+      # ApplicationDataLoading concern: Uses optimized application loading with attachment preloading
+      # Flow: load_application_with_attachments -> finds application + preloads proof attachments
+      # This is crucial for proof review since we need attachment metadata without N+1 queries
+      @application = load_application_with_attachments(params[:application_id])
     rescue ActiveRecord::RecordNotFound
       redirect_to admin_applications_path, alert: 'Application not found'
     end
@@ -67,7 +74,7 @@ module Admin
     end
 
     def proof_review_params
-      params.require(:proof_review).permit(:proof_type, :status, :rejection_reason)
+      params.expect(proof_review: %i[proof_type status rejection_reason])
     end
 
     def next_proof_for_review

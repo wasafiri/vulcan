@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Seed File for "user_mailer_password_reset"
 # (Suggest saving as db/seeds/email_templates/user_mailer_password_reset.rb)
 # --------------------------------------------------
@@ -19,4 +21,4 @@ EmailTemplate.create_or_find_by!(name: 'user_mailer_password_reset', format: :te
   TEXT
   template.version = 1
 end
-puts 'Seeded user_mailer_password_reset (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?
+Rails.logger.debug 'Seeded user_mailer_password_reset (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

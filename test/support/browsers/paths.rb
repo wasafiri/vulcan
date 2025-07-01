@@ -6,14 +6,14 @@ module TestBrowsers
   module Paths
     # Base directory for browser binaries
     def self.root
-      @root ||= Rails.root.join('tmp', 'test_browsers')
+      @root ||= Rails.root.join('tmp/test_browsers')
     end
 
     # Create directory if it doesn't exist
     def self.ensure_directories!
-      FileUtils.mkdir_p(root) unless Dir.exist?(root)
-      FileUtils.mkdir_p(chrome_dir) unless Dir.exist?(chrome_dir)
-      FileUtils.mkdir_p(chromedriver_dir) unless Dir.exist?(chromedriver_dir)
+      FileUtils.mkdir_p(root)
+      FileUtils.mkdir_p(chrome_dir)
+      FileUtils.mkdir_p(chromedriver_dir)
     end
 
     # Chrome binary directory

@@ -25,6 +25,9 @@ module TrainingSessions
     rescue ActiveRecord::RecordInvalid => e
       Rails.logger.error("Error updating training session status: #{e.message}")
       failure(message: e.message)
+    rescue ArgumentError => e
+      Rails.logger.error("Invalid parameters for updating training session status: #{e.message}")
+      failure(message: e.message)
     rescue StandardError => e
       Rails.logger.error("Unexpected error updating training session status: #{e.message}")
       failure(message: "An unexpected error occurred: #{e.message}")
@@ -51,7 +54,7 @@ module TrainingSessions
       scheduled_for = @params[:training_session][:scheduled_for]
       Rails.logger.debug { "Forced transition with scheduled_for: #{scheduled_for}" }
 
-      raise ActiveRecord::RecordInvalid, "scheduled_for is required when changing from #{@old_status} to scheduled" if scheduled_for.blank?
+      raise ArgumentError, "scheduled_for is required when changing from #{@old_status} to scheduled" if scheduled_for.blank?
 
       @training_session.assign_attributes(status: 'scheduled', scheduled_for: scheduled_for)
       @training_session.save!(validate: false) # Bypass validations if needed

@@ -7,37 +7,37 @@ module Admin
     setup do
       # Create a proper admin with the correct type (Administrator, not Users::Administrator)
       @admin = create(:admin)
-      # Note: We previously removed vendor creation from setup
+      # NOTE: We previously removed vendor creation from setup
       sign_in_as(@admin) # Use standard helper
     end
 
-  test 'should get new with attached w9' do
-    # Create vendor with w9 attachment
-    vendor = create(:vendor, type: 'Vendor')
+    test 'should get new with attached w9' do
+      # Create vendor with w9 attachment
+      vendor = create(:vendor, type: 'Vendor')
 
-    # Directly attach a sample file
-    vendor.w9_form.attach(
-      io: File.open(Rails.root.join('test/fixtures/files/sample_w9.pdf')),
-      filename: 'w9.pdf',
-      content_type: 'application/pdf'
-    )
+      # Directly attach a sample file
+      vendor.w9_form.attach(
+        io: Rails.root.join('test/fixtures/files/sample_w9.pdf').open,
+        filename: 'w9.pdf',
+        content_type: 'application/pdf'
+      )
 
-    assert vendor.w9_form.attached?, 'W9 form should be attached'
+      assert vendor.w9_form.attached?, 'W9 form should be attached'
 
-    # Now try to access the new page
-    get new_admin_vendor_w9_review_path(vendor)
+      # Now try to access the new page
+      get new_admin_vendor_w9_review_path(vendor)
 
-    # Since there's a W9 form attached, we should get success
-    assert_response :success
-    assert_select 'h1', 'Review W9 Form' if response.body.present?
-  end
+      # Since there's a W9 form attached, we should get success
+      assert_response :success
+      assert_select 'h1', 'Review W9 Form' if response.body.present?
+    end
 
     test 'should create approved w9 review' do
       # Create vendor with explicit Vendor type
       vendor = create(:vendor, type: 'Vendor')
       # Attach w9_form to vendor
       vendor.w9_form.attach(
-        io: File.open(Rails.root.join('test/fixtures/files/test_proof.pdf')),
+        io: Rails.root.join('test/fixtures/files/test_proof.pdf').open,
         filename: 'w9_form.pdf',
         content_type: 'application/pdf'
       )
@@ -62,7 +62,7 @@ module Admin
       assert_equal 'approved', vendor.w9_status
     rescue ActiveSupport::TestCase::Assertion => e
       # Log the validation errors
-      Rails.logger.debug "W9Review errors: #{@controller.instance_variable_get('@w9_review')&.errors&.full_messages}"
+      Rails.logger.debug { "W9Review errors: #{@controller.instance_variable_get('@w9_review')&.errors&.full_messages}" }
       raise e
     end
 
@@ -72,7 +72,7 @@ module Admin
 
       # Directly attach W9 form
       vendor.w9_form.attach(
-        io: File.open(Rails.root.join('test/fixtures/files/sample_w9.pdf')),
+        io: Rails.root.join('test/fixtures/files/sample_w9.pdf').open,
         filename: 'w9.pdf',
         content_type: 'application/pdf'
       )
@@ -103,7 +103,7 @@ module Admin
       # Log the validation errors
       w9_review = @controller.instance_variable_get('@w9_review')
       if w9_review
-        Rails.logger.debug "W9Review validation errors: #{w9_review.errors.full_messages}"
+        Rails.logger.debug { "W9Review validation errors: #{w9_review.errors.full_messages}" }
       else
         Rails.logger.debug 'W9Review instance variable is nil'
       end
@@ -116,7 +116,7 @@ module Admin
 
       # Directly attach W9 form
       vendor.w9_form.attach(
-        io: File.open(Rails.root.join('test/fixtures/files/sample_w9.pdf')),
+        io: Rails.root.join('test/fixtures/files/sample_w9.pdf').open,
         filename: 'w9.pdf',
         content_type: 'application/pdf'
       )
@@ -155,7 +155,7 @@ module Admin
 
       # Directly attach a sample file (essential for the test)
       vendor.w9_form.attach(
-        io: File.open(Rails.root.join('test/fixtures/files/sample_w9.pdf')),
+        io: Rails.root.join('test/fixtures/files/sample_w9.pdf').open,
         filename: 'w9.pdf',
         content_type: 'application/pdf'
       )
@@ -174,7 +174,7 @@ module Admin
 
       # Directly attach W9 form
       vendor.w9_form.attach(
-        io: File.open(Rails.root.join('test/fixtures/files/sample_w9.pdf')),
+        io: Rails.root.join('test/fixtures/files/sample_w9.pdf').open,
         filename: 'w9.pdf',
         content_type: 'application/pdf'
       )
@@ -209,7 +209,7 @@ module Admin
 
       # Directly attach a sample file
       vendor.w9_form.attach(
-        io: File.open(Rails.root.join('test/fixtures/files/sample_w9.pdf')),
+        io: Rails.root.join('test/fixtures/files/sample_w9.pdf').open,
         filename: 'w9.pdf',
         content_type: 'application/pdf'
       )
@@ -233,7 +233,7 @@ module Admin
 
       # Directly attach W9 form
       vendor.w9_form.attach(
-        io: File.open(Rails.root.join('test/fixtures/files/sample_w9.pdf')),
+        io: Rails.root.join('test/fixtures/files/sample_w9.pdf').open,
         filename: 'w9.pdf',
         content_type: 'application/pdf'
       )

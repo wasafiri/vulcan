@@ -8,7 +8,7 @@ class VoucherTest < ActiveSupport::TestCase
   setup do
     # Clear email deliveries to prevent test pollution
     ActionMailer::Base.deliveries.clear
-    
+
     Current.user = create(:admin)
     # Create a constituent with a unique email for each test to avoid email conflicts
     constituent = create(:constituent, email: "unique_setup_#{Time.now.to_i}_#{rand(1000)}@example.com")
@@ -96,7 +96,7 @@ class VoucherTest < ActiveSupport::TestCase
 
     # Create constituent with specific disabilities and unique email
     constituent = create(:constituent,
-                         email: "unique_disability_test_#{Time.now.to_i}_#{rand(10000)}@example.com",
+                         email: "unique_disability_test_#{Time.now.to_i}_#{rand(10_000)}@example.com",
                          hearing_disability: true,   # 100
                          vision_disability: true,    # 200
                          mobility_disability: false, # 0

@@ -28,7 +28,7 @@ class PagesControllerTest < ActionDispatch::IntegrationTest
 
     # Check that view files exist
     %w[help how_it_works eligibility apply contact].each do |view|
-      assert File.exist?(Rails.root.join("app/views/pages/#{view}.html.erb")),
+      assert Rails.root.join("app/views/pages/#{view}.html.erb").exist?,
              "app/views/pages/#{view}.html.erb should exist"
     end
 

@@ -35,7 +35,7 @@ module VendorPortal
       else
         render json: {
           valid: false,
-          message: 'Invalid or expired voucher code' 
+          message: 'Invalid or expired voucher code'
         }
       end
     end

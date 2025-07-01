@@ -18,7 +18,9 @@
 # traits (:with_mocked_income_proof, :with_mocked_residency_proof, etc.)
 module ActiveStorageTestHelper
   # Make these class methods so they can be called directly
-  extend self
+
+  module_function
+
   # Attaches real StringIO objects as income and residency proofs to an application.
   #
   # @param application [Application] The application to attach proofs to

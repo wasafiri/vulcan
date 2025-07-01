@@ -51,8 +51,8 @@ module Applications
       assert_not_nil dependent, 'Dependent should have been created'
 
       # Key assertions: The dependent should have a system email but the guardian's email in dependent_email
-      assert_match /dependent-.*@system\.matvulcan\.local/, dependent.email,
-                   'Dependent should have a system-generated email to avoid uniqueness conflicts'
+      assert_match(/dependent-.*@system\.matvulcan\.local/, dependent.email,
+                   'Dependent should have a system-generated email to avoid uniqueness conflicts')
       assert_equal @guardian.email, dependent.dependent_email,
                    "Dependent should have guardian's email in dependent_email field when email_strategy is 'guardian'"
       assert_equal @guardian.email, dependent.effective_email,

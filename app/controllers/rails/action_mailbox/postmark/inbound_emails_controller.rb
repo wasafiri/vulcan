@@ -3,8 +3,9 @@
 module Rails
   module ActionMailbox
     module Postmark
-      class InboundEmailsController < ActionController::Base
+      class InboundEmailsController < ApplicationController
         skip_before_action :verify_authenticity_token
+        skip_before_action :authenticate_user!
         before_action :ensure_authentic
 
         def create

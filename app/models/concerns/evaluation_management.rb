@@ -54,7 +54,7 @@ module EvaluationManagement
   # Returns the date of the most recently completed evaluation
   # @return [DateTime, nil] The date of the last completed evaluation or nil if none exists
   def last_evaluation_completed_at
-    evaluations.where(status: :completed).order(evaluation_date: :desc).limit(1).pluck(:evaluation_date).first
+    evaluations.where(status: :completed).order(evaluation_date: :desc).limit(1).pick(:evaluation_date)
   end
 
   # Returns all evaluations for this application in descending order of creation
@@ -66,6 +66,6 @@ module EvaluationManagement
   private
 
   def determine_evaluation_type
-    user && user.evaluations.exists? ? :follow_up : :initial
+    user&.evaluations&.exists? ? :follow_up : :initial
   end
 end

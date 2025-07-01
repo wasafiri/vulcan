@@ -17,14 +17,11 @@ class AccountRecoveryController < ApplicationController
 
       # Notify administrators of the recovery request
       notify_admins_of_recovery_request(recovery_request)
-
-      # Redirect to confirmation page
-      redirect_to account_recovery_confirmation_path
-    else
-      # We don't want to reveal if an email exists in our system
-      # So we show the confirmation page regardless
-      redirect_to account_recovery_confirmation_path
     end
+
+    # We don't want to reveal if an email exists in our system
+    # So we show the confirmation page regardless
+    redirect_to account_recovery_confirmation_path
   end
 
   def confirmation

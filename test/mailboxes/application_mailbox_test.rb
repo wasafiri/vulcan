@@ -13,7 +13,7 @@ class ApplicationMailboxTest < ActionMailbox::TestCase
         body: 'Test email body'
       ).to_s
     )
-    
+
     # Check that the routing resolves to the correct mailbox class
     mailbox_class = ApplicationMailbox.mailbox_for(inbound_email)
     assert_equal ProofSubmissionMailbox, mailbox_class
@@ -28,7 +28,7 @@ class ApplicationMailboxTest < ActionMailbox::TestCase
         body: 'Test email body'
       ).to_s
     )
-    
+
     mailbox_class = ApplicationMailbox.mailbox_for(inbound_email)
     assert_equal ProofSubmissionMailbox, mailbox_class
   end
@@ -42,7 +42,7 @@ class ApplicationMailboxTest < ActionMailbox::TestCase
         body: 'Medical certification document'
       ).to_s
     )
-    
+
     mailbox_class = ApplicationMailbox.mailbox_for(inbound_email)
     assert_equal MedicalCertificationMailbox, mailbox_class
   end
@@ -56,7 +56,7 @@ class ApplicationMailboxTest < ActionMailbox::TestCase
         body: 'Unknown email body'
       ).to_s
     )
-    
+
     mailbox_class = ApplicationMailbox.mailbox_for(inbound_email)
     assert_equal DefaultMailbox, mailbox_class
   end

@@ -13,7 +13,7 @@ module VoucherManagement
 
     with_lock do
       voucher = vouchers.create!
-      
+
       # Step 1: Log the auditable business event
       AuditEventService.log(
         action: 'voucher_assigned',

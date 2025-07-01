@@ -59,7 +59,7 @@ class ProofManageableTest < ActiveSupport::TestCase
   end
 
   test 'purges proofs with audit trail' do
-    # SKIP: This test is too sensitive to callback timing in test environment  
+    # SKIP: This test is too sensitive to callback timing in test environment
     skip('Proof purging is tested in integration tests')
   end
 

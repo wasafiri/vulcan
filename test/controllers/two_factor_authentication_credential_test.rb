@@ -116,7 +116,8 @@ class TwoFactorAuthenticationCredentialTest < ActionDispatch::IntegrationTest
 
     # Try accessing the credential creation form
     get new_credential_two_factor_authentication_path(type: 'webauthn')
-    assert_redirected_to sign_in_path, "Expected redirect to sign_in_path, but got status #{response.status}. Location: #{response.location}. Body starts with: #{response.body[0..100]}"
+    assert_redirected_to sign_in_path,
+                         "Expected redirect to sign_in_path, but got status #{response.status}. Location: #{response.location}. Body starts with: #{response.body[0..100]}"
 
     # Try accessing the WebAuthn options endpoint
     post webauthn_creation_options_two_factor_authentication_path, xhr: true
@@ -175,6 +176,4 @@ class TwoFactorAuthenticationCredentialTest < ActionDispatch::IntegrationTest
     # Step 4: Verify the credential still exists in the database
     assert WebauthnCredential.exists?(other_credential.id), "Other user's credential should not be deleted"
   end
-
-  private
 end

@@ -234,7 +234,7 @@ module Applications
 
         # Verify all logs are sorted by created_at in descending order
         assert_equal logs.map(&:created_at), logs.map(&:created_at).sort.reverse
-        
+
         # Verify profile event is included and properly positioned
         assert_includes logs, profile_event
       end

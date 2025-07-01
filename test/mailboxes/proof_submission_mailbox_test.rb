@@ -6,15 +6,15 @@ require 'test_helper'
 #
 # CRITICAL ACTIONMAILBOX TESTING BREAKTHROUGH:
 # ==========================================
-# 
+#
 # PROBLEM: We spent hours debugging why emails had status 'delivered' but no mailbox methods were called
 # ROOT CAUSE: We were using the WRONG ActionMailbox test method and setting up stubs incorrectly
 #
 # THE SOLUTION - Use receive_inbound_email_from_mail() correctly:
 # =============================================================
-# 
+#
 # ❌ WRONG WAY (what we were doing):
-#    1. Call receive_inbound_email_from_mail(**email_params) 
+#    1. Call receive_inbound_email_from_mail(**email_params)
 #    2. Set up stubs after the call
 #    3. Email gets processed immediately but stubs aren't active yet
 #    4. Result: Status 'delivered' but no methods called
@@ -35,15 +35,15 @@ require 'test_helper'
 #
 # MOST IMPORTANT DISCOVERY AFTER 3 HOURS OF DEBUGGING:
 # =====================================================
-# 
+#
 # THE 'delivered' STATUS MYSTERY SOLVED:
-# 
+#
 # ❌ WRONG ASSUMPTION: "delivered status means the email wasn't processed"
 # ✅ ACTUAL REALITY: "delivered status means processing worked but ActionMailbox couldn't mark it 'processed'"
 #
 # WHAT ACTUALLY HAPPENS:
 # 1. Email gets routed to ProofSubmissionMailbox ✅
-# 2. All before_processing callbacks pass ✅  
+# 2. All before_processing callbacks pass ✅
 # 3. process() method runs completely ✅
 # 4. ProofAttachmentService.attach_proof() works ✅
 # 5. Proof gets attached to application ✅
@@ -90,7 +90,7 @@ require 'test_helper'
 # 5. Email status meanings:
 #    - 'processing' = Default initial status
 #    - 'delivered' = Routed to mailbox but processing incomplete/failed
-#    - 'processed' = Successfully processed by mailbox  
+#    - 'processed' = Successfully processed by mailbox
 #    - 'bounced' = Rejected by before_processing callbacks
 #    - 'failed' = Exception thrown during processing
 #
@@ -129,23 +129,23 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
     # Configure ActionMailbox for testing - this is critical!
     # Without this, emails won't be routed properly and tests will fail mysteriously
     Rails.application.config.action_mailbox.ingress = :test
-    
+
     # Create test data with unique identifiers to prevent cross-test contamination
     # Each test run gets a fresh constituent to avoid email uniqueness conflicts
     unique_email = "john.doe.#{SecureRandom.hex(4)}@example.com"
     @constituent = create(:constituent, email: unique_email)
-    
+
     # Create application in the correct state for proof submission testing
     # - status: :in_progress (required for proof submission to be allowed)
     # - skip_proofs: true (prevents automatic proof validation during creation)
     @application = create(:application, user: @constituent, status: :in_progress, skip_proofs: true)
-    
+
     # Set proof statuses explicitly using update_columns to bypass callbacks
     # This ensures we have a clean slate for testing proof attachment logic
     @application.update_columns(
       income_proof_status: :not_reviewed,
       residency_proof_status: :not_reviewed,
-      total_rejections: 0  # Ensure this is set properly to prevent null constraint errors
+      total_rejections: 0 # Ensure this is set properly to prevent null constraint errors
     )
 
     # Set up PDF content for attachments - must be large enough to meet validation requirements
@@ -156,11 +156,11 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
     # Stubbing Policy.get() will NOT work because it calls find_by() which hits the database
     # Always create real Policy records in tests instead of stubbing
     # This prevents test failures due to missing policy configurations
-    
+
     # Mock rate limiting to always pass - prevents test failures due to rate limits
     # In real scenarios, rate limiting would be tested separately
     RateLimit.stubs(:check!).returns(true)
-    
+
     # Mock ProofAttachmentValidator to prevent validation failures in unit tests
     # Integration tests should use real validation, but unit tests can stub this
     ProofAttachmentValidator.stubs(:validate!).returns(true)
@@ -181,7 +181,7 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
     Policy.find_or_create_by!(key: 'max_proof_rejections') { |p| p.value = 3 }
     Policy.find_or_create_by!(key: 'proof_submission_rate_limit_email') { |p| p.value = 5 }
     Policy.find_or_create_by!(key: 'proof_submission_rate_period') { |p| p.value = 24 }
-    # Note: support_email cannot be stored as Policy (integer-only), handled with fallback in code
+    # NOTE: support_email cannot be stored as Policy (integer-only), handled with fallback in code
 
     # We will NOT stub bounce_with_notification, proof_submission_error, or attach_proof
     # Instead, we will use assert_throws for expected bounces and real data for integration tests
@@ -224,108 +224,107 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
   # 8. Provide detailed status interpretation and debugging guidance
   # 9. Return success/failure based on processing outcome
   def safe_receive_email(email_params)
-    puts "\n" + "="*60
-    puts "EMAIL PROCESSING ATTEMPT"
-    puts "="*60
+    puts "\n#{'=' * 60}"
+    puts 'EMAIL PROCESSING ATTEMPT'
+    puts '=' * 60
     puts "TO: #{email_params[:to]}"
     puts "FROM: #{email_params[:from]}"
     puts "SUBJECT: #{email_params[:subject]}"
     puts "HAS ATTACHMENTS: #{email_params[:attachments].present?}"
     puts "ACTIONMAILBOX INGRESS: #{Rails.application.config.action_mailbox.ingress}"
-    
+
     # Check if constituent exists before processing - helps with debugging routing issues
     constituent = User.find_by(email: email_params[:from])
     puts "CONSTITUENT FOUND: #{constituent.present?} (#{email_params[:from]})"
     if constituent
       # Check for active applications - helps identify bounce reasons
-      app = constituent.applications.where(status: [:in_progress, :needs_information, :reminder_sent, :awaiting_documents]).first
+      app = constituent.applications.where(status: %i[in_progress needs_information reminder_sent awaiting_documents]).first
       puts "ACTIVE APPLICATION: #{app.present?} (ID: #{app&.id})"
     end
-    
+
     # Track InboundEmail record creation to verify ActionMailbox is working
     initial_count = ActionMailbox::InboundEmail.count
     puts "INBOUND EMAILS BEFORE: #{initial_count}"
-    
+
     # Process the email and capture the inbound_email record
     # Extract attachments from email_params since receive_inbound_email_from_mail doesn't accept them directly
     attachments = email_params.delete(:attachments)
-    
+
     # Handle attachments properly using block syntax for receive_inbound_email_from_mail
-    if attachments.present?
-      inbound_email = receive_inbound_email_from_mail(**email_params) do |mail|
-        attachments.each do |filename, content|
-          mail.attachments[filename] = content
-        end
-      end
-    else
-      inbound_email = receive_inbound_email_from_mail(**email_params)
-    end
-    
+    inbound_email = if attachments.present?
+                      receive_inbound_email_from_mail(**email_params) do |mail|
+                        attachments.each do |filename, content|
+                          mail.attachments[filename] = content
+                        end
+                      end
+                    else
+                      receive_inbound_email_from_mail(**email_params)
+                    end
+
     # Verify InboundEmail record was created
     final_count = ActionMailbox::InboundEmail.count
     puts "INBOUND EMAILS AFTER: #{final_count}"
     puts "EMAIL RECORD CREATED: #{final_count > initial_count}"
-    
+
     if inbound_email
       # Check the actual processing result
       inbound_email.reload
       processing_status = inbound_email.status
-      
+
       puts "EMAIL ID: #{inbound_email.id}"
       puts "PROCESSING STATUS: #{processing_status}"
-      
+
       # Determine which mailbox should handle this email - helps verify routing
       begin
         mailbox_class = ApplicationMailbox.mailbox_for(inbound_email)
         puts "ROUTED TO MAILBOX: #{mailbox_class}"
-      rescue => e
+      rescue StandardError => e
         puts "ROUTING ERROR: #{e.message}"
       end
-      
+
       # Check for related events (bounces, processing, etc.) - helps with debugging
       related_events = Event.where("metadata ->> 'inbound_email_id' = ?", inbound_email.id.to_s)
       puts "RELATED EVENTS: #{related_events.count}"
       related_events.each do |event|
         puts "  - #{event.action}: #{event.metadata['error'] || 'success'}"
       end
-      
+
       # Interpret processing status and provide guidance
       case processing_status
       when 'bounced'
-        puts "❌ EMAIL BOUNCED"
-        puts "BOUNCE REASON: Check events above for specific error"
-        return false
+        puts '❌ EMAIL BOUNCED'
+        puts 'BOUNCE REASON: Check events above for specific error'
+        false
       when 'processed'
-        puts "✅ EMAIL PROCESSED SUCCESSFULLY"
-        return true
+        puts '✅ EMAIL PROCESSED SUCCESSFULLY'
+        true
       when 'delivered'
-        puts "⚠️  EMAIL DELIVERED - ActionMailbox Testing Best Practice"
+        puts '⚠️  EMAIL DELIVERED - ActionMailbox Testing Best Practice'
         puts "MEANING: Email reached mailbox and business logic likely worked, but ActionMailbox couldn't mark as 'processed'"
-        puts "ACTION: This is acceptable - verify business outcomes (proof attached, events created)"
-        puts "NOTE: This is a test environment quirk, not a production failure"
-        return true  # Accept 'delivered' as valid per ActionMailbox testing guide
+        puts 'ACTION: This is acceptable - verify business outcomes (proof attached, events created)'
+        puts 'NOTE: This is a test environment quirk, not a production failure'
+        true # Accept 'delivered' as valid per ActionMailbox testing guide
       when 'failed'
-        puts "💥 EMAIL PROCESSING FAILED"
-        puts "CAUSE: Exception thrown during mailbox processing"
-        return false
+        puts '💥 EMAIL PROCESSING FAILED'
+        puts 'CAUSE: Exception thrown during mailbox processing'
+        false
       else
         puts "❓ UNKNOWN EMAIL STATUS: #{processing_status}"
-        return false
+        false
       end
     else
-      puts "💥 NO INBOUND EMAIL RECORD CREATED"
-      puts "LIKELY CAUSE: ActionMailbox ingress not set to :test"
-      return false
+      puts '💥 NO INBOUND EMAIL RECORD CREATED'
+      puts 'LIKELY CAUSE: ActionMailbox ingress not set to :test'
+      false
     end
-    
   rescue StandardError => e
-    puts "💥 EXCEPTION DURING EMAIL PROCESSING:"
+    puts '💥 EXCEPTION DURING EMAIL PROCESSING:'
     puts "ERROR: #{e.message}"
-    puts "BACKTRACE:"
+    puts 'BACKTRACE:'
     e.backtrace.first(10).each { |line| puts "  #{line}" }
-    return false
+    false
   ensure
-    puts "="*60
+    puts '=' * 60
   end
 
   # HELPER METHOD TO RETRIEVE LATEST EVENT WITH ERROR HANDLING:
@@ -492,7 +491,7 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
           body: 'I forgot to attach the proof!'
         )
       end
-      
+
       # Verify the correct audit event was created
       latest_event = get_latest_event
       assert_equal 'proof_submission_no_attachments', latest_event&.action
@@ -512,7 +511,7 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
   test 'bounces email when max rejections reached' do
     measure_time('Process email with max rejections') do
       # Update the application to have max rejections
-      max_rejections = 3  # Use the value we set up in the setup method
+      max_rejections = 3 # Use the value we set up in the setup method
       @application.update_columns(total_rejections: max_rejections) # Use update_columns to bypass callbacks
 
       # Debug: Verify the application state
@@ -539,7 +538,7 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
           mail.attachments['proof.pdf'] = @pdf_content
         end
       end
-      
+
       # Verify the correct audit event was created
       latest_event = get_latest_event
       assert_equal 'proof_submission_max_rejections_reached', latest_event&.action
@@ -569,16 +568,16 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
   # 4. Verify both proof types work correctly with subject-based determination
   test 'determines proof type from subject' do
     puts "\n🧪 RAILS BEST PRACTICE: ACTIONMAILBOX INTEGRATION TEST"
-    puts "Using real test data instead of stubs for proper integration testing"
-    puts "Focus: Testing business outcomes, not ActionMailbox status internals"
-    
+    puts 'Using real test data instead of stubs for proper integration testing'
+    puts 'Focus: Testing business outcomes, not ActionMailbox status internals'
+
     measure_time('Determine proof type from subject') do
       puts "\n🔄 TESTING INCOME PROOF EMAIL"
-      
+
       # Track initial state for better assertions
       initial_events_count = Event.count
       initial_inbound_emails_count = ActionMailbox::InboundEmail.count
-      
+
       # Use ActionMailbox best practice: real test data, proper assertions
       inbound_email = receive_inbound_email_from_mail(
         to: MatVulcan::InboundEmailConfig.inbound_email_address,
@@ -588,104 +587,104 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
       ) do |mail|
         mail.attachments['income_proof.pdf'] = @pdf_content
       end
-      
-      puts "📊 DETAILED RESULTS:"
+
+      puts '📊 DETAILED RESULTS:'
       puts "Email ID: #{inbound_email.id}"
       puts "Status: #{inbound_email.status}"
-      
+
       # Enhanced debugging using Rails assertions
-      assert_not_nil inbound_email, "InboundEmail should be created"
-      assert_instance_of ActionMailbox::InboundEmail, inbound_email, "Should be an InboundEmail instance"
-      
+      assert_not_nil inbound_email, 'InboundEmail should be created'
+      assert_instance_of ActionMailbox::InboundEmail, inbound_email, 'Should be an InboundEmail instance'
+
       # Check if the email was routed correctly - verifies ApplicationMailbox routing logic
       begin
         mailbox_class = ApplicationMailbox.mailbox_for(inbound_email)
         puts "Routed to: #{mailbox_class}"
-        assert_equal ProofSubmissionMailbox, mailbox_class, "Should route to ProofSubmissionMailbox"
-      rescue => e
+        assert_equal ProofSubmissionMailbox, mailbox_class, 'Should route to ProofSubmissionMailbox'
+      rescue StandardError => e
         puts "Routing error: #{e.message}"
         flunk "Email routing failed: #{e.message}"
       end
-      
+
       # Verify exactly one new email was created
       final_inbound_emails_count = ActionMailbox::InboundEmail.count
       assert_equal initial_inbound_emails_count + 1, final_inbound_emails_count,
-        "Should create exactly one new InboundEmail record"
-      
+                   'Should create exactly one new InboundEmail record'
+
       # Check for any processing errors or exceptions - comprehensive debugging
       if inbound_email.status == 'delivered'
         puts "\n🔍 DEBUGGING 'delivered' STATUS:"
-        
+
         # Check for related events that might explain the issue
         related_events = Event.where("metadata ->> 'inbound_email_id' = ?", inbound_email.id.to_s)
         puts "Related events: #{related_events.count}"
         related_events.each do |event|
           puts "  - #{event.action}: #{event.metadata}"
         end
-        
+
         # Check application state - verify business logic worked
         @application.reload
         puts "Application income_proof attached: #{@application.income_proof.attached?}"
         puts "Application income_proof_status: #{@application.income_proof_status}"
-        
+
         # Check if any exceptions were logged
         recent_events = Event.where(created_at: 1.minute.ago..Time.current).order(created_at: :desc)
         error_events = recent_events.select { |e| e.metadata&.dig('error').present? }
         if error_events.any?
-          puts "Error events found:"
+          puts 'Error events found:'
           error_events.each { |e| puts "  - #{e.action}: #{e.metadata['error']}" }
         end
-        
-        puts "📝 ACTUAL BEHAVIOR ANALYSIS:"
-        puts "- Email was delivered to mailbox but not fully processed"
+
+        puts '📝 ACTUAL BEHAVIOR ANALYSIS:'
+        puts '- Email was delivered to mailbox but not fully processed'
         puts "- This suggests the process() method started but didn't complete"
-        puts "- All the processing actually worked (proof attached, events created)"
+        puts '- All the processing actually worked (proof attached, events created)'
         puts "- This means there's likely an exception being raised AFTER successful processing"
-        puts "- Most likely: ProofAttachmentService.attach_proof is returning success:false despite working"
-        puts "- This is a Rails/ActionMailbox testing quirk - the actual functionality works"
-        
+        puts '- Most likely: ProofAttachmentService.attach_proof is returning success:false despite working'
+        puts '- This is a Rails/ActionMailbox testing quirk - the actual functionality works'
+
         puts "\n🤔 ACTIONMAILBOX TESTING INSIGHT:"
         puts "The 'delivered' status doesn't mean the test failed - it means ActionMailbox"
         puts "couldn't mark it as 'processed' due to some exception, but the actual business"
-        puts "logic (proof attachment, events, status updates) all worked correctly."
-        puts "This is likely a testing environment issue, not a production issue."
+        puts 'logic (proof attachment, events, status updates) all worked correctly.'
+        puts 'This is likely a testing environment issue, not a production issue.'
       end
-      
+
       # RAILS BEST PRACTICE: Test business outcomes, not ActionMailbox internals
       # After 3 hours of debugging, we learned that 'delivered' status doesn't mean failure
       # It means the business logic worked but ActionMailbox couldn't mark it as 'processed'
       # So we test what actually matters: did the business logic work?
-      
+
       if inbound_email.status == 'processed'
         puts "✅ Email marked as 'processed' - perfect!"
       elsif inbound_email.status == 'delivered'
         puts "⚠️  Email marked as 'delivered' - this is a test environment quirk"
-        puts "   The business logic still worked (see events and attachments above)"
-        puts "   This is acceptable for testing - we verify business outcomes below"
+        puts '   The business logic still worked (see events and attachments above)'
+        puts '   This is acceptable for testing - we verify business outcomes below'
       else
         flunk "Email has unexpected status: #{inbound_email.status}. Expected 'processed' or 'delivered'"
       end
-      
+
       # Use assert_predicate for better readability - verify business outcome
       @application.reload
-      assert_predicate @application.income_proof, :attached?, 
-        "Income proof should be attached to application"
-      
+      assert_predicate @application.income_proof, :attached?,
+                       'Income proof should be attached to application'
+
       # Verify events were created properly - ensures audit trail works
       final_events_count = Event.count
       events_created = final_events_count - initial_events_count
-      assert_operator events_created, :>, 0, "Should create at least one event"
-      
+      assert_operator events_created, :>, 0, 'Should create at least one event'
+
       # Check for specific event types - verifies proper event logging
       recent_events = Event.where(user: @constituent, created_at: 1.minute.ago..Time.current)
       event_actions = recent_events.pluck(:action)
       assert_includes event_actions, 'proof_submission_received',
-        "Should create proof_submission_received event. Created events: #{event_actions}"
-      
-      puts "✅ Income proof email processed successfully"
-      
+                      "Should create proof_submission_received event. Created events: #{event_actions}"
+
+      puts '✅ Income proof email processed successfully'
+
       puts "\n🔄 TESTING RESIDENCY PROOF EMAIL"
-      
+
       # Test residency proof processing with same comprehensive verification
       inbound_email2 = receive_inbound_email_from_mail(
         to: MatVulcan::InboundEmailConfig.inbound_email_address,
@@ -695,25 +694,25 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
       ) do |mail|
         mail.attachments['residency_proof.pdf'] = @pdf_content
       end
-      
+
       puts "Status: #{inbound_email2.status}"
-      
+
       # Apply the same ActionMailbox testing best practice for second email
       if inbound_email2.status == 'processed'
         puts "✅ Residency email marked as 'processed' - perfect!"
       elsif inbound_email2.status == 'delivered'
         puts "⚠️  Residency email marked as 'delivered' - test environment quirk"
-        puts "   The business logic still worked - we verify outcomes below"
+        puts '   The business logic still worked - we verify outcomes below'
       else
         flunk "Residency email has unexpected status: #{inbound_email2.status}. Expected 'processed' or 'delivered'"
       end
-      
+
       # Verify residency proof business outcome
       @application.reload
       assert_predicate @application.residency_proof, :attached?,
-        "Residency proof should be attached to application"
-      
-      puts "✅ Residency proof email processed successfully"
+                       'Residency proof should be attached to application'
+
+      puts '✅ Residency proof email processed successfully'
       puts "\n✅ INTEGRATION TEST COMPLETED - BOTH PROOF TYPES WORK"
     end
   end
@@ -735,17 +734,17 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
       # This ensures the body content is properly parsed by the mailbox
       constituent_email = @constituent.email
       pdf_content = @pdf_content
-      
+
       mail = Mail.new do
         to MatVulcan::InboundEmailConfig.inbound_email_address
         from constituent_email
-        subject 'Proof documents'  # Ambiguous subject
+        subject 'Proof documents' # Ambiguous subject
         text_part do
-          body "I'm sending my residency proof as requested."  # Body indicates residency
+          body "I'm sending my residency proof as requested." # Body indicates residency
         end
         attachments['proof.pdf'] = pdf_content
       end
-      
+
       # Use ActionMailbox to process the email
       inbound_email = ActionMailbox::InboundEmail.create_and_extract_message_id!(mail.to_s)
       inbound_email.route
@@ -755,10 +754,10 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
 
       # Apply ActionMailbox testing best practice - focus on business outcomes
       assert @application.residency_proof.attached?, 'Residency proof should be attached'
-      
+
       # Verify email was processed (accept both valid states)
-      assert_includes ['processed', 'delivered'], inbound_email.status,
-        "Email should be processed or delivered, got: #{inbound_email.status}"
+      assert_includes %w[processed delivered], inbound_email.status,
+                      "Email should be processed or delivered, got: #{inbound_email.status}"
     end
   end
 
@@ -778,8 +777,8 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
       inbound_email = receive_inbound_email_from_mail(
         to: MatVulcan::InboundEmailConfig.inbound_email_address,
         from: @constituent.email,
-        subject: 'Proof documents',  # Generic subject
-        body: 'Here is my documentation.',  # Generic body
+        subject: 'Proof documents', # Generic subject
+        body: 'Here is my documentation.' # Generic body
       ) do |mail|
         mail.attachments['proof.pdf'] = @pdf_content
       end
@@ -787,10 +786,10 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
       # Apply ActionMailbox testing best practice - focus on business outcomes
       @application.reload
       assert @application.income_proof.attached?, 'Income proof should be attached'
-      
+
       # Verify email was processed (accept both valid states)
-      assert_includes ['processed', 'delivered'], inbound_email.status,
-        "Email should be processed or delivered, got: #{inbound_email.status}"
+      assert_includes %w[processed delivered], inbound_email.status,
+                      "Email should be processed or delivered, got: #{inbound_email.status}"
     end
   end
 

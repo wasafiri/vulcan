@@ -39,7 +39,7 @@ module Admin
 
     def mark_batch_as_printed
       @letters = PrintQueueItem.where(id: params[:letter_ids])
-                              .includes(:constituent)
+                               .includes(:constituent)
 
       if @letters.empty?
         # Set the correct flash notice for an empty batch as expected by the test
@@ -60,7 +60,7 @@ module Admin
 
     def download_batch
       @letters = PrintQueueItem.where(id: params[:letter_ids])
-                              .includes(:constituent, :pdf_letter_attachment)
+                               .includes(:constituent, :pdf_letter_attachment)
 
       return redirect_empty_letters if @letters.empty?
       return send_single_letter(@letters.first) if @letters.one?
@@ -90,11 +90,11 @@ module Admin
     end
 
     def send_multiple_letters(letters)
-      zipfile_name = "letters_batch_#{Date.today.strftime('%Y%m%d')}.zip"
-      
+      zipfile_name = "letters_batch_#{Time.zone.today.strftime('%Y%m%d')}.zip"
+
       # Create a zip file in memory
       zip_data = create_zip_data(letters)
-      
+
       # Send the data directly, avoiding file system operations
       send_data zip_data,
                 filename: zipfile_name,
@@ -108,18 +108,18 @@ module Admin
     def create_zip_data(letters)
       # Create a StringIO to hold the zip data
       buffer = StringIO.new
-      
+
       Zip::OutputStream.write_buffer(buffer) do |zos|
         letters.each do |letter_item|
           next unless letter_item.pdf_letter.attached?
-          
+
           # Add each PDF to the zip file
           filename = letter_filename(letter_item)
           zos.put_next_entry(filename)
           zos.write letter_item.pdf_letter.download
         end
       end
-      
+
       # Return the binary data
       buffer.string
     end

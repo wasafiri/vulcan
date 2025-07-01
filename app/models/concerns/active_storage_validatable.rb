@@ -7,7 +7,7 @@ module ActiveStorageValidatable
   extend ActiveSupport::Concern
 
   # Standardized file validation constants
-  # These replace the scattered constants in ProofManageable, ProofAttachmentValidator, 
+  # These replace the scattered constants in ProofManageable, ProofAttachmentValidator,
   # controllers, and JavaScript files
   ALLOWED_CONTENT_TYPES = %w[
     application/pdf
@@ -27,15 +27,16 @@ module ActiveStorageValidatable
     max_size_bytes: MAX_FILE_SIZE,
     max_size_mb: MAX_FILE_SIZE / 1.megabyte,
     error_messages: {
-      invalid_type: "Invalid file type. Please upload a PDF or an image file (jpg, jpeg, png, tiff, bmp).",
+      invalid_type: 'Invalid file type. Please upload a PDF or an image file (jpg, jpeg, png, tiff, bmp).',
       file_too_large: "File is too large. Maximum size allowed is #{MAX_FILE_SIZE / 1.megabyte}MB.",
       file_too_small: "File is too small. Minimum size required is #{MIN_FILE_SIZE} bytes.",
-      no_file: "Please select a file to upload."
+      no_file: 'Please select a file to upload.'
     }
   }.freeze
 
   included do
     # Provide validation methods that can be used by models
+
     private
 
     # Validates content type of an attachment
@@ -43,10 +44,10 @@ module ActiveStorageValidatable
     # @param attribute [Symbol] The attribute name for error reporting
     def validate_attachment_content_type(attachment, attribute)
       return unless attachment.attached?
-      
-      unless ALLOWED_CONTENT_TYPES.include?(attachment.content_type)
-        errors.add(attribute, JS_VALIDATION_CONFIG[:error_messages][:invalid_type])
-      end
+
+      return if ALLOWED_CONTENT_TYPES.include?(attachment.content_type)
+
+      errors.add(attribute, JS_VALIDATION_CONFIG[:error_messages][:invalid_type])
     end
 
     # Validates file size of an attachment
@@ -77,12 +78,10 @@ module ActiveStorageValidatable
     # @return [Array<String>] Array of error messages (empty if valid)
     def validate_file_params(file)
       errors = []
-      
+
       return [JS_VALIDATION_CONFIG[:error_messages][:no_file]] if file.blank?
 
-      unless ALLOWED_CONTENT_TYPES.include?(file.content_type)
-        errors << JS_VALIDATION_CONFIG[:error_messages][:invalid_type]
-      end
+      errors << JS_VALIDATION_CONFIG[:error_messages][:invalid_type] unless ALLOWED_CONTENT_TYPES.include?(file.content_type)
 
       if file.size < MIN_FILE_SIZE
         errors << JS_VALIDATION_CONFIG[:error_messages][:file_too_small]
@@ -99,4 +98,4 @@ module ActiveStorageValidatable
       JS_VALIDATION_CONFIG
     end
   end
-end 
+end

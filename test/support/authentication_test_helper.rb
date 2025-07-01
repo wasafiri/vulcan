@@ -4,7 +4,7 @@
 #
 # Standardised helpers for signing users in/out across non-system tests.
 # – Controller tests → sign_in_for_controller_test
-# – Integration tests → sign_in_for_integration_test  
+# – Integration tests → sign_in_for_integration_test
 # – Unit/other        → sign_in_for_unit_test
 #
 # For system tests, see SystemTestAuthentication module.
@@ -12,7 +12,7 @@
 module AuthenticationTestHelper
   # Include shared authentication core functionality
   include AuthenticationCore
-  
+
   # Explicit methods for different test contexts --------------------------------
 
   # Controller-level cookie sign-in.
@@ -153,32 +153,32 @@ module AuthenticationTestHelper
   # Helper methods to ensure authentication headers are included in integration test requests
 
   def default_headers
-    @headers ||= {}
+    @default_headers ||= {}
   end
 
   # Override HTTP methods to include authentication headers for integration tests
   def get(path, **args)
     args[:headers] = default_headers.merge(args[:headers] || {}) if is_integration_test?
-    super(path, **args)
+    super
   end
 
   def post(path, **args)
     args[:headers] = default_headers.merge(args[:headers] || {}) if is_integration_test?
-    super(path, **args)
+    super
   end
 
   def patch(path, **args)
     args[:headers] = default_headers.merge(args[:headers] || {}) if is_integration_test?
-    super(path, **args)
+    super
   end
 
   def put(path, **args)
     args[:headers] = default_headers.merge(args[:headers] || {}) if is_integration_test?
-    super(path, **args)
+    super
   end
 
   def delete(path, **args)
     args[:headers] = default_headers.merge(args[:headers] || {}) if is_integration_test?
-    super(path, **args)
+    super
   end
 end

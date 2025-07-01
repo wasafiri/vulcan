@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Seed File for "evaluator_mailer_evaluation_submission_confirmation"
 # --------------------------------------------------
 EmailTemplate.create_or_find_by!(name: 'evaluator_mailer_evaluation_submission_confirmation', format: :text) do |template|
@@ -23,4 +25,4 @@ EmailTemplate.create_or_find_by!(name: 'evaluator_mailer_evaluation_submission_c
   TEXT
   template.version = 1
 end
-puts 'Seeded evaluator_mailer_evaluation_submission_confirmation (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?
+Rails.logger.debug 'Seeded evaluator_mailer_evaluation_submission_confirmation (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

@@ -52,7 +52,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
   test 'should set Current.user before update' do
     # Verify Current.user is set during the request
     UsersController.any_instance.expects(:set_current_user).once
-    
+
     patch profile_path, params: {
       user: {
         first_name: 'Test Name'
@@ -64,14 +64,14 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     assert_no_difference('Event.count') do
       patch profile_path, params: {
         user: {
-          first_name: '',  # Invalid - required field
-          email: 'invalid-email'  # Invalid format
+          first_name: '', # Invalid - required field
+          email: 'invalid-email' # Invalid format
         }
       }
     end
 
     assert_response :unprocessable_entity
-    assert_select '.bg-red-50', text: /error/i  # Error message should be displayed
+    assert_select '.bg-red-50', text: /error/i # Error message should be displayed
   end
 
   test 'should redirect admin to admin dashboard after update' do
@@ -133,8 +133,8 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     patch profile_path, params: {
       user: {
         first_name: 'Allowed Update',
-        type: 'Users::Administrator',  # Should not be allowed
-        status: 'suspended'  # Should not be allowed
+        type: 'Users::Administrator', # Should not be allowed
+        status: 'suspended' # Should not be allowed
       }
     }
 
@@ -148,4 +148,4 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     # Clean up Current.user to avoid affecting other tests
     Current.user = nil
   end
-end 
+end

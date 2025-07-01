@@ -280,9 +280,9 @@ module PaperApplicationsTestHelper
 
     # Helper to properly escape text for XPath queries
     def xpath_literal(str)
-      if !str.include?("'")
+      if str.exclude?("'")
         "'#{str}'"
-      elsif !str.include?('"')
+      elsif str.exclude?('"')
         %("#{str}")
       else
         parts = str.scan(/[^'"]+|['"]/)

@@ -1,20 +1,20 @@
 # frozen_string_literal: true
 
 # Configure Cuprite globally for system tests
-if defined?(Capybara) && defined?(Capybara::Cuprite)
+if defined?(Capybara::Cuprite)
   Capybara.register_driver :cuprite do |app|
     Capybara::Cuprite::Driver.new(app, {
-      js_errors: true,
-      headless: %w[0 false].exclude?(ENV['HEADLESS']),
-      slowmo: ENV['SLOWMO']&.to_f,
-      # Reduce timeouts for faster tests
-      process_timeout: 5,
-      timeout: 5,
-      # Skip image loading for speed
-      skip_image_loading: true,
-      # Increase browser idle time
-      browser_options: ENV['DOCKER'] ? { 'no-sandbox' => nil } : {}
-    })
+                                    js_errors: true,
+                                    headless: %w[0 false].exclude?(ENV.fetch('HEADLESS', nil)),
+                                    slowmo: ENV['SLOWMO']&.to_f,
+                                    # Reduce timeouts for faster tests
+                                    process_timeout: 5,
+                                    timeout: 5,
+                                    # Skip image loading for speed
+                                    skip_image_loading: true,
+                                    # Increase browser idle time
+                                    browser_options: ENV['DOCKER'] ? { 'no-sandbox' => nil } : {}
+                                  })
   end
 
   # Configure default driver

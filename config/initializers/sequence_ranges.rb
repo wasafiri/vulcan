@@ -22,7 +22,7 @@ Rails.application.config.after_initialize do
           Rails.logger.info "Setting applications_id_seq to #{new_value} (from #{current_value}) with randomization for security"
           ActiveRecord::Base.connection.exec_query(
             "SELECT setval('applications_id_seq', $1)",
-            "Set Application Sequence",
+            'Set Application Sequence',
             [[nil, new_value]]
           )
         else

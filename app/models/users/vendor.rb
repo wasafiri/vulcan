@@ -119,9 +119,9 @@ module Users
       # When a W9 form is uploaded, it should go to pending_review status
       # unless it's already pending_review (to avoid unnecessary updates)
       # This handles: not_submitted -> pending_review, rejected -> pending_review, approved -> pending_review
-      if w9_form.attached? && !w9_status_pending_review?
-        update_column(:w9_status, :pending_review)
-      end
+      return unless w9_form.attached? && !w9_status_pending_review?
+
+      update_column(:w9_status, :pending_review)
     end
   end
 end

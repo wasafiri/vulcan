@@ -10,7 +10,7 @@ class ProofsSystemTest < ApplicationSystemTestCase
     @user = users(:constituent_john)
 
     # Create test files
-    fixture_dir = Rails.root.join('test', 'fixtures', 'files')
+    fixture_dir = Rails.root.join('test/fixtures/files')
     FileUtils.mkdir_p(fixture_dir)
 
     # Create test files if they don't exist

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Seed File for "voucher_notifications_voucher_expiring_soon"
 # --------------------------------------------------
 EmailTemplate.create_or_find_by!(name: 'voucher_notifications_voucher_expiring_soon', format: :text) do |template|
@@ -32,4 +34,4 @@ EmailTemplate.create_or_find_by!(name: 'voucher_notifications_voucher_expiring_s
   TEXT
   template.version = 1
 end
-puts 'Seeded voucher_notifications_voucher_expiring_soon (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?
+Rails.logger.debug 'Seeded voucher_notifications_voucher_expiring_soon (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

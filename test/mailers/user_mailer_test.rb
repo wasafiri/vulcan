@@ -73,7 +73,7 @@ class UserMailerTest < ActionMailer::TestCase
     assert_includes email.content_type, 'text/plain', 'Email should be text/plain (may include charset)'
 
     # Manually interpolate the expected body format string to compare with the main body
-    expected_body = format('Text Body with %<reset_url>s', reset_url: 'http://example.com/password/edit?token=test-password-reset-token')
+    expected_body = 'Text Body with http://example.com/password/edit?token=test-password-reset-token'
     assert_includes email.body.to_s, expected_body
   end
 
@@ -102,7 +102,7 @@ class UserMailerTest < ActionMailer::TestCase
     assert_includes email.content_type, 'text/plain', 'Email should be text/plain (may include charset)'
 
     # Manually interpolate the expected body format string to compare with the main body
-    expected_body = format('Text Body with %<verification_url>s', verification_url: 'http://example.com/constituent_portal/applications/verify?token=test-email-verification-token')
+    expected_body = 'Text Body with http://example.com/constituent_portal/applications/verify?token=test-email-verification-token'
     assert_includes email.body.to_s, expected_body
   end
 end

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Seed File for "application_notifications_proof_approved"
 # --------------------------------------------------
 EmailTemplate.create_or_find_by!(name: 'application_notifications_proof_approved', format: :text) do |template|
@@ -22,4 +24,4 @@ EmailTemplate.create_or_find_by!(name: 'application_notifications_proof_approved
   TEXT
   template.version = 1
 end
-puts 'Seeded application_notifications_proof_approved (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?
+Rails.logger.debug 'Seeded application_notifications_proof_approved (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

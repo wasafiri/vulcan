@@ -7,15 +7,15 @@ namespace :letters do
 
     # Directory paths
     email_dirs = [
-      Rails.root.join('app', 'views', 'application_notifications_mailer'),
-      Rails.root.join('app', 'views', 'evaluator_mailer'),
-      Rails.root.join('app', 'views', 'training_session_notifications_mailer'),
-      Rails.root.join('app', 'views', 'user_mailer'),
-      Rails.root.join('app', 'views', 'vendor_notifications_mailer'),
-      Rails.root.join('app', 'views', 'voucher_notifications_mailer')
+      Rails.root.join('app/views/application_notifications_mailer'),
+      Rails.root.join('app/views/evaluator_mailer'),
+      Rails.root.join('app/views/training_session_notifications_mailer'),
+      Rails.root.join('app/views/user_mailer'),
+      Rails.root.join('app/views/vendor_notifications_mailer'),
+      Rails.root.join('app/views/voucher_notifications_mailer')
     ]
 
-    letter_dir = Rails.root.join('app', 'views', 'letters')
+    letter_dir = Rails.root.join('app/views/letters')
 
     # Get all email template names (excluding layouts, shared, and partials)
     email_templates = []

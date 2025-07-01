@@ -4,64 +4,32 @@ module Admin
   class DashboardController < ApplicationController
     before_action :require_admin!
     include Pagy::Backend
+    include DashboardMetricsLoading
 
     def index
-      load_dashboard_counts
+      load_dashboard_metrics
       scope = build_application_scope
       scope = apply_filter(scope, params[:filter])
       @pagy, @applications = pagy(scope, items: 20)
     end
 
-    def load_dashboard_counts
-      # Ensure all instance variable keys are sanitized to prevent errors with special characters
-      safe_assign(:current_fiscal_year, fiscal_year)
-      safe_assign(:total_users_count, User.count)
-      safe_assign(:ytd_constituents_count, Application.where(created_at: fiscal_year_start..).count)
-
-      # Add debug logging for application counts
-      active_count = Application.active.count
-      approved_count = Application.where(status: :approved).count
-      Rails.logger.info "Dashboard counts - Active: #{active_count}, Approved: #{approved_count}"
-
-      # Calculate medical certs and proofs needing review counts
-      proofs_needing_review_count = Application.where(income_proof_status: :not_reviewed)
-                                               .or(Application.where(residency_proof_status: :not_reviewed))
-                                               .distinct
-                                               .count
-      medical_certs_to_review_count = Application.where(medical_certification_status: 'received').count
-
-      # Add detailed logging for troubleshooting
-      Rails.logger.info "Medical certifications needing review: #{medical_certs_to_review_count}"
-      Rails.logger.info "Proofs needing review: #{proofs_needing_review_count}"
-
-      safe_assign(:open_applications_count, active_count)
-      safe_assign(:pending_services_count, approved_count)
-      safe_assign(:proofs_needing_review_count, proofs_needing_review_count)
-      safe_assign(:medical_certs_to_review_count, medical_certs_to_review_count)
-
-      # Calculate training requests count - first try notifications, then fallback to joined training sessions
-      training_count = Notification.where(action: 'training_requested')
-                                   .where(notifiable_type: 'Application')
-                                   .select(:notifiable_id)
-                                   .distinct
-                                   .count
-
-      # If no training requests found via notifications, check actual training sessions
-      if training_count.zero?
-        training_count = Application.joins(:training_sessions)
-                                    .where(training_sessions: { status: %i[requested scheduled confirmed] })
-                                    .distinct
-                                    .count
-      end
-
-      safe_assign(:training_requests_count, training_count)
-      Rails.logger.info "Training requests: #{training_count}"
-
-      # Log the final instance variable values
-      Rails.logger.info "Dashboard instance variables - @open_applications_count: #{@open_applications_count}, @pending_services_count: #{@pending_services_count}"
-    end
-
     private
+    # Dashboard metrics loading is now handled by the DashboardMetricsLoading concern
+
+    def calculate_training_requests
+      # Try notifications first, fallback to training sessions
+      notification_count = Notification.where(action: 'training_requested', notifiable_type: 'Application')
+                                       .select(:notifiable_id)
+                                       .distinct
+                                       .count
+
+      return notification_count if notification_count.positive?
+
+      Application.joins(:training_sessions)
+                 .where(training_sessions: { status: %i[requested scheduled confirmed] })
+                 .distinct
+                 .count
+    end
 
     # Safely assigns a value to an instance variable after sanitizing the key
     # @param key [String, Symbol] The variable name, without the '@' prefix
@@ -109,16 +77,6 @@ module Admin
       else
         scope
       end
-    end
-
-    def fiscal_year
-      current_date = Date.current
-      current_date.month >= 7 ? current_date.year : current_date.year - 1
-    end
-
-    def fiscal_year_start
-      year = fiscal_year
-      Date.new(year, 7, 1)
     end
   end
 end

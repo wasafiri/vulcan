@@ -66,7 +66,7 @@ class ConstituentProofsSubmissionTest < ActionDispatch::IntegrationTest
         # Verify both events were created (similar to integration test)
         attachment_events = Event.where(action: 'income_proof_attached').order(created_at: :desc)
         tracking_events = Event.where(action: 'proof_submitted').order(created_at: :desc)
-        
+
         assert_equal 1, attachment_events.count, 'Expected 1 income_proof_attached event'
         assert_equal 1, tracking_events.count, 'Expected 1 proof_submitted event'
 

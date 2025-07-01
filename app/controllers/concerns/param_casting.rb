@@ -56,20 +56,9 @@ module ParamCasting
   # Cast boolean values in complex nested parameter structures
   # This handles the paper applications controller's more complex parameter structure
   def cast_complex_boolean_params
-    # Cast for application attributes
-    if params[:application].present?
-      cast_boolean_for(params[:application], APPLICATION_BOOLEAN_FIELDS + USER_DISABILITY_FIELDS)
-    end
-
-    # Cast for disability attributes within nested structures
-    cast_boolean_for(params[:applicant_attributes], USER_DISABILITY_FIELDS) if params[:applicant_attributes].present?
-    cast_boolean_for(params[:guardian_attributes], USER_DISABILITY_FIELDS) if params[:guardian_attributes].present?
-    cast_boolean_for(params[:constituent], USER_DISABILITY_FIELDS) if params[:constituent].present?
-
-    # Cast contact strategy checkboxes
-    STRATEGY_CHECKBOX_FIELDS.each do |checkbox_param|
-      params[checkbox_param] = to_boolean(params[checkbox_param]) if params[checkbox_param].present?
-    end
+    cast_application_booleans
+    cast_nested_user_booleans
+    cast_strategy_checkboxes
   end
 
   # Safely cast a single value to boolean
@@ -83,6 +72,33 @@ module ParamCasting
   alias safe_boolean_cast to_boolean
 
   private
+
+  # Cast boolean values in application parameters
+  def cast_application_booleans
+    return if params[:application].blank?
+
+    cast_boolean_for(params[:application], APPLICATION_BOOLEAN_FIELDS + USER_DISABILITY_FIELDS)
+  end
+
+  # Cast boolean values in nested user attribute parameters
+  def cast_nested_user_booleans
+    nested_params = %i[applicant_attributes guardian_attributes constituent]
+
+    nested_params.each do |param_key|
+      next if params[param_key].blank?
+
+      cast_boolean_for(params[param_key], USER_DISABILITY_FIELDS)
+    end
+  end
+
+  # Cast boolean values for contact strategy checkboxes
+  def cast_strategy_checkboxes
+    STRATEGY_CHECKBOX_FIELDS.each do |checkbox_param|
+      next if params[checkbox_param].blank?
+
+      params[checkbox_param] = to_boolean(params[checkbox_param])
+    end
+  end
 
   # Cast boolean values for specific fields within a hash
   # @param hash [ActionController::Parameters, Hash] The parameter hash to modify
@@ -100,4 +116,4 @@ module ParamCasting
       hash[field_sym] = to_boolean(value)
     end
   end
-end 
+end

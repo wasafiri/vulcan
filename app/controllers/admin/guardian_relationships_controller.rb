@@ -2,6 +2,7 @@
 
 module Admin
   class GuardianRelationshipsController < Admin::BaseController
+    include UserServiceIntegration
     before_action :set_guardian, only: %i[new create]
     before_action :set_relationship, only: [:destroy]
 
@@ -14,20 +15,29 @@ module Admin
     end
 
     def create
-      # Find or build dependent user
+      # Find dependent user
       dependent_user_id = params[:guardian_relationship][:dependent_id]
+      dependent_user = User.find_by(id: dependent_user_id)
+      
+      unless dependent_user
+        flash[:alert] = 'Dependent user not found.'
+        redirect_to admin_user_path(@guardian)
+        return
+      end
 
-      # Create the guardian relationship
-      @guardian_relationship = GuardianRelationship.new(
-        guardian_id: @guardian.id,
-        dependent_id: dependent_user_id,
-        relationship_type: params[:guardian_relationship][:relationship_type]
-      )
-
-      if @guardian_relationship.save
+      # Using UserServiceIntegration concern for consistent relationship creation
+      # Flow: create_guardian_relationship_with_service -> handles validation and creation
+      if create_guardian_relationship_with_service(@guardian, dependent_user, params[:guardian_relationship][:relationship_type])
         redirect_to admin_user_path(@guardian), notice: 'Guardian relationship created successfully.'
       else
-        @dependent = User.find_by(id: dependent_user_id) if dependent_user_id.present?
+        @dependent = dependent_user
+        @guardian_relationship = GuardianRelationship.new(
+          guardian_user: @guardian,
+          dependent_user: @dependent,
+          relationship_type: params[:guardian_relationship][:relationship_type]
+        )
+        log_user_service_error('to create guardian relationship', 'Relationship creation failed')
+        flash.now[:alert] = 'Failed to create guardian relationship.'
         render :new, status: :unprocessable_entity
       end
     end
@@ -56,7 +66,7 @@ module Admin
     end
 
     def guardian_relationship_params
-      params.require(:guardian_relationship).permit(:dependent_id, :relationship_type)
+      params.expect(guardian_relationship: %i[dependent_id relationship_type])
     end
   end
 end

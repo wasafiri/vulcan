@@ -22,7 +22,7 @@ class PostmarkEmailTracker
   def self.fetch_message_details(client, message_id)
     message = client.get_message(message_id)
     status = message['Status']
-    delivered_at = message['DeliveredAt'] ? Time.parse(message['DeliveredAt']) : nil
+    delivered_at = message['DeliveredAt'] ? Time.zone.parse(message['DeliveredAt']) : nil
     [status, delivered_at]
   rescue StandardError => e
     Rails.logger.error("Error fetching message details: #{e.message}")
@@ -33,7 +33,7 @@ class PostmarkEmailTracker
     opens_response = client.get_message_opens(message_id, count: 1, offset: 0)
     if opens_response['Opens'].present?
       first_open = opens_response['Opens'].first
-      opened_at = Time.parse(first_open['ReceivedAt'])
+      opened_at = Time.zone.parse(first_open['ReceivedAt'])
       [opened_at, first_open]
     else
       [nil, nil]

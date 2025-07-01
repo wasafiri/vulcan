@@ -15,33 +15,19 @@ class ApplicationStorageDecorator
 
   # Basic application attributes that should be delegated directly
 
-  def id
-    application.id
-  end
+  delegate :id, to: :application
 
-  def application_date
-    application.application_date
-  end
+  delegate :application_date, to: :application
 
-  def user
-    application.user
-  end
+  delegate :user, to: :application
 
-  def status
-    application.status
-  end
+  delegate :status, to: :application
 
-  def income_proof_status
-    application.income_proof_status
-  end
+  delegate :income_proof_status, to: :application
 
-  def residency_proof_status
-    application.residency_proof_status
-  end
+  delegate :residency_proof_status, to: :application
 
-  def medical_certification_status
-    application.medical_certification_status
-  end
+  delegate :medical_certification_status, to: :application
 
   # ActiveStorage attachment accessors that avoid triggering eager loading
 
@@ -155,11 +141,9 @@ class ApplicationStorageDecorator
                                            else
                                              # Fallback query - should ideally not be hit from index view now
                                              Rails.logger.warn "PERFORMANCE: Falling back to DB query for attachment existence: #{name} on Application #{application.id}"
-                                             ActiveStorage::Attachment.where(
-                                               record_type: 'Application',
-                                               record_id: application.id,
-                                               name: name
-                                             ).exists?
+                                             ActiveStorage::Attachment.exists?(record_type: 'Application',
+                                                                               record_id: application.id,
+                                                                               name: name)
                                            end
   end
 
@@ -183,16 +167,16 @@ class ApplicationStorageDecorator
 
   def attachment_metadata
     context = @current_attachment_context || 'unknown'
-    Rails.logger.debug "Accessing attachment metadata for #{context} on application #{application.id}"
+    Rails.logger.debug { "Accessing attachment metadata for #{context} on application #{application.id}" }
 
     # Return empty metadata for safety if context not set
     { filename: nil, content_type: nil, byte_size: 0 }
   end
 
   # Pass through method_missing to the original application for methods we don't override
-  def method_missing(method_name, *args, &block)
+  def method_missing(method_name, *, &)
     if application.respond_to?(method_name)
-      application.send(method_name, *args, &block)
+      application.send(method_name, *, &)
     else
       super
     end

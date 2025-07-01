@@ -56,21 +56,23 @@ module Admin
     end
 
     def voucher_params
-      params.require(:voucher).permit(:status, :expiration_date, :notes)
+      params.expect(voucher: %i[status expiration_date notes])
     end
 
     def load_status_counts
-      @active_vouchers_count   = Voucher.where(status: :active).count
-      @expiring_soon_count     = Voucher.expiring_soon.count
-      @redeemed_vouchers_count = Voucher.where(status: :redeemed).count
-      @unassigned_vouchers_count = Voucher.where(status: :active, vendor_id: nil).count
+      # SafeInstanceVariables concern: Provides safe_assign method for setting instance variables
+      # Flow: safe_assign(key, value) -> sanitizes key and sets @key = value
+      # Benefits: Prevents XSS attacks, ensures valid Ruby variable names, consistent error handling
+      safe_assign(:active_vouchers_count, Voucher.where(status: :active).count)
+      safe_assign(:expiring_soon_count, Voucher.expiring_soon.count)
+      safe_assign(:redeemed_vouchers_count, Voucher.where(status: :redeemed).count)
+      safe_assign(:unassigned_vouchers_count, Voucher.where(status: :active, vendor_id: nil).count)
     end
 
     def apply_filters(scope)
       scope = apply_status_filter(scope)
       scope = apply_additional_filters(scope)
-      scope = apply_date_range_filter(scope)
-      scope
+      apply_date_range_filter(scope)
     end
 
     def apply_status_filter(scope)
@@ -95,7 +97,7 @@ module Admin
     end
 
     def apply_date_range_filter(scope)
-      return scope unless params[:date_range].present?
+      return scope if params[:date_range].blank?
 
       case params[:date_range]
       when 'today'
@@ -112,7 +114,7 @@ module Admin
     end
 
     def apply_today_filter(scope)
-      scope.where(created_at: Time.current.beginning_of_day..Time.current.end_of_day)
+      scope.where(created_at: Time.current.all_day)
     end
 
     def apply_week_filter(scope)
@@ -140,65 +142,51 @@ module Admin
     end
 
     def generate_csv(vouchers)
+      return '' if vouchers.empty?
+
+      build_csv_content(vouchers)
+    end
+
+    def build_csv_content(vouchers)
       require 'smarter_csv'
 
-      vouchers_data = vouchers.map do |voucher|
-        {
-          'Code' => voucher.code,
-          'Status' => voucher.status,
-          'Initial Value' => voucher.initial_value,
-          'Remaining Value' => voucher.remaining_value,
-          'Vendor' => voucher.vendor&.business_name,
-          'Created At' => voucher.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-          'Expiration Date' => voucher.expiration_date&.strftime('%Y-%m-%d'),
-          'Last Transaction' => voucher.transactions.last&.processed_at&.strftime('%Y-%m-%d %H:%M:%S')
-        }
-      end
+      vouchers_data = vouchers.map { |voucher| voucher_to_hash(voucher) }
 
-      # Return empty string if no data to prevent errors
-      return '' if vouchers_data.empty?
-
-      temp_file = nil
-      csv_content = nil
+      # Use SmarterCSV to generate CSV with automatic header discovery
+      temp_file = Tempfile.new(['vouchers', '.csv'])
 
       begin
-        # Create a temporary file
-        temp_file = Tempfile.new(['vouchers', '.csv'])
-
-        # Use SmarterCSV::Writer with the temp file path
-        # Pass the whole data array; smarter_csv handles headers automatically
         writer = SmarterCSV::Writer.new(temp_file.path)
         writer << vouchers_data
-        writer.finalize # This saves and closes the file stream managed by smarter_csv
+        writer.finalize
 
-        # Rewind and read the content from the temp file
         temp_file.rewind
-        csv_content = temp_file.read
+        temp_file.read
       ensure
-        # Ensure the temp file is closed and deleted
-        temp_file&.close
-        temp_file&.unlink # Deletes the file from the filesystem
+        temp_file.close
+        temp_file.unlink
       end
-
-      csv_content
     end
 
-    def csv_headers
-      ['Code', 'Status', 'Initial Value', 'Remaining Value', 'Vendor', 'Created At', 'Expiration Date',
-       'Last Transaction']
+    def voucher_to_hash(voucher)
+      {
+        'Code' => voucher.code,
+        'Status' => voucher.status,
+        'Initial Value' => voucher.initial_value,
+        'Remaining Value' => voucher.remaining_value,
+        'Vendor' => voucher.vendor&.business_name,
+        'Created At' => format_date_time(voucher.created_at),
+        'Expiration Date' => format_date(voucher.expiration_date),
+        'Last Transaction' => format_date_time(voucher.transactions.last&.processed_at)
+      }
     end
 
-    def voucher_csv_row(voucher)
-      [
-        voucher.code,
-        voucher.status,
-        voucher.initial_value,
-        voucher.remaining_value,
-        voucher.vendor&.business_name,
-        voucher.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-        voucher.expiration_date&.strftime('%Y-%m-%d'),
-        voucher.transactions.last&.processed_at&.strftime('%Y-%m-%d %H:%M:%S')
-      ]
+    def format_date_time(datetime)
+      datetime&.strftime('%Y-%m-%d %H:%M:%S')
+    end
+
+    def format_date(date)
+      date&.strftime('%Y-%m-%d')
     end
 
     def log_event!(action)

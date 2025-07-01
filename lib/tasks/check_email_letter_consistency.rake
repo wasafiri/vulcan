@@ -43,7 +43,7 @@ namespace :letters do
 
     puts "\nChecking for mailer methods without letter generation..."
 
-    letter_types = PrintQueueItem.pluck(:letter_type).uniq
+    letter_types = PrintQueueItem.distinct.pluck(:letter_type)
     missing_letter_methods = []
 
     mailer_classes.each do |mailer_class|
@@ -89,9 +89,7 @@ namespace :letters do
           next if method_name.start_with?('_') || method_name == 'mail'
 
           # Check if method is mentioned in the letter generator
-          unless letter_generator_source.include?(method_name)
-            mailer_methods_not_in_generator << "#{mailer_class.name}##{method_name}"
-          end
+          mailer_methods_not_in_generator << "#{mailer_class.name}##{method_name}" unless letter_generator_source.include?(method_name)
         end
       end
 

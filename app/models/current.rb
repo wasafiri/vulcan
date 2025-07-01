@@ -6,16 +6,16 @@
 class Current < ActiveSupport::CurrentAttributes
   # Paper application context - used to bypass certain validations during admin paper application processing
   attribute :paper_context
-  
+
   # Proof resubmission context - used to bypass validations during proof resubmission flows
   attribute :resubmitting_proof
-  
+
   # Skip proof validation flag - used in tests and specific service contexts
   attribute :skip_proof_validation
-  
+
   # Current user for request context
   attribute :user
-  
+
   # Request ID for tracking and debugging
   attribute :request_id
 
@@ -60,9 +60,7 @@ class Current < ActiveSupport::CurrentAttributes
   # Reset callback to ensure clean state between requests
   resets do
     # Log state reset in development for debugging
-    if Rails.env.development?
-      Rails.logger.debug "Current attributes reset: paper_context=#{paper_context}, resubmitting_proof=#{resubmitting_proof}"
-    end
+    Rails.logger.debug { "Current attributes reset: paper_context=#{paper_context}, resubmitting_proof=#{resubmitting_proof}" } if Rails.env.development?
   end
 
   # Legacy attributes that were already in the class

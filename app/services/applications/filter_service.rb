@@ -63,11 +63,11 @@ module Applications
       when 'training_requests'
         # Match the controller logic: check notifications first, then fall back to training sessions
         notification_app_ids = Notification.where(action: 'training_requested')
-                                          .where(notifiable_type: 'Application')
-                                          .select(:notifiable_id)
-                                          .distinct
-                                          .pluck(:notifiable_id)
-        
+                                           .where(notifiable_type: 'Application')
+                                           .select(:notifiable_id)
+                                           .distinct
+                                           .pluck(:notifiable_id)
+
         if notification_app_ids.any?
           scope.where(id: notification_app_ids)
         else
@@ -93,9 +93,9 @@ module Applications
         date_range = Date.new(fy, 7, 1)..Date.new(fy + 1, 6, 30)
         scope.where(created_at: date_range)
       when 'last_30'
-        scope.where('created_at >= ?', 30.days.ago.beginning_of_day)
+        scope.where(created_at: 30.days.ago.beginning_of_day..)
       when 'last_90'
-        scope.where('created_at >= ?', 90.days.ago.beginning_of_day)
+        scope.where(created_at: 90.days.ago.beginning_of_day..)
       else
         scope
       end

@@ -49,7 +49,7 @@ module Admin
       visit admin_applications_path
 
       # Find application with constituent name
-      find('a', text: @constituent.full_name, match: :first).click
+      first('a', text: @constituent.full_name).click
 
       # Verify the audit log shows the application creation
       within '#audit-logs' do

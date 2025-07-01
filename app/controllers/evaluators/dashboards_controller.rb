@@ -38,7 +38,7 @@ module Evaluators
       @scheduled_evaluations = Evaluation.active
       @completed_evaluations = Evaluation.completed_evaluations
       @followup_evaluations = Evaluation.needing_followup
-      @assigned_constituents = Constituent.where(evaluator_id: Evaluator.pluck(:id)).to_a.uniq(&:id)
+      @assigned_constituents = Constituent.where(evaluator_id: Evaluator.select(:id)).to_a.uniq(&:id)
     end
 
     def load_evaluator_data

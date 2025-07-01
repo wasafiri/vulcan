@@ -11,7 +11,7 @@ module AdminTests
       # Ensure all necessary attachments are present
       unless @application.income_proof.attached?
         @application.income_proof.attach(
-          io: File.open(Rails.root.join('test/fixtures/files/income_proof.pdf')),
+          io: Rails.root.join('test/fixtures/files/income_proof.pdf').open,
           filename: 'income_proof.pdf',
           content_type: 'application/pdf'
         )
@@ -19,7 +19,7 @@ module AdminTests
 
       unless @application.residency_proof.attached?
         @application.residency_proof.attach(
-          io: File.open(Rails.root.join('test/fixtures/files/residency_proof.pdf')),
+          io: Rails.root.join('test/fixtures/files/residency_proof.pdf').open,
           filename: 'residency_proof.pdf',
           content_type: 'application/pdf'
         )

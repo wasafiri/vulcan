@@ -14,14 +14,16 @@
 module ConstituentPortal
   module Proofs
     class ProofsController < ApplicationController
+      include RequestMetadataHelper
+
       # Tell Rails to look for views in the new location
       prepend_view_path 'app/views/constituent_portal/proofs'
       before_action :authenticate_user!
       before_action :require_constituent!
       before_action :set_application
-      before_action :ensure_can_submit_proof
-      before_action :authorize_proof_access!, only: [:resubmit] # Add filter for resubmit
-      before_action :check_rate_limit, only: [:resubmit]
+      before_action :ensure_can_submit_proof, only: %i[new resubmit]
+      before_action :authorize_proof_access!, only: %i[resubmit]
+      before_action :check_rate_limit, only: %i[resubmit]
       skip_before_action :verify_authenticity_token, only: [:direct_upload]
 
       def new
@@ -46,28 +48,18 @@ module ConstituentPortal
         # This prevents nested transaction issues that can cause attachment rollbacks
         attach_and_update_proof
         track_submission
-
-        # Set flash and keep it through redirects
-        flash[:notice] = 'Proof submitted successfully'
-        flash.keep(:notice)
-        redirect_to constituent_portal_application_path(@application)
+        handle_successful_submission
       rescue RateLimit::ExceededError
-        # Set flash and keep it through redirects
-        flash[:alert] = 'Please wait before submitting another proof'
-        flash.keep(:alert)
-        redirect_to constituent_portal_application_path(@application)
+        handle_rate_limit_error
       rescue StandardError => e
-        unless Rails.env.test?
-          Rails.logger.error "ERROR IN RESUBMIT: #{e.class.name}: #{e.message}"
-          Rails.logger.error e.backtrace.join("\n")
-        end
+        handle_submission_error(e)
         raise
       end
 
       private
 
       def blob_params
-        params.expect(blob: [:filename, :byte_size, :checksum, :content_type, metadata: {}])
+        params.expect(blob: [:filename, :byte_size, :checksum, :content_type, { metadata: {} }])
       end
 
       def direct_upload_json(blob)
@@ -81,37 +73,51 @@ module ConstituentPortal
       end
 
       def set_application
+        application_id = extract_application_id
+        return if redirect_if_missing_application_id(application_id)
+
+        @application = find_user_application(application_id)
+        handle_application_not_found(application_id) if @application.nil?
+      end
+
+      def extract_application_id
         # The application ID could be in different params based on the routing
         # In routes.rb: get 'proofs/new/:proof_type', to: 'proofs/proofs#new', as: :new_proof
-        # The :id is from the resource-level param, and we need to extract the ID from the URL path
+        # The :id is from the resource-level param; extract the ID from the URL path
         application_id = params[:application_id]
 
         # Special handling for the route format
         if application_id.nil? && params[:id].present?
-          # When using routes like /constituent_portal/applications/123/proofs/new/income
-          # the ID comes through as :id
+          # When using routes like /constituent_portal/applications/123/proofs/new/income; the ID comes through as :id
           application_id = params[:id]
         end
 
-        if application_id.blank?
-          Rails.logger.error "Application ID is nil or empty in params: #{params.inspect}"
-          redirect_to constituent_portal_dashboard_path, alert: 'Application not found'
-          return
-        end
+        application_id
+      end
 
+      # rubocop:disable Naming/PredicateMethod
+      def redirect_if_missing_application_id(application_id)
+        return false if application_id.present?
+
+        Rails.logger.error "Application ID is nil or empty in params: #{params.inspect}"
+        redirect_to constituent_portal_dashboard_path, alert: 'Application not found'
+        true
+      end
+      # rubocop:enable Naming/PredicateMethod
+
+      def find_user_application(application_id)
         # First try the standard approach
-        @application = current_user.applications.find_by(id: application_id)
+        application = current_user.applications.find_by(id: application_id)
 
         # If that fails, try a more flexible query to handle potential type mismatches
-        if @application.nil?
-          @application = Application.where(id: application_id)
-                                    .where(user_id: current_user.id)
-                                    .first
-        end
+        return application unless application.nil?
 
-        # If we still couldn't find it, redirect
-        return unless @application.nil?
+        Application.where(id: application_id)
+                   .where(user_id: current_user.id)
+                   .first
+      end
 
+      def handle_application_not_found(application_id)
         Rails.logger.error "Application not found with ID: #{application_id} for user: #{current_user.id}"
         redirect_to constituent_portal_dashboard_path, alert: 'Application not found'
       end
@@ -135,7 +141,7 @@ module ConstituentPortal
 
         redirect_to constituent_portal_application_path(@application),
                     alert: 'Invalid proof type or status'
-        return false # Add explicit return to halt execution
+        false # Add explicit return to halt execution
       end
 
       def check_rate_limit
@@ -152,29 +158,14 @@ module ConstituentPortal
       # This ensures a consistent approach to attachment across the application
       # Both constituent portal and paper applications use the same service
       def attach_and_update_proof
-        # Log that we're resubmitting a previously rejected proof
-        is_resubmitting = (@application.income_proof_status_rejected? && params[:proof_type] == 'income') ||
-                          (@application.residency_proof_status_rejected? && params[:proof_type] == 'residency')
-
-        Rails.logger.info "Resubmitting previously rejected #{params[:proof_type]} proof for application #{@application.id}" if is_resubmitting
+        is_resubmitting = determine_resubmission_status
+        log_resubmission_attempt(is_resubmitting)
 
         # Set Current attribute to communicate resubmission status to validation layer
         Current.resubmitting_proof = is_resubmitting
 
         begin
-          result = ProofAttachmentService.attach_proof({
-            application: @application,
-            proof_type: params[:proof_type],
-            blob_or_file: params[:"#{params[:proof_type]}_proof_upload"],
-            status: :not_reviewed,
-            admin: current_user,
-            submission_method: :web,
-            metadata: {
-              ip_address: request.remote_ip,
-              user_agent: request.user_agent || 'Rails Testing',
-              resubmitting: is_resubmitting # Pass resubmission flag in metadata
-            }
-          })
+          result = ProofAttachmentService.attach_proof(build_attachment_params(is_resubmitting))
         ensure
           # Always reset Current attribute, even if an exception occurs
           Current.resubmitting_proof = nil
@@ -186,18 +177,64 @@ module ConstituentPortal
         raise "Failed to attach proof: #{result[:error]&.message}"
       end
 
+      def determine_resubmission_status
+        (@application.income_proof_status_rejected? && params[:proof_type] == 'income') ||
+          (@application.residency_proof_status_rejected? && params[:proof_type] == 'residency')
+      end
+
+      def log_resubmission_attempt(is_resubmitting)
+        return unless is_resubmitting
+
+        Rails.logger.info "Resubmitting previously rejected #{params[:proof_type]} proof for application #{@application.id}"
+      end
+
+      def build_attachment_params(is_resubmitting)
+        {
+          application: @application,
+          proof_type: params[:proof_type],
+          blob_or_file: params[:"#{params[:proof_type]}_proof_upload"],
+          status: :not_reviewed,
+          admin: current_user,
+          submission_method: :web,
+          # Using RequestMetadataHelper for consistent metadata creation
+          metadata: proof_submission_metadata(params[:proof_type], {
+            resubmitting: is_resubmitting # Pass resubmission flag in metadata
+          })
+        }
+      end
+
+      def handle_successful_submission
+        # Set flash and keep it through redirects
+        flash[:notice] = 'Proof submitted successfully'
+        flash.keep(:notice)
+        redirect_to constituent_portal_application_path(@application)
+      end
+
+      def handle_rate_limit_error
+        # Set flash and keep it through redirects
+        flash[:alert] = 'Please wait before submitting another proof'
+        flash.keep(:alert)
+        redirect_to constituent_portal_application_path(@application)
+      end
+
+      def handle_submission_error(error)
+        return if Rails.env.test?
+
+        Rails.logger.error "ERROR IN RESUBMIT: #{error.class.name}: #{error.message}"
+        Rails.logger.error error.backtrace.join("\n")
+      end
+
       def track_submission
         # Create Event for application audit log
         AuditEventService.log(
           action: 'proof_submitted',
           actor: current_user,
           auditable: @application,
-          metadata: {
+          # Using RequestMetadataHelper for consistent audit metadata
+          metadata: audit_metadata({
             proof_type: params[:proof_type],
-            submission_method: 'web',
-            ip_address: request.remote_ip,
-            user_agent: request.user_agent
-          }
+            submission_method: 'web'
+          })
         )
       end
 

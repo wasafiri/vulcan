@@ -296,7 +296,7 @@ module ConstituentPortal
           mobility_disability: checkbox_params(false),
           cognition_disability: checkbox_params(false),
           residency_proof: @valid_image, # Added residency proof
-          income_proof: @valid_pdf,       # Added income proof
+          income_proof: @valid_pdf, # Added income proof
           medical_provider_attributes: {
             name: 'Dr. Smith',
             phone: '2025551234',
@@ -404,8 +404,6 @@ module ConstituentPortal
       assert_equal 50_000, json_response['thresholds']['8']
     end
 
-
-
     # Test that user association is maintained during update
     test 'should maintain user association during update' do
       # Set up the application and make it a draft
@@ -472,7 +470,7 @@ module ConstituentPortal
       dependent_app = create(:application, user: dependent, status: :draft)
 
       # Set up guardian relationship between current user and dependent
-      relationship = GuardianRelationship.create!(
+      GuardianRelationship.create!(
         guardian_id: @user.id,
         dependent_id: dependent.id,
         relationship_type: 'parent'
@@ -536,11 +534,11 @@ module ConstituentPortal
             state: 'MD',
             zip_code: '21201'
           },
-                      medical_provider_attributes: {
-              name: 'Dr. Smith',
-              phone: '2025551234',
-              email: 'drsmith@example.com'
-            },
+          medical_provider_attributes: {
+            name: 'Dr. Smith',
+            phone: '2025551234',
+            email: 'drsmith@example.com'
+          },
           save_draft: 'Save Application'
         }
       end
@@ -616,29 +614,29 @@ module ConstituentPortal
 
     test 'should save address information to dependent user when guardian creates application' do
       # Setup: Create a guardian and a dependent user linked by GuardianRelationship
-      guardian = create(:constituent, 
-                       email: 'guardian.address.test@example.com', 
-                       phone: '5555550030',
-                       # Guardian starts with existing address
-                       physical_address_1: '999 Guardian Lane',
-                       city: 'Bethesda',
-                       state: 'MD',
-                       zip_code: '20814')
-      dependent = create(:constituent, 
-                        email: 'dependent.address.test@example.com', 
-                        phone: '5555550031',
-                        # Start with no address information
-                        physical_address_1: nil,
-                        physical_address_2: nil,
-                        city: nil,
-                        state: nil,
-                        zip_code: nil)
+      guardian = create(:constituent,
+                        email: 'guardian.address.test@example.com',
+                        phone: '5555550030',
+                        # Guardian starts with existing address
+                        physical_address_1: '999 Guardian Lane',
+                        city: 'Bethesda',
+                        state: 'MD',
+                        zip_code: '20814')
+      dependent = create(:constituent,
+                         email: 'dependent.address.test@example.com',
+                         phone: '5555550031',
+                         # Start with no address information
+                         physical_address_1: nil,
+                         physical_address_2: nil,
+                         city: nil,
+                         state: nil,
+                         zip_code: nil)
       GuardianRelationship.create!(guardian_id: guardian.id, dependent_id: dependent.id, relationship_type: 'parent')
 
-          # Sign in as the guardian
-    sign_in_for_integration_test guardian
+      # Sign in as the guardian
+      sign_in_for_integration_test guardian
 
-    # Create application for dependent with address information
+      # Create application for dependent with address information
       assert_difference('Application.count') do
         post constituent_portal_applications_path, params: {
           application: {
@@ -680,17 +678,17 @@ module ConstituentPortal
       # CRITICAL: Verify that the address information was saved to the DEPENDENT user model, not the guardian
       dependent.reload
       guardian.reload
-      
+
       # Address should be saved to the dependent (the applicant)
       assert_equal '789 Elm Avenue', dependent.physical_address_1, 'Address line 1 should be saved to dependent user'
       assert_equal 'Unit 5', dependent.physical_address_2, 'Address line 2 should be saved to dependent user'
       assert_equal 'Rockville', dependent.city, 'City should be saved to dependent user'
       assert_equal 'MD', dependent.state, 'State should be saved to dependent user'
       assert_equal '20850', dependent.zip_code, 'ZIP code should be saved to dependent user'
-      
-             # Guardian's address should remain unchanged
-       assert_equal '999 Guardian Lane', guardian.physical_address_1, 'Guardian address should not be affected'
-       assert_equal 'Bethesda', guardian.city, 'Guardian city should not be affected'
+
+      # Guardian's address should remain unchanged
+      assert_equal '999 Guardian Lane', guardian.physical_address_1, 'Guardian address should not be affected'
+      assert_equal 'Bethesda', guardian.city, 'Guardian city should not be affected'
     end
   end
 end

@@ -20,13 +20,21 @@ module Admin
 
       if style == :button
         # Use classes similar to other full-height buttons in the form
+        button_classes = [
+          'inline-flex justify-center py-2 px-4 border border-transparent shadow-sm',
+          'text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700',
+          'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
+        ].join(' ')
+
         link_to 'View Certification', url,
                 target: '_blank',
-                class: 'inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500', rel: 'noopener'
+                class: button_classes,
+                rel: 'noopener'
       else
         link_to 'View Certification', url,
                 target: '_blank',
-                class: 'text-blue-600 hover:text-blue-800 underline', rel: 'noopener'
+                class: 'text-blue-600 hover:text-blue-800 underline',
+                rel: 'noopener'
       end
     end
 

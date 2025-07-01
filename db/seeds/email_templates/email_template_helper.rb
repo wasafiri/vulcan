@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module EmailTemplateHelper
   def self.template_path(mailer_name, template_name)
     Rails.root.join('app', 'views', mailer_name, "#{template_name}.text.erb")

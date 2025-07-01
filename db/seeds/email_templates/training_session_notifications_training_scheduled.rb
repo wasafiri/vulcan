@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Seed File for "training_session_notifications_training_scheduled"
 # (Suggest saving as db/seeds/email_templates/training_session_notifications_training_scheduled.rb)
 # --------------------------------------------------
@@ -26,4 +28,4 @@ EmailTemplate.create_or_find_by!(name: 'training_session_notifications_training_
   TEXT
   template.version = 1
 end
-puts 'Seeded training_session_notifications_training_scheduled (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?
+Rails.logger.debug 'Seeded training_session_notifications_training_scheduled (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

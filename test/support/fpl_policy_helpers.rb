@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module FplPolicyHelpers
   def setup_fpl_policies
     # Stub the log_change method to avoid validation errors in test
@@ -18,4 +20,4 @@ module FplPolicyHelpers
     Policy.find_or_create_by(key: 'fpl_8_person').update(value: 50_000)
     Policy.find_or_create_by(key: 'fpl_modifier_percentage').update(value: 400)
   end
-end 
+end

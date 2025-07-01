@@ -1,12 +1,13 @@
 # frozen_string_literal: true
 
+# rubocop:disable Metrics/BlockLength
 Rails.application.routes.draw do
   # Handle favicon requests silently to prevent routing errors in tests
   get '/favicon.ico', to: proc { [204, {}, []] }
-  
+
   # Test routes (only in test environment)
   get 'test/auth_status', to: 'test#auth_status' if Rails.env.test?
-  
+
   root to: 'home#index'
 
   # Static pages
@@ -52,19 +53,19 @@ Rails.application.routes.draw do
     post 'verify/:type', to: 'two_factor_authentications#process_verification', as: :process_verification
     get 'verification_options/:type', to: 'two_factor_authentications#verification_options', as: :verification_options
 
-    # Credential management routes
-    get 'credentials/:type/new', to: 'two_factor_authentications#new_credential', as: :new_credential
-    post 'credentials/:type', to: 'two_factor_authentications#create_credential', as: :create_credential
-    delete 'credentials/:type/:id', to: 'two_factor_authentications#destroy_credential', as: :destroy_credential
-    get 'credentials/:type/success', to: 'two_factor_authentications#credential_success', as: :credential_success
+    # Credential management routes (delegated to TwoFactorCredentialsController)
+    get 'credentials/:type/new', to: 'two_factor_credentials#new_credential', as: :new_credential
+    post 'credentials/:type', to: 'two_factor_credentials#create_credential', as: :create_credential
+    delete 'credentials/:type/:id', to: 'two_factor_credentials#destroy_credential', as: :destroy_credential
+    get 'credentials/:type/success', to: 'two_factor_credentials#credential_success', as: :credential_success
 
     # SMS specific routes
-    get 'credentials/sms/:id/verify', to: 'two_factor_authentications#verify_sms_credential', as: :verify_sms_credential
-    post 'credentials/sms/:id/confirm', to: 'two_factor_authentications#confirm_sms_credential', as: :confirm_sms_credential
-    post 'credentials/sms/:id/resend', to: 'two_factor_authentications#resend_sms_code', as: :resend_sms_code
+    get 'credentials/sms/:id/verify', to: 'two_factor_credentials#verify_sms_credential', as: :verify_sms_credential
+    post 'credentials/sms/:id/confirm', to: 'two_factor_credentials#confirm_sms_credential', as: :confirm_sms_credential
+    post 'credentials/sms/:id/resend', to: 'two_factor_credentials#resend_sms_code', as: :resend_sms_code
 
     # WebAuthn specific routes
-    post 'credentials/webauthn/options', to: 'two_factor_authentications#webauthn_creation_options', as: :webauthn_creation_options
+    post 'credentials/webauthn/options', to: 'two_factor_credentials#webauthn_creation_options', as: :webauthn_creation_options
   end
 
   # Account Recovery
@@ -253,6 +254,7 @@ Rails.application.routes.draw do
       end
     end
   end
+  # rubocop:enable Metrics/BlockLength
 
   namespace :evaluators do
     resource :dashboard, only: [:show], controller: :dashboards

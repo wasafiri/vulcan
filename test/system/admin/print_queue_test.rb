@@ -39,7 +39,7 @@ module Admin
       assert_button 'Mark Selected as Printed', disabled: true
 
       # Select a letter
-      find('.letter-checkbox', match: :first).check
+      first('.letter-checkbox').check
 
       # Buttons should become enabled
       assert_button 'Download Selected', disabled: false
@@ -81,7 +81,7 @@ module Admin
       initial_pending_count = find_all('.letter-checkbox').size
 
       # Select the first letter
-      find('.letter-checkbox', match: :first).check
+      first('.letter-checkbox').check
 
       # Click the "Mark Selected as Printed" button
       accept_confirm do
@@ -102,7 +102,7 @@ module Admin
       visit admin_print_queue_index_path
 
       # Find the "View PDF" link for the first letter and click it
-      within(find('tr', match: :first)) do
+      within(first('tr')) do
         click_link 'View PDF'
       end
 

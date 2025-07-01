@@ -35,12 +35,13 @@ module Applications
     end
 
     def initialize(form)
+      super()
       @form = form
       @errors = []
     end
 
     def call
-      return failure_result(["Form is invalid"]) unless @form.valid?
+      return failure_result(['Form is invalid']) unless @form.valid?
 
       ActiveRecord::Base.transaction do
         setup_applicant_user
@@ -98,12 +99,10 @@ module Applications
         submission_method: @form.submission_method,
         application_date: target_application.application_date || Date.current
       }
-      
+
       # Only set user if this is a new application or explicitly changing the user
-      if target_application.new_record? || @form.user_id.present?
-        attributes[:user] = applicant_user
-      end
-      
+      attributes[:user] = applicant_user if target_application.new_record? || @form.user_id.present?
+
       target_application.assign_attributes(attributes)
     end
 
@@ -122,10 +121,10 @@ module Applications
       end
 
       # Attach income proof if provided
-      if @form.income_proof.present?
-        target_application.income_proof.attach(@form.income_proof)
-        target_application.income_proof_status = 'not_reviewed' if @form.is_submission
-      end
+      return if @form.income_proof.blank?
+
+      target_application.income_proof.attach(@form.income_proof)
+      target_application.income_proof_status = 'not_reviewed' if @form.is_submission
     end
 
     def save_application_with_audit
@@ -163,14 +162,14 @@ module Applications
       return unless target_application.persisted?
 
       # Log dependent application event if applicable
-      if @form.for_dependent? && target_application.managing_guardian && target_application.user
-        relationship = find_guardian_relationship
-        event_service = Applications::EventService.new(target_application, user: @form.current_user)
-        event_service.log_dependent_application_update(
-          dependent: target_application.user,
-          relationship_type: relationship&.relationship_type
-        )
-      end
+      return unless @form.for_dependent? && target_application.managing_guardian && target_application.user
+
+      relationship = find_guardian_relationship
+      event_service = Applications::EventService.new(target_application, user: @form.current_user)
+      event_service.log_dependent_application_update(
+        dependent: target_application.user,
+        relationship_type: relationship&.relationship_type
+      )
     end
 
     def find_guardian_relationship
@@ -182,16 +181,17 @@ module Applications
 
     def determine_status
       return 'in_progress' if @form.is_submission
+
       @form.application&.status || 'draft'
     end
 
     def determine_managing_guardian_id
       # If explicitly set in form, use that
       return @form.managing_guardian_id if @form.managing_guardian_id.present?
-      
+
       # If this is for a dependent, use current_user as guardian
       return @form.current_user.id if @form.for_dependent?
-      
+
       # Otherwise, no managing guardian
       nil
     end
@@ -212,4 +212,4 @@ module Applications
       Result.new(success: false, application: target_application, errors: errors)
     end
   end
-end 
+end

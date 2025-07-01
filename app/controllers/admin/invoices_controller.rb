@@ -4,11 +4,11 @@ module Admin
   class InvoicesController < Admin::BaseController
     include Pagy::Backend
 
-    before_action :set_invoice, only: %i[show update mark_check_issued mark_check_cashed] # Added :show
+    before_action :set_invoice, only: %i[show update approve]
     before_action :require_admin!
 
     def index
-      scope = Invoice.includes(:vendor) # Removed :voucher_transactions as it's not used in the index view
+      scope = Invoice.includes(:vendor)
                      .order(created_at: :desc)
 
       scope = apply_filters(scope)
@@ -20,7 +20,9 @@ module Admin
                              .where(voucher_transactions: { invoice_id: nil,
                                                             status: VoucherTransaction.statuses[:transaction_completed] })
                              .group('users.id, users.business_name')
-                             .select('users.id, users.business_name, SUM(voucher_transactions.amount) as total_amount, COUNT(DISTINCT voucher_transactions.id) as transaction_count')
+                             .select('users.id, users.business_name, ' \
+                                     'SUM(voucher_transactions.amount) as total_amount, ' \
+                                     'COUNT(DISTINCT voucher_transactions.id) as transaction_count')
                              .order('total_amount DESC')
 
       respond_to do |format|
@@ -77,54 +79,78 @@ module Admin
     end
 
     def invoice_params
-      params.require(:invoice).permit(
-        :status,
-        :payment_notes,
-        :gad_invoice_reference
+      params.expect(
+        invoice: %i[status
+                    payment_notes
+                    gad_invoice_reference]
       )
     end
 
     def apply_filters(scope)
+      scope = apply_basic_filters(scope)
+      scope = apply_date_range_filter(scope)
+      apply_payment_status_filter(scope)
+    end
+
+    def apply_basic_filters(scope)
       scope = scope.where(status: params[:status]) if params[:status].present?
       scope = scope.where(vendor_id: params[:vendor_id]) if params[:vendor_id].present?
-
-      if params[:date_range].present?
-        case params[:date_range]
-        when 'today'
-          scope = scope.where(created_at: Time.current.all_day)
-        when 'week'
-          scope = scope.where(created_at: 1.week.ago.beginning_of_day..Time.current.end_of_day)
-        when 'month'
-          scope = scope.where(created_at: 1.month.ago.beginning_of_day..Time.current.end_of_day)
-        when 'custom'
-          if params[:start_date].present? && params[:end_date].present?
-            start_date = Date.parse(params[:start_date])
-            end_date = Date.parse(params[:end_date])
-            scope = scope.where(created_at: start_date.beginning_of_day..end_date.end_of_day)
-          end
-        end
-      end
-
-      if params[:payment_status].present?
-        case params[:payment_status]
-        when 'pending_check'
-          scope = scope.where(status: :approved, check_number: nil)
-        when 'check_issued'
-          scope = scope.where.not(check_number: nil).where(check_cashed_at: nil)
-        when 'check_cashed'
-          scope = scope.where.not(check_cashed_at: nil)
-        end
-      end
-
       scope
+    end
+
+    def apply_date_range_filter(scope)
+      return scope if params[:date_range].blank?
+
+      case params[:date_range]
+      when 'today'
+        scope.where(created_at: Time.current.all_day)
+      when 'week'
+        scope.where(created_at: 1.week.ago.beginning_of_day..Time.current.end_of_day)
+      when 'month'
+        scope.where(created_at: 1.month.ago.beginning_of_day..Time.current.end_of_day)
+      when 'custom'
+        apply_custom_date_range_filter(scope)
+      else
+        scope
+      end
+    end
+
+    def apply_custom_date_range_filter(scope)
+      return scope unless params[:start_date].present? && params[:end_date].present?
+
+      start_date = Date.parse(params[:start_date])
+      end_date = Date.parse(params[:end_date])
+      scope.where(created_at: start_date.beginning_of_day..end_date.end_of_day)
+    end
+
+    def apply_payment_status_filter(scope)
+      return scope if params[:payment_status].blank?
+
+      case params[:payment_status]
+      when 'pending_check'
+        scope.where(status: :approved, check_number: nil)
+      when 'check_issued'
+        scope.where.not(check_number: nil).where(check_cashed_at: nil)
+      when 'check_cashed'
+        scope.where.not(check_cashed_at: nil)
+      else
+        scope
+      end
     end
 
     def generate_csv(invoices)
       require 'smarter_csv'
       require 'tempfile'
-      require 'fileutils' # Although Tempfile handles cleanup, good practice if more complex ops needed
+      require 'fileutils'
 
-      invoices_data = invoices.map do |invoice|
+      invoices_data = format_invoices_for_csv(invoices)
+      return '' if invoices_data.empty?
+
+      generate_csv_content(invoices_data)
+    end
+
+    def format_invoices_for_csv(invoices)
+      invoices.map do |invoice|
         {
           'Invoice Number' => invoice.invoice_number,
           'Vendor' => invoice.vendor.business_name,
@@ -137,33 +163,38 @@ module Admin
           'GAD Reference' => invoice.gad_invoice_reference
         }
       end
+    end
 
-      # Return empty string if no data to prevent errors
-      return '' if invoices_data.empty?
-
+    def generate_csv_content(invoices_data)
       temp_file = nil
       csv_content = nil
 
       begin
-        # Create a temporary file
-        temp_file = Tempfile.new(['invoices', '.csv'])
-
-        # Use SmarterCSV::Writer with the temp file path
-        # Pass the whole data array; smarter_csv handles headers automatically
-        writer = SmarterCSV::Writer.new(temp_file.path)
-        writer << invoices_data
-        writer.finalize # This saves and closes the file stream managed by smarter_csv
-
-        # Rewind and read the content from the temp file
-        temp_file.rewind
-        csv_content = temp_file.read
+        temp_file = create_temp_csv_file(invoices_data)
+        csv_content = read_csv_content(temp_file)
       ensure
-        # Ensure the temp file is closed and deleted
-        temp_file&.close
-        temp_file&.unlink # Deletes the file from the filesystem
+        cleanup_temp_file(temp_file)
       end
 
       csv_content
+    end
+
+    def create_temp_csv_file(invoices_data)
+      temp_file = Tempfile.new(['invoices', '.csv'])
+      writer = SmarterCSV::Writer.new(temp_file.path)
+      writer << invoices_data
+      writer.finalize
+      temp_file
+    end
+
+    def read_csv_content(temp_file)
+      temp_file.rewind
+      temp_file.read
+    end
+
+    def cleanup_temp_file(temp_file)
+      temp_file&.close
+      temp_file&.unlink
     end
 
     def log_event!(action, metadata = {})

@@ -160,10 +160,10 @@ module Admin
       new_dependent = User.find_by(dependent_email: dependent_email)
       assert new_guardian, "New guardian should have been created with email #{guardian_email}"
       assert new_dependent, "New dependent should have been created with dependent_email #{dependent_email}"
-      
+
       # Verify the dependent has their own email in both fields since they provided one
-      assert_equal dependent_email, new_dependent.email, "Dependent should keep their own email when provided"
-      assert_equal dependent_email, new_dependent.dependent_email, "Dependent should have their own email in dependent_email"
+      assert_equal dependent_email, new_dependent.email, 'Dependent should keep their own email when provided'
+      assert_equal dependent_email, new_dependent.dependent_email, 'Dependent should have their own email in dependent_email'
 
       created_application = Application.find_by(user_id: new_dependent.id)
       assert created_application, "Application should have been created for dependent #{new_dependent.id}"
@@ -292,10 +292,10 @@ module Admin
       # For dependents with their own email, dependent_email should match the provided email
       new_dependent = User.find_by(dependent_email: dependent_email)
       assert new_dependent, "New dependent should have been created with dependent_email #{dependent_email}"
-      
+
       # Verify the dependent has their own email in both fields since they provided one
-      assert_equal dependent_email, new_dependent.email, "Dependent should keep their own email when provided"
-      assert_equal dependent_email, new_dependent.dependent_email, "Dependent should have their own email in dependent_email"
+      assert_equal dependent_email, new_dependent.email, 'Dependent should keep their own email when provided'
+      assert_equal dependent_email, new_dependent.dependent_email, 'Dependent should have their own email in dependent_email'
 
       created_application = Application.find_by(user_id: new_dependent.id)
       assert created_application, "Application should have been created for dependent #{new_dependent.id}"
@@ -322,7 +322,7 @@ module Admin
       assert_difference 'User.count', 1, 'User.count should increase by 1' do
         assert_difference 'Application.count', 1, 'Application.count should increase by 1' do
           assert_difference 'ProofReview.count', 1, 'ProofReview.count should increase by 1' do
-            # Note: Event.count may include other events like profile_updated_by_guardian
+            # NOTE: Event.count may include other events like profile_updated_by_guardian
             # We verify specific application events below instead of total count
             post admin_paper_applications_path,
                  headers: default_headers,
@@ -341,11 +341,11 @@ module Admin
       assert_equal "The address on the document doesn't match for residency.", residency_review.notes
 
       # Verify events (filter for application-related events)
-      application_events = Event.where("action IN (?, ?, ?)", 'application_created', 'proof_submitted', 'proof_rejected').order(:created_at)
-      
+      application_events = Event.where('action IN (?, ?, ?)', 'application_created', 'proof_submitted', 'proof_rejected').order(:created_at)
+
       # We expect 2 events plus we'll manually add the missing proof_submitted event
-      assert_equal 2, application_events.count, "Expected 2 application-related events before adding missing one"
-      
+      assert_equal 2, application_events.count, 'Expected 2 application-related events before adding missing one'
+
       # Add the missing proof_submitted event for income proof that should have been created
       AuditEventService.log(
         action: 'proof_submitted',
@@ -358,20 +358,20 @@ module Admin
           has_attachment: true
         }
       )
-      
+
       # Now verify all 3 events
-      application_events = Event.where("action IN (?, ?, ?)", 'application_created', 'proof_submitted', 'proof_rejected').order(:created_at)
-      assert_equal 3, application_events.count, "Expected 3 application-related events total"
-      
+      application_events = Event.where('action IN (?, ?, ?)', 'application_created', 'proof_submitted', 'proof_rejected').order(:created_at)
+      assert_equal 3, application_events.count, 'Expected 3 application-related events total'
+
       # Check events by action and proof type, not strict order
       created_event = application_events.find { |e| e.action == 'application_created' }
       submitted_event = application_events.find { |e| e.action == 'proof_submitted' }
       rejected_event = application_events.find { |e| e.action == 'proof_rejected' }
-      
-      assert_not_nil created_event, "Should have application_created event"
-      assert_not_nil submitted_event, "Should have proof_submitted event"
-      assert_not_nil rejected_event, "Should have proof_rejected event"
-      
+
+      assert_not_nil created_event, 'Should have application_created event'
+      assert_not_nil submitted_event, 'Should have proof_submitted event'
+      assert_not_nil rejected_event, 'Should have proof_rejected event'
+
       assert_equal 'income', submitted_event.metadata['proof_type']
       assert_equal 'residency', rejected_event.metadata['proof_type']
     end
@@ -427,62 +427,14 @@ module Admin
     end
 
     def stub_proof_services
-      # Allow events to be created normally for counting in tests
-      # The test expects 3 events to be created
-
-      ProofAttachmentService
-        .stubs(:attach_proof)
-        .with(any_of(has_entry(proof_type: :income), has_entry(proof_type: 'income')))
-        .returns(success: true) do |args|
-          # Simulate the service's action: update application's proof status.
-          args[:application].income_proof_status = :approved
-          
-          # Since we're stubbing the service, we need to manually create the audit event 
-          # that the real ProofAttachmentService would create
-          AuditEventService.log(
-            action: 'proof_submitted',
-            actor: @admin,
-            auditable: args[:application],
-            metadata: {
-              proof_type: 'income', # Use string to match what the test expects
-              submission_method: 'paper',
-              status: 'approved',
-              has_attachment: true
-            }
-          )
-          
-          { success: true } # Return success for the service call
-        end
-
-      ProofAttachmentService
-        .stubs(:reject_proof_without_attachment)
-        .with(has_entry(proof_type: :residency))
-        .returns(success: true) do |args|
-          # This service method IS responsible for creating a ProofReview.
-          proof_review = args[:application].proof_reviews.create!(
-            admin: @admin, # Use @admin from setup
-            proof_type: :residency,
-            status: :rejected,
-            rejection_reason: args[:reason],
-            notes: args[:notes],
-            submission_method: :paper,
-            reviewed_at: Time.current
-          )
-          
-          # Since we're stubbing the service and bypassing ProofReview callbacks,
-          # we need to manually create the audit event that send_notification would create
-          AuditEventService.log(
-            action: 'proof_rejected',
-            actor: @admin,
-            auditable: args[:application],
-            metadata: {
-              proof_type: :residency,
-              rejection_reason: args[:reason]
-            }
-          )
-          
-          { success: true } # Return success for the service call
-        end
+      # Instead of stubbing the entire service, just stub the notification parts
+      # Let the ProofAttachmentService run normally so ProofReviews get created properly
+      
+      # Stub the notification service to prevent actual email sending
+      NotificationService.stubs(:create_and_deliver!).returns(true)
+      
+      # Stub any mailer calls that might happen
+      ApplicationNotificationsMailer.stubs(:proof_rejected).returns(stub(deliver_later: true))
     end
 
     test 'should send proof_rejected email when proof is rejected' do
@@ -851,7 +803,7 @@ module Admin
         # Generate unique email and phone to avoid uniqueness collisions
         unique_email = "test-app-save-failure-#{Time.now.to_i}@example.com"
         unique_phone = "555-#{rand(100..999)}-#{rand(1000..9999)}"
-        
+
         post admin_paper_applications_path, headers: default_headers, params: {
           constituent: {
             first_name: 'Test',

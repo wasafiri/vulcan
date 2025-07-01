@@ -9,14 +9,14 @@ const DEBUG = false;
 
 // Endpoint mappings
 const ENDPOINTS = {
-  verify:    type => `/two_factor_authentication/verify/${type}`,
-  options:   type => `/two_factor_authentication/verification_options/${type}`,
-  create:    type => `/two_factor_authentication/credentials/${type}`,
-  success:   type => `/two_factor_authentication/credentials/${type}/success`, 
-  destroy:   (type, id) => `/two_factor_authentication/credentials/${type}/${id}`,
-  smsVerify:  id   => `/two_factor_authentication/credentials/sms/${id}/verify`,
-  smsConfirm: id   => `/two_factor_authentication/credentials/sms/${id}/confirm`,
-  smsResend:  id   => `/two_factor_authentication/credentials/sms/${id}/resend`
+  verify: type => `/two_factor_authentication/verify/${type}`,
+  options: type => `/two_factor_authentication/verification_options/${type}`,
+  create: type => `/two_factor_authentication/credentials/${type}`,
+  success: type => `/two_factor_authentication/credentials/${type}/success`,
+  destroy: (type, id) => `/two_factor_authentication/credentials/${type}/${id}`,
+  smsVerify: id => `/two_factor_authentication/credentials/sms/${id}/verify`,
+  smsConfirm: id => `/two_factor_authentication/credentials/sms/${id}/confirm`,
+  smsResend: id => `/two_factor_authentication/credentials/sms/${id}/resend`
 };
 
 // Simple centralized logger
@@ -138,10 +138,10 @@ const Auth = {
   // Map WebAuthn errors to user messages
   getErrorMessage(error) {
     const map = {
-      NotAllowedError:   "The operation was cancelled or timed out.",
+      NotAllowedError: "The operation was cancelled or timed out.",
       NotSupportedError: "Your browser doesn't support this feature or device.",
-      SecurityError:     "The operation was blocked for security reasons.",
-      AbortError:        "The operation was aborted.",
+      SecurityError: "The operation was blocked for security reasons.",
+      AbortError: "The operation was aborted.",
       InvalidStateError: "The device is not in a valid state for this operation."
     };
     return map[error.name] || "Failed to complete operation.";

@@ -20,6 +20,12 @@
 # report success but no actual attachments will be created, leading to false positives.
 # Use real test data and let the service run normally for proper integration testing.
 class ProofAttachmentService
+  # Parameter object for attachment event logging to reduce method parameter count
+  AttachmentEventContext = Struct.new(
+    :application, :proof_type, :status, :submission_method,
+    :admin, :metadata, :blob_size, :skip_audit_events,
+    keyword_init: true
+  )
   # Attaches a proof document to an application
   #
   # This is the central method used by both constituent portal and paper application
@@ -125,7 +131,14 @@ class ProofAttachmentService
   end
 
   def self.build_context(result, proof_type, status)
-    context = {
+    context = build_base_context(result, proof_type, status)
+    add_blob_size_to_context(context, result)
+    add_error_details_to_context(context, result)
+    context
+  end
+
+  def self.build_base_context(result, proof_type, status)
+    {
       proof_type: proof_type,
       status: status,
       success: result[:success],
@@ -133,13 +146,20 @@ class ProofAttachmentService
       environment: Rails.env,
       transaction_id: SecureRandom.uuid
     }
-    context[:blob_size_bytes] = result[:blob_size] if result[:success] && result[:blob_size].present?
-    if result[:error]
-      context[:error_class] = result[:error].class.name
-      context[:error_message] = result[:error].message
-      context[:error_backtrace] = result[:error].backtrace.first(3) if result[:error].backtrace
-    end
-    context
+  end
+
+  def self.add_blob_size_to_context(context, result)
+    return unless result[:success] && result[:blob_size].present?
+
+    context[:blob_size_bytes] = result[:blob_size]
+  end
+
+  def self.add_error_details_to_context(context, result)
+    return unless result[:error]
+
+    context[:error_class] = result[:error].class.name
+    context[:error_message] = result[:error].message
+    context[:error_backtrace] = result[:error].backtrace.first(3) if result[:error].backtrace
   end
 
   def self.record_datadog_metrics(result, _context, proof_type, status)
@@ -163,73 +183,79 @@ class ProofAttachmentService
     private
 
     def perform_attachment_flow(result, params)
-      application = params.fetch(:application)
-      proof_type = params.fetch(:proof_type)
-      attachment_param = prepare_attachment_param(params.fetch(:blob_or_file), proof_type)
-      blob_size = calculate_blob_size(params.fetch(:blob_or_file))
-      submission_method = params.fetch(:submission_method)
+      flow_data = prepare_flow_data(params)
 
-      with_paper_context(submission_method, proof_type) do
-        attach_and_verify_initial_save(application, proof_type, attachment_param)
+      with_paper_context(flow_data.submission_method, flow_data.proof_type) do
+        attach_and_verify_initial_save(flow_data.application, flow_data.proof_type, flow_data.attachment_param)
+        log_attachment_events_from_flow_data(flow_data, params)
+        verify_attachment_persisted_after_update(flow_data.application, flow_data.proof_type)
 
-        log_attachment_events(application, proof_type, params.fetch(:status), submission_method,
-                              params.fetch(:admin), params.fetch(:metadata), params.fetch(:blob_or_file), blob_size,
-                              skip_audit_events: params.fetch(:skip_audit_events))
-
-        verify_attachment_persisted_after_update(application, proof_type)
-
-        result[:blob_size] = blob_size
+        result[:blob_size] = flow_data.blob_size
         result[:success] = true
       end
     end
 
     def attach_and_verify_initial_save(application, proof_type, attachment_param)
-      begin
-        application.send("#{proof_type}_proof").attach(attachment_param)
-      rescue ActiveSupport::MessageVerifier::InvalidSignature, ActiveRecord::RecordNotFound => e
-        # Handle "mismatched digest" or invalid signed ID errors
-        Rails.logger.warn "ActiveStorage signed ID error: #{e.message}. Attempting to recreate blob."
-        
-        # If attachment_param is a signed ID that's become invalid, we need to handle this gracefully
-        if attachment_param.is_a?(String) && attachment_param.start_with?('eyJf')
-          Rails.logger.error "Invalid signed ID detected, cannot recover. Original error: #{e.message}"
-          raise "Failed to attach proof: Invalid or expired attachment reference"
-        end
-        
-        # For other types of attachment params, try to recreate the blob
-        if attachment_param.respond_to?(:tempfile) || attachment_param.is_a?(ActionDispatch::Http::UploadedFile)
-          begin
-            blob = ActiveStorage::Blob.create_and_upload!(
-              io: attachment_param.tempfile,
-              filename: attachment_param.original_filename,
-              content_type: attachment_param.content_type
-            )
-            application.send("#{proof_type}_proof").attach(blob)
-          rescue StandardError => retry_error
-            Rails.logger.error "Failed to recreate blob: #{retry_error.message}"
-            raise "Failed to attach proof after retry: #{retry_error.message}"
-          end
-        else
-          raise "Failed to attach proof: #{e.message}"
-        end
+      perform_attachment(application, proof_type, attachment_param)
+      save_application_with_attachment(application)
+      verify_attachment_persisted(application, proof_type)
+    end
+
+    def perform_attachment(application, proof_type, attachment_param)
+      application.send("#{proof_type}_proof").attach(attachment_param)
+    rescue ActiveSupport::MessageVerifier::InvalidSignature, ActiveRecord::RecordNotFound => e
+      handle_attachment_signature_error(application, proof_type, attachment_param, e)
+    end
+
+    def handle_attachment_signature_error(application, proof_type, attachment_param, error)
+      Rails.logger.warn "ActiveStorage signed ID error: #{error.message}. Attempting to recreate blob."
+
+      validate_recoverable_attachment_param(attachment_param, error)
+      blob = recreate_blob_from_uploaded_file(attachment_param)
+      application.send("#{proof_type}_proof").attach(blob)
+    end
+
+    def validate_recoverable_attachment_param(attachment_param, error)
+      if attachment_param.is_a?(String) && attachment_param.start_with?('eyJf')
+        Rails.logger.error "Invalid signed ID detected, cannot recover. Original error: #{error.message}"
+        raise 'Failed to attach proof: Invalid or expired attachment reference'
       end
-      
-      begin
-        application.save!
-      rescue StandardError => e
-        Rails.logger.error "Save failed: #{e.message}"
-        unless Rails.env.test? && ENV['VERBOSE_TESTS'].blank?
-          Rails.logger.error "Validation errors: #{application.errors.full_messages.join(', ')}"
-        end
-        raise "Failed to save application with attachment: #{e.message}"
-      end
-      
+
+      return if attachment_param.respond_to?(:tempfile) || attachment_param.is_a?(ActionDispatch::Http::UploadedFile)
+
+      raise "Failed to attach proof: #{error.message}"
+    end
+
+    def recreate_blob_from_uploaded_file(attachment_param)
+      ActiveStorage::Blob.create_and_upload!(
+        io: attachment_param.tempfile,
+        filename: attachment_param.original_filename,
+        content_type: attachment_param.content_type
+      )
+    rescue StandardError => e
+      Rails.logger.error "Failed to recreate blob: #{e.message}"
+      raise "Failed to attach proof after retry: #{e.message}"
+    end
+
+    def save_application_with_attachment(application)
+      application.save!
+    rescue StandardError => e
+      Rails.logger.error "Save failed: #{e.message}"
+      log_validation_errors(application) unless Rails.env.test? && ENV['VERBOSE_TESTS'].blank?
+      raise "Failed to save application with attachment: #{e.message}"
+    end
+
+    def log_validation_errors(application)
+      Rails.logger.error "Validation errors: #{application.errors.full_messages.join(', ')}"
+    end
+
+    def verify_attachment_persisted(application, proof_type)
       application.reload
-      
-      unless application.send("#{proof_type}_proof").attached?
-        Rails.logger.error "Attachment failed to persist for #{proof_type} proof on application #{application.id}"
-        raise 'Attachment failed to persist after save and reload'
-      end
+
+      return if application.send("#{proof_type}_proof").attached?
+
+      Rails.logger.error "Attachment failed to persist for #{proof_type} proof on application #{application.id}"
+      raise 'Attachment failed to persist after save and reload'
     end
 
     def verify_attachment_persisted_after_update(application, proof_type)
@@ -314,42 +340,53 @@ class ProofAttachmentService
       blob_or_file
     end
 
-    def log_attachment_events(application, proof_type, status, submission_method, admin, metadata, _blob_or_file,
-                              blob_size, skip_audit_events: false)
-      attached_blob = application.send("#{proof_type}_proof").blob
+    def log_attachment_events(context)
+      event_metadata = build_event_metadata(context)
+
+      log_audit_event(context, event_metadata) unless context.skip_audit_events
+      update_application_status(context)
+      send_notification(context, event_metadata)
+    end
+
+    def build_event_metadata(context)
+      attached_blob = context.application.send("#{context.proof_type}_proof").blob
       blob_id = attached_blob&.id
 
-      event_metadata = metadata.merge(
-        proof_type: proof_type,
-        submission_method: submission_method,
-        status: status,
+      context.metadata.merge(
+        proof_type: context.proof_type,
+        submission_method: context.submission_method,
+        status: context.status,
         has_attachment: true,
         blob_id: blob_id,
-        blob_size: blob_size,
+        blob_size: context.blob_size,
         success: true,
         filename: attached_blob&.filename.to_s
       )
+    end
 
-      unless skip_audit_events
-        AuditEventService.log(
-          action: "#{proof_type}_proof_attached",
-          auditable: application,
-          actor: admin || application.user,
-          metadata: event_metadata
-        )
-      end
+    def log_audit_event(context, event_metadata)
+      AuditEventService.log(
+        action: "#{context.proof_type}_proof_attached",
+        auditable: context.application,
+        actor: context.admin || context.application.user,
+        metadata: event_metadata
+      )
+    end
 
+    def update_application_status(context)
       ActiveRecord::Base.transaction do
-        status_attrs = { "#{proof_type}_proof_status" => status }
-        status_attrs[:needs_review_since] = Time.current if status == :not_reviewed
-        application.update!(status_attrs)
+        status_attrs = { "#{context.proof_type}_proof_status" => context.status }
+        status_attrs[:needs_review_since] = Time.current if context.status == :not_reviewed
+        context.application.update!(status_attrs)
       end
+    end
 
+    def send_notification(context, event_metadata)
       NotificationService.create_and_deliver!(
-        type: "#{proof_type}_proof_attached",
-        recipient: application.user,
-        actor: admin || application.user,
-        notifiable: application,
+        type: "#{context.proof_type}_proof_attached",
+        recipient: context.application.user,
+        actor: context.admin || context.application.user,
+        notifiable: context.application,
         metadata: event_metadata
       )
     end
@@ -359,11 +396,23 @@ class ProofAttachmentService
       notes = rejection_details.fetch(:notes, nil)
 
       with_paper_context(submission_method, proof_type) do
+        # Update the proof status
         application.reject_proof_without_attachment!(
           proof_type,
           admin: admin,
           reason: reason,
           notes: notes || 'Rejected during paper application submission'
+        )
+
+        # Create the proof review record
+        application.proof_reviews.create!(
+          admin: admin,
+          proof_type: proof_type,
+          status: 'rejected',
+          rejection_reason: reason,
+          notes: notes,
+          reviewed_at: Time.current,
+          submission_method: submission_method
         )
       end
     end
@@ -392,6 +441,33 @@ class ProofAttachmentService
         notifiable: application,
         metadata: audit_metadata
       )
+    end
+
+    def prepare_flow_data(params)
+      blob_or_file = params.fetch(:blob_or_file)
+
+      Struct.new(:application, :proof_type, :attachment_param, :blob_size, :submission_method, keyword_init: true).new(
+        application: params.fetch(:application),
+        proof_type: params.fetch(:proof_type),
+        attachment_param: prepare_attachment_param(blob_or_file, params.fetch(:proof_type)),
+        blob_size: calculate_blob_size(blob_or_file),
+        submission_method: params.fetch(:submission_method)
+      )
+    end
+
+    def log_attachment_events_from_flow_data(flow_data, params)
+      context = AttachmentEventContext.new(
+        application: flow_data.application,
+        proof_type: flow_data.proof_type,
+        status: params.fetch(:status),
+        submission_method: flow_data.submission_method,
+        admin: params.fetch(:admin),
+        metadata: params.fetch(:metadata),
+        blob_size: flow_data.blob_size,
+        skip_audit_events: params.fetch(:skip_audit_events)
+      )
+
+      log_attachment_events(context)
     end
 
     def with_paper_context(submission_method, _proof_type)

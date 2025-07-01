@@ -22,7 +22,7 @@ class ProofAttachmentMetricsJobTest < ActiveJob::TestCase
     # Clear all users to ensure a completely clean slate for system_user and admins
     # This is an aggressive cleanup but ensures no stale user IDs
     User.delete_all
-    
+
     # Clear the cached system user to prevent stale references
     User.instance_variable_set(:@system_user, nil)
 

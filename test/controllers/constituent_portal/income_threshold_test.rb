@@ -14,8 +14,6 @@ module ConstituentPortal
       setup_fpl_policies
     end
 
-
-
     test 'fpl_thresholds endpoint returns correct data' do
       get fpl_thresholds_constituent_portal_applications_path
       assert_response :success

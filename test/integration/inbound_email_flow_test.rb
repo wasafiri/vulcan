@@ -97,7 +97,7 @@ class InboundEmailFlowTest < ActionDispatch::IntegrationTest
   teardown do
     # Restore original environment variables
     ENV['RAILS_INBOUND_EMAIL_PASSWORD'] = @original_password
-    
+
     # Clean up Current attributes
     Current.reset
   end
@@ -128,9 +128,7 @@ class InboundEmailFlowTest < ActionDispatch::IntegrationTest
     assert @application.income_proof.attached?, 'Income proof should be attached after processing email'
 
     # Since the email mentioned income proof, income proof should be attached but not residency
-    unless @initial_income_proof_attached
-      assert @application.income_proof.attached?, 'Income proof should be attached after processing email'
-    end
+    assert @application.income_proof.attached?, 'Income proof should be attached after processing email' unless @initial_income_proof_attached
     assert_equal @initial_residency_proof_attached, @application.residency_proof.attached?,
                  'Residency proof attachment state should not have changed'
 
@@ -154,10 +152,10 @@ class InboundEmailFlowTest < ActionDispatch::IntegrationTest
 
         # Apply ActionMailbox testing best practice - accept 'delivered' as valid
         inbound_email.reload
-        # For malformed emails, we expect either 'failed', 'bounced', or 'delivered' 
+        # For malformed emails, we expect either 'failed', 'bounced', or 'delivered'
         # (delivered means it reached a mailbox but couldn't be processed)
-        assert_includes ['failed', 'bounced', 'delivered'], inbound_email.status,
-          "Malformed email should have appropriate status, got: #{inbound_email.status}"
+        assert_includes %w[failed bounced delivered], inbound_email.status,
+                        "Malformed email should have appropriate status, got: #{inbound_email.status}"
       end
     rescue StandardError => e
       # An error is acceptable but not required behavior

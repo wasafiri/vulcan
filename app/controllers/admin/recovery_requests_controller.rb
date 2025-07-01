@@ -4,7 +4,7 @@ module Admin
   class RecoveryRequestsController < ApplicationController
     before_action :authenticate_user!
     before_action :ensure_admin
-    before_action :set_recovery_request, only: [:show, :approve]
+    before_action :set_recovery_request, only: %i[show approve]
 
     def index
       @recovery_requests = RecoveryRequest.includes(:user).where(status: 'pending').order(created_at: :desc)
@@ -41,9 +41,9 @@ module Admin
     end
 
     def ensure_admin
-      unless current_user.admin?
-        redirect_to root_path, alert: 'You are not authorized to access this page.'
-      end
+      return if current_user.admin?
+
+      redirect_to root_path, alert: 'You are not authorized to access this page.'
     end
 
     def notify_user_of_approval

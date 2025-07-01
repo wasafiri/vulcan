@@ -38,7 +38,7 @@ module Admin
     end
 
     def vendor_params
-      params.require(:vendor).permit(:business_name, :business_tax_id, :status)
+      params.expect(vendor: %i[business_name business_tax_id status])
     end
 
     def require_admin!

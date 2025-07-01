@@ -2,8 +2,8 @@
 
 FactoryBot.define do
   factory :voucher_transaction do
-    association :voucher
-    association :vendor
+    voucher
+    vendor
     amount { 100.00 }
     status { :transaction_completed }
     processed_at { Time.current }
@@ -26,7 +26,7 @@ FactoryBot.define do
     end
 
     trait :with_invoice do
-      association :invoice
+      invoice
     end
 
     trait :partial_redemption do

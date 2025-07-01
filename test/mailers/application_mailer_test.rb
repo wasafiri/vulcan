@@ -17,7 +17,7 @@ class ApplicationMailerTest < ActionMailer::TestCase
   test 'host_url is set correctly in production with missing MAILER_HOST' do
     Rails.stub :env, ActiveSupport::StringInquirer.new('production') do
       # Store the original MAILER_HOST value
-      original_host = ENV['MAILER_HOST']
+      original_host = ENV.fetch('MAILER_HOST', nil)
 
       begin
         # Temporarily unset MAILER_HOST
@@ -39,7 +39,7 @@ class ApplicationMailerTest < ActionMailer::TestCase
   test 'host_url is set correctly in production with MAILER_HOST' do
     Rails.stub :env, ActiveSupport::StringInquirer.new('production') do
       # Store the original MAILER_HOST value
-      original_host = ENV['MAILER_HOST']
+      original_host = ENV.fetch('MAILER_HOST', nil)
 
       begin
         # Set a test MAILER_HOST value

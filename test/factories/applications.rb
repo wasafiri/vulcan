@@ -73,7 +73,7 @@ FactoryBot.define do
       residency_proof_status { :rejected }
       needs_review_since { Time.current }
       last_activity_at { Time.current }
-      
+
       # This trait represents the constituent portal scenario where
       # proofs were uploaded and then rejected by admin review
       after(:create) do |application|
@@ -85,7 +85,7 @@ FactoryBot.define do
         )
         application.residency_proof.attach(
           io: Rails.root.join('test/fixtures/files/medical_certification_valid.pdf').open,
-          filename: 'residency_proof.pdf', 
+          filename: 'residency_proof.pdf',
           content_type: 'application/pdf'
         )
       end
@@ -93,7 +93,7 @@ FactoryBot.define do
 
     trait :paper_rejected_proofs do
       status { :needs_information }
-      
+
       # This trait represents the paper application scenario where
       # admin rejected proofs without uploading them (paper workflow)
       after(:create) do |application|
@@ -153,7 +153,7 @@ FactoryBot.define do
       income_proof_status { :not_reviewed }
       residency_proof_status { :not_reviewed }
       needs_review_since { Time.current }
-      
+
       after(:create) do |application|
         # Attach proofs that need review
         application.income_proof.attach(

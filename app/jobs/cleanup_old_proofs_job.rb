@@ -5,7 +5,7 @@ class CleanupOldProofsJob < ApplicationJob
 
   def perform
     Application.where(status: :archived)
-               .where('updated_at < ?', 30.days.ago)
+               .where(updated_at: ...30.days.ago)
                .find_each(&:purge_proofs)
   end
 end

@@ -46,14 +46,13 @@ module VendorPortal
 
       # Create application for the constituent
       @application = create(:application,
-        user: @constituent,
-        status: 'in_progress',
-        household_size: 1,
-        annual_income: 25_000,
-        medical_provider_name: 'Dr. Test Provider',
-        medical_provider_email: 'doctor@example.com',
-        medical_provider_phone: '555-123-4567'
-      )
+                            user: @constituent,
+                            status: 'in_progress',
+                            household_size: 1,
+                            annual_income: 25_000,
+                            medical_provider_name: 'Dr. Test Provider',
+                            medical_provider_email: 'doctor@example.com',
+                            medical_provider_phone: '555-123-4567')
 
       # Create voucher with a fixed code for testing
       @voucher = Voucher.new(

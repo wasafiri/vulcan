@@ -21,9 +21,7 @@ module VendorPortal
           nil
         end
 
-        if start_date && end_date
-          transactions_scope = transactions_scope.where(created_at: start_date.beginning_of_day..end_date.end_of_day)
-        end
+        transactions_scope = transactions_scope.where(created_at: start_date.beginning_of_day..end_date.end_of_day) if start_date && end_date
       end
 
       # Calculate totals for the filtered transactions (before pagination)

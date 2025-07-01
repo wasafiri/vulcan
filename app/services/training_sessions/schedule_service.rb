@@ -24,6 +24,9 @@ module TrainingSessions
     rescue ActiveRecord::RecordInvalid => e
       Rails.logger.error("Error scheduling training session: #{e.message}")
       failure(message: e.message)
+    rescue ArgumentError => e
+      Rails.logger.error("Invalid parameters for scheduling training session: #{e.message}")
+      failure(message: e.message)
     rescue StandardError => e
       Rails.logger.error("Unexpected error scheduling training session: #{e.message}")
       failure(message: "An unexpected error occurred: #{e.message}")
@@ -32,7 +35,7 @@ module TrainingSessions
     private
 
     def validate_params!
-      raise ActiveRecord::RecordInvalid, 'scheduled_for is required' if @params[:scheduled_for].blank?
+      raise ArgumentError, 'scheduled_for is required' if @params[:scheduled_for].blank?
     end
 
     def update_training_session!

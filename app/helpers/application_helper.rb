@@ -108,8 +108,8 @@ module ApplicationHelper
   # Alias for the constituent portal proof route helper
   # The actual generated helper is constituent_portal_application_new_proof_path
   # but views and tests expect new_proof_constituent_portal_application_path
-  def new_proof_constituent_portal_application_path(application, **options)
-    constituent_portal_application_new_proof_path(application, **options)
+  def new_proof_constituent_portal_application_path(application, **)
+    constituent_portal_application_new_proof_path(application, **)
   end
 
   private

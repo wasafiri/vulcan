@@ -210,18 +210,16 @@ namespace :notification_tracking do
   end
 
   def update_application_counter(app_id)
-    begin
-      application = Application.find(app_id)
-      current_count = get_current_notification_count(app_id)
+    application = Application.find(app_id)
+    current_count = get_current_notification_count(app_id)
 
-      if application_counter_needs_update?(application, current_count)
-        update_counter_and_log(application, current_count)
-      else
-        puts "Application counter is already correct: #{application.medical_certification_request_count}"
-      end
-    rescue StandardError => e
-      puts "ERROR checking application counter: #{e.message}"
+    if application_counter_needs_update?(application, current_count)
+      update_counter_and_log(application, current_count)
+    else
+      puts "Application counter is already correct: #{application.medical_certification_request_count}"
     end
+  rescue StandardError => e
+    puts "ERROR checking application counter: #{e.message}"
   end
 
   def get_current_notification_count(app_id)

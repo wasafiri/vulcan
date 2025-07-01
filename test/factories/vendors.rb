@@ -17,7 +17,7 @@ FactoryBot.define do
       terms_accepted_at { 1.day.ago }
       after(:create) do |vendor|
         vendor.w9_form.attach(
-          io: File.open(Rails.root.join('test/fixtures/files/sample_w9.txt')),
+          io: Rails.root.join('test/fixtures/files/sample_w9.txt').open,
           filename: 'w9.txt',
           content_type: 'text/plain'
         )
@@ -35,7 +35,7 @@ FactoryBot.define do
     trait :with_w9 do
       after(:create) do |vendor|
         vendor.w9_form.attach(
-          io: File.open(Rails.root.join('test/fixtures/files/sample_w9.pdf')),
+          io: Rails.root.join('test/fixtures/files/sample_w9.pdf').open,
           filename: 'w9.pdf',
           content_type: 'application/pdf'
         )
@@ -83,7 +83,7 @@ FactoryBot.define do
       terms_accepted_at { 1.day.ago }
       after(:create) do |vendor|
         vendor.w9_form.attach(
-          io: File.open(Rails.root.join('test/fixtures/files/sample_w9.txt')),
+          io: Rails.root.join('test/fixtures/files/sample_w9.txt').open,
           filename: 'w9.txt',
           content_type: 'text/plain'
         )

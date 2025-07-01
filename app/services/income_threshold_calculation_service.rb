@@ -17,11 +17,11 @@ class IncomeThresholdCalculationService < BaseService
     threshold = base_fpl * (modifier / 100.0)
 
     success('Threshold calculated successfully', {
-      household_size: @household_size,
-      base_fpl: base_fpl,
-      modifier: modifier,
-      threshold: threshold
-    })
+              household_size: @household_size,
+              base_fpl: base_fpl,
+              modifier: modifier,
+              threshold: threshold
+            })
   rescue StandardError => e
     log_error(e, "Failed to calculate income threshold for household size #{@household_size}")
     failure("Unable to calculate income threshold: #{e.message}")

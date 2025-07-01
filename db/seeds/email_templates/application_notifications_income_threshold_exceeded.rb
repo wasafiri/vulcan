@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Seed File for "application_notifications_income_threshold_exceeded"
 # (Suggest saving as db/seeds/email_templates/application_notifications_income_threshold_exceeded.rb)
 # --------------------------------------------------
@@ -31,4 +33,4 @@ EmailTemplate.create_or_find_by!(name: 'application_notifications_income_thresho
   TEXT
   template.version = 1
 end
-puts 'Seeded application_notifications_income_threshold_exceeded (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?
+Rails.logger.debug 'Seeded application_notifications_income_threshold_exceeded (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

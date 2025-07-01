@@ -132,7 +132,7 @@ class RateLimitTest < ActiveSupport::TestCase
     # This test just needs to verify that multiple calls work without errors
 
     # Calls up to the limit (including the first one)
-    @limit.times do |i|
+    @limit.times do |_i|
       assert_nothing_raised do
         RateLimit.check!(@action, @identifier, @method)
       end

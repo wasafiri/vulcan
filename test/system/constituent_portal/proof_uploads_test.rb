@@ -9,8 +9,8 @@ class ProofUploadsTest < ApplicationSystemTestCase
   include ActiveJob::TestHelper
 
   # Add safe timeout capabilities to prevent test from hanging
-  def with_timeout(seconds = 5, &block)
-    Timeout.timeout(seconds, &block)
+  def with_timeout(seconds = 5, &)
+    Timeout.timeout(seconds, &)
   rescue Timeout::Error => e
     puts "TIMEOUT ERROR: Operation timed out after #{seconds} seconds"
     puts "Current path: #{begin
@@ -283,28 +283,28 @@ class ProofUploadsTest < ApplicationSystemTestCase
 
     # Group errors by similarity
     grouped_errors = {
-      "Authentication Issues (Most Common)": [
+      'Authentication Issues (Most Common)': [
         "Unable to sign in properly - redirected back to sign in page (#{errors[:redirects]} occurrences)",
         "Session not maintained between requests (#{errors[:session]} occurrences)",
         "Authentication cookie not set correctly (#{errors[:cookies]} occurrences)",
         "User login state not preserved during test (#{errors[:state]} occurrences)"
       ],
 
-      "Route/Path Issues": [
+      'Route/Path Issues': [
         "Incorrect route helper used - 'new_proof_constituent_portal_application_path' is correct (#{errors[:route_helper]} occurrences)",
         "Path parameters not correctly passed (#{errors[:params]} occurrences)",
         "Constituent portal routes may have changed (#{errors[:routes]} occurrences)",
         "Application ID not properly resolved in route (#{errors[:app_id]} occurrences)"
       ],
 
-      "Element Visibility Issues": [
+      'Element Visibility Issues': [
         "Unable to find file input field (#{errors[:field]} occurrences)",
         "Elements with expected text not found on page (#{errors[:text]} occurrences)",
         "Form elements may be hidden or conditionally displayed (#{errors[:hidden]} occurrences)",
         "Data attributes for targeting may have changed (#{errors[:data_attrs]} occurrences)"
       ],
 
-      "Form Submission Issues (Least Common)": [
+      'Form Submission Issues (Least Common)': [
         "Unable to interact with form elements (#{errors[:interaction]} occurrences)",
         "Form submissions not properly processed (#{errors[:submissions]} occurrences)",
         "Direct uploads not configured correctly in test environment (#{errors[:uploads]} occurrences)",

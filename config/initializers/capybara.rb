@@ -19,7 +19,7 @@ if Rails.env.test?
       # Allow Cuprite to capture JS errors and convert to Ruby exceptions
       js_errors: true,
       # Enable headless mode by default but allow override via HEADLESS=0
-      headless: !%w[0 false].include?(ENV.fetch('HEADLESS', 'true').downcase),
+      headless: %w[0 false].exclude?(ENV.fetch('HEADLESS', 'true').downcase),
       # Slow down interactions for better visibility when not headless
       slowmo: ENV['SLOWMO']&.to_f
     )

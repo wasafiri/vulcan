@@ -3,8 +3,8 @@
 FactoryBot.define do
   factory :training_session do
     # Required associations
-    association :application
-    association :trainer # Add default trainer association
+    application
+    trainer # Add default trainer association
 
     # Default status
     status { :requested } # Matches schema default 0
@@ -28,7 +28,7 @@ FactoryBot.define do
       status { :completed }
       completed_at { 1.day.ago }
       notes { 'Training session completed notes.' }
-      association :product_trained_on, factory: :product # Explicitly create product for completed sessions
+      product_trained_on factory: %i[product] # Explicitly create product for completed sessions
     end
 
     trait :cancelled do

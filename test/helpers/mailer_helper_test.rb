@@ -18,7 +18,7 @@ class MailerHelperTest < ActionView::TestCase
   end
 
   test 'format_date handles Time objects' do
-    time = Time.new(2025, 3, 10, 15, 30, 0)
+    time = Time.zone.local(2025, 3, 10, 15, 30, 0)
     assert_equal 'March 10 2025', format_date(time)
     assert_equal '03/10/2025', format_date(time, :short)
     assert_equal 'March 10 2025 at 03:30 PM', format_date(time, :full)

@@ -120,8 +120,8 @@ module ConstituentPortal
       # Verify audit log was created correctly
       event = Event.last
       assert_equal 'profile_updated_by_guardian', event.action
-      assert_equal @guardian.id, event.user_id  # Actor is the guardian
-      assert_equal @dependent.id, event.metadata['user_id']  # Target is the dependent
+      assert_equal @guardian.id, event.user_id # Actor is the guardian
+      assert_equal @dependent.id, event.metadata['user_id'] # Target is the dependent
       assert_equal @guardian.id, event.metadata['updated_by']
 
       # Verify changes are recorded
@@ -134,7 +134,7 @@ module ConstituentPortal
     test 'should set Current.user before update' do
       # Verify Current.user is set during the request
       DependentsController.any_instance.expects(:set_current_user).once
-      
+
       patch constituent_portal_dependent_path(@dependent), params: {
         dependent: {
           first_name: 'Test Update'
@@ -161,7 +161,7 @@ module ConstituentPortal
 
       get constituent_portal_dependent_path(@dependent)
       assert_response :success
-      
+
       # Check that recent changes section is displayed
       assert_select '.bg-white', text: /Recent Changes/i
       assert_select 'span', text: @guardian.full_name
@@ -188,7 +188,7 @@ module ConstituentPortal
 
       get edit_constituent_portal_dependent_path(@dependent)
       assert_response :success
-      
+
       # Check that recent changes section is displayed
       assert_select '.bg-white', text: /Recent Changes/i
       assert_select 'span', text: /Phone/i
@@ -231,8 +231,8 @@ module ConstituentPortal
       assert_no_difference('Event.count') do
         patch constituent_portal_dependent_path(@dependent), params: {
           dependent: {
-            first_name: '',  # Invalid - required field
-            email: 'invalid-email'  # Invalid format
+            first_name: '', # Invalid - required field
+            email: 'invalid-email' # Invalid format
           }
         }
       end
@@ -242,7 +242,7 @@ module ConstituentPortal
 
     test 'should redirect to application if application_id param present' do
       application = create(:application, user: @dependent, managing_guardian: @guardian)
-      
+
       patch constituent_portal_dependent_path(@dependent), params: {
         application_id: application.id,
         dependent: {
@@ -259,8 +259,8 @@ module ConstituentPortal
       patch constituent_portal_dependent_path(@dependent), params: {
         dependent: {
           first_name: 'Allowed Update',
-          type: 'Users::Administrator',  # Should not be allowed
-          status: 'suspended'  # Should not be allowed
+          type: 'Users::Administrator', # Should not be allowed
+          status: 'suspended' # Should not be allowed
         }
       }
 

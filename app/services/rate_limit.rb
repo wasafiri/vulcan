@@ -17,7 +17,7 @@ class RateLimit
   def check!
     raise ArgumentError, "Unknown rate limit action: #{@action}" unless @limit
 
-    current_count = current_usage_count()
+    current_count = current_usage_count
     if current_count >= @limit[:max]
       raise ExceededError,
             "Rate limit exceeded for #{@action} (#{@method}): maximum #{@limit[:max]} submissions per #{@limit[:period] / 1.hour} hour(s)"

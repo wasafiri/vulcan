@@ -94,6 +94,6 @@ module MailboxTestHelper
         (subject_pattern.nil? || mail.subject.match?(subject_pattern))
     end
 
-    assert matching_emails.any?, "No email delivered to #{to} #{subject_pattern ? "with subject matching #{subject_pattern}" : ''}"
+    assert matching_emails.any?, "No email delivered to #{to} #{"with subject matching #{subject_pattern}" if subject_pattern}"
   end
 end

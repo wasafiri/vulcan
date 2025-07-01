@@ -39,11 +39,11 @@ class ProofReview < ApplicationRecord
 
   def admin_must_be_admin_type
     Rails.logger.info "ProofReview validation - Admin: #{admin.inspect}, Admin type: #{admin&.type}, Admin#admin? result: #{admin&.admin?}"
-    
-    unless admin&.admin?
-      Rails.logger.error "Admin validation failed: #{admin&.inspect} (type: #{admin&.type}) - admin? method returned false"
-      errors.add(:admin, 'must be an administrator')
-    end
+
+    return if admin&.admin?
+
+    Rails.logger.error "Admin validation failed: #{admin&.inspect} (type: #{admin&.type}) - admin? method returned false"
+    errors.add(:admin, 'must be an administrator')
   end
 
   def application_must_be_active
@@ -65,7 +65,7 @@ class ProofReview < ApplicationRecord
     return true if status_approved?
 
     # For rejected proofs in non-production, be more lenient
-    return false if status_rejected? && (Rails.env.development? || Rails.env.test?)
+    return false if status_rejected? && Rails.env.local?
 
     # Default to validating
     true

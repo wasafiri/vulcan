@@ -48,7 +48,6 @@ class FaxService
       return nil
     end
 
-    # For a real implementation, we would need to:
     # 1. Upload the PDF to a publicly accessible URL (S3, etc.)
     # 2. Get the URL of the uploaded file
     # 3. Send the fax using that URL
@@ -86,15 +85,15 @@ class FaxService
   # @param options [Hash] Additional options containing from number
   # @return [Boolean] Whether validation passed
   def validate_client_and_numbers(to, options)
-    return false unless validate_client_initialized
-    return false unless validate_recipient_number(to)
+    return false unless validate_client_initialized?
+    return false unless validate_recipient_number?(to)
 
-    validate_sender_number(options[:from] || @fax_from_number)
+    validate_sender_number?(options[:from] || @fax_from_number)
   end
 
   # Validate that Twilio client is initialized
   # @return [Boolean] Whether client is valid
-  def validate_client_initialized
+  def validate_client_initialized?
     return true if @client
 
     Rails.logger.error 'Cannot send fax: Twilio client not initialized'
@@ -104,7 +103,7 @@ class FaxService
   # Validate recipient fax number
   # @param to [String] The recipient fax number
   # @return [Boolean] Whether number is valid
-  def validate_recipient_number(to)
+  def validate_recipient_number?(to)
     return true if valid_fax_number?(to)
 
     Rails.logger.error "Invalid fax number: #{to}"
@@ -114,7 +113,7 @@ class FaxService
   # Validate sender fax number
   # @param from [String] The sender fax number
   # @return [Boolean] Whether number is valid
-  def validate_sender_number(from)
+  def validate_sender_number?(from)
     return true if valid_fax_number?(from)
 
     Rails.logger.error "Invalid from fax number: #{from}"

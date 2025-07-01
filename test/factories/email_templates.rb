@@ -9,7 +9,7 @@ FactoryBot.define do
     description { 'A default email template.' }
     format { :html } # Default format
     version { 1 }
-    association :updated_by, factory: :admin
+    updated_by factory: %i[admin]
 
     trait :html do
       format { :html }

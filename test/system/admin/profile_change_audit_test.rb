@@ -81,7 +81,7 @@ module Admin
 
     test 'profile changes are chronologically ordered with other audit events' do
       # Create multiple events at different times
-      
+
       # Application status change (oldest)
       ApplicationStatusChange.create!(
         application: @application,
@@ -122,7 +122,7 @@ module Admin
       # Verify events are in chronological order (newest first)
       within '#audit-logs tbody' do
         rows = all('tr')
-        
+
         # First row should be the proof review (newest)
         within rows[0] do
           assert_text 'Admin Review'
@@ -169,7 +169,7 @@ module Admin
       within '#audit-logs' do
         assert_text 'Profile Updated'
         assert_text "#{@constituent.full_name} updated their profile"
-        
+
         # Check that the summary includes the changed fields
         detail_text = find('td', text: /updated their profile/).text
         assert_match(/First name.*Last name.*Email.*Phone.*Physical address 1.*City.*Zip code/, detail_text)
@@ -178,7 +178,7 @@ module Admin
 
     test 'no profile changes shown when none exist' do
       # Don't create any profile change events
-      
+
       # Visit the application page
       visit admin_application_path(@application)
 
@@ -190,4 +190,4 @@ module Admin
       end
     end
   end
-end 
+end

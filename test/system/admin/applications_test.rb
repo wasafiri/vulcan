@@ -11,7 +11,7 @@ module Admin
       # Attach the proofs manually to ensure complete control over the attachments
       unless @application.income_proof.attached?
         @application.income_proof.attach(
-          io: File.open(Rails.root.join('test/fixtures/files/income_proof.pdf')),
+          io: Rails.root.join('test/fixtures/files/income_proof.pdf').open,
           filename: 'income_proof.pdf',
           content_type: 'application/pdf'
         )
@@ -19,7 +19,7 @@ module Admin
 
       unless @application.residency_proof.attached?
         @application.residency_proof.attach(
-          io: File.open(Rails.root.join('test/fixtures/files/residency_proof.pdf')),
+          io: Rails.root.join('test/fixtures/files/residency_proof.pdf').open,
           filename: 'residency_proof.pdf',
           content_type: 'application/pdf'
         )
@@ -27,7 +27,7 @@ module Admin
 
       unless @application.medical_certification.attached?
         @application.medical_certification.attach(
-          io: File.open(Rails.root.join('test/fixtures/files/medical_certification_valid.pdf')),
+          io: Rails.root.join('test/fixtures/files/medical_certification_valid.pdf').open,
           filename: 'medical_certification_valid.pdf',
           content_type: 'application/pdf'
         )

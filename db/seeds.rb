@@ -394,23 +394,49 @@ end
 if Rails.env.production?
   Rails.logger.debug 'Production environment detected. Seeding skipped to prevent data override.'
 else
+  puts "🌱 SEEDING STARTED at #{Time.current}"
   begin
     ActiveRecord::Base.transaction do
+      puts "🧹 Clearing existing data..."
       clear_existing_data
+      
+      puts "📦 Creating products from fixtures..."
       create_products_from_fixtures
+      
+      puts "📋 Creating policies..."
       create_policies
+      
+      puts "👥 Loading fixture data (users, applications, invoices)..."
       load_fixtures_data
+      
+      puts "📧 Seeding email templates..."
       seed_email_templates
+      
+      puts "📁 Ensuring storage directory exists..."
       ensure_storage_directory
+      
+      puts "📎 Attaching files to applications..."
       attach_files_to_applications
+      
+      puts "🔍 Verifying and fixing missing files..."
       verify_and_fix_missing_files
     end
   rescue StandardError => e
+    puts "❌ SEEDING FAILED: #{e.message}"
     seed_error "Seeding failed: #{e.message}"
     Rails.logger.debug 'Backtrace:'
-    e.backtrace.first(10).each { |line| puts line }
+    e.backtrace.first(10).each { |line| Rails.logger.debug line }
     exit 1
   else
+    # Show summary of what was created
+    puts "📊 SEEDING SUMMARY:"
+    puts "   Users: #{User.count}"
+    puts "   Applications: #{Application.count}"
+    puts "   Products: #{Product.count}"
+    puts "   Policies: #{Policy.count}"
+    puts "   Email Templates: #{EmailTemplate.count}"
+    puts "   Invoices: #{Invoice.count}"
+    puts "✅ SEEDING COMPLETED SUCCESSFULLY at #{Time.current}!"
     Rails.logger.debug 'Seeding completed successfully!' unless Rails.env.production?
   end
 end

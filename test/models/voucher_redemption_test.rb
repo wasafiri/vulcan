@@ -44,7 +44,7 @@ class VoucherRedemptionTest < ActiveSupport::TestCase
     # Test that AuditEventService.log is called during redemption
     # We'll be flexible about which exact calls since there might be multiple
     # (redemption event + status change event)
-    
+
     # Simply verify that AuditEventService.log gets called
     AuditEventService.expects(:log).at_least_once.returns(nil)
 

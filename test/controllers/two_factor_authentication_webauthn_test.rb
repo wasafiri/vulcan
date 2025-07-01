@@ -112,7 +112,7 @@ class TwoFactorAuthenticationWebauthnTest < ActionDispatch::IntegrationTest
     # Mock the WebAuthn::Credential.from_get method
     WebAuthn::Credential.stub :from_get, mock_credential do
       post process_verification_two_factor_authentication_path(type: 'webauthn'),
-           params: { credential: { id: 'test-credential-id' } },
+           params: { two_factor_authentication: { id: 'test-credential-id' } },
            as: :json
 
       # We expect not_found response since our credential id doesn't exist
@@ -148,9 +148,9 @@ class TwoFactorAuthenticationWebauthnTest < ActionDispatch::IntegrationTest
 
     # Mock the WebAuthn::Credential.from_get method to return our mock
     WebAuthn::Credential.stub :from_get, mock_credential do
-      # Post invalid data to trigger error handling
+      # Post malformed credential data to trigger error handling
       post process_verification_two_factor_authentication_path(type: 'webauthn'),
-           params: { invalid: 'data' },
+           params: { two_factor_authentication: { id: 'malformed-credential-data', type: 'public-key' } },
            as: :json
 
       # Verify we get an appropriate error response - not_found because the credential ID won't exist

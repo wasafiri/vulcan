@@ -1,9 +1,12 @@
+# frozen_string_literal: true
+
 require 'application_system_test_case'
 require 'webauthn/fake_client' # Ensure FakeClient is available
 require_relative '../support/webauthn_test_helper' # Include the helper
 
 # This test focuses on WebAuthn credential management and sign-in flows
-class WebauthnSignInTest < ApplicationSystemTestCase # Renamed class for clarity
+# Renamed class for clarity
+class WebauthnSignInTest < ApplicationSystemTestCase
   include SystemTestAuthentication
   include WebauthnTestHelper # Include the helper methods
   # Add teardown to handle any browser cleanup issues gracefully

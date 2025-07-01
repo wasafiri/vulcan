@@ -13,7 +13,7 @@ class DisabilityValidationTest < ActiveSupport::TestCase
 
     @application_params = {
       user: @constituent,
-      application_date: Date.today,
+      application_date: Time.zone.today,
       household_size: 1,
       annual_income: 30_000,
       maryland_resident: true,
@@ -47,11 +47,10 @@ class DisabilityValidationTest < ActiveSupport::TestCase
 
   test 'application can be saved as draft without disability' do
     application = create(:application,
-      user: @constituent,
-      status: :draft,
-      household_size: 1,
-      annual_income: 30_000
-    )
+                         user: @constituent,
+                         status: :draft,
+                         household_size: 1,
+                         annual_income: 30_000)
     assert application.save, 'Application should be saved as draft without disability'
   end
 
@@ -66,11 +65,10 @@ class DisabilityValidationTest < ActiveSupport::TestCase
     )
 
     application = create(:application,
-      user: @constituent,
-      status: :draft,
-      household_size: 1,
-      annual_income: 30_000
-    )
+                         user: @constituent,
+                         status: :draft,
+                         household_size: 1,
+                         annual_income: 30_000)
     application.status = 'in_progress'
 
     assert_not application.save, 'Application should not be submitted without disability'
@@ -96,11 +94,10 @@ class DisabilityValidationTest < ActiveSupport::TestCase
       @constituent.update("#{disability_type}_disability" => true)
 
       application = create(:application,
-        user: @constituent,
-        status: :draft,
-        household_size: 1,
-        annual_income: 30_000
-      )
+                           user: @constituent,
+                           status: :draft,
+                           household_size: 1,
+                           annual_income: 30_000)
       application.status = 'in_progress'
 
       assert application.save,
@@ -119,11 +116,10 @@ class DisabilityValidationTest < ActiveSupport::TestCase
     )
 
     application = create(:application,
-      user: @constituent,
-      status: :draft,
-      household_size: 1,
-      annual_income: 30_000
-    )
+                         user: @constituent,
+                         status: :draft,
+                         household_size: 1,
+                         annual_income: 30_000)
     application.status = 'in_progress'
 
     assert application.save, 'Application should be submitted with multiple disabilities'
@@ -140,17 +136,16 @@ class DisabilityValidationTest < ActiveSupport::TestCase
     )
 
     application = create(:application,
-      user: @constituent,
-      status: :draft,
-      household_size: 1,
-      annual_income: 30_000
-    )
+                         user: @constituent,
+                         status: :draft,
+                         household_size: 1,
+                         annual_income: 30_000)
     application.status = 'in_progress'
 
     assert application.save, 'Application should be submitted with all disabilities'
   end
 
-  test 'has_disability_selected? returns true when at least one disability is selected' do
+  test 'disability_selected? returns true when at least one disability is selected' do
     @constituent.update(
       hearing_disability: false,
       vision_disability: false,
@@ -159,11 +154,11 @@ class DisabilityValidationTest < ActiveSupport::TestCase
       cognition_disability: false
     )
 
-    assert @constituent.has_disability_selected?,
-           'has_disability_selected? should return true when at least one disability is selected'
+    assert @constituent.disability_selected?,
+           'disability_selected? should return true when at least one disability is selected'
   end
 
-  test 'has_disability_selected? returns false when no disabilities are selected' do
+  test 'disability_selected? returns false when no disabilities are selected' do
     @constituent.update(
       hearing_disability: false,
       vision_disability: false,
@@ -172,7 +167,7 @@ class DisabilityValidationTest < ActiveSupport::TestCase
       cognition_disability: false
     )
 
-    assert_not @constituent.has_disability_selected?,
-               'has_disability_selected? should return false when no disabilities are selected'
+    assert_not @constituent.disability_selected?,
+               'disability_selected? should return false when no disabilities are selected'
   end
 end

@@ -99,6 +99,10 @@ module Evaluators
       @evaluation = current_user.evaluations.build
     end
 
+    def edit
+      # @evaluation is set by set_evaluation
+    end
+
     def create
       @evaluation = current_user.evaluations.build(evaluation_params)
       @evaluation.status ||= :pending
@@ -113,10 +117,6 @@ module Evaluators
       else
         render :new, status: :unprocessable_entity
       end
-    end
-
-    def edit
-      # @evaluation is set by set_evaluation
     end
 
     def update
@@ -201,20 +201,20 @@ module Evaluators
     end
 
     def evaluation_params
-      params.require(:evaluation).permit(
-        :constituent_id,
-        :application_id,
-        :evaluation_date,
-        :evaluation_datetime,
-        :evaluation_type,
-        :status,
-        :notes,
-        :location,
-        :needs,
-        :reschedule_reason,
-        attendees: %i[name relationship],
-        products_tried: %i[product_id reaction],
-        recommended_product_ids: []
+      params.expect(
+        evaluation: [:constituent_id,
+                     :application_id,
+                     :evaluation_date,
+                     :evaluation_datetime,
+                     :evaluation_type,
+                     :status,
+                     :notes,
+                     :location,
+                     :needs,
+                     :reschedule_reason,
+                     { attendees: %i[name relationship],
+                       products_tried: %i[product_id reaction],
+                       recommended_product_ids: [] }]
       )
     end
 
@@ -224,7 +224,7 @@ module Evaluators
       redirect_to root_path, alert: 'Not authorized'
     end
 
-    def filter_evaluations(scope, status)
+    def filter_evaluations(_scope, status)
       # Base query - either all sessions or just mine
       base_query = if current_user.admin?
                      # For administrators, they don't have an 'evaluations' association

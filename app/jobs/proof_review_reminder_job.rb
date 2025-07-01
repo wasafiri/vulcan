@@ -7,8 +7,8 @@ class ProofReviewReminderJob < ApplicationJob
     Rails.logger.info('Running ProofReviewReminderJob')
 
     # Find applications that have been needing review for more than 3 days
-    stale_applications = Application.where('needs_review_since < ?', 3.days.ago)
-                                   .includes(:user, :proof_reviews)
+    stale_applications = Application.where(needs_review_since: ...3.days.ago)
+                                    .includes(:user, :proof_reviews)
 
     return if stale_applications.empty?
 

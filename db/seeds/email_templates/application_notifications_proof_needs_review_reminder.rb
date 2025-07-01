@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Seed File for "admin_application_notifications_proof_needs_review_remimder.rb"
 # --------------------------------------------------
 EmailTemplate.create_or_find_by!(name: 'admin_notifications_stale_reviews_summary', format: :text) do |template|
@@ -26,4 +28,4 @@ EmailTemplate.create_or_find_by!(name: 'admin_notifications_stale_reviews_summar
   TEXT
   template.version = 1
 end
-puts 'Seeded admin_notifications_stale_reviews_summary (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?
+Rails.logger.debug 'Seeded admin_notifications_stale_reviews_summary (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

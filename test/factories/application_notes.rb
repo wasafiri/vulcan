@@ -2,8 +2,8 @@
 
 FactoryBot.define do
   factory :application_note do
-    association :application
-    association :admin, factory: :admin
+    application
+    admin factory: %i[admin]
     content { 'This is a note about the application.' }
     internal_only { true }
 

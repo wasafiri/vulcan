@@ -5,7 +5,6 @@ class Invoice < ApplicationRecord
   has_many :vouchers, dependent: :nullify
   has_many :voucher_transactions, dependent: :nullify
 
-  validates :vendor, presence: true
   validates :start_date, presence: true
   validates :end_date, presence: true
   validates :total_amount, presence: true, numericality: { greater_than_or_equal_to: 0 }
@@ -137,8 +136,7 @@ class Invoice < ApplicationRecord
     overlapping = self.class
                       .where(vendor_id: vendor_id)  # Only check same vendor
                       .where.not(id: id)            # Exclude self when updating
-                      .where('start_date <= ? AND end_date >= ?', end_date, start_date)
-                      .exists?
+                      .exists?(['start_date <= ? AND end_date >= ?', end_date, start_date])
 
     return unless overlapping
 

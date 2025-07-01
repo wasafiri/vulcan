@@ -120,7 +120,7 @@ class ApplicationProofValidationTest < ActiveSupport::TestCase
     application = create(:application, :in_progress)
 
     # Create a valid PDF for income proof (to prevent other validations from failing first)
-    valid_pdf = File.open(Rails.root.join('test/fixtures/files/income_proof.pdf'))
+    valid_pdf = Rails.root.join('test/fixtures/files/income_proof.pdf').open
 
     # Create a test text file (which should be rejected)
     file = Tempfile.new(['test', '.txt'])

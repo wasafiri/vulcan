@@ -29,9 +29,7 @@ module Users
     # Define disability attributes with defaults
     DISABILITY_TYPES.each do |type|
       attribute :"#{type}_disability", :boolean, default: false
-    end
 
-    DISABILITY_TYPES.each do |type|
       define_method("#{type}_disability=") do |value|
         super(ActiveModel::Type::Boolean.new.cast(value))
       end
@@ -51,61 +49,85 @@ module Users
     end
 
     # Public method to check if any disability is selected
-    def has_disability_selected?
+    def disability_selected?
       hearing_disability || vision_disability || speech_disability || mobility_disability || cognition_disability
     end
 
     # Class methods for encrypted lookups
     def self.find_duplicates(first_name, last_name, date_of_birth)
-      Rails.logger.debug "*** find_duplicates called with: first_name=#{first_name}, last_name=#{last_name}, date_of_birth=#{date_of_birth} (#{date_of_birth.class})"
-      
-      return none if first_name.blank? || last_name.blank? || date_of_birth.blank?
+      log_duplicate_search_params(first_name, last_name, date_of_birth)
+      return none if invalid_duplicate_params?(first_name, last_name, date_of_birth)
 
-      # Ensure consistent date format for encryption
-      formatted_date = case date_of_birth
-                      when String then date_of_birth
-                      when Date then date_of_birth.strftime('%Y-%m-%d')
-                      else return none
-                      end
-      
-      Rails.logger.debug "*** Using formatted_date: #{formatted_date} (#{formatted_date.class})"
+      formatted_date = format_date_for_encryption(date_of_birth)
+      return none if formatted_date.nil?
 
-      # Check all existing records and their dates
-      all_matching_name = where('LOWER(first_name) = ? AND LOWER(last_name) = ?', 
-                             first_name.downcase, 
-                             last_name.downcase)
-      
-      if all_matching_name.exists?
-        Rails.logger.debug "*** Found #{all_matching_name.count} name matches"
-        all_matching_name.each do |user|
-          Rails.logger.debug "*** User #{user.id}: DOB=#{user.date_of_birth} (#{user.date_of_birth.class}), formatted=#{user.date_of_birth.is_a?(Date) ? user.date_of_birth.strftime('%Y-%m-%d') : user.date_of_birth}"
+      log_debug_matches(first_name, last_name) if Rails.logger.debug?
+      build_duplicate_query(first_name, last_name, formatted_date)
+    end
+
+    class << self
+      private
+
+      def log_duplicate_search_params(first_name, last_name, date_of_birth)
+        Rails.logger.debug do
+          "*** find_duplicates called with: first_name=#{first_name}, last_name=#{last_name}, date_of_birth=#{date_of_birth} (#{date_of_birth.class})"
         end
       end
 
-      # Debug the query
-      query = where('LOWER(first_name) = ? AND LOWER(last_name) = ? AND date_of_birth = ?',
-                   first_name.downcase,
-                   last_name.downcase,
-                   formatted_date)
-      Rails.logger.debug "*** Duplicate query SQL: #{query.to_sql}"
-      results = query.pluck(:id, :first_name, :last_name)
-      Rails.logger.debug "*** Duplicate query results: #{results.inspect}, count: #{results.count}"
-      query
+      def invalid_duplicate_params?(first_name, last_name, date_of_birth)
+        first_name.blank? || last_name.blank? || date_of_birth.blank?
+      end
+
+      def format_date_for_encryption(date_of_birth)
+        formatted_date = case date_of_birth
+                         when String then date_of_birth
+                         when Date then date_of_birth.strftime('%Y-%m-%d')
+                         end
+
+        Rails.logger.debug { "*** Using formatted_date: #{formatted_date} (#{formatted_date.class})" } if formatted_date
+        formatted_date
+      end
+
+      def log_debug_matches(first_name, last_name)
+        all_matching_name = where('LOWER(first_name) = ? AND LOWER(last_name) = ?',
+                                  first_name.downcase, last_name.downcase)
+
+        return unless all_matching_name.exists?
+
+        Rails.logger.debug { "*** Found #{all_matching_name.count} name matches" }
+        all_matching_name.each do |user|
+          user_dob_formatted = user.date_of_birth.is_a?(Date) ? user.date_of_birth.strftime('%Y-%m-%d') : user.date_of_birth
+          Rails.logger.debug { "*** User #{user.id}: DOB=#{user.date_of_birth} (#{user.date_of_birth.class}), formatted=#{user_dob_formatted}" }
+        end
+      end
+
+      def build_duplicate_query(first_name, last_name, formatted_date)
+        query = where('LOWER(first_name) = ? AND LOWER(last_name) = ? AND date_of_birth = ?',
+                      first_name.downcase, last_name.downcase, formatted_date)
+
+        if Rails.logger.debug?
+          Rails.logger.debug { "*** Duplicate query SQL: #{query.to_sql}" }
+          results = query.pluck(:id, :first_name, :last_name)
+          Rails.logger.debug { "*** Duplicate query results: #{results.inspect}, count: #{results.count}" }
+        end
+
+        query
+      end
     end
 
     private
 
     def check_for_duplicates
-      Rails.logger.debug "*** Checking for duplicates: first_name=#{first_name}, last_name=#{last_name}, date_of_birth=#{date_of_birth} (#{date_of_birth.class})"
+      Rails.logger.debug { "*** Checking for duplicates: first_name=#{first_name}, last_name=#{last_name}, date_of_birth=#{date_of_birth} (#{date_of_birth.class})" }
       return unless first_name.present? && last_name.present? && date_of_birth.present?
 
       # Look for potential duplicates using the class method
       duplicates = self.class.find_duplicates(first_name, last_name, date_of_birth)
-      
+
       # Don't exclude self since this is a new record
       has_duplicates = duplicates.exists?
       self.needs_duplicate_review = has_duplicates
-      Rails.logger.debug "*** Found duplicates: #{has_duplicates} - setting needs_duplicate_review to #{needs_duplicate_review}"
+      Rails.logger.debug { "*** Found duplicates: #{has_duplicates} - setting needs_duplicate_review to #{needs_duplicate_review}" }
     end
 
     def must_have_at_least_one_disability

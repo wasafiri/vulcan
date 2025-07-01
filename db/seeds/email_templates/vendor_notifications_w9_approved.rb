@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Seed File for "vendor_notifications_w9_approved"
 # (Suggest saving as db/seeds/email_templates/vendor_notifications_w9_approved.rb)
 # --------------------------------------------------
@@ -23,4 +25,4 @@ EmailTemplate.create_or_find_by!(name: 'vendor_notifications_w9_approved', forma
   TEXT
   template.version = 1
 end
-puts 'Seeded vendor_notifications_w9_approved (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?
+Rails.logger.debug 'Seeded vendor_notifications_w9_approved (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

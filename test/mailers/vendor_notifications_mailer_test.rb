@@ -11,16 +11,14 @@ class VendorNotificationsMailerTest < ActionMailer::TestCase
     # This simulates what the real EmailTemplate.render method does
     template_instance.stubs(:render).with(any_parameters).returns do |**vars|
       # For the invoice_number variable
-      if vars[:invoice_number]
-        rendered_subject = subject_format
-        rendered_body = body_format.gsub('%<invoice_number>s', vars[:invoice_number])
-      elsif vars[:rejection_reason]
-        rendered_subject = subject_format
-        rendered_body = body_format.gsub('%<rejection_reason>s', vars[:rejection_reason])
-      else
-        rendered_subject = subject_format
-        rendered_body = body_format
-      end
+      rendered_subject = subject_format
+      rendered_body = if vars[:invoice_number]
+                        body_format.gsub('%<invoice_number>s', vars[:invoice_number])
+                      elsif vars[:rejection_reason]
+                        body_format.gsub('%<rejection_reason>s', vars[:rejection_reason])
+                      else
+                        body_format
+                      end
       [rendered_subject, rendered_body]
     end
 

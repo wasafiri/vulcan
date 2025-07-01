@@ -18,10 +18,10 @@ module Applications
 
       # Create applications with specific statuses and dates for reporting tests using unique users
       # 1 Draft application
-      draft_app = create(:application,
-                         user: create(:constituent, email: "unique_dashboard_draft_#{Time.now.to_i}@example.com"),
-                         created_at: current_fy_start + 1.month,
-                         status: :draft)
+      create(:application,
+             user: create(:constituent, email: "unique_dashboard_draft_#{Time.now.to_i}@example.com"),
+             created_at: current_fy_start + 1.month,
+             status: :draft)
 
       # 2 In-progress applications (submitted by constituent)
       _submitted_app1 = create(:application,

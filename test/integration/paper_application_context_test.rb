@@ -68,17 +68,17 @@ class PaperApplicationContextTest < ActionDispatch::IntegrationTest
     # Verify normal validation runs again after context is cleared
     # Create a fresh application to avoid cached validation state
     fresh_application = FactoryBot.create(:application,
-                                        user: @constituent,
-                                        status: :in_progress,
-                                        income_proof_status: :approved) # Invalid state - approved but no proof attached
-    
+                                          user: @constituent,
+                                          status: :in_progress,
+                                          income_proof_status: :approved) # Invalid state - approved but no proof attached
+
     # Ensure no proofs are attached to this fresh application
     fresh_application.income_proof.detach if fresh_application.income_proof.attached?
     fresh_application.residency_proof.detach if fresh_application.residency_proof.attached?
-    
+
     # Clear any validation errors from the initial save
     fresh_application.errors.clear
-    
+
     assert_not fresh_application.valid?, 'Validation should be active again after context cleanup'
   end
 end

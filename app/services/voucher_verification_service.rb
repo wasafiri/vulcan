@@ -14,7 +14,7 @@ class VoucherVerificationService
   def verify
     # Parse the submitted DOB
     return failed_result(:invalid_format) unless valid_dob_format?
-    
+
     # Check if the DOB matches
     if dobs_match?
       handle_successful_verification
@@ -30,7 +30,11 @@ class VoucherVerificationService
   end
 
   def parsed_dob
-    @parsed_dob ||= Date.parse(submitted_dob_str) rescue nil
+    @parsed_dob ||= begin
+      Date.parse(submitted_dob_str)
+    rescue StandardError
+      nil
+    end
   end
 
   def dobs_match?
@@ -41,10 +45,10 @@ class VoucherVerificationService
   def handle_successful_verification
     # Reset attempts counter
     reset_verification_attempts
-    
+
     # Mark this voucher as verified
     verified_vouchers << voucher.id
-    
+
     VerificationResult.new(
       success: true,
       message_key: 'dob_verification_success'
@@ -54,9 +58,9 @@ class VoucherVerificationService
   def handle_failed_verification
     # Increment failed attempts counter
     increment_verification_attempts
-    
+
     current_attempts = verification_attempts
-    
+
     if current_attempts >= max_attempts
       VerificationResult.new(
         success: false,
@@ -92,7 +96,7 @@ class VoucherVerificationService
   def verified_vouchers
     session[:verified_vouchers] ||= []
   end
-  
+
   # Simple value object to represent verification result
   class VerificationResult
     attr_reader :success, :message_key, :attempts_left

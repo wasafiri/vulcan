@@ -127,7 +127,7 @@ class PrintQueueItemTest < ActiveSupport::TestCase
 
   # Helper method to set up mock attachments for all PrintQueueItems
   def setup_attachment_mocks_for_print_queue
-    PrintQueueItem.all.each do |item|
+    PrintQueueItem.find_each do |item|
       next if item.pdf_letter_attached? # Skip if already mocked
 
       mock_pdf = mock_attached_file(filename: "letter_#{item.id}.pdf")

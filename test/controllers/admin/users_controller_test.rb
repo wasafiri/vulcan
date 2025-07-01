@@ -29,7 +29,7 @@ module Admin
       end
 
       assert_response :success
-      json_response = JSON.parse(response.body)
+      json_response = response.parsed_body
       assert json_response['success']
       assert_equal 'New', json_response['user']['first_name']
       assert_equal 'Guardian', json_response['user']['last_name']
@@ -52,7 +52,7 @@ module Admin
       end
 
       assert_response :unprocessable_entity
-      json_response = JSON.parse(response.body)
+      json_response = response.parsed_body
       assert_not json_response['success']
       assert json_response['errors'].present?
     end
@@ -91,19 +91,19 @@ module Admin
       end
 
       assert_response :success
-      
+
       # Test that duplicate detection would work by finding users with same criteria
       second_user = Users::Constituent.find_by(email: 'second.duplicate@example.com')
-      
-      # Test duplicate detection by finding users with same name and DOB 
+
+      # Test duplicate detection by finding users with same name and DOB
       potential_duplicates = Users::Constituent.where(
         first_name: second_user.first_name,
         last_name: second_user.last_name,
         date_of_birth: second_user.date_of_birth
       ).where.not(id: second_user.id)
-      
-      assert potential_duplicates.exists?, "Expected user to be flagged for duplicate review"
-      assert potential_duplicates.include?(first_user), "Should find the first user as a potential duplicate"
+
+      assert potential_duplicates.exists?, 'Expected user to be flagged for duplicate review'
+      assert potential_duplicates.include?(first_user), 'Should find the first user as a potential duplicate'
     end
   end
 end

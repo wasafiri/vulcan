@@ -23,7 +23,7 @@ class UserMailer < ApplicationMailer
       reset_url: reset_url
     }.compact
 
-    puts "DEBUG: About to call render on text_template: #{text_template.inspect}" # Debug line
+    Rails.logger.debug { "DEBUG: About to call render on text_template: #{text_template.inspect}" } # Debug line
     # Render subject and body from the text template
     rendered_subject, rendered_text_body = text_template.render(**variables)
 
@@ -78,7 +78,7 @@ class UserMailer < ApplicationMailer
       verification_url: verification_url
     }.compact
 
-    puts "DEBUG: About to call render on text_template: #{text_template.inspect}" # Debug line
+    Rails.logger.debug { "DEBUG: About to call render on text_template: #{text_template.inspect}" } # Debug line
     # Render subject and body from the text template
     rendered_subject, rendered_text_body = text_template.render(**variables)
 

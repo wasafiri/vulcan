@@ -12,22 +12,19 @@ class VoucherNotificationsMailerTest < ActionMailer::TestCase
     # This simulates what the real EmailTemplate.render method does
     template_instance.stubs(:render).with(any_parameters).returns do |**vars|
       # For the voucher_code variable which is present in most templates
-      if vars[:voucher_code]
-        rendered_subject = subject_format
-        rendered_body = body_format.gsub('%<voucher_code>s', vars[:voucher_code])
-      elsif vars[:vendor_business_name] && body_format.include?('%<vendor_business_name>s')
-        rendered_subject = subject_format
-        rendered_body = body_format.gsub('%<voucher_code>s', vars[:voucher_code])
+      rendered_subject = subject_format
+      rendered_body = if vars[:voucher_code]
+                        body_format.gsub('%<voucher_code>s', vars[:voucher_code])
+                      elsif vars[:vendor_business_name] && body_format.include?('%<vendor_business_name>s')
+                        body_format.gsub('%<voucher_code>s', vars[:voucher_code])
                                    .gsub('%<vendor_business_name>s', vars[:vendor_business_name])
-      elsif vars[:days_remaining] && body_format.include?('%<days_remaining>s')
-        rendered_subject = subject_format
-        rendered_body = body_format.gsub('%<voucher_code>s', vars[:voucher_code])
+                      elsif vars[:days_remaining] && body_format.include?('%<days_remaining>s')
+                        body_format.gsub('%<voucher_code>s', vars[:voucher_code])
                                    .gsub('%<days_remaining>s', vars[:days_remaining].to_s)
                                    .gsub('%<expiration_date_formatted>s', vars[:expiration_date_formatted])
-      else
-        rendered_subject = subject_format
-        rendered_body = body_format
-      end
+                      else
+                        body_format
+                      end
       [rendered_subject, rendered_body]
     end
 

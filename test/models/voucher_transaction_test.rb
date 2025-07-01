@@ -191,7 +191,7 @@ class VoucherTransactionTest < ActiveSupport::TestCase
         tx = VoucherTransaction.new(
           voucher: voucher,
           vendor: test_vendor,
-          amount: BigDecimal('50.00'),  # Use 50 to avoid confusion with setup
+          amount: BigDecimal('50.00'), # Use 50 to avoid confusion with setup
           status: :transaction_completed,
           processed_at: Time.current,
           reference_number: 'DAILY-TEST-001'

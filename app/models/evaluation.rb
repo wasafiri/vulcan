@@ -13,7 +13,6 @@ class Evaluation < ApplicationRecord
   enum :evaluation_type, { initial: 0, renewal: 1, special: 2 }
 
   # Simplified validations
-  validates :evaluator, presence: true
   validates :reschedule_reason, presence: true, if: :rescheduling?
   validate :evaluator_must_be_evaluator_type
   validate :scheduled_time_must_be_future, on: :create

@@ -153,7 +153,7 @@ module MailerHelper
     return date unless date.is_a?(String)
 
     begin
-      date.include?(':') ? Time.parse(date) : Date.parse(date)
+      date.include?(':') ? Time.zone.parse(date) : Date.parse(date)
     rescue ArgumentError, TypeError
       date
     end

@@ -77,7 +77,7 @@ module Trainers
     def training_sessions
       @training_sessions ||= if current_user.admin?
                                # Show all training sessions for admins
-                               TrainingSession.all.includes(application: :user)
+                               TrainingSession.includes(application: :user)
                              else
                                # Show only the trainer's own sessions for trainers
                                TrainingSession.where(trainer_id: current_user.id)

@@ -263,9 +263,7 @@ class EmailTemplate < ApplicationRecord
 
     required_vars.each do |var|
       # Check for either %{variable} or %<variable>s format
-      unless body.to_s.include?("%{#{var}}") || body.to_s.include?("%<#{var}>")
-        errors.add(:body, "must include the variable %{#{var}} or %<#{var}>s")
-      end
+      errors.add(:body, "must include the variable %{#{var}} or %<#{var}>s") unless body.to_s.include?("%{#{var}}") || body.to_s.include?("%<#{var}>")
     end
   end
 

@@ -24,6 +24,9 @@ module TrainingSessions
     rescue ActiveRecord::RecordInvalid => e
       Rails.logger.error("Error cancelling training session: #{e.message}")
       failure(message: e.message)
+    rescue ArgumentError => e
+      Rails.logger.error("Invalid parameters for cancelling training session: #{e.message}")
+      failure(message: e.message)
     rescue StandardError => e
       Rails.logger.error("Unexpected error cancelling training session: #{e.message}")
       failure(message: "An unexpected error occurred: #{e.message}")
@@ -34,7 +37,7 @@ module TrainingSessions
     def validate_params!
       return if @params[:cancellation_reason].present?
 
-      raise ActiveRecord::RecordInvalid, 'cancellation_reason is required'
+      raise ArgumentError, 'cancellation_reason is required'
     end
 
     def update_training_session!

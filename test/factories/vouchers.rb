@@ -7,8 +7,8 @@ FactoryBot.define do
     remaining_value { initial_value }
     status { :active }
     issued_at { Time.current }
-    association :application
-    association :vendor, factory: :vendor, strategy: :build
+    application
+    association :vendor, strategy: :build
 
     trait :active do
       status { :active }

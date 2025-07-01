@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Seed File for "vendor_notifications_w9_expiring_soon"
 # (Suggest saving as db/seeds/email_templates/vendor_notifications_w9_expiring_soon.rb)
 # --------------------------------------------------
@@ -31,4 +33,4 @@ EmailTemplate.create_or_find_by!(name: 'vendor_notifications_w9_expiring_soon', 
   TEXT
   template.version = 1
 end
-puts 'Seeded vendor_notifications_w9_expiring_soon (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?
+Rails.logger.debug 'Seeded vendor_notifications_w9_expiring_soon (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

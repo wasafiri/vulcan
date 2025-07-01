@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Seed File for "medical_provider_certification_submission_error"
 EmailTemplate.create_or_find_by!(name: 'medical_provider_certification_submission_error', format: :text) do |template|
   template.subject = 'Medical Certification Submission Error'
@@ -24,4 +26,4 @@ EmailTemplate.create_or_find_by!(name: 'medical_provider_certification_submissio
   TEXT
   template.version = 1
 end
-puts 'Seeded medical_provider_certification_submission_error (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?
+Rails.logger.debug 'Seeded medical_provider_certification_submission_error (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

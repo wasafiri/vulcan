@@ -14,8 +14,6 @@ class PaperApplicationDirectUploadTest < ActionDispatch::IntegrationTest
     setup_fpl_policies
   end
 
-
-
   test 'direct upload for paper applications should work with signed_ids' do
     # Set up sample proof files using existing fixtures in test/fixtures/files/
     income_proof = fixture_file_upload('income_proof.pdf', 'application/pdf')
@@ -40,7 +38,8 @@ class PaperApplicationDirectUploadTest < ActionDispatch::IntegrationTest
           physical_address_1: '123 Main St',
           city: 'Anytown',
           state: 'MD',
-          zip_code: '12345'
+          zip_code: '12345',
+          hearing_disability: true
         },
         application: {
           household_size: 2,
@@ -49,7 +48,10 @@ class PaperApplicationDirectUploadTest < ActionDispatch::IntegrationTest
           self_certify_disability: true,
           medical_provider_name: 'Dr. Smith',
           medical_provider_phone: '555-123-4567',
-          medical_provider_email: 'smith@example.com'
+          medical_provider_email: 'smith@example.com',
+          terms_accepted: true,
+          information_verified: true,
+          medical_release_authorized: true
         },
         income_proof_action: 'accept',
         income_proof_signed_id: income_blob.signed_id,

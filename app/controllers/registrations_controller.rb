@@ -87,46 +87,26 @@ class RegistrationsController < ApplicationController
   end
 
   def send_registration_confirmation
-    if @user.communication_preference.to_s == 'email'
-      # Use deliver_later for background sending
-      ApplicationNotificationsMailer.registration_confirmation(@user).deliver_later
-    else
-      Letters::TextTemplateToPdfService.new(
-        template_name: 'application_notifications_registration_confirmation',
-        recipient: @user,
-        variables: {
-          user_full_name: @user.full_name,
-          dashboard_url: constituent_portal_dashboard_url,
-          new_application_url: apply_url,
-          active_vendors_text_list: Vendor.active.pluck(:name).join(', '),
-          # Shared partial variables for text template
-          header_text: Mailers::SharedPartialHelpers.header_text(
-            title: 'Welcome to the Maryland Accessible Telecommunications Program',
-            logo_url: ActionController::Base.helpers.asset_path('logo.png',
-                                                                host: Rails.application.config.action_mailer.default_url_options[:host])
-          ),
-          footer_text: Mailers::SharedPartialHelpers.footer_text(
-            contact_email: Policy.get('support_email') || 'support@example.com',
-            website_url: root_url(host: Rails.application.config.action_mailer.default_url_options[:host]),
-            show_automated_message: true
-          )
-        }
-      ).queue_for_printing
-    end
+    # Delegate confirmation logic to RegistrationConfirmationService
+    result = Users::RegistrationConfirmationService.new(user: @user, request: request).call
+
+    return if result.success?
+
+    Rails.logger.error("Registration confirmation failed: #{result.error}")
   end
 
   def registration_params
-    params.require(:user).permit(
-      :email, :password, :password_confirmation,
-      :first_name, :last_name, :middle_initial,
-      :date_of_birth, :phone, :phone_type, :timezone, :locale,
-      :hearing_disability, :vision_disability,
-      :speech_disability, :mobility_disability, :cognition_disability,
-      :communication_preference,
-      # Address fields for letter notifications
-      :physical_address_1, :physical_address_2,
-      :city, :state, :zip_code,
-      :needs_duplicate_review
+    params.expect(
+      user: [:email, :password, :password_confirmation,
+             :first_name, :last_name, :middle_initial,
+             :date_of_birth, :phone, :phone_type, :timezone, :locale,
+             :hearing_disability, :vision_disability,
+             :speech_disability, :mobility_disability, :cognition_disability,
+             :communication_preference,
+             # Address fields for letter notifications
+             :physical_address_1, :physical_address_2,
+             :city, :state, :zip_code,
+             :needs_duplicate_review]
     )
   end
 
@@ -140,11 +120,6 @@ class RegistrationsController < ApplicationController
     return false unless normalized_first_name.present? && normalized_last_name.present? && user.date_of_birth.present?
 
     # Correctly use where(...).exists? for multiple conditions
-    User.where(
-      'lower(first_name) = ? AND lower(last_name) = ? AND date_of_birth = ?',
-      normalized_first_name,
-      normalized_last_name,
-      user.date_of_birth
-    ).exists?
+    User.exists?(['lower(first_name) = ? AND lower(last_name) = ? AND date_of_birth = ?', normalized_first_name, normalized_last_name, user.date_of_birth])
   end
 end

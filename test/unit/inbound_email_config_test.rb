@@ -6,8 +6,8 @@ require 'test_helper'
 class InboundEmailConfigUnitTest < Minitest::Test
   def setup
     # Save original values
-    @original_address = ENV['INBOUND_EMAIL_ADDRESS']
-    @original_provider = ENV['INBOUND_EMAIL_PROVIDER']
+    @original_address = ENV.fetch('INBOUND_EMAIL_ADDRESS', nil)
+    @original_provider = ENV.fetch('INBOUND_EMAIL_PROVIDER', nil)
 
     # Save original module values
     @original_config_address = MatVulcan::InboundEmailConfig.inbound_email_address
@@ -56,6 +56,7 @@ class InboundEmailConfigUnitTest < Minitest::Test
     assert_equal 'sub.example.co.uk', MatVulcan::InboundEmailConfig.inbound_email_domain
   end
 
+  # Temporarily change configuration to verify the system works with different providers:
   def test_uses_environment_variables_when_available
     ENV['INBOUND_EMAIL_ADDRESS'] = 'env-test@example.com'
     ENV['INBOUND_EMAIL_PROVIDER'] = 'mailgun'
@@ -76,10 +77,14 @@ class InboundEmailConfigUnitTest < Minitest::Test
   def test_using_helper_returns_correct_value
     MatVulcan::InboundEmailConfig.provider = :postmark
     assert MatVulcan::InboundEmailConfig.using?(:postmark)
+    # rubocop:disable Rails/RefuteMethods
     refute MatVulcan::InboundEmailConfig.using?(:sendgrid)
+    # rubocop:enable Rails/RefuteMethods
 
     MatVulcan::InboundEmailConfig.provider = :mailgun
     assert MatVulcan::InboundEmailConfig.using?(:mailgun)
+    # rubocop:disable Rails/RefuteMethods
     refute MatVulcan::InboundEmailConfig.using?(:postmark)
+    # rubocop:enable Rails/RefuteMethods
   end
 end

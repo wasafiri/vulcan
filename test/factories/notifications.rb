@@ -3,9 +3,9 @@
 FactoryBot.define do
   unless FactoryBot.factories.registered?(:notification)
     factory :notification do
-      association :recipient, factory: :user
-      association :actor, factory: :user
-      association :notifiable, factory: :application
+      recipient factory: %i[user]
+      actor factory: %i[user]
+      notifiable factory: %i[application]
 
       action { 'proof_submitted' }
       read_at { nil }

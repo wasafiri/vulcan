@@ -17,7 +17,7 @@ module TestBrowsers
     # Set default driver to our custom driver
     Capybara.javascript_driver = :chrome_headless
 
-    puts "Chrome configuration complete!" if ENV['VERBOSE_TESTS']
+    puts 'Chrome configuration complete!' if ENV['VERBOSE_TESTS']
   end
 
   # Register a custom Capybara driver that uses standard Chrome

@@ -94,10 +94,12 @@ class NotificationService
       case notification.action
       when 'proof_rejected', 'proof_approved'
         [ApplicationNotificationsMailer, notification.action.to_sym]
+      when 'account_created'
+        [ApplicationNotificationsMailer, :account_created]
       when /\Amedical_certification_/
         # e.g., 'medical_certification_approved' -> :approved
         [MedicalProviderMailer, notification.action.sub('medical_certification_', '').to_sym]
-      # Add other mailer resolutions here as the system is migrated.
+      # Add other mailer resolutions here.
       else
         Rails.logger.warn "NotificationService: No mailer configured for action: #{notification.action}"
         [nil, nil]

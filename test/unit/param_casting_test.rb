@@ -6,9 +6,9 @@ class ParamCastingTest < ActiveSupport::TestCase
   # Simple controller class to test the concern
   class TestController
     include ParamCasting
-    
+
     attr_accessor :params
-    
+
     def initialize(params = {})
       @params = ActionController::Parameters.new(params)
     end
@@ -23,7 +23,7 @@ class ParamCastingTest < ActiveSupport::TestCase
     assert_equal true, @controller.to_boolean(1)
     assert_equal true, @controller.to_boolean('true')
     assert_equal true, @controller.to_boolean(true)
-    
+
     assert_equal false, @controller.to_boolean('0')
     assert_equal false, @controller.to_boolean(0)
     assert_equal false, @controller.to_boolean('false')
@@ -39,13 +39,13 @@ class ParamCastingTest < ActiveSupport::TestCase
 
   test 'cast_boolean_params works with standard application structure' do
     @controller.params = ActionController::Parameters.new({
-      application: {
-        maryland_resident: '1',
-        hearing_disability: '0',
-        terms_accepted: 'true',
-        some_other_field: 'not a boolean'
-      }
-    })
+                                                            application: {
+                                                              maryland_resident: '1',
+                                                              hearing_disability: '0',
+                                                              terms_accepted: 'true',
+                                                              some_other_field: 'not a boolean'
+                                                            }
+                                                          })
 
     @controller.cast_boolean_params
 
@@ -57,16 +57,16 @@ class ParamCastingTest < ActiveSupport::TestCase
 
   test 'cast_complex_boolean_params works with nested structures' do
     @controller.params = ActionController::Parameters.new({
-      application: {
-        maryland_resident: '1'
-      },
-      applicant_attributes: {
-        hearing_disability: '1',
-        vision_disability: '0'
-      },
-      use_guardian_email: 'true',
-      use_guardian_phone: '0'
-    })
+                                                            application: {
+                                                              maryland_resident: '1'
+                                                            },
+                                                            applicant_attributes: {
+                                                              hearing_disability: '1',
+                                                              vision_disability: '0'
+                                                            },
+                                                            use_guardian_email: 'true',
+                                                            use_guardian_phone: '0'
+                                                          })
 
     @controller.cast_complex_boolean_params
 
@@ -79,8 +79,8 @@ class ParamCastingTest < ActiveSupport::TestCase
 
   test 'cast_boolean_params handles missing application params gracefully' do
     @controller.params = ActionController::Parameters.new({
-      some_other: 'value'
-    })
+                                                            some_other: 'value'
+                                                          })
 
     # Should not raise an error
     assert_nothing_raised do
@@ -90,7 +90,7 @@ class ParamCastingTest < ActiveSupport::TestCase
 
   test 'cast_boolean_for handles array workaround for hidden checkboxes' do
     hash = {
-      hearing_disability: ['', '1'],  # Rails hidden checkbox pattern
+      hearing_disability: ['', '1'], # Rails hidden checkbox pattern
       vision_disability: '0'
     }
 
@@ -99,4 +99,4 @@ class ParamCastingTest < ActiveSupport::TestCase
     assert_equal true, hash[:hearing_disability]
     assert_equal false, hash[:vision_disability]
   end
-end 
+end

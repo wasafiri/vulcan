@@ -7,27 +7,20 @@ module Admin
     include Pagy::Backend
 
     def index
-      scope = Product.includes(:vendors).ordered_by_name
-      if params[:device_types].present?
-        types = Array(params[:device_types]).select(&:present?)
-        scope = scope.with_selected_types(types) if types.any?
-      end
-
+      scope = filtered_products_scope
       @products = params[:show_archived] ? scope : scope.active
       @pagy, @products = pagy(@products, items: 20)
-
-      @products_by_type = @products.each_with_object({}) do |product, hash|
-        (product.device_types || []).each do |type|
-          hash[type] ||= []
-          hash[type] << product
-        end
-      end
+      @products_by_type = group_products_by_type(@products)
     end
 
     def show; end
 
     def new
       @product = Product.new
+      load_vendors
+    end
+
+    def edit
       load_vendors
     end
 
@@ -39,10 +32,6 @@ module Admin
         load_vendors
         render :new, status: :unprocessable_entity
       end
-    end
-
-    def edit
-      load_vendors
     end
 
     def update
@@ -73,16 +62,16 @@ module Admin
     private
 
     def product_params
-      filtered_params = params.require(:product).permit(
-        :name,
-        :manufacturer,
-        :model_number,
-        :description,
-        :features,
-        :compatibility_notes,
-        :documentation_url,
-        device_types: [],
-        vendor_ids: []
+      filtered_params = params.expect(
+        product: [:name,
+                  :manufacturer,
+                  :model_number,
+                  :description,
+                  :features,
+                  :compatibility_notes,
+                  :documentation_url,
+                  { device_types: [],
+                    vendor_ids: [] }]
       )
       filtered_params[:device_types]&.reject!(&:blank?)
       filtered_params
@@ -97,6 +86,23 @@ module Admin
 
     def load_vendors
       @vendors = User.vendors.ordered_by_name
+    end
+
+    def filtered_products_scope
+      scope = Product.includes(:vendors).ordered_by_name
+      return scope if params[:device_types].blank?
+
+      types = Array(params[:device_types]).compact_blank
+      types.any? ? scope.with_selected_types(types) : scope
+    end
+
+    def group_products_by_type(products)
+      products.each_with_object({}) do |product, hash|
+        (product.device_types || []).each do |type|
+          hash[type] ||= []
+          hash[type] << product
+        end
+      end
     end
   end
 end

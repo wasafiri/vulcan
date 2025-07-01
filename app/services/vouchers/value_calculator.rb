@@ -30,11 +30,11 @@ module Vouchers
     private
 
     def log_calculation(disability_type, value)
-      Rails.logger.debug(
+      Rails.logger.debug do
         "Voucher calculation: #{disability_type} disability " \
-        "present: #{constituent.send("#{disability_type}_disability")}, " \
-        "value: #{value}"
-      )
+          "present: #{constituent.send("#{disability_type}_disability")}, " \
+          "value: #{value}"
+      end
     end
   end
 end

@@ -54,7 +54,7 @@ module AttachmentTestHelper
                          attached: true)
     # Create a proper ActiveStorage::Filename object instead of mocking it
     filename_obj = ActiveStorage::Filename.new(filename)
-    
+
     # Mock the Blob
     blob_mock = mock("ActiveStorage::Blob #{filename}")
     blob_mock.stubs(:filename).returns(filename_obj)

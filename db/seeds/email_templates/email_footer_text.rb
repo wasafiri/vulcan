@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Seed File for "email_footer_text"
 EmailTemplate.create_or_find_by!(name: 'email_footer_text', format: :text) do |template|
   template.subject = 'Email Footer Text'
@@ -14,4 +16,4 @@ EmailTemplate.create_or_find_by!(name: 'email_footer_text', format: :text) do |t
   TEXT
   template.version = 1
 end
-puts 'Seeded email_footer_text (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?
+Rails.logger.debug 'Seeded email_footer_text (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

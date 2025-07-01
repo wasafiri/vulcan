@@ -129,9 +129,9 @@ module CupriteTestBridge
 
   # Time execution of operations and log metrics
   def measure_time(operation_name)
-    start_time = Time.now
+    start_time = Time.zone.now
     result = yield
-    duration = Time.now - start_time
+    duration = Time.zone.now - start_time
     puts "#{operation_name} took #{duration.round(2)}s"
     result
   end

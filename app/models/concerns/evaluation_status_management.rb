@@ -51,14 +51,10 @@ module EvaluationStatusManagement
     # Only consider it rescheduling if:
     # 1. The date is changing AND
     # 2. We're staying in a scheduled state (not completing or cancelling)
-    if evaluation_date_changed? && status_scheduled? && !status_changed?
-      return true
-    end
+    return true if evaluation_date_changed? && status_scheduled? && !status_changed?
 
     # Or if we're explicitly changing TO rescheduled status
-    if status_changed? && status_rescheduled?
-      return true
-    end
+    return true if status_changed? && status_rescheduled?
 
     false
   end

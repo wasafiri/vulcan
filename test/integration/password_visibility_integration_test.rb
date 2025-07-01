@@ -26,10 +26,10 @@ class PasswordVisibilityIntegrationTest < ActionDispatch::IntegrationTest
   test 'password visibility toggle works on password reset page' do
     # Create a real user and generate a valid reset token
     user = create(:user)
-    
+
     # Generate a valid password reset token using Rails' token system
     token = user.generate_token_for(:password_reset)
-    
+
     # Visit the edit path with the valid token
     get edit_password_path(token: token)
     assert_response :success

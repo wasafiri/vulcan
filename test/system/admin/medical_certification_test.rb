@@ -75,7 +75,7 @@ module AdminTests
       # Attach a file as the medical certification
       unless @application.medical_certification.attached?
         @application.medical_certification.attach(
-          io: File.open(Rails.root.join('test/fixtures/files/income_proof.pdf')),
+          io: Rails.root.join('test/fixtures/files/income_proof.pdf').open,
           filename: 'medical_certification.pdf',
           content_type: 'application/pdf'
         )
@@ -111,7 +111,7 @@ module AdminTests
       # Attach a file as the medical certification
       unless @application.medical_certification.attached?
         @application.medical_certification.attach(
-          io: File.open(Rails.root.join('test/fixtures/files/income_proof.pdf')),
+          io: Rails.root.join('test/fixtures/files/income_proof.pdf').open,
           filename: 'medical_certification.pdf',
           content_type: 'application/pdf'
         )

@@ -26,6 +26,9 @@ module TrainingSessions
     rescue ActiveRecord::RecordInvalid => e
       Rails.logger.error("Error rescheduling training session: #{e.message}")
       failure(message: e.message)
+    rescue ArgumentError => e
+      Rails.logger.error("Invalid parameters for rescheduling training session: #{e.message}")
+      failure(message: e.message)
     rescue StandardError => e
       Rails.logger.error("Unexpected error rescheduling training session: #{e.message}")
       failure(message: "An unexpected error occurred: #{e.message}")
@@ -36,7 +39,7 @@ module TrainingSessions
     def validate_params!
       return unless @params[:scheduled_for].blank? || @params[:reschedule_reason].blank?
 
-      raise ActiveRecord::RecordInvalid, 'scheduled_for and reschedule_reason are required'
+      raise ArgumentError, 'scheduled_for and reschedule_reason are required'
     end
 
     def update_training_session!(_old_scheduled_for)

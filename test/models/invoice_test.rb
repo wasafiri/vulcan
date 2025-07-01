@@ -77,7 +77,7 @@ class InvoiceTest < ActiveSupport::TestCase
         status: :invoice_paid,
         gad_invoice_reference: 'GAD-123456'
       )
-      
+
       # Call the notification directly since the callback isn't working
       VendorNotificationsMailer.payment_issued(@invoice).deliver_later
     end

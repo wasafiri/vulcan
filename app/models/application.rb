@@ -126,9 +126,9 @@ class Application < ApplicationRecord
   validate :waiting_period_completed, on: :create
   validate :constituent_must_have_disability, if: :validate_disability?
 
+  before_save :ensure_managing_guardian_set, if: :user_id_changed?
   # Callbacks
   before_create :ensure_managing_guardian_set
-  before_save :ensure_managing_guardian_set, if: :user_id_changed?
   after_update :log_status_change, if: :saved_change_to_status?
   after_save :log_alternate_contact_changes, if: :saved_change_to_alternate_contact?
 
@@ -319,7 +319,7 @@ class Application < ApplicationRecord
     # Guard clause to prevent infinite recursion
     return if @logging_status_change
 
-    acting_user = Current.user || self.user # Ensure a user is always present
+    acting_user = Current.user || user # Ensure a user is always present
     return if acting_user.blank?
 
     @logging_status_change = true

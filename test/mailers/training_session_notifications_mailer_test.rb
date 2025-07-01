@@ -12,26 +12,23 @@ class TrainingSessionNotificationsMailerTest < ActionMailer::TestCase
     # This simulates what the real EmailTemplate.render method does
     template_instance.stubs(:render).with(any_parameters).returns do |**vars|
       # Handle trainer variables
-      if vars[:trainer_full_name] && vars[:constituent_full_name]
-        rendered_subject = subject_format
-        rendered_body = body_format.gsub('%<trainer_full_name>s', vars[:trainer_full_name])
+      rendered_subject = subject_format
+      rendered_body = if vars[:trainer_full_name] && vars[:constituent_full_name]
+                        body_format.gsub('%<trainer_full_name>s', vars[:trainer_full_name])
                                    .gsub('%<constituent_full_name>s', vars[:constituent_full_name])
-      # Handle training scheduled variables
-      elsif vars[:constituent_name] && vars[:trainer_name] && vars[:scheduled_date]
-        rendered_subject = subject_format
-        rendered_body = body_format.gsub('%<constituent_name>s', vars[:constituent_name])
+                      # Handle training scheduled variables
+                      elsif vars[:constituent_name] && vars[:trainer_name] && vars[:scheduled_date]
+                        body_format.gsub('%<constituent_name>s', vars[:constituent_name])
                                    .gsub('%<trainer_name>s', vars[:trainer_name])
                                    .gsub('%<scheduled_date>s', vars[:scheduled_date])
-      # Handle training completed variables
-      elsif vars[:constituent_name] && vars[:trainer_name] && vars[:completion_date]
-        rendered_subject = subject_format
-        rendered_body = body_format.gsub('%<constituent_name>s', vars[:constituent_name])
+                      # Handle training completed variables
+                      elsif vars[:constituent_name] && vars[:trainer_name] && vars[:completion_date]
+                        body_format.gsub('%<constituent_name>s', vars[:constituent_name])
                                    .gsub('%<trainer_name>s', vars[:trainer_name])
                                    .gsub('%<completion_date>s', vars[:completion_date])
-      else
-        rendered_subject = subject_format
-        rendered_body = body_format
-      end
+                      else
+                        body_format
+                      end
 
       [rendered_subject, rendered_body]
     end

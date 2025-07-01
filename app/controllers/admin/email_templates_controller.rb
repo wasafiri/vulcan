@@ -16,7 +16,7 @@ module Admin
       # Group templates by name for better organization
       grouped_templates = templates.group_by(&:name).map do |_name, group|
         # Sort within each group - html first, then text
-        group.sort_by { |t| t.format }
+        group.sort_by(&:format)
       end.flatten
 
       # Apply pagination to the sorted list - use pagy_array for Array objects
@@ -35,18 +35,8 @@ module Admin
     def show
       # @email_template is set by before_action
       # @template_definition is set by before_action
-      
-      # Log the email template view for audit purposes
-      Event.create!(
-        user: current_user,
-        action: 'email_template_viewed',
-        metadata: {
-          email_template_id: @email_template.id,
-          email_template_name: @email_template.name,
-          email_template_format: @email_template.format,
-          timestamp: Time.current.iso8601
-        }
-      )
+
+      log_audit_event('email_template_viewed')
     end
 
     # GET /admin/email_templates/:id/new_test_email
@@ -78,34 +68,11 @@ module Admin
     def update
       # @email_template is set by before_action
       # @template_definition is set by before_action
-      
-      # Store original values for audit logging
-      original_subject = @email_template.subject
-      original_body = @email_template.body
-      
+
+      @original_values = capture_original_values
+
       if @email_template.update(email_template_params.merge(updated_by: current_user))
-        # Log the email template update for audit purposes
-        Event.create!(
-          user: current_user,
-          action: 'email_template_updated',
-          metadata: {
-            email_template_id: @email_template.id,
-            email_template_name: @email_template.name,
-            email_template_format: @email_template.format,
-            changes: {
-              subject: {
-                from: original_subject,
-                to: @email_template.subject
-              },
-              body: {
-                from: original_body,
-                to: @email_template.body
-              }
-            }.select { |_key, change| change[:from] != change[:to] }, # Only include actual changes
-            timestamp: Time.current.iso8601
-          }
-        )
-        
+        log_template_update_event
         redirect_to admin_email_template_path(@email_template), notice: 'Email template was successfully updated.'
       else
         flash.now[:alert] = "Failed to update template: #{@email_template.errors.full_messages.join(', ')}"
@@ -115,60 +82,40 @@ module Admin
 
     # POST /admin/email_templates/:id/send_test
     def send_test
-      # @email_template is set by before_action
       @test_email_form = ::Admin::TestEmailForm.new(test_email_params)
 
       if @test_email_form.valid?
-        # Fetch sample data for the template
-        sample_data = helpers.sample_data_for_template(@email_template.name)
-
-        # Render the template with sample data
-        rendered_subject, rendered_body = @email_template.render(**sample_data)
-
-        # Send the email
-        AdminTestMailer.with(
-          user: current_user,
-          recipient_email: @test_email_form.email,
-          template_name: @email_template.name,
-          subject: rendered_subject,
-          body: rendered_body,
-          format: @email_template.format
-        ).test_email.deliver_later
-
-        # Log the test email send for audit purposes
-        Event.create!(
-          user: current_user,
-          action: 'email_template_test_sent',
-          metadata: {
-            email_template_id: @email_template.id,
-            email_template_name: @email_template.name,
-            email_template_format: @email_template.format,
-            recipient_email: @test_email_form.email,
-            timestamp: Time.current.iso8601
-          }
-        )
-
+        send_test_email
+        log_audit_event('email_template_test_sent', test_email_metadata)
         redirect_to admin_email_template_path(@email_template),
                     notice: "Test email sent successfully to #{@test_email_form.email}."
       else
-        flash.now[:alert] = "Invalid email address: #{@test_email_form.errors.full_messages.join(', ')}"
-        render :new_test_email, status: :unprocessable_entity
+        handle_invalid_form
       end
     rescue StandardError => e
-      Rails.logger.error("Failed to send test email for template #{@email_template.id}: #{e.message}")
-      Rails.logger.error(e.backtrace.join("\n"))
-
-      # Re-initialize the form with the submitted email
-      @test_email_form = ::Admin::TestEmailForm.new(
-        email: params.dig(:admin_test_email_form, :email) || current_user.email,
-        template_id: @email_template.id
-      )
-
-      flash.now[:alert] = "Failed to send test email: #{e.message}. Check sample data and template syntax."
-      render :new_test_email, status: :unprocessable_entity
+      handle_test_email_error(e)
     end
 
     private
+
+    def capture_original_values
+      {
+        subject: @email_template.subject,
+        body: @email_template.body
+      }
+    end
+
+    def log_template_update_event
+      log_audit_event('email_template_updated', changes: template_changes)
+    end
+
+    def template_changes
+      changes = {
+        subject: { from: @original_values[:subject], to: @email_template.subject },
+        body: { from: @original_values[:body], to: @email_template.body }
+      }
+      changes.reject { |_key, change| change[:from] == change[:to] }
+    end
 
     def set_template
       @email_template = EmailTemplate.find(params[:id])
@@ -196,6 +143,58 @@ module Admin
 
     def test_email_params
       params.expect(admin_test_email_form: %i[email template_id])
+    end
+
+    # Shared audit logging method
+    def log_audit_event(action, additional_metadata = {})
+      base_metadata = {
+        email_template_id: @email_template.id,
+        email_template_name: @email_template.name,
+        email_template_format: @email_template.format,
+        timestamp: Time.current.iso8601
+      }
+
+      Event.create!(
+        user: current_user,
+        action: action,
+        metadata: base_metadata.merge(additional_metadata)
+      )
+    end
+
+    def send_test_email
+      sample_data = helpers.sample_data_for_template(@email_template.name)
+      rendered_subject, rendered_body = @email_template.render(**sample_data)
+
+      AdminTestMailer.with(
+        user: current_user,
+        recipient_email: @test_email_form.email,
+        template_name: @email_template.name,
+        subject: rendered_subject,
+        body: rendered_body,
+        format: @email_template.format
+      ).test_email.deliver_later
+    end
+
+    def test_email_metadata
+      { recipient_email: @test_email_form.email }
+    end
+
+    def handle_invalid_form
+      flash.now[:alert] = "Invalid email address: #{@test_email_form.errors.full_messages.join(', ')}"
+      render :new_test_email, status: :unprocessable_entity
+    end
+
+    def handle_test_email_error(error)
+      Rails.logger.error("Failed to send test email for template #{@email_template.id}: #{error.message}")
+      Rails.logger.error(error.backtrace.join("\n"))
+
+      @test_email_form = ::Admin::TestEmailForm.new(
+        email: params.dig(:admin_test_email_form, :email) || current_user.email,
+        template_id: @email_template.id
+      )
+
+      flash.now[:alert] = "Failed to send test email: #{error.message}. Check sample data and template syntax."
+      render :new_test_email, status: :unprocessable_entity
     end
   end
 end

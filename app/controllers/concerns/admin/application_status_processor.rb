@@ -41,7 +41,7 @@ module Admin
     # @param error_details [String, nil] Specific error details from validation or exception.
     def handle_application_failure(action_name, prefix, error_details = nil)
       # Pull any ActiveModel errors, or fall back to the passed‑in details or a generic
-      app_errors    = @application&.errors&.full_messages&.to_sentence
+      app_errors = (@application.errors.full_messages.to_sentence if @application&.errors&.any?)
       error_message = error_details || app_errors || 'An unexpected error occurred.'
 
       flash.now[:alert] = "#{prefix}: #{error_message}"

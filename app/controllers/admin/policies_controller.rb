@@ -5,7 +5,7 @@ module Admin
     before_action :set_policy, only: %i[show edit update]
 
     def index
-      @policies = Policy.all.order(:key)
+      @policies = Policy.order(:key)
       @recent_changes = PolicyChange.includes(:policy, :user)
                                     .order(created_at: :desc)
                                     .limit(10)
@@ -62,32 +62,19 @@ module Admin
     end
 
     def bulk_update
+      # Delegate to BulkUpdateService for bulk update logic
       @policies = Policy.all
-      Policy.transaction do
-        policies_data = policy_params
+      result = Policies::BulkUpdateService.new(
+        policies_data: policy_params,
+        current_user: current_user
+      ).call
 
-        if policies_data.is_a?(Array)
-          policies_data.each do |policy_attrs|
-            policy = Policy.find(policy_attrs[:id])
-            policy.updated_by = current_user
-            raise ::ActiveRecord::RecordInvalid, policy unless policy.update(value: policy_attrs[:value])
-          end
-        else
-          policies_data.each_value do |policy_attrs|
-            policy = Policy.find(policy_attrs[:id])
-            policy.updated_by = current_user
-            raise ::ActiveRecord::RecordInvalid, policy unless policy.update(value: policy_attrs[:value])
-          end
-        end
-
-        redirect_to admin_policies_path, notice: 'Policies updated successfully.'
+      if result.success?
+        redirect_to admin_policies_path, notice: result.message
+      else
+        flash[:alert] = result.message
+        redirect_to admin_policies_path
       end
-    rescue ::ActiveRecord::RecordInvalid => e
-      flash[:alert] = "Failed to update policies: #{e.record.errors.full_messages.join(', ')}"
-      redirect_to admin_policies_path
-    rescue ::ActiveRecord::RecordNotFound
-      flash[:alert] = 'Failed to update policies: Could not find one or more policies'
-      redirect_to admin_policies_path
     end
 
     private
@@ -115,7 +102,7 @@ module Admin
     end
 
     def create_policy_params
-      params.require(:policy).permit(:key, :value)
+      params.expect(policy: %i[key value])
     end
   end
 end

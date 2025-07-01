@@ -1,7 +1,9 @@
+# frozen_string_literal: true
+
 FactoryBot.define do
   factory :recovery_request do
     # Create a unique user to avoid conflicts
-    association :user, factory: :user, email: "recovery-user-#{SecureRandom.hex(4)}@example.com"
+    user factory: %i[user], email: "recovery-user-#{SecureRandom.hex(4)}@example.com"
     status { 'pending' }
     details { 'Lost my security key during travel' }
     ip_address { '127.0.0.1' }
@@ -10,13 +12,13 @@ FactoryBot.define do
     trait :approved do
       status { 'approved' }
       resolved_at { Time.current }
-      association :resolved_by, factory: :admin, email: "recovery-admin-#{SecureRandom.hex(4)}@example.com"
+      resolved_by factory: %i[admin], email: "recovery-admin-#{SecureRandom.hex(4)}@example.com"
     end
 
     trait :rejected do
       status { 'rejected' }
       resolved_at { Time.current }
-      association :resolved_by, factory: :admin, email: "recovery-admin-#{SecureRandom.hex(4)}@example.com"
+      resolved_by factory: %i[admin], email: "recovery-admin-#{SecureRandom.hex(4)}@example.com"
     end
   end
 end

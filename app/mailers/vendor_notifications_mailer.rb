@@ -10,7 +10,7 @@ class VendorNotificationsMailer < ApplicationMailer
     Rails.application.config.action_mailer.default_url_options
   end
 
-    def invoice_generated
+  def invoice_generated
     invoice      = params[:invoice]
     vendor       = invoice.vendor
     transactions = invoice.voucher_transactions.includes(:voucher)
@@ -21,7 +21,7 @@ class VendorNotificationsMailer < ApplicationMailer
     attachments["invoice-#{invoice.invoice_number}.pdf"] = generate_invoice_pdf(invoice, vendor, transactions)
 
     send_mail(vendor.email, subject, body)
-  rescue => e
+  rescue StandardError => e
     log_mail_error(e, vendor, 'vendor_notifications_invoice_generated', variables.except(:transactions_html_table, :transactions_text_list))
     raise e
   end
@@ -34,7 +34,7 @@ class VendorNotificationsMailer < ApplicationMailer
     subject, body = render_template('vendor_notifications_payment_issued', variables)
 
     send_mail(vendor.email, subject, body)
-  rescue => e
+  rescue StandardError => e
     log_mail_error(e, vendor, 'vendor_notifications_payment_issued', variables)
     raise e
   end
@@ -46,7 +46,7 @@ class VendorNotificationsMailer < ApplicationMailer
     subject, body = render_template('vendor_notifications_w9_approved', variables)
 
     send_mail(vendor.email, subject, body)
-  rescue => e
+  rescue StandardError => e
     log_mail_error(e, vendor, 'vendor_notifications_w9_approved', variables.except(:status_box_html, :header_html, :footer_html))
     raise e
   end
@@ -58,19 +58,19 @@ class VendorNotificationsMailer < ApplicationMailer
 
     message = "Your W9 form requires attention. Reason: #{reason}. Please visit the vendor portal to upload a corrected form."
     variables = build_w9_variables(vendor, :error, 'W9 Form Requires Attention', 'W9 Rejected', message)
-      .merge(rejection_reason: reason, vendor_portal_url: resolve_vendor_portal_url)
+                .merge(rejection_reason: reason, vendor_portal_url: resolve_vendor_portal_url)
 
     subject, body = render_template('vendor_notifications_w9_rejected', variables)
     send_mail(vendor.email, subject, body, content_type: 'text/plain')
-  rescue => e
+  rescue StandardError => e
     log_mail_error(e, vendor, 'vendor_notifications_w9_rejected', variables.except(:status_box_html, :header_html, :footer_html))
     raise e
   end
 
   def w9_expiring_soon
     vendor = params[:vendor]
-    return unless vendor.w9_expiration_date.present?
-    
+    return if vendor.w9_expiration_date.blank?
+
     days_until_expiry = (vendor.w9_expiration_date - Date.current).to_i
     expiration_date_formatted = vendor.w9_expiration_date.strftime('%B %d, %Y')
     association_msg = vendor.associated? ? 'Your association requires a valid W9.' : ''
@@ -79,25 +79,25 @@ class VendorNotificationsMailer < ApplicationMailer
     info_msg    = "Please visit the vendor portal to upload a new W9 form to avoid any disruption. #{association_msg}"
 
     variables = build_w9_variables(vendor, :warning, 'W9 Form Expiring Soon', 'W9 Expiring Soon', warning_msg)
-      .merge(
-        status_box_info_text: status_box_text(status: :info, title: 'Action Required', message: info_msg),
-        days_until_expiry: days_until_expiry,
-        expiration_date_formatted: expiration_date_formatted,
-        vendor_association_message: association_msg,
-        vendor_portal_url: resolve_vendor_portal_url
-      )
+                .merge(
+                  status_box_info_text: status_box_text(status: :info, title: 'Action Required', message: info_msg),
+                  days_until_expiry: days_until_expiry,
+                  expiration_date_formatted: expiration_date_formatted,
+                  vendor_association_message: association_msg,
+                  vendor_portal_url: resolve_vendor_portal_url
+                )
 
     subject, body = render_template('vendor_notifications_w9_expiring_soon', variables)
     send_mail(vendor.email, subject, body, content_type: 'text/plain')
-  rescue => e
+  rescue StandardError => e
     log_mail_error(e, vendor, 'vendor_notifications_w9_expiring_soon', variables.except(:status_box_warning_html, :status_box_info_html, :header_html, :footer_html))
     raise e
   end
 
   def w9_expired
     vendor = params[:vendor]
-    return unless vendor.w9_expiration_date.present?
-    
+    return if vendor.w9_expiration_date.blank?
+
     expiration_date_formatted = vendor.w9_expiration_date.strftime('%B %d, %Y')
     association_msg = vendor.associated? ? 'Your association requires a valid W9.' : ''
 
@@ -105,16 +105,16 @@ class VendorNotificationsMailer < ApplicationMailer
     info_msg    = "Please visit the vendor portal immediately to upload a new W9 form to avoid payment delays. #{association_msg}"
 
     variables = build_w9_variables(vendor, :warning, 'W9 Form Has Expired - Action Required', 'W9 Expired', warning_msg)
-      .merge(
-        status_box_info_text: status_box_text(status: :info, title: 'Action Required', message: info_msg),
-        expiration_date_formatted: expiration_date_formatted,
-        vendor_association_message: association_msg,
-        vendor_portal_url: resolve_vendor_portal_url
-      )
+                .merge(
+                  status_box_info_text: status_box_text(status: :info, title: 'Action Required', message: info_msg),
+                  expiration_date_formatted: expiration_date_formatted,
+                  vendor_association_message: association_msg,
+                  vendor_portal_url: resolve_vendor_portal_url
+                )
 
     subject, body = render_template('vendor_notifications_w9_expired', variables)
     send_mail(vendor.email, subject, body, content_type: 'text/plain')
-  rescue => e
+  rescue StandardError => e
     log_mail_error(e, vendor, 'vendor_notifications_w9_expired', variables.except(:status_box_warning_html, :status_box_info_html, :header_html, :footer_html))
     raise e
   end
@@ -200,7 +200,9 @@ class VendorNotificationsMailer < ApplicationMailer
   end
 
   def logo_url
-    ActionController::Base.helpers.asset_path('logo.png', host: default_url_options[:host]) rescue nil
+    ActionController::Base.helpers.asset_path('logo.png', host: default_url_options[:host])
+  rescue StandardError
+    nil
   end
 
   def support_email

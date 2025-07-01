@@ -44,10 +44,10 @@ class ApplicationMailboxRoutingTest < ActionMailbox::TestCase
 
   test 'routes proof@example.com emails to proof submission mailbox' do
     assert_mailbox_routed ProofSubmissionMailbox,
-      to: 'proof@example.com',
-      from: @constituent.email,
-      subject: 'Test Subject',
-      body: 'Test Body'
+                          to: 'proof@example.com',
+                          from: @constituent.email,
+                          subject: 'Test Subject',
+                          body: 'Test Body'
   end
 
   test 'routes emails to Postmark inbound address to proof submission mailbox' do
@@ -58,10 +58,10 @@ class ApplicationMailboxRoutingTest < ActionMailbox::TestCase
     MatVulcan::InboundEmailConfig.inbound_email_address = 'test-hash@inbound.postmarkapp.com'
 
     assert_mailbox_routed ProofSubmissionMailbox,
-      to: 'test-hash@inbound.postmarkapp.com',
-      from: @constituent.email,
-      subject: 'Test Subject',
-      body: 'Test Body'
+                          to: 'test-hash@inbound.postmarkapp.com',
+                          from: @constituent.email,
+                          subject: 'Test Subject',
+                          body: 'Test Body'
 
     # Restore original address
     MatVulcan::InboundEmailConfig.inbound_email_address = original_address
@@ -69,17 +69,17 @@ class ApplicationMailboxRoutingTest < ActionMailbox::TestCase
 
   test 'routes medical-cert@mdmat.org emails to medical certification mailbox' do
     assert_mailbox_routed MedicalCertificationMailbox,
-      to: 'medical-cert@mdmat.org',
-      from: @medical_provider.email,
-      subject: 'Medical Certification',
-      body: 'Test Medical Certification'
+                          to: 'medical-cert@mdmat.org',
+                          from: @medical_provider.email,
+                          subject: 'Medical Certification',
+                          body: 'Test Medical Certification'
   end
 
   test 'routes unmatched emails to default mailbox' do
     assert_mailbox_routed DefaultMailbox,
-      to: 'unknown@example.com',
-      from: 'sender@example.com',
-      subject: 'Unknown Email',
-      body: 'This email should go to the default mailbox'
+                          to: 'unknown@example.com',
+                          from: 'sender@example.com',
+                          subject: 'Unknown Email',
+                          body: 'This email should go to the default mailbox'
   end
 end

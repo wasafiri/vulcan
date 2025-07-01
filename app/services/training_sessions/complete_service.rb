@@ -24,6 +24,9 @@ module TrainingSessions
     rescue ActiveRecord::RecordInvalid => e
       Rails.logger.error("Error completing training session: #{e.message}")
       failure(message: e.message)
+    rescue ArgumentError => e
+      Rails.logger.error("Invalid parameters for completing training session: #{e.message}")
+      failure(message: e.message)
     rescue StandardError => e
       Rails.logger.error("Unexpected error completing training session: #{e.message}")
       failure(message: "An unexpected error occurred: #{e.message}")
@@ -32,10 +35,10 @@ module TrainingSessions
     private
 
     def validate_params!
-      raise ActiveRecord::RecordInvalid, 'notes is required' if @params[:notes].blank?
+      raise ArgumentError, 'notes is required' if @params[:notes].blank?
       return if @params[:product_trained_on_id].present?
 
-      raise ActiveRecord::RecordInvalid, 'product_trained_on_id is required'
+      raise ArgumentError, 'product_trained_on_id is required'
     end
 
     def update_training_session!

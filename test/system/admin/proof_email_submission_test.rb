@@ -28,10 +28,8 @@ module Admin
 
     test 'admin can view and approve proof submitted via email' do
       # Create a temporary file for testing
-      file_path = Rails.root.join('tmp', 'income_proof.pdf')
-      File.open(file_path, 'w') do |f|
-        f.write('This is a test PDF file')
-      end
+      file_path = Rails.root.join('tmp/income_proof.pdf')
+      File.write(file_path, 'This is a test PDF file')
 
       # Create and process an inbound email
       inbound_email = create_inbound_email_with_attachment(
@@ -62,15 +60,13 @@ module Admin
       assert_text 'Proof approved successfully'
 
       # Clean up
-      File.delete(file_path) if File.exist?(file_path)
+      FileUtils.rm_f(file_path)
     end
 
     test 'admin can view and reject proof submitted via email' do
       # Create a temporary file for testing
-      file_path = Rails.root.join('tmp', 'income_proof.pdf')
-      File.open(file_path, 'w') do |f|
-        f.write('This is a test PDF file')
-      end
+      file_path = Rails.root.join('tmp/income_proof.pdf')
+      File.write(file_path, 'This is a test PDF file')
 
       # Create and process an inbound email
       inbound_email = create_inbound_email_with_attachment(
@@ -102,16 +98,16 @@ module Admin
       assert_text 'Proof rejected successfully'
 
       # Clean up
-      File.delete(file_path) if File.exist?(file_path)
+      FileUtils.rm_f(file_path)
     end
 
     test 'admin can view multiple attachments from a single email' do
       # Create temporary files for testing
-      file_path1 = Rails.root.join('tmp', 'income_proof1.pdf')
-      file_path2 = Rails.root.join('tmp', 'income_proof2.pdf')
+      file_path1 = Rails.root.join('tmp/income_proof1.pdf')
+      file_path2 = Rails.root.join('tmp/income_proof2.pdf')
 
-      File.open(file_path1, 'w') { |f| f.write('This is test file 1') }
-      File.open(file_path2, 'w') { |f| f.write('This is test file 2') }
+      File.write(file_path1, 'This is test file 1')
+      File.write(file_path2, 'This is test file 2')
 
       # Create a raw email with multiple attachments
       mail = Mail.new do
@@ -141,8 +137,8 @@ module Admin
       assert_text 'income_proof2.pdf'
 
       # Clean up
-      File.delete(file_path1) if File.exist?(file_path1)
-      File.delete(file_path2) if File.exist?(file_path2)
+      FileUtils.rm_f(file_path1)
+      FileUtils.rm_f(file_path2)
     end
   end
 end

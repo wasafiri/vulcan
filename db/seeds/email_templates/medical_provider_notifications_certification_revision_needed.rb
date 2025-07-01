@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Seed File for "medical_provider_notifications_certification_revision_needed"
 EmailTemplate.create_or_find_by!(name: 'medical_provider_notifications_certification_revision_needed', format: :text) do |template|
   template.subject = 'Disability Certification Needs Updates'
@@ -39,4 +41,4 @@ EmailTemplate.create_or_find_by!(name: 'medical_provider_notifications_certifica
   TEXT
   template.version = 1
 end
-puts 'Seeded medical_provider_notifications_certification_revision_needed (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?
+Rails.logger.debug 'Seeded medical_provider_notifications_certification_revision_needed (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

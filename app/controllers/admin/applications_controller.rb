@@ -9,11 +9,24 @@ module Admin
 
     include ActionView::Helpers::TagHelper
     include ActionView::Helpers::JavaScriptHelper
+    # RedirectHelper: Provides standardized redirect_with_notice/redirect_with_alert methods
     include RedirectHelper
     include Admin::ApplicationStatusProcessor
+    # TurboStreamResponseHandling: Provides methods for handling both HTML and Turbo Stream responses
+    # Key methods: handle_success_response, handle_error_response, build_success_turbo_streams
+    include TurboStreamResponseHandling
+    # ApplicationDataLoading: Provides optimized methods for loading applications and attachments
+    # Key methods: load_application_with_attachments, preload_attachments_for_applications, load_proof_histories
+    include ApplicationDataLoading
+    # DashboardMetricsLoading: Provides methods for loading dashboard metrics and counts
+    # Key methods: load_dashboard_metrics, safe_assign, load_fiscal_year_data
+    include DashboardMetricsLoading
+    # RequestMetadataHelper: Provides standardized request metadata methods
+    # Key methods: basic_request_metadata, audit_metadata, proof_submission_metadata
+    include RequestMetadataHelper
     before_action :set_application, only: %i[
       show edit update
-      verify_income request_documents review_proof update_proof_status
+      request_documents review_proof update_proof_status
       approve reject assign_evaluator assign_trainer schedule_training complete_training
       update_certification_status resend_medical_certification assign_voucher
       upload_medical_certification
@@ -21,33 +34,39 @@ module Admin
     before_action :load_audit_logs_with_service, only: %i[show approve reject]
 
     def index
+      # DashboardMetricsLoading concern: Loads comprehensive dashboard metrics
+      # Flow: load_dashboard_metrics -> load_simple_counts + load_reporting_service_data + load_remaining_metrics
+      # This populates instance variables like @open_applications_count, @proofs_needing_review_count, etc.
       load_dashboard_metrics
 
-      scoped = filtered_scope(base_scope)
+      scoped = filtered_scope(build_application_base_scope)
       @pagy, page_of_apps = paginate(scoped)
-      attachments_index   = preload_attachments(page_of_apps)
+      # ApplicationDataLoading concern: Efficiently preloads attachments for multiple applications
+      # Flow: preload_attachments_for_applications -> groups attachments by application_id to avoid N+1 queries
+      attachments_index   = preload_attachments_for_applications(page_of_apps)
 
-      @applications = decorate_apps(page_of_apps, attachments_index)
-      
+      # ApplicationDataLoading concern: Decorates applications with storage information
+      # Flow: decorate_applications_with_storage -> wraps each app with ApplicationStorageDecorator
+      @applications = decorate_applications_with_storage(page_of_apps, attachments_index)
+
       # Load recent notifications with proper eager loading to avoid N+1 queries
       @recent_notifications = Notification
-        .includes(:notifiable, :actor)
-        .where('created_at > ?', 7.days.ago)
-        .order(created_at: :desc)
-        .limit(5)
-        .map { |n| NotificationDecorator.new(n) }
+                              .includes(:notifiable, :actor)
+                              .where('created_at > ?', 7.days.ago)
+                              .order(created_at: :desc)
+                              .limit(5)
+                              .map { |n| NotificationDecorator.new(n) }
     end
 
     def show
       # Application already loaded by set_application with attachments
-      # Only load additional associations specifically needed by the show view
-      load_application_associations_for_show
+      # ApplicationDataLoading concern: Loads associations specifically needed for show views
+      # Flow: load_application_show_associations -> loads status changes, proof reviews, training data
+      load_application_show_associations(@application)
 
-      # Preload and structure proof history data
-      @proof_histories = {
-        income: load_proof_history(:income),
-        residency: load_proof_history(:residency)
-      }
+      # ApplicationDataLoading concern: Structures proof history data efficiently
+      # Flow: load_proof_histories -> loads reviews and audits for income/residency proofs
+      @proof_histories = load_proof_histories(@application)
 
       # Use our new service for certification events
       certification_service = Applications::CertificationEventsService.new(@application)
@@ -59,35 +78,10 @@ module Admin
       @completed_training_sessions_count = if @application.respond_to?(:training_sessions) &&
                                               @application.training_sessions.respond_to?(:completed_sessions) &&
                                               @application.training_sessions.completed_sessions.present?
-                                              @application.training_sessions.completed_sessions.count
+                                             @application.training_sessions.completed_sessions.count
                                            else
-                                              0 # Default to 0 if there are no completed sessions or the method doesn't exist
+                                             0 # Default to 0 if there are no completed sessions or the method doesn't exist
                                            end
-    end
-
-    # Load only the associations that are actually needed for the show view
-    def load_application_associations_for_show
-      # Load status changes directly – they're always needed
-      ApplicationStatusChange.where(application_id: @application.id)
-                             .includes(:user)
-                             .load
-
-      # Load proof reviews that are needed
-      ProofReview.where(application_id: @application.id)
-                 .includes(:admin)
-                 .order(created_at: :desc)
-                 .load
-
-      # Access user if needed (for caching, if necessary)
-      User.find_by(id: @application.user_id) if @application.user_id.present?
-
-      # Load training-related data for approved applications
-      return unless @application.status_approved?
-
-      @application.evaluations.preload(:evaluator) if @application.respond_to?(:evaluations)
-      return unless @application.respond_to?(:training_sessions)
-
-      @application.training_sessions.preload(:trainer).order(created_at: :desc)
     end
 
     def edit; end
@@ -145,27 +139,21 @@ module Admin
       if result.success?
         handle_successful_review # This handles both HTML and Turbo Stream success
       else
-        # Handle failure for both HTML and Turbo Stream
-        respond_to do |format|
-          format.html { render :show, status: :unprocessable_entity, alert: result.message }
-          format.turbo_stream do
-            flash.now[:error] = result.message
-            render turbo_stream: turbo_stream.update('flash', partial: 'shared/flash')
-          end
-        end
+        handle_error_response(
+          error_message: result.message,
+          html_render_action: :show
+        )
       end
     end
 
     # Validates the admin user and reloads if necessary
     # @return [User] The validated admin user
     def validate_and_prepare_admin_user
-      Rails.logger.info "Update proof status - Current user: #{current_user.inspect}"
-      Rails.logger.info "Current user type: #{current_user.type}, admin? method result: #{current_user.admin?}"
+      Rails.logger.info "Current user: #{current_user.inspect}; Current user type: #{current_user.type}, admin? method result: #{current_user.admin?}"
 
       if current_user.admin?
         current_user
       elsif ['Administrator', 'Users::Administrator'].include?(current_user.type)
-        Rails.logger.info 'User type indicates admin but admin? method returned false, reloading user'
         User.find(current_user.id)
       else
         Rails.logger.error 'Non-admin user attempting to perform admin action'
@@ -175,18 +163,21 @@ module Admin
 
     # Handles a successful proof review
     def handle_successful_review
-      respond_to do |format|
-        format.html { redirect_with_notice("#{params[:proof_type].capitalize} proof #{params[:status]} successfully.") }
-        format.turbo_stream { handle_turbo_stream_success }
-      end
-    end
+      message = "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
 
-    # Handles turbo_stream success response for proof review
-    def handle_turbo_stream_success
-      prepare_data_for_turbo_stream
-      flash.now[:notice] = "#{params[:proof_type].capitalize} proof #{params[:status]} successfully."
-      streams = build_turbo_streams_for_success
-      render turbo_stream: streams
+      # TurboStreamResponseHandling concern: Handles both HTML and Turbo Stream responses uniformly
+      # Flow: handle_success_response -> responds with redirect for HTML or turbo streams for AJAX
+      # For Turbo Streams: updates specified elements and removes modals
+      # For HTML: redirects with notice message
+      handle_success_response(
+        html_redirect_path: admin_application_path(@application),
+        html_message: message,
+        turbo_updates: {
+          'attachments-section' => 'attachments',      # Updates attachment display
+          'audit-logs' => 'audit_logs'                 # Updates audit log section
+        },
+        turbo_modals_to_remove: standard_application_modals  # Closes review modals
+      )
     end
 
     # Removed original process_application_status method - logic moved to concern
@@ -269,7 +260,7 @@ module Admin
       when :new_upload
         upload_new_certification(status)
       else
-        redirect_with_alert('Invalid certification update type')
+        redirect_with_alert(admin_application_path(@application), 'Invalid certification update type')
       end
     end
 
@@ -282,9 +273,9 @@ module Admin
       )
 
       if result.success?
-        redirect_with_notice('Medical certification rejected and provider notified.')
+        redirect_with_notice(admin_application_path(@application), 'Medical certification rejected and provider notified.')
       else
-        redirect_with_alert("Failed to reject certification: #{result.message}")
+        redirect_with_alert(admin_application_path(@application), "Failed to reject certification: #{result.message}")
       end
     end
 
@@ -302,7 +293,7 @@ module Admin
       if result[:success]
         handle_successful_status_update(status)
       else
-        redirect_with_alert("Failed to update certification status: #{result[:error]&.message}")
+        redirect_with_alert(admin_application_path(@application), "Failed to update certification status: #{result[:error]&.message}")
       end
     end
 
@@ -319,7 +310,7 @@ module Admin
       if success
         handle_successful_status_update(status)
       else
-        redirect_with_alert('Failed to update certification status.')
+        redirect_with_alert(admin_application_path(@application), 'Failed to update certification status.')
       end
     end
 
@@ -329,23 +320,11 @@ module Admin
       @application.reload # Ensure we have the latest status after callbacks
       if @application.status_approved?
         # If the callback auto-approved it, show that message
-        redirect_with_notice('Medical certification status updated and application auto-approved.')
+        redirect_with_notice(admin_application_path(@application), 'Medical certification status updated and application auto-approved.')
       else
         # Otherwise, just show the certification status update message
-        redirect_with_notice('Medical certification status updated.')
+        redirect_with_notice(admin_application_path(@application), 'Medical certification status updated.')
       end
-    end
-
-    # Redirects with a notice message
-    # @param message [String] The notice message
-    def redirect_with_notice(message)
-      redirect_to admin_application_path(@application), notice: message
-    end
-
-    # Redirects with an alert message
-    # @param message [String] The alert message
-    def redirect_with_alert(message)
-      redirect_to admin_application_path(@application), alert: message
     end
 
     def resend_medical_certification
@@ -445,10 +424,8 @@ module Admin
 
     # Builds standard request metadata
     def request_metadata
-      {
-        ip_address: request.remote_ip,
-        user_agent: request.user_agent
-      }
+      # Using RequestMetadataHelper for consistent metadata creation
+      basic_request_metadata
     end
 
     # Handles the result of certification operations
@@ -464,50 +441,18 @@ module Admin
       end
     end
 
-  private
-
-    # --- Turbo Stream Success Helpers ---
+    private
 
     # Prepares necessary data before rendering turbo streams
-    def prepare_data_for_turbo_stream
-      reload_application_and_associations
-      load_proof_histories
+    def prepare_turbo_stream_data
+      @application = reload_application_and_associations(@application)
+      @proof_histories = load_proof_histories(@application)
       # Use our AuditLogBuilder service to load audit logs
       audit_log_builder = Applications::AuditLogBuilder.new(@application)
       @audit_logs = audit_log_builder.build_audit_logs
     end
 
-    # Builds the array of turbo stream objects for the success response
-    def build_turbo_streams_for_success
-      streams = []
-      # Update necessary content sections (excluding #modals)
-      streams << turbo_stream.update('flash', partial: 'shared/flash')
-      streams << turbo_stream.update('attachments-section', partial: 'attachments')
-      streams << turbo_stream.update('audit-logs', partial: 'audit_logs')
-
-      # Explicitly remove the modals that should be closed
-      streams.concat(remove_modals_streams)
-      streams
-    end
-
     # --- Other Private Helpers ---
-
-    def reload_application_and_associations
-      @application = load_base_application
-      return unless @application.status_approved?
-
-      @application.evaluations.preload(:evaluator) if @application.respond_to?(:evaluations)
-      return unless @application.respond_to?(:training_sessions)
-
-      @application.training_sessions.preload(:trainer).order(created_at: :desc)
-    end
-
-    def load_proof_histories
-      @proof_histories = {
-        income: load_proof_history(:income),
-        residency: load_proof_history(:residency)
-      }
-    end
 
     def load_notifications
       Notification
@@ -537,32 +482,6 @@ module Admin
         .order(created_at: :desc)
     end
 
-    def remove_modals_streams
-      [
-        turbo_stream.remove('proofRejectionModal'),
-        turbo_stream.remove('incomeProofReviewModal'),
-        turbo_stream.remove('residencyProofReviewModal'),
-        turbo_stream.remove('medicalCertificationReviewModal')
-      ]
-    end
-
-    def load_proof_history(type)
-      {
-        reviews: filter_and_sort(@application.proof_reviews, type, :reviewed_at),
-        audits: filter_and_sort(@application.events.where(action: 'proof_submitted', metadata: { proof_type: type }), type, :created_at)
-      }
-    rescue StandardError => e
-      Rails.logger.error "Failed to load #{type} proof history: #{e.message}"
-      Rails.logger.error e.backtrace.join("\n")
-      { reviews: [], audits: [], error: true }
-    end
-
-    def filter_and_sort(collection, type, sort_method)
-      collection.select { |item| item.proof_type.to_sym == type.to_sym }
-                .sort_by(&sort_method)
-                .reverse
-    end
-
     def log_param_class
       cls = params[:medical_certification].class.name
       Rails.logger.info "PARAM CLASS: #{cls}"
@@ -575,9 +494,9 @@ module Admin
         if file_param.respond_to?(:content_type)
           "Regular file upload with content_type: #{file_param.content_type}"
         elsif file_param.respond_to?(:[]) && file_param[:signed_id].present?
-          "Direct upload with signed_id"
+          'Direct upload with signed_id'
         elsif file_param.is_a?(String)
-          "String input (potential direct upload signed ID)"
+          'String input (potential direct upload signed ID)'
         else
           "Unknown structure: #{file_param.class.name}"
         end
@@ -587,7 +506,7 @@ module Admin
 
     # Logs detailed information about certification parameters (only in dev/test)
     def log_certification_params
-      return unless Rails.env.development? || Rails.env.test?
+      return unless Rails.env.local?
 
       Rails.logger.info "MEDICAL CERTIFICATION PARAMS: #{params.to_unsafe_h.inspect}"
       Rails.logger.info "MEDICAL CERTIFICATION FILE PARAM: #{params[:medical_certification].inspect}"
@@ -617,36 +536,12 @@ module Admin
 
     # Loads an application with only the essential attachments; each specific controller action will load the additional associations it needs
     def set_application
-      @application = load_base_application
+      # ApplicationDataLoading concern: Optimized application loading with attachment preloading
+      # Flow: load_application_with_attachments -> Application.find + preload_application_attachments
+      # This avoids N+1 queries by preloading attachment metadata without loading variant records
+      @application = load_application_with_attachments(params[:id])
     rescue ActiveRecord::RecordNotFound
       redirect_to admin_applications_path, alert: 'Application not found'
-    end
-
-    # Base application loader without unnecessary eager loading
-    def load_base_application
-      # Load application first, without eager loading anything
-      application = Application.find(params[:id])
-
-      # Preload the attachment metadata without loading associated models or variant records
-      attachment_ids = ActiveStorage::Attachment
-                       .where(record_type: 'Application', record_id: application.id)
-                       .select(:id, :name, :blob_id)
-                       .pluck(:id)
-
-      # Make sure blobs are accessible with all required attributes.
-      # This avoids the variant_records and preview_image_attachment eager loading, but includes service_name and other necessary attributes
-      if attachment_ids.any?
-        ActiveStorage::Blob
-          .joins('INNER JOIN active_storage_attachments ON active_storage_blobs.id = active_storage_attachments.blob_id')
-          .where(active_storage_attachments: { id: attachment_ids })
-          .select('active_storage_blobs.id, active_storage_blobs.filename, ' \
-                  'active_storage_blobs.content_type, active_storage_blobs.byte_size, ' \
-                  'active_storage_blobs.checksum, active_storage_blobs.created_at, ' \
-                  'active_storage_blobs.service_name, active_storage_blobs.metadata')
-          .to_a
-      end
-
-      application
     end
 
     def application_params
@@ -675,63 +570,9 @@ module Admin
     end
 
     ### metrics --------------------------------------------------------------------
-
-    def load_dashboard_metrics
-      load_simple_counts
-      load_reporting_service_data
-      load_remaining_metrics
-    rescue StandardError => e
-      Rails.logger.error "Dashboard metric error: #{e.message}"
-    end
-
-    def load_simple_counts
-      @open_applications_count   = Application.active.count
-      @pending_services_count    = Application.where(status: :approved).count
-    end
-
-    def load_reporting_service_data
-      service_result = Applications::ReportingService.new.generate_index_data
-      return unless service_result.is_a?(BaseService::Result) && service_result.success?
-
-      service_result.data.to_h.each do |key, value|
-        next if %w[open_applications_count pending_services_count].include?(key.to_s)
-        next if key.to_s.blank? || value.nil?
-
-        instance_variable_set("@#{key}", value)
-      end
-    end
-
-    def load_remaining_metrics
-      @proofs_needing_review_count     = Application.where(income_proof_status: :not_reviewed)
-                                                    .or(Application.where(residency_proof_status: :not_reviewed))
-                                                    .distinct.count
-
-      @medical_certs_to_review_count   = Application.where.not(status: %i[rejected archived])
-                                                    .where(medical_certification_status: :received)
-                                                    .count
-
-      @training_requests_count         = training_requests_count
-    end
-
-    def training_requests_count
-      count = Notification.where(action: 'training_requested', notifiable_type: 'Application')
-                          .distinct.count(:notifiable_id)
-
-      return count unless count.zero?
-
-      Application.joins(:training_sessions)
-                .where(training_sessions: { status: %i[requested scheduled confirmed] })
-                .distinct.count
-    end
+    # Dashboard metrics loading is now handled by the DashboardMetricsLoading concern
 
     ### scope / filtering ----------------------------------------------------------
-
-    def base_scope
-      Application
-        .includes(:user, :managing_guardian)
-        .distinct
-        .then { |rel| params[:status].present? ? rel : rel.where.not(status: %i[rejected archived]) }
-    end
 
     def filtered_scope(scope)
       result = Applications::FilterService.new(scope, params).apply_filters
@@ -753,34 +594,6 @@ module Admin
     rescue StandardError => e
       Rails.logger.error "Pagination failed: #{e.message}"
       [Pagy.new(count: scope.count, page: 1), scope.limit(20)]
-    end
-
-    ### attachments ----------------------------------------------------------------
-
-    def preload_attachments(apps)
-      ids = apps.map(&:id)
-      return {} if ids.empty?
-
-      begin
-        ActiveStorage::Attachment
-          .where(record_type: 'Application', record_id: ids, name: WANTED_ATTACHMENT_NAMES)
-          .group(:record_id, :name)
-          .pluck(:record_id, :name)
-          .group_by(&:first)
-          .transform_values { |rows| rows.map(&:second).to_set }
-      rescue StandardError => e
-        # If the query fails, log the error and return an empty hash
-        Rails.logger.error "Error preloading attachments: #{e.message}"
-        {}
-      end
-    end
-
-    ### decoration -----------------------------------------------------------------
-
-    def decorate_apps(apps, attachment_index)
-      apps.map do |app|
-        ApplicationStorageDecorator.new(app, attachment_index[app.id] || Set.new)
-      end
     end
   end
 end

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'application_system_test_case'
 require_relative '../../support/cuprite_test_bridge'
 
@@ -62,13 +64,13 @@ module Admin
         fill_in 'constituent[last_name]', with: 'TestChild'
         fill_in 'constituent[date_of_birth]', with: 10.years.ago.strftime('%Y-%m-%d')
         fill_in 'constituent[dependent_email]', with: "dependent-test-#{Time.now.to_i}@example.com"
-        
+
         # Select email strategy (dependent has their own email)
         choose 'email_strategy_dependent'
-        
+
         # Select relationship type
         select 'Child', from: 'relationship_type'
-        
+
         # Add disability information
         check 'constituent[hearing_disability]'
       end
@@ -105,16 +107,16 @@ module Admin
       # Step 11: Verify database changes
       assert_equal before_count + 1, Application.count,
                    'Application count should have increased by 1'
-      
+
       assert_equal before_user_count + 2, User.count,
                    'User count should have increased by 2 (guardian + dependent)'
-                   
+
       assert_equal before_relationship_count + 1, GuardianRelationship.count,
                    'Guardian relationship count should have increased by 1'
 
       # Step 12: Verify the application structure
       newest_app = Application.order(created_at: :desc).first
-      
+
       # Application should belong to the dependent
       assert_equal 'Users::Constituent', newest_app.user.type,
                    'Application user should be a Constituent'
@@ -142,11 +144,11 @@ module Admin
       # Try to create guardian with missing required fields
       within '#guardian-info-section' do
         click_on 'Create new guardian' if page.has_link?('Create new guardian')
-        
+
         # Leave required fields empty and try to submit
         fill_in 'guardian_attributes[first_name]', with: ''
         fill_in 'guardian_attributes[email]', with: 'invalid-email'
-        
+
         click_button 'Save Guardian'
 
         # Should show validation errors without submitting
@@ -159,11 +161,10 @@ module Admin
 
     test 'allows selecting existing guardian instead of creating new one' do
       # Create an existing guardian
-      existing_guardian = create(:constituent, 
-        first_name: 'Existing', 
-        last_name: 'Guardian',
-        email: 'existing.guardian@example.com'
-      )
+      create(:constituent,
+             first_name: 'Existing',
+             last_name: 'Guardian',
+             email: 'existing.guardian@example.com')
 
       admin = create(:admin, verified: true)
       enhanced_sign_in(admin)
@@ -175,10 +176,10 @@ module Admin
       # Search for existing guardian
       within '#guardian-info-section' do
         fill_in 'Search guardians...', with: 'Existing'
-        
+
         # Wait for search results
         assert_text 'Existing Guardian', wait: 5
-        
+
         # Select the existing guardian
         click_on 'Select Guardian'
       end
@@ -198,7 +199,7 @@ module Admin
       # Create a guardian
       within '#guardian-info-section' do
         click_on 'Create new guardian' if page.has_link?('Create new guardian')
-        
+
         fill_in 'guardian_attributes[first_name]', with: 'Selected'
         fill_in 'guardian_attributes[last_name]', with: 'Guardian'
         fill_in 'guardian_attributes[date_of_birth]', with: 40.years.ago.strftime('%Y-%m-%d')
@@ -208,9 +209,9 @@ module Admin
         fill_in 'guardian_attributes[city]', with: 'Baltimore'
         select 'MD', from: 'guardian_attributes[state]'
         fill_in 'guardian_attributes[zip_code]', with: '21203'
-        
+
         click_button 'Save Guardian'
-        
+
         # Verify guardian is displayed as selected
         assert_text 'Selected Guardian', wait: 5
       end
@@ -229,10 +230,10 @@ module Admin
     def attach_pdf_proof(type)
       fixture_path = Rails.root.join('test/fixtures/files', "#{type}_proof.pdf")
       fixture_path = Rails.root.join('test/fixtures/files/blank.pdf') unless File.exist?(fixture_path)
-      
+
       raise "Missing test fixture file: #{fixture_path}" unless File.exist?(fixture_path)
-      
+
       attach_file "#{type}_proof", fixture_path
     end
   end
-end 
+end

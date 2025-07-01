@@ -6,8 +6,8 @@ module MatVulcan
   class InboundEmailConfigTest < ActiveSupport::TestCase
     setup do
       # Save original values
-      @original_address = ENV['INBOUND_EMAIL_ADDRESS']
-      @original_provider = ENV['INBOUND_EMAIL_PROVIDER']
+      @original_address = ENV.fetch('INBOUND_EMAIL_ADDRESS', nil)
+      @original_provider = ENV.fetch('INBOUND_EMAIL_PROVIDER', nil)
 
       # Save original module values
       @original_config_address = MatVulcan::InboundEmailConfig.inbound_email_address
@@ -76,11 +76,11 @@ module MatVulcan
     test 'using? helper returns correct value' do
       MatVulcan::InboundEmailConfig.provider = :postmark
       assert MatVulcan::InboundEmailConfig.using?(:postmark)
-      refute MatVulcan::InboundEmailConfig.using?(:sendgrid)
+      assert_not MatVulcan::InboundEmailConfig.using?(:sendgrid)
 
       MatVulcan::InboundEmailConfig.provider = :mailgun
       assert MatVulcan::InboundEmailConfig.using?(:mailgun)
-      refute MatVulcan::InboundEmailConfig.using?(:postmark)
+      assert_not MatVulcan::InboundEmailConfig.using?(:postmark)
     end
   end
 end

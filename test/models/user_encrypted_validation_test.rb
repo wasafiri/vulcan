@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'test_helper'
 
 class UserEncryptedValidationTest < ActiveSupport::TestCase
@@ -148,7 +150,6 @@ class UserEncryptedValidationTest < ActiveSupport::TestCase
     assert_equal user1.id, user2.id
   end
 
-
   test 'helper methods work correctly with encryption' do
     attrs = unique_attributes
     user = User.create!(attrs)
@@ -290,7 +291,7 @@ class UserEncryptedValidationTest < ActiveSupport::TestCase
                       physical_address_2: nil,
                       middle_initial: '',
                       county_of_residence: nil
-    ))
+                    ))
     user.save!
 
     # Should handle nil/blank encrypted values without errors

@@ -12,8 +12,6 @@ class TrainingSession < ApplicationRecord
 
   # Validations
   validates :scheduled_for, presence: true, if: -> { status_scheduled? || status_confirmed? || will_be_scheduled? }
-  validates :trainer, presence: true
-  validates :application, presence: true
   validates :reschedule_reason, presence: true, if: :rescheduling?
   validate :trainer_must_be_trainer_type
   validate :scheduled_time_must_be_future, on: :create

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class SessionsController < ApplicationController
   skip_before_action :authenticate_user!, only: %i[new create]
   def new
@@ -14,40 +16,10 @@ class SessionsController < ApplicationController
 
     handle_invalid_credentials and return unless user&.authenticate(params[:password])
 
-    # User doesn't have 2FA, sign them in directly using the ApplicationController helper
-    sign_in(user) and return unless user.second_factor_enabled?
+    return sign_in(user) unless user.second_factor_enabled?
 
-    # Store user ID temporarily and redirect to 2FA step
-    cookies.delete(:session_token) # Ensure no old session interferes
-    TwoFactorAuth.clear_challenge(session) # Clear any stale challenge
-    TwoFactorAuth.store_temp_user_id(session, user.id)
-    TwoFactorAuth.store_return_path(session, session[:return_to])
-
-    # Check available 2FA methods
-    has_totp = user.totp_credentials.exists?
-    has_sms = user.sms_credentials.exists?
-    has_webauthn = user.webauthn_credentials.exists?
-
-    # Count available methods
-    available_methods = [has_totp, has_sms, has_webauthn].count(true)
-
-    case available_methods
-    when 0
-      # User has 2FA enabled but no credentials - redirect to setup
-      redirect_to setup_two_factor_authentication_path and return
-    when 1
-      # Only one method available - go directly to it
-      if has_totp
-        redirect_to verify_method_two_factor_authentication_path(type: 'totp') and return
-      elsif has_sms
-        redirect_to verify_method_two_factor_authentication_path(type: 'sms') and return
-      elsif has_webauthn
-        redirect_to verify_method_two_factor_authentication_path(type: 'webauthn') and return
-      end
-    else
-      # Multiple methods available - show choice screen
-      redirect_to verify_two_factor_authentication_path and return
-    end
+    setup_two_factor_session(user)
+    redirect_to_two_factor_verification(user)
   end
 
   def destroy
@@ -77,5 +49,43 @@ class SessionsController < ApplicationController
     # user = User.find_by(email: params[:email])
     # user&.track_failed_attempt!(request.remote_ip) if user # Assuming track_failed_attempt! exists
     redirect_to sign_in_path(email_hint: params[:email]), alert: 'Invalid email or password'
+  end
+
+  def setup_two_factor_session(user)
+    cookies.delete(:session_token) # Ensure no old session interferes
+    TwoFactorAuth.clear_challenge(session) # Clear any stale challenge
+    TwoFactorAuth.store_temp_user_id(session, user.id)
+    TwoFactorAuth.store_return_path(session, session[:return_to])
+  end
+
+  def redirect_to_two_factor_verification(user)
+    available_methods = count_available_two_factor_methods(user)
+
+    case available_methods
+    when 0
+      redirect_to setup_two_factor_authentication_path
+    when 1
+      redirect_to_single_two_factor_method(user)
+    else
+      redirect_to verify_two_factor_authentication_path
+    end
+  end
+
+  def count_available_two_factor_methods(user)
+    [
+      user.totp_credentials.exists?,
+      user.sms_credentials.exists?,
+      user.webauthn_credentials.exists?
+    ].count(true)
+  end
+
+  def redirect_to_single_two_factor_method(user)
+    if user.totp_credentials.exists?
+      redirect_to verify_method_two_factor_authentication_path(type: 'totp')
+    elsif user.sms_credentials.exists?
+      redirect_to verify_method_two_factor_authentication_path(type: 'sms')
+    elsif user.webauthn_credentials.exists?
+      redirect_to verify_method_two_factor_authentication_path(type: 'webauthn')
+    end
   end
 end

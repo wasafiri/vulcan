@@ -9,7 +9,7 @@ class ProofSubmissionFlowTest < ActionDispatch::IntegrationTest
   setup do
     # Use our clean test helper for consistent setup
     setup_clean_test_environment
-    
+
     @user = create(:constituent, email: 'johnny-test@example.com')
     @application = create(:application, :paper_rejected_proofs, user: @user)
     @valid_pdf = fixture_file_upload('test/fixtures/files/medical_certification_valid.pdf', 'application/pdf')
@@ -23,7 +23,7 @@ class ProofSubmissionFlowTest < ActionDispatch::IntegrationTest
       follow_redirect!(headers: { 'X-Test-User-Id' => @test_user_id.to_s })
     end
   end
-  
+
   teardown do
     # Use our clean helper for consistent teardown
     clear_current_context

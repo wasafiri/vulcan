@@ -21,9 +21,7 @@ module AuthenticationCore
   # This centralizes cookie deletion logic that was duplicated across helper modules
   def delete_session_cookie
     # Rack mock session (integration tests)
-    if respond_to?(:rack_mock_session) && rack_mock_session.respond_to?(:cookie_jar)
-      rack_mock_session.cookie_jar.delete(SESSION_COOKIE_NAME)
-    end
+    rack_mock_session.cookie_jar.delete(SESSION_COOKIE_NAME) if respond_to?(:rack_mock_session) && rack_mock_session.respond_to?(:cookie_jar)
 
     # Request session (controller tests)
     if defined?(request) && request.respond_to?(:session)

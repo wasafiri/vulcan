@@ -20,7 +20,7 @@ module Applications
 
       # Create ApplicationStatusChange directly since there's no factory
       cert_status_change = ApplicationStatusChange.create!(
-        application: @application, 
+        application: @application,
         user: @admin,
         from_status: 'submitted',
         to_status: 'requested',
@@ -29,14 +29,14 @@ module Applications
 
       cert_event = Event.create!(
         user: @admin,
-        auditable: @application, 
+        auditable: @application,
         action: 'medical_certification_approved',
         metadata: {}
       )
 
       non_cert_event = Event.create!(
         user: @admin,
-        auditable: @application, 
+        auditable: @application,
         action: 'application_created',
         metadata: {}
       )
@@ -62,11 +62,11 @@ module Applications
       # Use different timestamps to avoid deduplication
       time_base = Time.current
 
-      request_notification = create(:notification, 
-                                   notifiable: @application, 
-                                   action: 'medical_certification_requested',
-                                   actor: @admin,
-                                   recipient: @application.user)
+      request_notification = create(:notification,
+                                    notifiable: @application,
+                                    action: 'medical_certification_requested',
+                                    actor: @admin,
+                                    recipient: @application.user)
       request_notification.update!(created_at: time_base - 2.minutes)
 
       approved_event = Event.create!(
@@ -79,10 +79,10 @@ module Applications
 
       # Create ApplicationStatusChange directly
       request_status_change = ApplicationStatusChange.create!(
-        application: @application, 
+        application: @application,
         user: @admin,
         from_status: 'submitted',
-        to_status: 'requested', 
+        to_status: 'requested',
         metadata: { change_type: 'medical_certification' },
         created_at: time_base
       )

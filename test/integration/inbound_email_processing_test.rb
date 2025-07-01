@@ -27,7 +27,7 @@ class InboundEmailProcessingTest < ActionDispatch::IntegrationTest
     # CRITICAL TESTING INSIGHT: Do NOT stub ProofAttachmentService.attach_proof
     # This service performs the actual file attachment - stubbing it prevents real attachments
     # Let the service run normally to test the complete integration flow
-    # 
+    #
     # TROUBLESHOOTING: If tests fail with "proof should be attached":
     # 1. Check if ProofAttachmentService.attach_proof is stubbed (remove the stub)
     # 2. Verify Policy records exist (especially max_proof_rejections)
@@ -90,10 +90,10 @@ class InboundEmailProcessingTest < ActionDispatch::IntegrationTest
       ) do |mail|
         mail.attachments['income_proof.pdf'] = pdf_content
       end
-      
+
       # Apply ActionMailbox testing best practice - accept both valid email states
-      assert_includes ['processed', 'delivered'], inbound_email.status,
-        "Email should be processed or delivered, got: #{inbound_email.status}"
+      assert_includes %w[processed delivered], inbound_email.status,
+                      "Email should be processed or delivered, got: #{inbound_email.status}"
     end
 
     # Ensure the application has an income_proof method before asserting
@@ -172,9 +172,9 @@ class InboundEmailProcessingTest < ActionDispatch::IntegrationTest
   test 'rejects email from unknown sender' do
     # INTEGRATION TEST APPROACH: Test the actual behavior, not internal method calls
     # Use ActionMailbox testing best practices - test the end result, not the implementation
-    
+
     unknown_email = "unknown-#{SecureRandom.hex(8)}@example.com"
-    
+
     # Process email from unknown sender - expect it to be bounced
     assert_difference -> { ActionMailbox::InboundEmail.count } do
       # The mailbox throws :bounce for unknown senders, which is expected behavior
@@ -189,7 +189,7 @@ class InboundEmailProcessingTest < ActionDispatch::IntegrationTest
         end
       end
     end
-    
+
     # Verify no proof was attached to any application (since sender is unknown)
     assert_not @application.income_proof.attached?, 'No proof should be attached for unknown sender'
   end
@@ -241,10 +241,10 @@ class InboundEmailProcessingTest < ActionDispatch::IntegrationTest
         mail.attachments['income_proof1.pdf'] = pdf_content1
         mail.attachments['income_proof2.pdf'] = pdf_content2
       end
-      
+
       # Apply ActionMailbox testing best practice - accept both valid email states
-      assert_includes ['processed', 'delivered'], inbound_email.status,
-        "Email should be processed or delivered, got: #{inbound_email.status}"
+      assert_includes %w[processed delivered], inbound_email.status,
+                      "Email should be processed or delivered, got: #{inbound_email.status}"
     end
 
     # Verify attachments were processed - we may not have multiple attachments support

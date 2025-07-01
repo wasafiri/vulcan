@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class RecoveryRequest < ApplicationRecord
   belongs_to :user
   belongs_to :resolved_by, class_name: 'User', optional: true

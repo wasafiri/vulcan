@@ -17,7 +17,7 @@ module Admin
       # Create applications with proofs needing review
       @app_with_income_proof = create(:application, :in_progress, user: create(:constituent, email: "income_proof#{@admin.email}"))
       @app_with_income_proof.income_proof.attach(
-        io: File.open(Rails.root.join('test/fixtures/files/income_proof.pdf')),
+        io: Rails.root.join('test/fixtures/files/income_proof.pdf').open,
         filename: 'income_proof.pdf',
         content_type: 'application/pdf'
       )
@@ -27,7 +27,7 @@ module Admin
       email = "residency_proof#{@admin.email}"
       @app_with_residency_proof = create(:application, :in_progress, user: create(:constituent, email: email))
       @app_with_residency_proof.residency_proof.attach(
-        io: File.open(Rails.root.join('test/fixtures/files/residency_proof.pdf')),
+        io: Rails.root.join('test/fixtures/files/residency_proof.pdf').open,
         filename: 'residency_proof.pdf',
         content_type: 'application/pdf'
       )
@@ -38,7 +38,7 @@ module Admin
       email = "medical_cert#{@admin.email}"
       @app_with_medical_cert = create(:application, :in_progress, user: create(:constituent, email: email))
       @app_with_medical_cert.medical_certification.attach(
-        io: File.open(Rails.root.join('test/fixtures/files/medical_certification_valid.pdf')),
+        io: Rails.root.join('test/fixtures/files/medical_certification_valid.pdf').open,
         filename: 'medical_certification_valid.pdf',
         content_type: 'application/pdf'
       )

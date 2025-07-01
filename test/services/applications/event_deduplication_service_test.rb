@@ -14,7 +14,7 @@ module Applications
     test 'correctly deduplicates events with different priorities' do
       service = EventDeduplicationService.new
       time = Time.current
-      
+
       # Create unique users to avoid email conflicts
       notification_user = create(:user, email: "notification_#{Time.current.to_f}@example.com")
       event_user = create(:user, email: "event_#{Time.current.to_f}@example.com")
@@ -36,7 +36,7 @@ module Applications
         created_at: time
       )
 
-      # Create an ApplicationStatusChange (high priority) - same timestamp for deduplication  
+      # Create an ApplicationStatusChange (high priority) - same timestamp for deduplication
       status_change = ApplicationStatusChange.create!(
         application: @application,
         user: @admin,
@@ -58,7 +58,7 @@ module Applications
       service = EventDeduplicationService.new
       # Use a time that's at the start of a minute to ensure events fall in same bucket
       time = Time.current.beginning_of_minute
-      
+
       # Create unique users to avoid email conflicts
       user1 = create(:user, email: "user1_#{Time.current.to_f}@example.com")
       user2 = create(:user, email: "user2_#{Time.current.to_f}@example.com")
@@ -67,27 +67,27 @@ module Applications
       # Create events directly since no :event factory exists
       event1 = Event.create!(
         user: user1,
-        auditable: @application, 
-        action: 'proof_submitted', 
-        metadata: { proof_type: 'income' }, 
+        auditable: @application,
+        action: 'proof_submitted',
+        metadata: { proof_type: 'income' },
         created_at: time
       )
-      
+
       event2 = Event.create!(
         user: user2,
-        auditable: @application, 
-        action: 'proof_submitted', 
-        metadata: { proof_type: 'income' }, 
-        created_at: time + 30.seconds  # Still within same minute
+        auditable: @application,
+        action: 'proof_submitted',
+        metadata: { proof_type: 'income' },
+        created_at: time + 30.seconds # Still within same minute
       )
 
       # Create a third event outside the window (different minute boundary)
       event3 = Event.create!(
         user: user3,
-        auditable: @application, 
-        action: 'proof_submitted', 
-        metadata: { proof_type: 'income' }, 
-        created_at: time + 70.seconds  # Past 1 minute boundary
+        auditable: @application,
+        action: 'proof_submitted',
+        metadata: { proof_type: 'income' },
+        created_at: time + 70.seconds # Past 1 minute boundary
       )
 
       result = service.deduplicate([event1, event2, event3])

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 FactoryBot.define do
   factory :guardian_relationship do
     guardian_user factory: %i[constituent] # Use constituent factory for more realistic data

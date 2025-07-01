@@ -25,7 +25,7 @@ module Admin
     end
 
     def note_params
-      params.require(:application_note).permit(:content, :internal_only)
+      params.expect(application_note: %i[content internal_only])
     end
   end
 end

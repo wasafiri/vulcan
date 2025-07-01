@@ -54,12 +54,12 @@ module Webhooks
       )
     end
 
-    def log_webhook(&block)
+    def log_webhook(&)
       ActiveSupport::Notifications.instrument(
         'webhook_received',
         controller: self.class.name,
         action: action_name,
-        type: params[:type], &block
+        type: params[:type], &
       )
     end
   end

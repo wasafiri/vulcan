@@ -5,7 +5,7 @@ require 'test_helper'
 module Applications
   class FilterServiceTest < ActiveSupport::TestCase
     include PaperApplicationContextHelpers
-    
+
     setup do
       # Set up context to skip proof validations during test setup
       setup_paper_application_context
@@ -156,7 +156,7 @@ module Applications
         @rejected_app.stubs(:income_proof_attached?).returns(true)
         @rejected_app.stubs(:residency_proof).returns(residency_proof_mock)
         @rejected_app.stubs(:residency_proof_attached?).returns(true)
-        
+
         # Update status after mocking attachments to avoid validation errors
         @rejected_app.update_columns(
           income_proof_status: :approved,

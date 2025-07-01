@@ -27,7 +27,7 @@ class ActiveStorageValidatableTest < ActiveSupport::TestCase
 
   test 'validates content type correctly' do
     model = TestModel.new
-    
+
     # Test valid content type
     model.attach_file(content_type: 'application/pdf', size: 2.megabytes)
     model.send(:validate_attachment_content_type, model.test_attachment, :test_attachment)
@@ -42,7 +42,7 @@ class ActiveStorageValidatableTest < ActiveSupport::TestCase
 
   test 'validates file size correctly' do
     model = TestModel.new
-    
+
     # Test valid size
     model.attach_file(content_type: 'application/pdf', size: 2.megabytes)
     model.send(:validate_attachment_size, model.test_attachment, :test_attachment)
@@ -98,7 +98,7 @@ class ActiveStorageValidatableTest < ActiveSupport::TestCase
 
   test 'provides JavaScript validation config' do
     config = TestModel.js_validation_config
-    
+
     assert_equal ActiveStorageValidatable::ALLOWED_CONTENT_TYPES, config[:allowed_types]
     assert_equal ActiveStorageValidatable::MAX_FILE_SIZE, config[:max_size_bytes]
     assert_equal 5, config[:max_size_mb]
@@ -106,4 +106,4 @@ class ActiveStorageValidatableTest < ActiveSupport::TestCase
     assert config[:error_messages][:invalid_type].present?
     assert config[:error_messages][:file_too_large].present?
   end
-end 
+end

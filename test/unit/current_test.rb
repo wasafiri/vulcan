@@ -124,4 +124,4 @@ class CurrentTest < ActiveSupport::TestCase
     assert_nil Current.skip_proof_validation
     assert_nil Current.test_user_id
   end
-end 
+end

@@ -18,11 +18,11 @@ module ProofTestHelper
     Event.delete_all if defined?(Event)
     ensure_active_storage_test_setup
   end
-  
+
   private
-  
+
   def ensure_active_storage_test_setup
-    storage_dir = Rails.root.join('tmp', 'storage')
+    storage_dir = Rails.root.join('tmp/storage')
     FileUtils.mkdir_p(storage_dir) unless storage_dir.exist?
   end
 
@@ -31,10 +31,10 @@ module ProofTestHelper
   # Create an application ready for proof submission testing
   def create_application_for_proof_submission(user: nil)
     clear_current_context
-    
+
     attributes = {}
     attributes[:user] = user if user
-    
+
     app = create(:application, **attributes)
     app.update_columns(
       income_proof_status: Application.income_proof_statuses[:rejected],
@@ -42,21 +42,21 @@ module ProofTestHelper
       status: Application.statuses[:needs_information],
       needs_review_since: nil
     )
-    
+
     app.reload
   end
 
   # Create an application ready for admin review
   def create_application_for_review(user: nil)
     clear_current_context
-    
+
     attributes = {
       income_proof_status: :not_reviewed,
       residency_proof_status: :not_reviewed,
       needs_review_since: Time.current
     }
     attributes[:user] = user if user
-    
+
     create(:application, :with_all_proofs, **attributes)
   end
 
@@ -64,23 +64,23 @@ module ProofTestHelper
   def assert_event_count(expected_count, event_action: nil)
     if event_action
       actual_count = Event.where(action: event_action).count
-      assert_equal expected_count, actual_count, 
-        "Expected #{expected_count} #{event_action} events, got #{actual_count}"
+      assert_equal expected_count, actual_count,
+                   "Expected #{expected_count} #{event_action} events, got #{actual_count}"
     else
       actual_count = Event.count
       assert_equal expected_count, actual_count,
-        "Expected #{expected_count} total events, got #{actual_count}"
+                   "Expected #{expected_count} total events, got #{actual_count}"
     end
   end
 
   # Assert that no duplicate events were created
   def assert_no_duplicate_events
     duplicate_groups = Event.group(:action, :auditable_type, :auditable_id, :user_id)
-                           .having('COUNT(*) > 1')
-                           .count
-    
-    assert_empty duplicate_groups, 
-      "Found duplicate events: #{duplicate_groups.inspect}"
+                            .having('COUNT(*) > 1')
+                            .count
+
+    assert_empty duplicate_groups,
+                 "Found duplicate events: #{duplicate_groups.inspect}"
   end
 
   # Legacy method for compatibility - sets up basic attachment mocks

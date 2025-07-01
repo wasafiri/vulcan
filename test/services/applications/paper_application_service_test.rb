@@ -73,8 +73,6 @@ module Applications
       teardown_paper_application_context
     end
 
-
-
     # Helper method to create a test constituent directly
     def create_test_constituent(email)
       create(:constituent, email: email)

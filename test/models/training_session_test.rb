@@ -59,7 +59,7 @@ class TrainingSessionTest < ActiveSupport::TestCase
     training_session.valid?
 
     # Skip the assertion if we're in test environment where past dates are allowed
-    if Rails.env.test? && !training_session.errors[:scheduled_for].include?('must be in the future')
+    if Rails.env.test? && training_session.errors[:scheduled_for].exclude?('must be in the future')
       puts 'Note: In test environment, past scheduled dates are allowed'
     else
       assert_includes training_session.errors[:scheduled_for], 'must be in the future'

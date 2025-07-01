@@ -136,12 +136,12 @@ module ActiveSupport
       # Clear Current attributes
       Current.reset if defined?(Current)
       Current.test_user_id = nil if defined?(Current)
-      
+
       # Clear instance variables that might leak between tests
       @authenticated_user = nil
       @test_user_id = nil
       @session_token = nil
-      
+
       # Clear ENV variable for backward compatibility
       ENV['TEST_USER_ID'] = nil if ENV['TEST_USER_ID'].present?
     end
@@ -172,7 +172,7 @@ module ActiveSupport
       }
       base['Cookie'] = "session_token=#{@session_token}" if defined?(@session_token) && @session_token.present?
       base['X-Test-User-Id'] = @test_user_id.to_s if defined?(@test_user_id) && @test_user_id.present?
-      
+
       base
     end
 

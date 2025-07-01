@@ -2,7 +2,7 @@
 
 module Users
   class Trainer < User
-    has_many :training_sessions, foreign_key: :trainer_id, dependent: :restrict_with_error
+    has_many :training_sessions, dependent: :restrict_with_error
     has_many :assigned_constituents,
              through: :training_sessions,
              source: :constituent

@@ -2,8 +2,8 @@
 
 FactoryBot.define do
   factory :proof_review do
-    association :application, factory: :application
-    association :admin
+    application factory: %i[application]
+    admin
     proof_type { :income } # or :residency
     status { :approved }
     reviewed_at { Time.current }
@@ -19,7 +19,7 @@ FactoryBot.define do
 
       begin
         # Attach the appropriate proof based on the proof type
-        fixture_dir = Rails.root.join('test', 'fixtures', 'files')
+        fixture_dir = Rails.root.join('test/fixtures/files')
         FileUtils.mkdir_p(fixture_dir)
 
         # Determine which proof file to use
@@ -89,7 +89,7 @@ FactoryBot.define do
         Thread.current[:paper_application_context] = true
 
         begin
-          fixture_dir = Rails.root.join('test', 'fixtures', 'files')
+          fixture_dir = Rails.root.join('test/fixtures/files')
           file_path = fixture_dir.join('test_income_proof.pdf')
           File.write(file_path, 'test content for income proof') unless File.exist?(file_path)
 
@@ -132,7 +132,7 @@ FactoryBot.define do
         Thread.current[:paper_application_context] = true
 
         begin
-          fixture_dir = Rails.root.join('test', 'fixtures', 'files')
+          fixture_dir = Rails.root.join('test/fixtures/files')
           file_path = fixture_dir.join('test_residency_proof.pdf')
           File.write(file_path, 'test content for residency proof') unless File.exist?(file_path)
 

@@ -3,6 +3,7 @@
 module Admin
   class PaperApplicationsController < Admin::BaseController
     include ParamCasting
+    include TurboStreamResponseHandling
     before_action :cast_complex_boolean_params, only: %i[create update]
 
     USER_BASE_FIELDS = %i[
@@ -93,9 +94,6 @@ module Admin
     end
 
     def send_rejection_notification
-      # This method seems out of scope for the current refactor of params,
-      # but ensure it still works or adapt if constituent_params structure changes impact it.
-      # For now, assuming it uses flat params from the form directly.
       constituent_params_for_notification = build_constituent_params_for_notification
       notification_params = build_notification_params
 
@@ -114,6 +112,12 @@ module Admin
     private
 
     def handle_service_failure(service, existing_application = nil)
+      error_message(service)
+      repopulate_form_data(service, existing_application)
+      render (existing_application ? :edit : :new), status: :unprocessable_entity
+    end
+
+    def error_message(service)
       if service.errors.any?
         error_message = service.errors.join('; ')
         Rails.logger.error "Paper application operation failed: #{error_message}"
@@ -122,35 +126,33 @@ module Admin
         Rails.logger.error 'Paper application operation failed with no specific service errors.'
         flash.now[:alert] = 'An unexpected error occurred.'
       end
+    end
 
-      # Repopulate @paper_application for the form
-      # The service should ideally return the objects it was working with, even on failure.
+    def repopulate_form_data(service, existing_application)
       @paper_application = {
         application: service.application || existing_application || Application.new,
         constituent: service.constituent || existing_application&.user || Constituent.new,
-        guardian_user_for_app: service.guardian_user_for_app, # For repopulating guardian fields
-        # Pass back the original params to help repopulate complex forms
-        submitted_params: params.to_unsafe_h.slice(:applicant_type, :relationship_type, :guardian_id, :dependent_id,
-                                                   :guardian_attributes, :applicant_attributes,
-                                                   :application, :constituent, :email_strategy, :phone_strategy, :address_strategy,
-                                                   :use_guardian_email, :use_guardian_phone, :use_guardian_address)
+        guardian_user_for_app: service.guardian_user_for_app,
+        submitted_params: build_submitted_params
       }
-      render (existing_application ? :edit : :new), status: :unprocessable_entity
+    end
+
+    def build_submitted_params
+      params.to_unsafe_h.slice(
+        :applicant_type, :relationship_type, :guardian_id, :dependent_id,
+        :guardian_attributes, :applicant_attributes, :application, :constituent,
+        :email_strategy, :phone_strategy, :address_strategy,
+        :use_guardian_email, :use_guardian_phone, :use_guardian_address
+      )
     end
 
     def log_file_and_form_params
-      Rails.logger.debug 'CONTROLLER - Params received:'
-      Rails.logger.debug { params.inspect }
-      Rails.logger.debug 'CONTROLLER - File params present:'
       Rails.logger.debug { "income_proof present: #{params[:income_proof].present?}" }
       Rails.logger.debug { "residency_proof present: #{params[:residency_proof].present?}" }
-      return unless params[:income_proof].present? && params[:income_proof].respond_to?(:original_filename)
-
-      Rails.logger.debug { "income_proof filename: #{params[:income_proof].original_filename}" }
+      nil unless params[:income_proof].present? && params[:income_proof].respond_to?(:original_filename)
     end
 
     def generate_success_message(application)
-      # ... (original generate_success_message logic)
       if application.proof_reviews.where(status: :rejected).any?
         rejected_proofs = []
         rejected_proofs << 'income' if application.income_proof_status_rejected?
@@ -168,68 +170,79 @@ module Admin
 
     # Main method to construct parameters for the PaperApplicationService
     def paper_application_processing_params
-      # Start with top-level permitted scalar values
-      # Infer applicant_type if guardian_id OR guardian_attributes is present and constituent data exists
-      current_applicant_type = params[:applicant_type]
-      if (params[:guardian_id].present? || params[:guardian_attributes].present?) &&
-         params[:constituent].present? && params.require(:constituent).permit(:first_name).present?
-        current_applicant_type = 'dependent'
-      end
+      service_params = build_base_service_params
+      add_application_params(service_params)
+      add_user_params(service_params)
+      add_proof_params(service_params)
 
-      # Translate checkbox parameters to strategy parameters (maintaining backward compatibility)
-      email_strategy = determine_email_strategy
-      phone_strategy = determine_phone_strategy
-      address_strategy = determine_address_strategy
+      Rails.logger.debug { "Final service params: #{service_params.inspect}" }
+      service_params
+    end
+
+    def build_base_service_params
+      current_applicant_type = determine_applicant_type
 
       service_params = params.permit(:relationship_type, :guardian_id, :dependent_id)
                              .to_h.with_indifferent_access
       service_params[:applicant_type] = current_applicant_type
-      service_params[:email_strategy] = email_strategy
-      service_params[:phone_strategy] = phone_strategy
-      service_params[:address_strategy] = address_strategy
+      service_params[:email_strategy] = determine_email_strategy
+      service_params[:phone_strategy] = determine_phone_strategy
+      service_params[:address_strategy] = determine_address_strategy
 
-      # Application attributes - initialize with permitted ones
+      service_params
+    end
+
+    def determine_applicant_type
+      # Infer applicant_type if guardian_id OR guardian_attributes is present and constituent data exists
+      return params[:applicant_type] if params[:applicant_type].present? && !inferred_dependent_application?
+
+      inferred_dependent_application? ? 'dependent' : params[:applicant_type]
+    end
+
+    def add_application_params(service_params)
       service_params[:application] = permitted_application_attributes if params[:application].present?
       service_params[:application] ||= {}
 
-      # Applicant disability attributes (from applicant_attributes section of the form)
-      all_applicant_attrs = permitted_applicant_disability_attributes
+      # Handle applicant disability attributes
+      applicant_attrs = permitted_applicant_disability_attributes
+      service_params[:application][:self_certify_disability] = applicant_attrs.delete(:self_certify_disability) if applicant_attrs.key?(:self_certify_disability)
 
-      # Separate self_certify_disability for the Application model
-      if all_applicant_attrs.key?(:self_certify_disability)
-        service_params[:application][:self_certify_disability] = all_applicant_attrs.delete(:self_certify_disability)
-      end
+      service_params[:applicant_disability_attrs] = applicant_attrs
+    end
 
+    def add_user_params(service_params)
       if service_params[:applicant_type] == 'dependent'
-        # The APPLICANT is the DEPENDENT - clean parameter handling with constituent
-        constituent_attrs = {}
-        constituent_attrs = permitted_constituent_attributes if params[:constituent].present?
-        service_params[:constituent] = constituent_attrs.deep_merge(all_applicant_attrs)
-
-        # Handle the Guardian separately
-        if service_params[:guardian_id].present?
-          # Existing guardian selected
-        elsif params[:guardian_attributes].present?
-          # New guardian to be created
-          service_params[:new_guardian_attributes] = permitted_guardian_attributes
-        end
-
-      else # Self-application (applicant_type == 'guardian' or legacy/unspecified)
-        # The APPLICANT is the self-applying adult
-        service_params[:constituent] = if params[:constituent].present? && params.require(:constituent).permit(:first_name).present?
-                                         permitted_constituent_attributes.deep_merge(all_applicant_attrs)
-                                       elsif params[:guardian_attributes].present?
-                                         # "Create New Guardian" form was filled for self-applicant
-                                         permitted_guardian_attributes.deep_merge(all_applicant_attrs)
-                                       else
-                                         # Fallback: ensure only disability flags are passed
-                                         all_applicant_attrs
-                                       end
+        add_dependent_params(service_params)
+      else
+        add_self_applicant_params(service_params)
       end
+    end
 
-      add_proof_params(service_params)
-      Rails.logger.debug { "Final service params: #{service_params.inspect}" }
-      service_params
+    def add_dependent_params(service_params)
+      # The APPLICANT is the DEPENDENT
+      constituent_attrs = params[:constituent].present? ? permitted_constituent_attributes : {}
+      applicant_attrs = service_params.delete(:applicant_disability_attrs) || {}
+      service_params[:constituent] = constituent_attrs.deep_merge(applicant_attrs)
+
+      # Handle the Guardian separately
+      return unless service_params[:guardian_id].blank? && params[:guardian_attributes].present?
+
+      service_params[:new_guardian_attributes] = permitted_guardian_attributes
+    end
+
+    def add_self_applicant_params(service_params)
+      # The APPLICANT is the self-applying adult
+      applicant_attrs = service_params.delete(:applicant_disability_attrs) || {}
+
+      service_params[:constituent] = if params[:constituent].present? && params.expect(constituent: [:first_name]).present?
+                                       permitted_constituent_attributes.deep_merge(applicant_attrs)
+                                     elsif params[:guardian_attributes].present?
+                                       # "Create New Guardian" form was filled for self-applicant
+                                       permitted_guardian_attributes.deep_merge(applicant_attrs)
+                                     else
+                                       # Fallback: ensure only disability flags are passed
+                                       applicant_attrs
+                                     end
     end
 
     # Translate checkbox UI to email strategy parameter
@@ -280,12 +293,12 @@ module Admin
     # Helper to determine if this is a dependent application based on guardian presence
     def inferred_dependent_application?
       (params[:guardian_id].present? || params[:guardian_attributes].present?) &&
-        params[:constituent].present? && params.require(:constituent).permit(:first_name).present?
+        params[:constituent].present? && params.expect(constituent: [:first_name]).present?
     end
 
     def permitted_guardian_attributes
       if params[:guardian_attributes].present?
-        params.require(:guardian_attributes).permit(*USER_BASE_FIELDS, *USER_DISABILITY_FIELDS)
+        params.expect(guardian_attributes: [*USER_BASE_FIELDS, *USER_DISABILITY_FIELDS])
               .to_h.with_indifferent_access
       else
         {}
@@ -295,19 +308,19 @@ module Admin
     def permitted_constituent_attributes
       # For constituents (including dependents), permit all standard user fields plus dependent-specific fields
       permitted_fields = USER_BASE_FIELDS + DEPENDENT_BASE_FIELDS + USER_DISABILITY_FIELDS
-      params.require(:constituent).permit(*permitted_fields).to_h.with_indifferent_access
+      params.expect(constituent: [*permitted_fields]).to_h.with_indifferent_access
     end
 
     def permitted_applicant_disability_attributes
       if params[:applicant_attributes].present?
-        params.require(:applicant_attributes).permit(*USER_DISABILITY_FIELDS).to_h.with_indifferent_access
+        params.expect(applicant_attributes: [*USER_DISABILITY_FIELDS]).to_h.with_indifferent_access
       else
         {}
       end
     end
 
     def permitted_application_attributes
-      params.require(:application).permit(*APPLICATION_FIELDS).to_h.with_indifferent_access
+      params.expect(application: [*APPLICATION_FIELDS]).to_h.with_indifferent_access
     end
 
     def add_proof_params(service_params)

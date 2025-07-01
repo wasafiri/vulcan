@@ -35,7 +35,7 @@ module Webhooks
     def webhook_debug(message)
       return unless ENV['DEBUG_WEBHOOKS'] == 'true'
 
-      Rails.logger.debug "[WEBHOOK DEBUG] #{message}"
+      Rails.logger.debug { "[WEBHOOK DEBUG] #{message}" }
     end
   end
 end

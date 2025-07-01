@@ -247,7 +247,7 @@ class Voucher < ApplicationRecord
   end
 
   def log_status_change
-    # Determine the actor safely - if both Current.user and system_user fail, 
+    # Determine the actor safely - if both Current.user and system_user fail,
     # we'll skip logging rather than break the voucher operation
     actor = Current.user
     if actor.nil?

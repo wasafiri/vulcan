@@ -443,11 +443,9 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
 
     # Sign out first
     visit root_path
-    if page.has_button?('Sign Out')
-      click_button 'Sign Out'
-    end
+    click_button 'Sign Out' if page.has_button?('Sign Out')
 
-    # Sign in - capture a screenshot of the page after sign-in 
+    # Sign in - capture a screenshot of the page after sign-in
     # to help diagnose what options are actually visible
     visit sign_in_path
     fill_in 'Email', with: @user.email
@@ -459,7 +457,7 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
     take_screenshot('2fa-verification-options-actual')
 
     # Just verify we're on a page that mentions security or authentication
-    assert page.has_text?(/security|verification|authentication|key|code/i), 
+    assert page.has_text?(/security|verification|authentication|key|code/i),
            'Not on a verification page'
 
     # At minimum, we should have a form for submitting a verification code
@@ -495,8 +493,8 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
 
     # Check if we're on the verification page or the sign in page
     assert(
-      current_path == verification_path || 
-      current_path == sign_in_path || 
+      current_path == verification_path ||
+      current_path == sign_in_path ||
       page.has_text?(/sign in|login|authentication required/i),
       'Not properly redirected when bypassing 2FA'
     )
@@ -521,11 +519,11 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
 
     # Decrypt and decode the session cookie
     store = ActionDispatch::Session::CookieStore.new(Rails.application, Rails.application.config.session_options)
-    session_data = store.send(:load_session, Rack::Request.new({'HTTP_COOKIE' => "#{session_key}=#{cookie[:value]}"}))[1] # [1] gets the hash
+    session_data = store.send(:load_session, Rack::Request.new({ 'HTTP_COOKIE' => "#{session_key}=#{cookie[:value]}" }))[1] # [1] gets the hash
 
     # Extract the secret from the metadata
     session_data&.dig(TwoFactorAuth::SESSION_KEYS[:metadata].to_s, 'secret') || # Check string key
-    session_data&.dig(TwoFactorAuth::SESSION_KEYS[:metadata], :secret) # Check symbol key
+      session_data&.dig(TwoFactorAuth::SESSION_KEYS[:metadata], :secret) # Check symbol key
   end
 
   # Helper to get the latest SMS credential for the user

@@ -5,10 +5,10 @@ module FormComponentHelper
     form.object.errors[field].present? ? 'border-red-500' : 'border-gray-300'
   end
 
-  def form_section(title:, &block)
+  def form_section(title:, &)
     tag.div(class: 'form-section') do
       concat tag.h3(title, class: 'text-lg font-medium mb-4')
-      concat capture(&block)
+      concat capture(&)
     end
   end
 end

@@ -2,6 +2,11 @@
 
 module Admin
   class ScannedProofsController < Admin::BaseController
+    # Include RedirectHelper concern to provide standardized redirect methods
+    # This replaces manual redirect_to calls with consistent redirect_with_notice/redirect_with_alert
+    # that take (path, message) parameters for better code organization
+    include RedirectHelper
+    
     before_action :set_application
     before_action :validate_proof_type, only: %i[new create]
     before_action :validate_file, only: [:create]
@@ -37,8 +42,9 @@ module Admin
       rescue StandardError => e
         # Log any unexpected error and let the user know to try again.
         Rails.logger.error("Proof upload failed: #{e.message}")
-        redirect_to admin_application_path(@application),
-                    alert: 'Error uploading proof. Please try again.'
+        # Using RedirectHelper concern method - provides consistent error handling
+        # Flow: redirect_with_alert(path, message) -> redirect_to path, alert: message
+        redirect_with_alert(admin_application_path(@application), 'Error uploading proof. Please try again.')
         return
       end
 
@@ -54,8 +60,9 @@ module Admin
         # Don't fail the upload if just the notification fails
       end
 
-      redirect_to admin_application_path(@application),
-                  notice: 'Proof successfully uploaded and attached'
+      # Using RedirectHelper concern method - provides consistent success handling
+      # Flow: redirect_with_notice(path, message) -> redirect_to path, notice: message
+      redirect_with_notice(admin_application_path(@application), 'Proof successfully uploaded and attached')
     end
 
     private
@@ -63,14 +70,15 @@ module Admin
     def set_application
       @application = Application.find(params[:application_id])
     rescue ActiveRecord::RecordNotFound
-      redirect_to admin_applications_path, alert: 'Application not found'
+      # Using RedirectHelper concern method for consistent error redirects
+      redirect_with_alert(admin_applications_path, 'Application not found')
     end
 
     def validate_proof_type
       return if %w[income residency].include?(params[:proof_type])
 
-      redirect_to admin_application_path(@application),
-                  alert: 'Invalid proof type'
+      # Using RedirectHelper concern method for validation error redirects
+      redirect_with_alert(admin_application_path(@application), 'Invalid proof type')
     end
 
     def validate_file

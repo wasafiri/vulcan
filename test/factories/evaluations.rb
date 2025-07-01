@@ -3,7 +3,7 @@
 # test/factories/evaluations.rb
 FactoryBot.define do
   factory :evaluation do
-    association :evaluator, type: 'Users::Evaluator'
+    evaluator
     constituent
     application
     evaluation_date { 1.day.from_now }
@@ -70,7 +70,7 @@ FactoryBot.define do
           product.documentation_url = 'https://support.apple.com/guide/iphone'
           product.device_types = ['Smartphone']
         end
-        
+
         pixel = Product.find_or_create_by(name: 'Pixel') do |product|
           product.description = 'Android smartphone with accessibility features'
           product.manufacturer = 'Google'

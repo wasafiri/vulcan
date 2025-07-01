@@ -43,12 +43,10 @@ module Admin
       assert @application.medical_certification.attached?
 
       # Verify that audit trail entry was created
-      assert ApplicationStatusChange.where(
-        application: @application,
-        change_type: 'medical_certification',
-        from_status: 'requested',
-        to_status: 'approved'
-      ).exists?
+      assert ApplicationStatusChange.exists?(application: @application,
+                                             change_type: 'medical_certification',
+                                             from_status: 'requested',
+                                             to_status: 'approved')
     end
 
     test 'admin can reject a medical certification without uploading' do
@@ -75,12 +73,10 @@ module Admin
       assert_equal 'rejected', @application.medical_certification_status
 
       # Verify that audit trail entry was created
-      assert ApplicationStatusChange.where(
-        application: @application,
-        change_type: 'medical_certification',
-        from_status: 'requested',
-        to_status: 'rejected'
-      ).exists?
+      assert ApplicationStatusChange.exists?(application: @application,
+                                             change_type: 'medical_certification',
+                                             from_status: 'requested',
+                                             to_status: 'rejected')
     end
 
     test 'admin sees error when trying to approve without a file' do

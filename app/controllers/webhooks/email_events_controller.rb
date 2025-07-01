@@ -45,8 +45,8 @@ module Webhooks
       end
 
       # Log validation result for debugging
-      Rails.logger.debug "Webhook payload validation: #{valid ? 'passed' : 'failed'}"
-      Rails.logger.debug "Params: #{params.inspect}"
+      Rails.logger.debug { "Webhook payload validation: #{valid ? 'passed' : 'failed'}" }
+      Rails.logger.debug { "Params: #{params.inspect}" }
 
       valid
     end

@@ -35,8 +35,6 @@ class ApplicationController < ActionController::Base
     redirect_to edit_password_path, notice: 'For security reasons, you must change your password before continuing.'
   end
 
-  # --- Session Handling ---
-
   # Creates a session, sets the cookie, tracks sign-in, and redirects.
   # To be called after successful authentication (password or 2FA).
   def sign_in(user)
@@ -59,13 +57,11 @@ class ApplicationController < ActionController::Base
       user_agent: request.user_agent,
       ip_address: request.remote_ip
     )
-    if session_record.save
-      cookies.signed[:session_token] = _session_cookie_options(session_record.session_token)
-      user.track_sign_in!(request.remote_ip) # Assuming this method exists on User model
-      session_record
-    else
-      nil # Indicate failure
-    end
+    return unless session_record.save
+
+    cookies.signed[:session_token] = _session_cookie_options(session_record.session_token)
+    user.track_sign_in!(request.remote_ip) # Assuming this method exists on User model
+    session_record
   end
 
   # Generates options for the session cookie.
@@ -89,8 +85,6 @@ class ApplicationController < ActionController::Base
     else root_path
     end
   end
-
-  # --- Two-Factor Authentication Helpers ---
 
   # Completes the 2FA authentication and redirects appropriately
   def complete_two_factor_authentication(user)

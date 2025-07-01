@@ -12,13 +12,14 @@ class EmailVerificationJob < ApplicationJob
 
     # Check MX records
     domain = medical_provider_email.email.split('@').last
+    mx_records = nil
     Resolv::DNS.open do |dns|
       mx_records = dns.getresources(domain, Resolv::DNS::Resource::IN::MX)
+    end
 
-      if mx_records.empty?
-        medical_provider_email.update(status: :failed)
-        return
-      end
+    if mx_records.empty?
+      medical_provider_email.update(status: :failed)
+      return
     end
 
     # If we get here, the email format is valid and MX records exist

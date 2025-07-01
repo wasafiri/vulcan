@@ -72,7 +72,7 @@ class ApplicationTest < ActiveSupport::TestCase
       end
 
       # Directly update proof status using SQL to avoid callbacks
-      ActiveRecord::Base.connection.execute(<<~SQL)
+      ActiveRecord::Base.connection.execute(<<~SQL.squish)
         UPDATE applications
         SET income_proof_status = #{Application.income_proof_statuses[:approved]},
             residency_proof_status = #{Application.residency_proof_statuses[:approved]}

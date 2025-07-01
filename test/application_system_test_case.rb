@@ -81,7 +81,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
           # First try to get and clear traffic
           5.times do |attempt|
             # Ensure all exchanges are finished
-            pending_requests = page.driver.browser.network.traffic.reject { |exchange| exchange.finished? }
+            pending_requests = page.driver.browser.network.traffic.reject(&:finished?)
 
             break if pending_requests.empty?
 
@@ -95,7 +95,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
           end
 
           # Double-check and wait if still pending
-          pending_requests = page.driver.browser.network.traffic.reject { |exchange| exchange.finished? }
+          pending_requests = page.driver.browser.network.traffic.reject(&:finished?)
           if pending_requests.any?
             debug_puts "Still have #{pending_requests.count} pending requests after initial clearing. Waiting..."
 
@@ -109,7 +109,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
               page.driver.browser.network.clear(:traffic)
 
               # Check again
-              pending_requests = page.driver.browser.network.traffic.reject { |exchange| exchange.finished? }
+              pending_requests = page.driver.browser.network.traffic.reject(&:finished?)
               break if pending_requests.empty?
             end
 
