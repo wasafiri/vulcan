@@ -62,18 +62,6 @@ jobs:
           yarn run build
           yarn run build:css
           
-      - name: Precompile Rails assets
-        run: bin/rails assets:precompile
-        env:
-          RAILS_ENV: test
-          
-      - name: Verify assets were built
-        run: |
-          ls -la app/assets/builds/
-          echo "application.css size:" $(wc -c < app/assets/builds/application.css)
-          echo "Checking public/assets:"
-          ls -la public/assets/ || echo "No public/assets directory"
-          
       - name: Setup database
         run: bin/rails db:prepare
         

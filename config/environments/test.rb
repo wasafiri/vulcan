@@ -17,8 +17,10 @@ Rails.application.configure do
   
   # Enable serving of assets from app/assets/builds in test environment
   config.assets.enabled = true
-  config.assets.compile = false  # Use precompiled assets
+  config.assets.compile = true  # Allow compilation in test for flexibility
   config.assets.check_precompiled_asset = false  # Don't check if assets are precompiled
+  config.assets.debug = false  # Don't expand asset pipeline in test
+  config.assets.quiet = true   # Reduce asset pipeline noise in test logs
 
   # Show full error reports.
   config.consider_all_requests_local = true
