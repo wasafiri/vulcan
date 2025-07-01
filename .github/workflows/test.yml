@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 name: "Rails Tests"
 
 on:
@@ -57,10 +59,21 @@ jobs:
           yarn install
           bundle install
           
+      - name: Ensure builds directory exists
+        run: mkdir -p app/assets/builds
+          
       - name: Build assets
         run: |
           yarn run build
           yarn run build:css
+          
+      - name: Verify assets were built
+        run: |
+          ls -la app/assets/builds/
+          echo "Checking if application.css exists:"
+          test -f app/assets/builds/application.css && echo "✓ application.css found" || echo "✗ application.css missing"
+          echo "Checking if application.js exists:"
+          test -f app/assets/builds/application.js && echo "✓ application.js found" || echo "✗ application.js missing"
           
       - name: Setup database
         run: bin/rails db:prepare

@@ -21,6 +21,12 @@ Rails.application.configure do
   config.assets.check_precompiled_asset = false  # Don't check if assets are precompiled
   config.assets.debug = false  # Don't expand asset pipeline in test
   config.assets.quiet = true   # Reduce asset pipeline noise in test logs
+  
+  # In CI, use pre-built assets without compilation
+  if ENV['CI'].present?
+    config.assets.compile = false  # Don't compile in CI, use pre-built assets
+    config.assets.digest = false   # Don't use digested filenames in CI
+  end
 
   # Show full error reports.
   config.consider_all_requests_local = true
