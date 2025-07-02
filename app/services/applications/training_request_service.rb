@@ -82,4 +82,4 @@ module Applications
       # Don't fail the request if logging fails
     end
   end
-end 
+end

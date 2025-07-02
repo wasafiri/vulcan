@@ -58,4 +58,4 @@ module AddressHelper
     errors << 'ZIP code is required' unless address.zip_code.present?
     errors
   end
-end 
+end

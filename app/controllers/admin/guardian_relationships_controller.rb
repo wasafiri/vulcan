@@ -18,7 +18,7 @@ module Admin
       # Find dependent user
       dependent_user_id = params[:guardian_relationship][:dependent_id]
       dependent_user = User.find_by(id: dependent_user_id)
-      
+
       unless dependent_user
         flash[:alert] = 'Dependent user not found.'
         redirect_to admin_user_path(@guardian)

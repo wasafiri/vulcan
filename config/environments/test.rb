@@ -14,14 +14,14 @@ Rails.application.configure do
   # Configure public file server for tests with cache-control for performance.
   config.public_file_server.headers = { 'cache-control' => 'public, max-age=3600' }
   config.public_file_server.enabled = true
-  
+
   # Enable serving of assets in test environment
   config.assets.enabled = true
-  config.assets.compile = true  # Always allow compilation in test for reliability
-  config.assets.check_precompiled_asset = false  # Don't check if assets are precompiled
+  config.assets.compile = true # Always allow compilation in test for reliability
+  config.assets.check_precompiled_asset = false # Don't check if assets are precompiled
   config.assets.debug = false  # Don't expand asset pipeline in test
   config.assets.quiet = true   # Reduce asset pipeline noise in test logs
-  config.assets.digest = false  # Don't use digested filenames in test
+  config.assets.digest = false # Don't use digested filenames in test
 
   # Show full error reports.
   config.consider_all_requests_local = true

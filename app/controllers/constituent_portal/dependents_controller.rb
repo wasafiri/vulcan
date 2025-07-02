@@ -39,7 +39,7 @@ module ConstituentPortal
 
       if result.success?
         @dependent_user = result.data[:user]
-        
+
         # Using UserServiceIntegration concern for relationship creation
         # Flow: create_guardian_relationship_with_service -> handles relationship creation and validation
         if create_guardian_relationship_with_service(current_user, @dependent_user, guardian_relationship_params[:relationship_type])
@@ -138,13 +138,13 @@ module ConstituentPortal
                        else
                          [errors.to_s]
                        end
-       
+
       Rails.logger.error "Failed to create dependent: #{error_messages.join(', ')}"
-      
+
       # Set up form variables for re-rendering
       @dependent_user ||= User.new(dependent_user_params)
       @guardian_relationship ||= GuardianRelationship.new(guardian_relationship_params)
-      
+
       flash.now[:alert] = "Failed to create dependent: #{error_messages.join(', ')}"
       render :new, status: :unprocessable_entity
     end

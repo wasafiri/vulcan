@@ -174,12 +174,12 @@ module Applications
     def validate_income_threshold(application_attrs) # rubocop:disable Naming/PredicateMethod
       household_size = application_attrs[:household_size]
       annual_income = application_attrs[:annual_income]
-      
+
       threshold_service = IncomeThresholdCalculationService.new(household_size)
       result = threshold_service.call
-      
+
       return false unless result.success?
-      
+
       threshold = result.data[:threshold]
       return true if annual_income.to_i <= threshold
 

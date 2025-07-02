@@ -6,7 +6,7 @@ module Admin
     # This replaces manual redirect_to calls with consistent redirect_with_notice/redirect_with_alert
     # that take (path, message) parameters for better code organization
     include RedirectHelper
-    
+
     before_action :set_application
     before_action :validate_proof_type, only: %i[new create]
     before_action :validate_file, only: [:create]

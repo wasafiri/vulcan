@@ -13,33 +13,33 @@ module UserServiceIntegration
     # Convert ActionController::Parameters to hash if needed
     attrs = user_params.respond_to?(:to_h) ? user_params.to_h : user_params
     attrs = attrs.with_indifferent_access if attrs.respond_to?(:with_indifferent_access)
-    
+
     service = Applications::UserCreationService.new(attrs, is_managing_adult: is_managing_adult)
     service.call
   end
 
   # Creates a guardian/dependent relationship using GuardianDependentManagementService
   # @param guardian_user [User] The guardian user
-  # @param dependent_user [User] The dependent user  
+  # @param dependent_user [User] The dependent user
   # @param relationship_type [String] The type of relationship
   # @param contact_strategies [Hash] Email, phone, and address strategies (defaults to 'dependent')
   # @return [Boolean] Whether the relationship was created successfully
   def create_guardian_relationship_with_service(guardian_user, dependent_user, relationship_type, contact_strategies: {})
     default_strategies = {
       email_strategy: 'dependent',
-      phone_strategy: 'dependent', 
+      phone_strategy: 'dependent',
       address_strategy: 'dependent'
     }
-    
+
     relationship_params = {
       applicant_type: 'dependent',
       relationship_type: relationship_type
     }.merge(default_strategies.merge(contact_strategies))
-    
+
     service = Applications::GuardianDependentManagementService.new(relationship_params)
     service.instance_variable_set(:@guardian_user, guardian_user)
     service.instance_variable_set(:@dependent_user, dependent_user)
-    
+
     service.create_guardian_relationship(relationship_type)
   end
 
@@ -63,4 +63,4 @@ module UserServiceIntegration
     error_messages = extract_error_messages(errors)
     Rails.logger.error "Failed #{context}: #{error_messages.join(', ')}"
   end
-end 
+end

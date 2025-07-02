@@ -146,7 +146,7 @@ module ConstituentPortal
 
     def request_training
       @application = current_user.applications.find(params[:id])
-      
+
       result = Applications::TrainingRequestService.new(
         application: @application,
         current_user: current_user
@@ -204,7 +204,7 @@ module ConstituentPortal
 
     def setup_guardian_application_context
       return unless @application
-      
+
       @application.managing_guardian_id = current_user.id
     end
 
@@ -398,7 +398,7 @@ module ConstituentPortal
       redirect_to root_path, alert: 'Access denied'
     end
 
-        def initialize_address
+    def initialize_address
       # AddressHelper concern: Uses standardized address creation with fallback logic
       # Flow: address_with_fallback(params, user) -> creates Address object with param values falling back to user values
       application_params = params[:application] || {}

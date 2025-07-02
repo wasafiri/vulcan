@@ -429,10 +429,10 @@ module Admin
     def stub_proof_services
       # Instead of stubbing the entire service, just stub the notification parts
       # Let the ProofAttachmentService run normally so ProofReviews get created properly
-      
+
       # Stub the notification service to prevent actual email sending
       NotificationService.stubs(:create_and_deliver!).returns(true)
-      
+
       # Stub any mailer calls that might happen
       ApplicationNotificationsMailer.stubs(:proof_rejected).returns(stub(deliver_later: true))
     end

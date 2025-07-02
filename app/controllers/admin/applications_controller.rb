@@ -176,7 +176,7 @@ module Admin
           'attachments-section' => 'attachments',      # Updates attachment display
           'audit-logs' => 'audit_logs'                 # Updates audit log section
         },
-        turbo_modals_to_remove: standard_application_modals  # Closes review modals
+        turbo_modals_to_remove: standard_application_modals # Closes review modals
       )
     end
 

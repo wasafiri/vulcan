@@ -14,6 +14,7 @@ module Admin
     end
 
     private
+
     # Dashboard metrics loading is now handled by the DashboardMetricsLoading concern
 
     def calculate_training_requests

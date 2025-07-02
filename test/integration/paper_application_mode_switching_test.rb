@@ -14,7 +14,7 @@ class PaperApplicationModeSwitchingTest < ActionDispatch::IntegrationTest
 
     # Create sample proofs for testing using file content directly
     sample_pdf_content = File.read(Rails.root.join('test/fixtures/files/sample.pdf'))
-    
+
     @income_blob = ActiveStorage::Blob.create_and_upload!(
       io: StringIO.new(sample_pdf_content),
       filename: 'income_proof.pdf',

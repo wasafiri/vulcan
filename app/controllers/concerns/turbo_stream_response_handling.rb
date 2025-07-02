@@ -27,20 +27,20 @@ module TurboStreamResponseHandling
   # @return [Array] Array of turbo stream objects
   def build_success_turbo_streams(updates = {}, modals_to_remove = [])
     streams = []
-    
+
     # Always update flash messages
     streams << turbo_stream.update('flash', partial: 'shared/flash')
-    
+
     # Add custom updates
     updates.each do |element_id, partial_name|
       streams << turbo_stream.update(element_id, partial: partial_name)
     end
-    
+
     # Remove specified modals
     modals_to_remove.each do |modal_id|
       streams << turbo_stream.remove(modal_id)
     end
-    
+
     streams
   end
 
@@ -60,7 +60,7 @@ module TurboStreamResponseHandling
       'attachments-section' => 'attachments',
       'audit-logs' => 'audit_logs'
     }
-    
+
     build_success_turbo_streams(updates, standard_application_modals)
   end
 
@@ -72,7 +72,7 @@ module TurboStreamResponseHandling
   # @param turbo_modals_to_remove [Array<String>] Modals to remove for Turbo Stream
   def handle_success_response(html_redirect_path:, html_message:, turbo_message: nil, turbo_updates: {}, turbo_modals_to_remove: [])
     turbo_message ||= html_message
-    
+
     respond_to do |format|
       format.html { redirect_to html_redirect_path, notice: html_message }
       format.turbo_stream do
@@ -98,8 +98,8 @@ module TurboStreamResponseHandling
       else
         format.html { redirect_back(fallback_location: root_path, alert: error_message) }
       end
-      
+
       format.turbo_stream { handle_turbo_stream_error(message: error_message) }
     end
   end
-end 
+end

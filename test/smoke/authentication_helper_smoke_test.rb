@@ -96,9 +96,7 @@ if ENV['CI']
 
       # Thread.current might not be reliable in all test environments
       # Just verify the authentication worked by checking the response
-      if Thread.current[:test_user_id].present?
-        assert_equal user.id.to_s, Thread.current[:test_user_id].to_s
-      end
+      assert_equal user.id.to_s, Thread.current[:test_user_id].to_s if Thread.current[:test_user_id].present?
 
       # Sign out
       sign_out
@@ -118,9 +116,7 @@ if ENV['CI']
       sign_in_for_integration_test(user1)
 
       # Verify thread-local storage if available
-      if Thread.current[:test_user_id].present?
-        assert_equal user1.id.to_s, Thread.current[:test_user_id].to_s
-      end
+      assert_equal user1.id.to_s, Thread.current[:test_user_id].to_s if Thread.current[:test_user_id].present?
 
       # Make a request to verify authentication
       get '/'

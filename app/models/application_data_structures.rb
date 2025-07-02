@@ -68,4 +68,4 @@ module ApplicationDataStructures
       }
     end
   end
-end 
+end

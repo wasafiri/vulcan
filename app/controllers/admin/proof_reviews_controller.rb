@@ -5,7 +5,7 @@ module Admin
     # ApplicationDataLoading concern: Provides optimized methods for loading applications and attachments
     # Key benefits: Preloads attachment metadata, avoids N+1 queries, optimizes for proof review workflows
     include ApplicationDataLoading
-    
+
     before_action :authenticate_user!
     before_action :require_admin!
     before_action :set_application

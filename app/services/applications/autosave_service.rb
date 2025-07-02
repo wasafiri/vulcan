@@ -117,7 +117,7 @@ module Applications
       return validation_result unless validation_result[:success]
 
       processed_value = cast_application_field_value(attribute, field_value)
-      
+
       begin
         @application.assign_attributes(attribute => processed_value)
       rescue ActiveRecord::UnknownAttributeError
@@ -136,7 +136,7 @@ module Applications
     end
 
     def cast_user_field_value(attribute, value)
-      if %w[hearing_disability vision_disability speech_disability 
+      if %w[hearing_disability vision_disability speech_disability
             mobility_disability cognition_disability].include?(attribute)
         ActiveModel::Type::Boolean.new.cast(value)
       else
@@ -171,4 +171,4 @@ module Applications
       { success: false, errors: { base: [message] } }
     end
   end
-end 
+end

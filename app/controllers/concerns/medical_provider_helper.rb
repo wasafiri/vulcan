@@ -56,4 +56,4 @@ module MedicalProviderHelper
     errors << 'Invalid email format' if provider.email.present? && !provider.valid_email?
     errors
   end
-end 
+end

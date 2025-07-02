@@ -75,8 +75,12 @@ module ApplicationDataLoading
   # @param attachment_names [Array<String>] Names of attachments to preload
   # @return [Hash] Hash mapping application_id to Set of attachment names
   def preload_attachments_for_applications(applications, attachment_names: nil)
-    attachment_names ||= self.class.const_get(:WANTED_ATTACHMENT_NAMES) rescue DEFAULT_ATTACHMENT_NAMES
-    
+    attachment_names ||= begin
+      self.class.const_get(:WANTED_ATTACHMENT_NAMES)
+    rescue StandardError
+      DEFAULT_ATTACHMENT_NAMES
+    end
+
     ids = applications.map(&:id)
     return {} if ids.empty?
 
@@ -112,8 +116,8 @@ module ApplicationDataLoading
     {
       reviews: filter_and_sort_by_type(application.proof_reviews, type, :reviewed_at),
       audits: filter_and_sort_by_type(
-        application.events.where(action: 'proof_submitted', metadata: { proof_type: type }), 
-        type, 
+        application.events.where(action: 'proof_submitted', metadata: { proof_type: type }),
+        type,
         :created_at
       )
     }
@@ -147,11 +151,9 @@ module ApplicationDataLoading
   # @return [ActiveRecord::Relation] The base scope
   def build_application_base_scope(exclude_statuses: %i[rejected archived])
     scope = Application.includes(:user, :managing_guardian).distinct
-    
-    if exclude_statuses.any?
-      scope = scope.where.not(status: exclude_statuses)
-    end
-    
+
+    scope = scope.where.not(status: exclude_statuses) if exclude_statuses.any?
+
     scope
   end
 
@@ -207,4 +209,4 @@ module ApplicationDataLoading
               .sort_by(&sort_method)
               .reverse
   end
-end 
+end

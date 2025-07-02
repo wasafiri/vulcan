@@ -397,28 +397,28 @@ else
   puts "🌱 SEEDING STARTED at #{Time.current}"
   begin
     ActiveRecord::Base.transaction do
-      puts "🧹 Clearing existing data..."
+      puts '🧹 Clearing existing data...'
       clear_existing_data
-      
-      puts "📦 Creating products from fixtures..."
+
+      puts '📦 Creating products from fixtures...'
       create_products_from_fixtures
-      
-      puts "📋 Creating policies..."
+
+      puts '📋 Creating policies...'
       create_policies
-      
-      puts "👥 Loading fixture data (users, applications, invoices)..."
+
+      puts '👥 Loading fixture data (users, applications, invoices)...'
       load_fixtures_data
-      
-      puts "📧 Seeding email templates..."
+
+      puts '📧 Seeding email templates...'
       seed_email_templates
-      
-      puts "📁 Ensuring storage directory exists..."
+
+      puts '📁 Ensuring storage directory exists...'
       ensure_storage_directory
-      
-      puts "📎 Attaching files to applications..."
+
+      puts '📎 Attaching files to applications...'
       attach_files_to_applications
-      
-      puts "🔍 Verifying and fixing missing files..."
+
+      puts '🔍 Verifying and fixing missing files...'
       verify_and_fix_missing_files
     end
   rescue StandardError => e
@@ -429,7 +429,7 @@ else
     exit 1
   else
     # Show summary of what was created
-    puts "📊 SEEDING SUMMARY:"
+    puts '📊 SEEDING SUMMARY:'
     puts "   Users: #{User.count}"
     puts "   Applications: #{Application.count}"
     puts "   Products: #{Product.count}"

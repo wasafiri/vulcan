@@ -62,15 +62,15 @@ module DocumentUploadHandling
 
   def attach_proof_document(proof_type, file)
     result = ProofAttachmentService.attach_proof({
-      application: @application,
-      proof_type: proof_type,
-      blob_or_file: file,
-      status: :not_reviewed,
-      admin: respond_to?(:current_user) && current_user&.admin? ? current_user : nil,
-      submission_method: :web,
-      # Using RequestMetadataHelper for consistent metadata creation
-      metadata: basic_request_metadata
-    })
+                                                   application: @application,
+                                                   proof_type: proof_type,
+                                                   blob_or_file: file,
+                                                   status: :not_reviewed,
+                                                   admin: respond_to?(:current_user) && current_user&.admin? ? current_user : nil,
+                                                   submission_method: :web,
+                                                   # Using RequestMetadataHelper for consistent metadata creation
+                                                   metadata: basic_request_metadata
+                                                 })
 
     # Using ApplicationDataStructures::ProofResult for consistent result handling
     ApplicationDataStructures::ProofResult.new(

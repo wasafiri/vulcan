@@ -37,4 +37,4 @@ module RequestMetadataHelper
       submission_timestamp: Time.current.iso8601
     ).merge(additional_data)
   end
-end 
+end

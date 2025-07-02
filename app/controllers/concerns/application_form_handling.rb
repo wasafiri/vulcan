@@ -61,4 +61,4 @@ module ApplicationFormHandling
     Rails.logger.error(message)
     Rails.logger.error(exception.backtrace.join("\n")) if exception&.backtrace
   end
-end 
+end

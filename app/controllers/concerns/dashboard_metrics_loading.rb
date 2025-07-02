@@ -46,7 +46,7 @@ module DashboardMetricsLoading
     proofs_count = Application.where(income_proof_status: :not_reviewed)
                               .or(Application.where(residency_proof_status: :not_reviewed))
                               .distinct.count
-    
+
     safe_assign(:proofs_needing_review_count, proofs_count)
   end
 
@@ -55,7 +55,7 @@ module DashboardMetricsLoading
     medical_count = Application.where.not(status: %i[rejected archived])
                                .where(medical_certification_status: :received)
                                .count
-    
+
     safe_assign(:medical_certs_to_review_count, medical_count)
   end
 
@@ -129,15 +129,15 @@ module DashboardMetricsLoading
     load_fiscal_year_application_counts unless @current_fy_applications
 
     safe_assign(:applications_chart_data, {
-      current: { 
-        'Applications' => @current_fy_applications, 
-        'Draft Applications' => @current_fy_draft_applications 
-      },
-      previous: { 
-        'Applications' => @previous_fy_applications, 
-        'Draft Applications' => @previous_fy_draft_applications 
-      }
-    })
+                  current: {
+                    'Applications' => @current_fy_applications,
+                    'Draft Applications' => @current_fy_draft_applications
+                  },
+                  previous: {
+                    'Applications' => @previous_fy_applications,
+                    'Draft Applications' => @previous_fy_draft_applications
+                  }
+                })
   end
 
   # Loads chart data for vouchers
@@ -145,15 +145,15 @@ module DashboardMetricsLoading
     load_fiscal_year_voucher_counts unless @current_fy_vouchers
 
     safe_assign(:vouchers_chart_data, {
-      current: { 
-        'Vouchers Issued' => @current_fy_vouchers, 
-        'Unredeemed Vouchers' => @current_fy_unredeemed_vouchers 
-      },
-      previous: { 
-        'Vouchers Issued' => @previous_fy_vouchers, 
-        'Unredeemed Vouchers' => @previous_fy_unredeemed_vouchers 
-      }
-    })
+                  current: {
+                    'Vouchers Issued' => @current_fy_vouchers,
+                    'Unredeemed Vouchers' => @current_fy_unredeemed_vouchers
+                  },
+                  previous: {
+                    'Vouchers Issued' => @previous_fy_vouchers,
+                    'Unredeemed Vouchers' => @previous_fy_unredeemed_vouchers
+                  }
+                })
   end
 
   # Loads chart data for services
@@ -161,15 +161,15 @@ module DashboardMetricsLoading
     load_fiscal_year_service_counts unless @current_fy_trainings
 
     safe_assign(:services_chart_data, {
-      current: { 
-        'Training Sessions' => @current_fy_trainings, 
-        'Evaluation Sessions' => @current_fy_evaluations 
-      },
-      previous: { 
-        'Training Sessions' => @previous_fy_trainings, 
-        'Evaluation Sessions' => @previous_fy_evaluations 
-      }
-    })
+                  current: {
+                    'Training Sessions' => @current_fy_trainings,
+                    'Evaluation Sessions' => @current_fy_evaluations
+                  },
+                  previous: {
+                    'Training Sessions' => @previous_fy_trainings,
+                    'Evaluation Sessions' => @previous_fy_evaluations
+                  }
+                })
   end
 
   # === Vendor and MFR Data ===
@@ -196,15 +196,15 @@ module DashboardMetricsLoading
     load_mfr_data unless @mfr_applications_approved
 
     safe_assign(:mfr_chart_data, {
-      current: { 
-        'Applications Approved' => @mfr_applications_approved, 
-        'Vouchers Issued' => @mfr_vouchers_issued 
-      },
-      previous: { 
-        'Applications Approved' => 0, 
-        'Vouchers Issued' => 0 
-      }
-    })
+                  current: {
+                    'Applications Approved' => @mfr_applications_approved,
+                    'Vouchers Issued' => @mfr_vouchers_issued
+                  },
+                  previous: {
+                    'Applications Approved' => 0,
+                    'Vouchers Issued' => 0
+                  }
+                })
   end
 
   # === User and YTD Data ===
@@ -276,4 +276,4 @@ module DashboardMetricsLoading
     safe_assign(:total_users_count, 0)
     safe_assign(:ytd_constituents_count, 0)
   end
-end 
+end

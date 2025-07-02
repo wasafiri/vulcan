@@ -4,7 +4,7 @@ require 'test_helper'
 
 class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   fixtures :all # Load all fixtures for system tests
-  
+
   include SystemTestAuthentication # Include authentication helper
   include SystemTestHelpers # Include helpers for working with Cuprite
 

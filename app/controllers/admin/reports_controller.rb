@@ -23,7 +23,6 @@ module Admin
 
     def vendor_performance; end
 
-    private
     # All dashboard metrics loading is now handled by the DashboardMetricsLoading concern
   end
 end

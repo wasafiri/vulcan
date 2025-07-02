@@ -198,8 +198,8 @@ module ConstituentPortal
           submission_method: :web,
           # Using RequestMetadataHelper for consistent metadata creation
           metadata: proof_submission_metadata(params[:proof_type], {
-            resubmitting: is_resubmitting # Pass resubmission flag in metadata
-          })
+                                                resubmitting: is_resubmitting # Pass resubmission flag in metadata
+                                              })
         }
       end
 
@@ -232,9 +232,9 @@ module ConstituentPortal
           auditable: @application,
           # Using RequestMetadataHelper for consistent audit metadata
           metadata: audit_metadata({
-            proof_type: params[:proof_type],
-            submission_method: 'web'
-          })
+                                     proof_type: params[:proof_type],
+                                     submission_method: 'web'
+                                   })
         )
       end
 

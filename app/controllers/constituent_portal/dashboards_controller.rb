@@ -5,7 +5,7 @@ module ConstituentPortal
     # ApplicationDataLoading concern: Provides optimized methods for loading applications efficiently
     # Key benefits: Reduces N+1 queries, provides consistent application scoping, optimizes for dashboard views
     include ApplicationDataLoading
-    
+
     before_action :authenticate_user!
     before_action :require_constituent!
     before_action :load_applications, only: [:show]
@@ -67,8 +67,8 @@ module ConstituentPortal
       # Flow: build_application_base_scope -> provides consistent base query with includes
       # exclude_statuses: [] means include all statuses (overriding default exclusions)
       @managed_applications = build_application_base_scope(exclude_statuses: [])
-                               .where(managing_guardian_id: current_user.id)
-                               .order(created_at: :desc)
+                              .where(managing_guardian_id: current_user.id)
+                              .order(created_at: :desc)
 
       # Log for debugging
       Rails.logger.info "Dashboard loaded guardian applications for user #{current_user.id}: " \
