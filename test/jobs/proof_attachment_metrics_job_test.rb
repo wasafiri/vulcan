@@ -124,6 +124,9 @@ class ProofAttachmentMetricsJobTest < ActiveJob::TestCase
   end
 
   test "doesn't create notifications when success rate is good" do
+    # Ensure clean state before test
+    Notification.delete_all
+    
     # Delete the failure events
     Event.where("action LIKE '%_failed'").delete_all
 
@@ -135,8 +138,15 @@ class ProofAttachmentMetricsJobTest < ActiveJob::TestCase
   end
 
   test "doesn't create notifications with too few failures" do
+    # Ensure clean state before test
+    Notification.delete_all
+    
     # Delete enough failure events to get below threshold of 5
     Event.where("action LIKE '%_failed'").limit(2).destroy_all
+
+    # Verify we have the expected number of failures (should be 4 after deleting 2 from 6)
+    failed_events = Event.where("action LIKE '%_failed'").where('created_at > ?', 24.hours.ago)
+    assert_equal 4, failed_events.count, "Should have 4 failure events after deleting 2"
 
     # Run the job
     ProofAttachmentMetricsJob.perform_now
