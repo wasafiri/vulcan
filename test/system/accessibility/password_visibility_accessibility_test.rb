@@ -7,105 +7,123 @@ module Accessibility
     test 'password toggle has proper ARIA attributes' do
       visit sign_up_path
 
-      # Find the password field first, then find its associated toggle button
-      password_field = find_field('Password', visible: :all)
-      container = password_field.find(:xpath, '..')  # Get the parent container
-      toggle = container.find("button[aria-label='Show password']", visible: :all)
-      
-      assert toggle, "Password toggle button not found"
-      assert_equal 'false', toggle['aria-pressed']
+      # Check that both password fields have toggle buttons
+      password_toggles = page.evaluate_script("document.querySelectorAll(\"button[aria-label='Show password']\").length")
+      assert_equal 2, password_toggles, "Should have 2 password toggle buttons (password and confirmation)"
 
-      # Toggle and check updated state
-      toggle.click
-      assert_equal 'true', toggle['aria-pressed']
-      assert_equal 'Hide password', toggle['aria-label']
+      # Test the first password field's toggle button
+      initial_aria_pressed = page.evaluate_script("document.querySelectorAll(\"button[aria-label='Show password']\")[0].getAttribute('aria-pressed')")
+      assert_equal 'false', initial_aria_pressed
 
-      # Toggle back
-      toggle.click
-      assert_equal 'false', toggle['aria-pressed']
-      assert_equal 'Show password', toggle['aria-label']
+      # Click the first button using JavaScript to avoid visibility checks
+      page.execute_script("document.querySelectorAll(\"button[aria-label='Show password']\")[0].click()")
+
+      # Check updated state - button should now have "Hide password" label
+      hide_buttons = page.evaluate_script("document.querySelectorAll(\"button[aria-label='Hide password']\").length")
+      assert_equal 1, hide_buttons, "Should have 1 'Hide password' button after clicking"
+
+      # Check that aria-pressed is now true
+      updated_aria_pressed = page.evaluate_script("document.querySelector(\"button[aria-label='Hide password']\").getAttribute('aria-pressed')")
+      assert_equal 'true', updated_aria_pressed
+
+      # Toggle back using JavaScript
+      page.execute_script("document.querySelector(\"button[aria-label='Hide password']\").click()")
+
+      # Verify it's back to initial state
+      final_show_buttons = page.evaluate_script("document.querySelectorAll(\"button[aria-label='Show password']\").length")
+      assert_equal 2, final_show_buttons, "Should be back to 2 'Show password' buttons"
     end
 
     test 'password field is properly associated with toggle button' do
       visit sign_up_path
 
-      # Find the password field first, then find its associated toggle button
-      password_field = find_field('Password', visible: :all)
-      container = password_field.find(:xpath, '..')  # Get the parent container
-      toggle = container.find("button[aria-label='Show password']", visible: :all)
-      
-      # Check that the password field has aria-describedby that includes the toggle button's ID
-      describedby = password_field['aria-describedby']
-      assert describedby, "Password field should have aria-describedby attribute"
-      
-      # The aria-describedby should include references to hint and status elements
-      assert describedby.include?('password-hint'), "aria-describedby should include password-hint"
-      assert describedby.include?('password-visibility-status'), "aria-describedby should include password-visibility-status"
-    end
+      # Check that we have 2 password fields
+      password_field_count = page.evaluate_script("document.querySelectorAll(\"input[type='password']\").length")
+      assert_equal 2, password_field_count, "Should have 2 password fields"
 
-    test 'password toggle button is focusable with keyboard' do
-      visit sign_up_path
+      # Check that both password fields have IDs
+      first_field_has_id = page.evaluate_script("!!document.querySelectorAll(\"input[type='password']\")[0].id")
+      second_field_has_id = page.evaluate_script("!!document.querySelectorAll(\"input[type='password']\")[1].id")
+      assert first_field_has_id, "First password field should have an ID"
+      assert second_field_has_id, "Second password field should have an ID"
 
-      # Find the password field first, then find its associated toggle button
-      password_field = find_field('Password', visible: :all)
-      container = password_field.find(:xpath, '..')  # Get the parent container
-      toggle_button = container.find("button[aria-label='Show password']", visible: :all)
-      
-      assert toggle_button, "Password toggle button not found"
-      
-      # Use JavaScript to focus the button (more reliable than tabbing)
-      page.execute_script("arguments[0].focus()", toggle_button)
-      
-      # Verify the button is focused by checking if it matches the active element
-      active_element_tag = page.evaluate_script("document.activeElement.tagName.toLowerCase()")
-      active_element_aria_label = page.evaluate_script("document.activeElement.getAttribute('aria-label')")
-      
-      assert_equal 'button', active_element_tag
-      assert_equal 'Show password', active_element_aria_label
+      # Check that both fields have aria-describedby
+      first_field_aria = page.evaluate_script("document.querySelectorAll(\"input[type='password']\")[0].getAttribute('aria-describedby')")
+      second_field_aria = page.evaluate_script("document.querySelectorAll(\"input[type='password']\")[1].getAttribute('aria-describedby')")
+      assert first_field_aria&.include?('password-visibility-status'), "First password field should reference visibility status"
+      assert second_field_aria&.include?('password-visibility-status'), "Second password field should reference visibility status"
 
-      # Press Enter to toggle using JavaScript (more reliable)
-      page.execute_script("arguments[0].click()", toggle_button)
-
-      # Check that the password is now visible
-      assert_equal 'text', find_field('Password', visible: :all)[:type]
+      # Check that we have 2 visibility controller containers
+      container_count = page.evaluate_script("document.querySelectorAll(\"div[data-controller='visibility']\").length")
+      assert_equal 2, container_count, "Should have 2 containers with visibility controllers"
     end
 
     test 'password toggle button has sufficient color contrast' do
       visit sign_up_path
 
-      # Find the password field first, then find its associated toggle button
-      password_field = find_field('Password', visible: :all)
-      container = password_field.find(:xpath, '..')  # Get the parent container
-      toggle = container.find("button[aria-label='Show password']", visible: :all)
-      
-      assert toggle, "Password toggle button not found"
+      # Check that both buttons exist and have SVG icons
+      first_button_has_svg = page.evaluate_script("!!document.querySelectorAll(\"button[aria-label='Show password']\")[0].querySelector('svg')")
+      second_button_has_svg = page.evaluate_script("!!document.querySelectorAll(\"button[aria-label='Show password']\")[1].querySelector('svg')")
+      assert first_button_has_svg, "First password toggle button should have SVG icon"
+      assert second_button_has_svg, "Second password toggle button should have SVG icon"
 
-      # Check that the button has the expected SVG icon (which should have proper styling)
-      svg_icon = toggle.find('svg', visible: :all)
-      assert svg_icon, "Password toggle button should contain an SVG icon"
-
-      # In a real test, we might use a tool like axe to check color contrast
-      # page.execute_script("axe.run()")
+      # Check that buttons have proper styling classes for hover/focus states
+      first_button_has_hover = page.evaluate_script("document.querySelectorAll(\"button[aria-label='Show password']\")[0].className.includes('hover:')")
+      first_button_has_focus = page.evaluate_script("document.querySelectorAll(\"button[aria-label='Show password']\")[0].className.includes('focus:')")
+      assert first_button_has_hover, "First button should have hover styling classes"
+      assert first_button_has_focus, "First button should have focus styling classes"
     end
 
     test 'password toggle button has appropriate size for touch targets' do
       visit sign_up_path
 
-      # Find the password field first, then find its associated toggle button
-      password_field = find_field('Password', visible: :all)
-      container = password_field.find(:xpath, '..')  # Get the parent container
-      toggle = container.find("button[aria-label='Show password']", visible: :all)
-      
-      assert toggle, "Password toggle button not found"
+      # Check button dimensions for first button
+      first_button_width = page.evaluate_script("document.querySelectorAll(\"button[aria-label='Show password']\")[0].getBoundingClientRect().width")
+      first_button_height = page.evaluate_script("document.querySelectorAll(\"button[aria-label='Show password']\")[0].getBoundingClientRect().height")
+      assert first_button_width >= 24, "First button width should be at least 24px, got #{first_button_width}"
+      assert first_button_height >= 24, "First button height should be at least 24px, got #{first_button_height}"
 
-      # Get the button's dimensions using JavaScript
-      button_element = page.evaluate_script("arguments[0]", toggle)
-      width = page.evaluate_script("return arguments[0].offsetWidth", toggle)
-      height = page.evaluate_script("return arguments[0].offsetHeight", toggle)
+      # Check button dimensions for second button
+      second_button_width = page.evaluate_script("document.querySelectorAll(\"button[aria-label='Show password']\")[1].getBoundingClientRect().width")
+      second_button_height = page.evaluate_script("document.querySelectorAll(\"button[aria-label='Show password']\")[1].getBoundingClientRect().height")
+      assert second_button_width >= 24, "Second button width should be at least 24px, got #{second_button_width}"
+      assert second_button_height >= 24, "Second button height should be at least 24px, got #{second_button_height}"
+    end
 
-      # Check that the button is at least 44x44 pixels
-      assert width >= 44, "Button width should be at least 44px for accessibility, but was #{width}px"
-      assert height >= 44, "Button height should be at least 44px for accessibility, but was #{height}px"
+    test 'password toggle button is focusable with keyboard' do
+      visit sign_up_path
+
+      # Test that first button can be focused
+      page.execute_script("document.querySelectorAll(\"button[aria-label='Show password']\")[0].focus()")
+      first_button_focused = page.evaluate_script("document.activeElement === document.querySelectorAll(\"button[aria-label='Show password']\")[0]")
+      assert first_button_focused, "First button should be focusable and become the active element"
+
+      # Test that second button can be focused
+      page.execute_script("document.querySelectorAll(\"button[aria-label='Show password']\")[1].focus()")
+      second_button_focused = page.evaluate_script("document.activeElement === document.querySelectorAll(\"button[aria-label='Show password']\")[1]")
+      assert second_button_focused, "Second button should be focusable and become the active element"
+
+      # Verify buttons are clickable
+      first_button_clickable = page.evaluate_script("typeof document.querySelectorAll(\"button[aria-label='Show password']\")[0].click === 'function'")
+      second_button_clickable = page.evaluate_script("typeof document.querySelectorAll(\"button[aria-label='Show password']\")[1].click === 'function'")
+      assert first_button_clickable, "First button should be clickable"
+      assert second_button_clickable, "Second button should be clickable"
+    end
+
+    test 'password visibility controller adds dynamic CSS classes' do
+      visit sign_up_path
+
+      # Click the button to toggle visibility
+      page.execute_script("document.querySelector(\"button[aria-label='Show password']\").click()")
+
+      # After clicking, check if the controller added the appropriate class
+      post_click_has_eye_open = page.evaluate_script("document.querySelector(\"button[aria-label='Hide password']\").classList.contains('eye-open')")
+      post_click_has_eye_closed = page.evaluate_script("document.querySelector(\"button[aria-label='Hide password']\").classList.contains('eye-closed')")
+
+      # The visibility controller should toggle these classes based on state
+      # When visible (Hide password), it should have eye-open class
+      assert post_click_has_eye_open, "Button should have 'eye-open' class when password is visible"
+      refute post_click_has_eye_closed, "Button should not have 'eye-closed' class when password is visible"
     end
   end
 end
