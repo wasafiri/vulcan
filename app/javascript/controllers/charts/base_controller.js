@@ -23,25 +23,14 @@ class ChartBaseController extends Controller {
 
   connect() {
     this.cleanupExistingChart()
-    
-    // Set explicit container dimensions to break CSS dependency chains
-    this.setFixedContainerSize()
-    
-    // Set up debounced resize handler for fluid responsiveness
-    this._onWindowResize = createUIUpdateDebounce(() => {
-      if (this.chartInstance && this.element.offsetParent !== null) {
-        this.handleResize()
-      }
-    })
-    
-    window.addEventListener("resize", this._onWindowResize)
+
+    // Remove fixed container sizing to enable responsive behavior
+    this.element.style.width = '100%'
+    this.element.style.height = this.chartHeightValue + 'px'
   }
 
   disconnect() {
     this.cleanupExistingChart()
-    if (this._onWindowResize) {
-      window.removeEventListener("resize", this._onWindowResize)
-    }
   }
 
   cleanupExistingChart() {
@@ -52,35 +41,10 @@ class ChartBaseController extends Controller {
   }
 
   // Set fixed container dimensions to prevent CSS layout loops
-  setFixedContainerSize() {
-    // Calculate a reasonable fixed width based on parent container
-    const parentWidth = this.element.parentElement?.clientWidth || 400
-    const chartWidth = Math.min(parentWidth - 20, 800) // Leave some margin
-    
-    // Apply fixed dimensions to prevent getComputedStyle loops
-    this.element.style.width = chartWidth + 'px'
-    this.element.style.height = this.chartHeightValue + 'px'
-    this.element.style.position = 'relative'
-    this.element.style.overflow = 'hidden'
-  }
+  // Removed setFixedContainerSize to enable responsive behavior
 
   // Handle resize by updating container size and recreating chart
-  handleResize() {
-    if (!this.chartInstance || !this.element.offsetParent) return
-    
-    const parentWidth = this.element.parentElement?.clientWidth || 400
-    const newChartWidth = Math.min(parentWidth - 20, 800)
-    const currentWidth = parseInt(this.element.style.width)
-    
-    // Only resize if width changed significantly
-    if (Math.abs(newChartWidth - currentWidth) > 10) {
-      // Update container size
-      this.element.style.width = newChartWidth + 'px'
-      
-      // Recreate chart with new dimensions
-      this.recreateChart()
-    }
-  }
+  // Removed handleResize method - Chart.js handles responsive resizing automatically
 
   // Defensive data validation
   validateData(data, context = "chart data") {
@@ -93,35 +57,20 @@ class ChartBaseController extends Controller {
 
   createCanvas(ariaLabel, ariaDesc) {
     const canvas = document.createElement("canvas")
-    
-    // Use container's fixed dimensions to prevent getComputedStyle calls
-    const containerWidth = parseInt(this.element.style.width) || 400
-    const height = this.chartHeightValue
-    
-    // CRITICAL FIX: Set HTML width/height attributes to prevent Chart.js getComputedStyle loops
-    // This is what Chart.js checks for to avoid forced reflows
-    canvas.setAttribute('width', containerWidth.toString())
-    canvas.setAttribute('height', height.toString())
-    
-    // Also set the canvas properties for proper resolution
-    canvas.width = containerWidth
-    canvas.height = height
-    
-    // Set CSS styles for display (optional but good for consistency)
-    canvas.style.width = containerWidth + 'px'
-    canvas.style.height = height + 'px'
     canvas.style.display = 'block'
-    
+    canvas.style.width = '100%'
+    canvas.style.height = '100%'
+
     // Add accessibility attributes
     canvas.setAttribute("role", "img")
     canvas.setAttribute("aria-label", ariaLabel)
-    
+
     // Generate unique ID for aria-describedby with collision prevention
     const baseId = this.element.id || `chart-${Date.now()}`
     const randomSuffix = Math.random().toString(36).substring(2, 6)
     const descId = `chart-desc-${baseId}-${randomSuffix}`
     canvas.setAttribute("aria-describedby", descId)
-    
+
     // Store for cleanup
     this._descId = descId
 
@@ -174,11 +123,11 @@ class ChartBaseController extends Controller {
   _showMessage(colorClass, text) {
     // Clear container without wiping out attached controllers
     this.element.textContent = ""
-    
+
     const div = document.createElement("div")
     div.className = `${colorClass} text-center p-4`
     div.textContent = text
-    
+
     this.element.appendChild(div)
   }
 
@@ -258,7 +207,7 @@ class ChartBaseController extends Controller {
 
     // Get configuration for chart type
     const baseConfig = this.getConfigForType(type, customOptions)
-    
+
     // Build final configuration
     const config = {
       type,
@@ -269,19 +218,19 @@ class ChartBaseController extends Controller {
     try {
       // Create chart instance
       const chartInstance = new Chart(ctx, config)
-      
+
       // Mount to DOM
       this.mountCanvas(canvas, desc)
-      
+
       // Store reference for cleanup
       this.chartInstance = chartInstance
-      
+
       if (process.env.NODE_ENV !== 'production') {
         console.log(`${type} chart created successfully`)
       }
-      
+
       return chartInstance
-      
+
     } catch (error) {
       this.handleError(`Failed to create ${type} chart`, error)
       return null
@@ -306,11 +255,11 @@ class ChartBaseController extends Controller {
       // Update chart data
       this.chartInstance.data = newData
       this.chartInstance.update('none') // No animation for server updates
-      
+
       if (process.env.NODE_ENV !== 'production') {
         console.log('Chart data updated from server')
       }
-      
+
     } catch (error) {
       this.handleError('Failed to update chart data', error)
     }
@@ -330,10 +279,10 @@ class ChartBaseController extends Controller {
     // Store current data and type
     const currentData = this.chartInstance.data
     const currentType = this.chartInstance.config.type
-    
+
     // Clean up existing chart
     this.cleanupExistingChart()
-    
+
     // Recreate with same data and type
     this.createChartInstance(currentType, currentData)
   }

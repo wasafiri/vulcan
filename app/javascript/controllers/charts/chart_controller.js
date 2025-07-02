@@ -75,10 +75,8 @@ export default class extends ChartBaseController {
     // 4) Turn string values into numbers (with fallback to 0)
     const numericData = this.prepareChartData()
 
-    // 5) Build a "responsive + animated" override on top of base defaults
+    // 5) Build an "animated" override on top of base defaults
     const responsiveOverrides = {
-      responsive: true,
-      maintainAspectRatio: false,
       animation: {
         duration: 800,
         easing: "easeOutQuart"

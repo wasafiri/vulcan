@@ -38,6 +38,9 @@ jobs:
       RAILS_ENV: test
       DATABASE_USERNAME: postgres
       DATABASE_PASSWORD: postgres
+      # Browser stability environment variables
+      CHROME_NO_SANDBOX: true
+      DISPLAY: :99.0
     services:
       postgres:
         image: postgres:17
@@ -55,7 +58,12 @@ jobs:
 
     steps:
       - name: Install packages
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y build-essential git libpq-dev node-gyp pkg-config python-is-python3 google-chrome-stable
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y build-essential git libpq-dev node-gyp pkg-config python-is-python3 google-chrome-stable xvfb
+
+      - name: Setup virtual display for headless browser
+        run: |
+          export DISPLAY=:99.0
+          Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -69,6 +77,10 @@ jobs:
       - name: Setup Database
         run: |
           bin/rails db:test:prepare
+
+      - name: Seed test database for system tests
+        run: |
+          RAILS_ENV=test bin/rails db:seed
 
       - name: Run tests
         run: |

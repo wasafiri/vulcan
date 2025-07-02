@@ -27,7 +27,6 @@ export class ChartConfigService {
    */
   getBaseConfig() {
     return {
-      responsive: true,
       maintainAspectRatio: false,
       animation: {
         duration: 800,
@@ -36,7 +35,7 @@ export class ChartConfigService {
       plugins: {
         title: {
           display: false,
-          font: { 
+          font: {
             size: this.theme.fonts.title,
             weight: 'bold'
           }
@@ -52,7 +51,7 @@ export class ChartConfigService {
         },
         tooltip: {
           backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          titleFont: { 
+          titleFont: {
             size: this.theme.fonts.title,
             weight: 'bold'
           },
@@ -76,7 +75,7 @@ export class ChartConfigService {
   getConfigForType(type, customOptions = {}) {
     const baseConfig = this.getBaseConfig()
     const typeConfig = this.getTypeSpecificConfig(type)
-    
+
     return this.deepMerge(baseConfig, typeConfig, customOptions)
   }
 
@@ -96,7 +95,7 @@ export class ChartConfigService {
             title: {
               display: true,
               text: 'Amount (USD)',
-              font: { 
+              font: {
                 size: this.theme.fonts.title,
                 weight: 'bold'
               }
@@ -111,7 +110,7 @@ export class ChartConfigService {
           }
         }
       },
-      
+
       line: {
         elements: {
           line: {
@@ -137,7 +136,7 @@ export class ChartConfigService {
           }
         }
       },
-      
+
       pie: {
         plugins: {
           legend: {
@@ -145,7 +144,7 @@ export class ChartConfigService {
           }
         }
       },
-      
+
       doughnut: {
         plugins: {
           legend: {
@@ -154,7 +153,7 @@ export class ChartConfigService {
         },
         cutout: '60%'
       },
-      
+
       radar: {
         scales: {
           r: {
@@ -166,7 +165,7 @@ export class ChartConfigService {
         }
       }
     }
-    
+
     return configs[type] || {}
   }
 
@@ -181,7 +180,7 @@ export class ChartConfigService {
       borderColor: this.theme.colors.primaryBorder,
       borderWidth: 2
     }
-    
+
     return { ...defaults, ...options }
   }
 
@@ -190,10 +189,10 @@ export class ChartConfigService {
    */
   createDatasets(datasets) {
     const colorKeys = Object.keys(this.theme.colors)
-    
+
     return datasets.map((dataset, index) => {
       const colorKey = colorKeys[index % colorKeys.length]
-      
+
       return this.createDataset(dataset.label, dataset.data, {
         backgroundColor: this.theme.colors[colorKey],
         borderColor: this.theme.colors[`${colorKey}Border`] || this.theme.colors[colorKey],
@@ -223,7 +222,7 @@ export class ChartConfigService {
    */
   deepMerge(...objects) {
     const result = {}
-    
+
     objects.forEach(obj => {
       Object.keys(obj || {}).forEach(key => {
         if (obj[key] && typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
@@ -233,7 +232,7 @@ export class ChartConfigService {
         }
       })
     })
-    
+
     return result
   }
 
@@ -272,12 +271,12 @@ export class ChartConfigService {
     // Set global defaults
     Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     Chart.defaults.color = '#374151'
-    
+
     // Disable animations in test environment
     if (process.env.NODE_ENV === 'test') {
       Chart.defaults.animation = false
     }
-    
+
     // Add performance optimizations
     Chart.defaults.parsing = false
     Chart.defaults.normalized = true
@@ -285,4 +284,4 @@ export class ChartConfigService {
 }
 
 // Export singleton instance
-export const chartConfig = new ChartConfigService() 
+export const chartConfig = new ChartConfigService()
