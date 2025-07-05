@@ -222,17 +222,16 @@ Typical failures: FPL too high, missing guardian data, proof issues, user valida
 
 ---
 
-## 10 · Roadmap & Limitations
+## 10 · Current Implementation Details
 
-| Planned | Current Gap |
-|---------|-------------|
-| Extract **Form Objects** | JS still holds some validation |
-| Command pattern for create/update | Controller does heavy lifting |
-| Move more validation server-side | Reliance on client JS |
-| ViewComponents for form slices | Repetition in ERB/partial logic |
+The current implementation has the following characteristics:
 
-Controller tweaks already made:
+*   **Validation**: Some validation logic resides in client-side JavaScript.
+*   **Service Layer**: The `PaperApplicationService` handles the core creation and update logic, but the controller still performs significant processing.
+*   **Views**: The form is rendered using ERB partials, which contain some repetitive logic.
 
-* Unified `constituent` params.  
-* Added `email_strategy`, `phone_strategy`, `address_strategy`.  
-* Dependent inference when `guardian_attributes` present.
+Recent controller enhancements include:
+
+*   Unified `constituent` parameters.
+*   The addition of `email_strategy`, `phone_strategy`, and `address_strategy` to manage contact information.
+*   Inference of dependent applications when `guardian_attributes` are present.

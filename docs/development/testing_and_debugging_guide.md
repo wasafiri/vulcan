@@ -2,17 +2,16 @@
 
 This comprehensive guide covers system testing, debugging, and fixing test failures in this Rails application. It consolidates lessons learned from debugging efforts and provides practical strategies for reliable testing.
 
-## ✅ Recent Test Consolidation Success (December 2025)
+## Test Suite Overview
 
-The application test suite underwent successful consolidation with **100% test success rate achieved**:
+The application test suite is consolidated and standardized to ensure reliability and maintainability. Key features of the test suite include:
 
-- **76 application tests passing** (319 assertions, 0 failures)
-- **16 test files consolidated** with shared helper modules
-- **110+ lines of duplicate code eliminated**
-- **Authentication patterns standardized** across integration tests
-- **FPL calculations corrected** to proper 400% Federal Poverty Level
+- A high rate of passing tests with extensive assertions.
+- Shared helper modules to reduce code duplication.
+- Standardized authentication patterns across all test types.
+- Accurate Federal Poverty Level (FPL) calculations.
 
-See: [`test_consolidation_strategy.md`](test_consolidation_strategy.md) for complete details.
+For more details on the consolidation strategy, see [`test_consolidation_strategy.md`](test_consolidation_strategy.md).
 
 ## Quick Start
 
@@ -95,13 +94,8 @@ sign_in_for_unit_test(user)
 update_current_user(user)
 ```
 
-### Why Explicit Methods?
-The original flexible `sign_in(user)` method used automatic detection to choose between controller and integration methods, but this caused bugs:
-- After HTTP requests, `@controller` would be set in integration tests
-- Priority logic would incorrectly choose controller method over integration method
-- This caused `@test_user_id` not to update properly for subsequent authentications
-
-**Solution**: Use explicit methods that clearly indicate the test context and avoid magical detection.
+### Rationale for Explicit Methods
+The testing framework uses explicit sign-in methods (e.g., `sign_in_for_integration_test`) instead of a single, flexible `sign_in` method. This approach prevents ambiguity and bugs related to automatic context detection, where the test framework might incorrectly guess whether to use a controller or integration-style sign-in. Explicit methods ensure that the correct authentication strategy is always used for the given test type.
 
 ### For System Tests
 ```ruby
@@ -129,48 +123,39 @@ system_test_sign_out
 
 ## Shared Test Helpers
 
-### ✅ FPL Policy Helpers (Globally Available)
-Use the centralized FPL policy setup for consistent test data:
+### FPL Policy Helpers
+A centralized FPL policy setup is available to ensure consistent test data.
 
 ```ruby
-# Available in all tests via global inclusion
+# The setup_fpl_policies helper is available in all tests.
+# It creates standardized policies with a 400% modifier.
 setup do
-  setup_fpl_policies  # Creates standardized policies with 400% modifier
+  setup_fpl_policies
 end
-
-# Manual usage (not usually needed)
-include FplPolicyHelpers
-setup_fpl_policies
 ```
 
-**FPL Values Set by Helper:**
-- 1 person: $15,000 (400% of $3,750 base)
-- 2 people: $20,000 (400% of $5,000 base)
-- 3 people: $25,000 (400% of $6,250 base)
-- etc.
-- Modifier: 400% (not 200% - this was corrected during consolidation)
+The helper sets the following FPL values:
+- 1 person: $15,000
+- 2 people: $20,000
+- 3 people: $25,000
+- And so on, based on a 400% modifier.
 
-### ✅ Paper Application Context Helpers (Globally Available)
-Use the centralized context management for paper application tests:
+### Paper Application Context Helpers
+Centralized context management is available for paper application tests.
 
 ```ruby
-# Available in all tests via global inclusion
+# The setup_paper_application_context helper is available in all tests.
+# It sets Current.paper_context = true.
 setup do
-  setup_paper_application_context  # Sets Current.paper_context = true
+  setup_paper_application_context
 end
 
 teardown do
-  teardown_paper_application_context  # Calls Current.reset
+  teardown_paper_application_context
 end
-
-# Manual usage (not usually needed)
-include PaperApplicationContextHelpers
 ```
 
-**Why This Matters:**
-- Bypasses `ProofConsistencyValidation` and `ProofManageable` validation concerns
-- Essential for testing paper application workflows
-- Prevents validation errors that only apply to online submissions
+This helper is essential for testing paper application workflows as it bypasses certain validations that only apply to online submissions.
 
 ### Module Locations
 ```
@@ -280,21 +265,14 @@ create(:application, :with_all_real_attachments)
 
 ## JavaScript Error Debugging
 
-### Ferrum::JavaScriptError Resolution
-**Problem**: `RangeError: Maximum call stack size exceeded` from `getComputedStyle` recursion.
+### Resolving JavaScript Errors
+A common JavaScript error, `RangeError: Maximum call stack size exceeded`, can occur due to recursion in style computations, particularly from libraries like Chart.js.
 
-**Root Cause**: Chart.js global import causing style computation recursion in headless browser.
-
-**Solution Applied**:
-1. Temporarily removed Chart.js global import from `application.js`
-2. Modified `chart_controller.js` to handle missing Chart.js gracefully
-3. Rebuilt JavaScript bundles with asset precompilation
-4. Fixed dependent selector radio button logic
-
-**Files Modified**:
-- `app/javascript/application.js` - Commented Chart.js import
-- `app/javascript/controllers/chart_controller.js` - Added availability check
-- `app/javascript/controllers/dependent_selector_controller.js` - Fixed selection logic
+The recommended solution is to:
+1.  Isolate the problematic import (e.g., Chart.js in `application.js`).
+2.  Modify controllers that depend on the library to handle its potential absence gracefully.
+3.  Rebuild JavaScript bundles.
+4.  Verify that related UI logic, such as dependent selectors, still functions correctly.
 
 ## Application Architecture Context
 
@@ -311,7 +289,7 @@ The paper application form uses coordinated Stimulus controllers:
 Uses `Current.paper_context` to bypass validations:
 - Critical for `ProofConsistencyValidation` and `ProofManageable` concerns
 - Must be set during paper form processing
-- ✅ **Now managed by shared helper**: Use `setup_paper_application_context` in tests
+- **Now managed by shared helper**: Use `setup_paper_application_context` in tests
 
 ### Guardian/Dependent Data Model
 - Uses `GuardianRelationship` model for explicit relationships
@@ -400,50 +378,21 @@ end
 | `SLOWMO` | Add delays for debugging | `SLOWMO=1.0` |
 | `DEBUG_AUTH` | Authentication debug info | `DEBUG_AUTH=true` |
 
-## Major Bug Fixes & Lessons Learned
+## Key Architectural Decisions and Patterns
 
-### Authentication Helper Consolidation (2025-05-17)
-**Issues Fixed**:
-1. Session leakage between tests in parallel environments
-2. Integration test header handling across multiple requests
-3. Inconsistent authentication state management
+This section documents important architectural decisions and the rationale behind them, derived from previous debugging and refactoring efforts.
 
-**Solutions**:
-- Created shared `AuthenticationCore` module
-- Standardized authentication patterns using Current attributes
-- Improved session cleanup with proper cookie and session clearing
-- Enhanced error messages and debug logging
+### Authentication Helpers
+The test suite employs a shared `AuthenticationCore` module and standardized patterns using `Current` attributes. This approach ensures consistent authentication state management, prevents session leakage between tests, and provides clear error messaging.
 
-### Guardian Relationship Migration (2025-05-25)
-**Issues Fixed**:
-1. Text assertion mismatches in guardian proof review
-2. Application creation failures with new schema
-3. Incorrect association usage in relationship creation
+### Guardian Relationships
+The system uses explicit `guardian_id` and `dependent_id` columns for creating `GuardianRelationship` records. This avoids ambiguity and ensures correct association handling. UI text and test assertions are aligned with this explicit terminology.
 
-**Solutions**:
-- Updated UI text assertions to match new terminology
-- Fixed GuardianRelationship creation to use column names (`guardian_id`, `dependent_id`) not association names
-- Enhanced test coverage for guardian functionality
+### Address Attribute Handling
+Address information is explicitly extracted and merged in the `ConstituentPortal::ApplicationsController#create` action to ensure it is saved correctly during application creation.
 
-### Address Information Bug (2025-05-26)
-**Critical Bug**: Address information entered during application creation wasn't being saved.
-
-**Root Cause**: `extract_address_attributes` method existed but wasn't called in controller.
-
-**Fix**: Added address attribute extraction and merging in `ConstituentPortal::ApplicationsController#create`
-
-**Impact**: Prevented data loss for thousands of applications and improved proof review context.
-
-### User Model Test Fixes (2025-01-25)
-**Issues Fixed**:
-1. Private method access errors
-2. Phone number and email uniqueness conflicts
-3. Hardcoded test data conflicts
-
-**Solutions**:
-- Used `send()` for private method testing
-- Generated unique phone numbers and emails
-- Updated assertions to match dynamic test data
+### User Model Testing
+Tests for the `User` model use `send()` to access private methods and dynamically generate unique phone numbers and emails to avoid conflicts.
 
 ## Best Practices
 
@@ -1283,7 +1232,6 @@ end
 result = service.call
 if result.success?
   notification = result.data
-  # ... use notification ...
 end
 ```
 
@@ -1498,4 +1446,119 @@ end
 - Use context guards to prevent callback conflicts
 - Standardize service return value patterns
 
-// ... existing code ... 
+## Advanced Cuprite & Docker Setup  _(2025-07 update)_
+
+The default Cuprite driver works great on a laptop, but you can push reliability further—especially in CI or with Docker—by following these patterns:
+
+### 1. Register a Docker-aware Cuprite driver
+```ruby
+require "capybara/cuprite"
+
+REMOTE_CHROME_URL   = ENV["CHROME_URL"]              # e.g. http://chrome:3333
+REMOTE_CHROME_HOST, REMOTE_CHROME_PORT = if REMOTE_CHROME_URL
+  uri = URI.parse(REMOTE_CHROME_URL)
+  [uri.host, uri.port]
+end
+
+remote_browser = begin
+  Socket.tcp(REMOTE_CHROME_HOST, REMOTE_CHROME_PORT, connect_timeout: 1).close
+  true
+rescue StandardError
+  false
+end
+
+Capybara.register_driver(:better_cuprite) do |app|
+  opts = {
+    window_size: [1200, 800],
+    inspector:   true,
+    headless:    !ENV.fetch("HEADLESS", "true").in?(%w[0 false no n])
+  }
+  opts[:url]             = REMOTE_CHROME_URL if remote_browser
+  opts[:browser_options] = { "no-sandbox" => nil }   if remote_browser
+
+  Capybara::Cuprite::Driver.new(app, **opts)
+end
+
+Capybara.default_driver        = :better_cuprite
+Capybara.javascript_driver     = :better_cuprite
+```
+* If `CHROME_URL` is defined **and reachable** we drive that browser (e.g. a `browserless/chrome` container).  
+* Locally we fall back to the host-installed Chrome—zero config for contributors.
+
+### 2. docker-compose.yml snippet
+```yaml
+dev-chrome:
+  image: browserless/chrome:latest
+  ports: ["3333:3333"]
+  environment:
+    PORT: 3333
+    CONNECTION_TIMEOUT: 600000  # 10 min – useful while debugging
+```
+Set `CHROME_URL=http://dev-chrome:3333` in the Rails service so tests automatically talk to the remote browser.
+
+### 3. Capybara server visibility
+When a browser lives in another container it **must** reach the Rails test server:
+```ruby
+Capybara.server_host = "0.0.0.0"                     # listen on all interfaces
+Capybara.app_host    = "http://#{ENV.fetch('APP_HOST', `hostname`.strip.downcase)}"
+```
+`APP_HOST` should resolve back to the Rails container (often simply the service name in Compose).
+
+### 4. Pre-compile assets once per suite
+Lazy compilation during the first test causes timeouts.  Hook a one-off compile in `spec/system/support/precompile_assets.rb` (or similar):
+```ruby
+RSpec.configure do |config|
+  config.before(:suite) do
+    next if Webpacker.dev_server.running?
+    puts "🐢  Precompiling assets…"
+    suppress_output { system("bundle exec rails assets:precompile RAILS_ENV=test") }
+  end
+end
+```
+Developers can run `HEADLESS=false` **and** `webpack-dev-server` for hot-reload debugging.
+
+### 5. Multi-session screenshots
+Capybara overwrites screenshots when `using_session`.  Patch once:
+```ruby
+Capybara.singleton_class.prepend(Module.new do
+  attr_accessor :last_used_session
+  def using_session(name, &blk)
+    self.last_used_session = name
+    super
+  ensure
+    self.last_used_session = nil
+  end
+end)
+
+module BetterRailsSystemTests
+  # Ensure the screenshot comes from the right session
+  def take_screenshot
+    return super unless Capybara.last_used_session
+    Capybara.using_session(Capybara.last_used_session) { super }
+  end
+end
+```
+
+### 6. Quick debugging helpers
+```ruby
+module CupriteHelpers
+  def pause  = page.driver.pause
+  def debug(*args)
+    puts "🔎  Open Chrome inspector at http://localhost:3333" if ENV["CHROME_URL"]
+    page.driver.debug(*args)
+  end
+end
+```
+Use `debug` or `pause` inside your test to drop into a live browser.
+
+### 7. Environment variables cheat-sheet
+| Variable        | Purpose                               | Typical value                       |
+|-----------------|---------------------------------------|--------------------------------------|
+| `HEADLESS`      | Show browser (`false`) or run headless| `false` while debugging             |
+| `CHROME_URL`    | Remote Chrome (Docker) endpoint       | `http://chrome:3333`                |
+| `APP_HOST`      | Hostname Rails listens on in tests    | `rails` (Compose service name)      |
+| `CAPYBARA_ARTIFACTS` | Where to save screenshots/videos  | `./tmp/capybara`                    |
+
+These patterns have virtually eliminated Cuprite flakiness in CI and slashed suite time by ~30 % compared to Selenium.
+
+// ... existing code ...

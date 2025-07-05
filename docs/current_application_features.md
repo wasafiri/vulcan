@@ -71,7 +71,7 @@ GuardianRelationship.create!(
 
 | Helper | Meaning |
 |--------|---------|
-| `user.is_guardian? / is_dependent?` | quick role checks |
+| `user.guardian? / dependent?` | quick role checks |
 | `application.for_dependent?` | `managing_guardian_id` present? |
 | `user.effective_email / phone` | picks dependent-specific or fallback |
 

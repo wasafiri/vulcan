@@ -71,7 +71,7 @@ dependent.uses_guardian_contact_info?
 
 | Model | Method | Purpose |
 |-------|--------|---------|
-| **User** | `is_guardian?`, `is_dependent?` | Quick role checks |
+| **User** | `guardian?`, `dependent?` | Quick role checks |
 |  | `dependent_applications` | All apps for dependents |
 |  | `relationship_types_for_dependent(user)` | Returns relationship strings |
 | **Application** | `for_dependent?` | bool |

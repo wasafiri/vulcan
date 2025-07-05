@@ -145,7 +145,7 @@ controls:
         - { path: "config/initializers/active_record_encryption.rb", purpose: "Encryption configuration" }
       details:
         - "TLS 1.2+ enforced via `force_ssl`"
-        - "✅ Completed: All sensitive PII encrypted via ActiveRecord `encrypts` (2025-05-31)"
+        - "All sensitive PII is encrypted via ActiveRecord `encrypts`."
         - "Deterministic encryption: email, phone, ssn_last4 (queryable)"
         - "Non-deterministic encryption: addresses, password_digest, credential secrets"
         - "Encrypted columns: users.password_digest, users.ssn_last4, users.email, users.phone, users.date_of_birth, users.physical_address_1, users.physical_address_2, users.city, users.state, users.zip_code, totp_credentials.secret, sms_credentials.code_digest, webauthn_credentials.public_key"

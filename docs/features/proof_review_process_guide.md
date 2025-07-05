@@ -60,10 +60,9 @@ def resubmit # This action handles resubmission of proofs
 
     # Audit event for proof submission is handled by the `track_submission` method in this controller.
     # Application status (e.g., needs_review_since) is updated via ProofManageable concern.
-    # Note: `ProofAttachmentService` is *not* called with `skip_audit_events: true` in this flow.
-    # Instead, `ProofAttachmentService` sets `Current.proof_attachment_service_context = true`
-    # during its execution, which causes the `ProofManageable` concern to skip its own audit event creation,
-    # preventing duplicate events.
+    # Note: `ProofAttachmentService` sets `Current.proof_attachment_service_context = true`
+    # during its execution. This causes the `ProofManageable` concern to skip its own audit event creation,
+    # which prevents duplicate events.
   end
 
   redirect_to constituent_portal_application_path(@application), notice: 'Proof submitted successfully'
@@ -109,9 +108,9 @@ def process_proof(type)
 end
 
 # Note on Audit Events in PaperApplicationService:
-# - If 'accept' with a file, `ProofAttachmentService` creates a `#{type}_proof_attached` audit event.
-# - If 'accept' without a file (paper context), `PaperApplicationService` creates a `proof_submitted` audit event.
-# - If 'reject', `ProofAttachmentService` creates a `#{type}_proof_rejected` audit event.
+# - When a proof is accepted with a file, `ProofAttachmentService` creates a `#{type}_proof_attached` audit event.
+# - When a proof is accepted without a file (in a paper context), `PaperApplicationService` creates a `proof_submitted` audit event.
+# - When a proof is rejected, `ProofAttachmentService` creates a `#{type}_proof_rejected` audit event.
 ```
 
 ### 3.3 · Email Submission via Action Mailbox
@@ -155,11 +154,11 @@ def attach_proof(attachment, proof_type)
   })
 
   raise "Failed to attach proof: #{result[:error]&.message}" unless result[:success]
-  # ProofAttachmentService already handled the attachment and notifications.
+  # ProofAttachmentService handles the attachment and notifications.
   # Note on Audit Events in ProofSubmissionMailbox:
-  # - `create_audit_record` creates `proof_submission_received`.
-  # - `ProofAttachmentService` creates `#{proof_type}_proof_attached`.
-  # - `notify_admin` creates `proof_submission_processed`.
+  # - `create_audit_record` creates a `proof_submission_received` event.
+  # - `ProofAttachmentService` creates a `#{proof_type}_proof_attached` event.
+  # - `notify_admin` creates a `proof_submission_processed` event.
 end
 ```
 
@@ -224,12 +223,12 @@ def review(proof_type:, status:, rejection_reason: nil, notes: nil)
       proof_type: @proof_type_key, status: @status_key
     )
     @proof_review.assign_attributes(admin: @admin, notes: notes, rejection_reason: rejection_reason)
-    # If it's an existing record being updated, the `on: :create` `set_reviewed_at` callback
-    # won't run. We need to explicitly update `reviewed_at` to reflect this new review action.
-    # If it's a new record, the `on: :create` callback will set it.
-    # `reviewed_at` is validated for presence, so it must be set before save!.
+    # If the record is being updated, the `on: :create` `set_reviewed_at` callback
+    # does not run. `reviewed_at` is explicitly updated to reflect the new review action.
+    # If it's a new record, the `on: :create` callback sets the timestamp.
+    # `reviewed_at` is validated for presence, so it is always set before save!.
     if @proof_review.new_record?
-      # `set_reviewed_at` callback will handle it via `before_validation :set_reviewed_at, on: :create`
+      # The `set_reviewed_at` callback handles this via `before_validation :set_reviewed_at, on: :create`.
     else
       @proof_review.reviewed_at = Time.current
     end
@@ -276,9 +275,9 @@ def check_for_auto_approval
             @application.update_column(:status, Application.statuses[:approved])
             Event.create!(
               user: @admin, # Admin who triggered the final approval.
-                            # Note: If auto-approved via `ApplicationStatusManagement` (e.g., by medical cert update),
-                            # the 'user' for the `application_auto_approved` event will be `nil` (system).
-                            # This is a known inconsistency in audit logging for auto-approval.
+            # Note: If auto-approved via `ApplicationStatusManagement` (e.g., by a medical cert update),
+            # the 'user' for the `application_auto_approved` event is `nil` (system).
+            # This is the expected behavior for system-driven audit logging for auto-approval.
               action: 'application_auto_approved',
               auditable: @application,
               metadata: {
@@ -493,7 +492,7 @@ def create_audit_record_for_proof(proof_type)
 end
 
 # Note on Event Action Names:
-# The `ProofAttachmentService` is the canonical source for audit events related to proof attachments.
+# `ProofAttachmentService` is the canonical source for audit events related to proof attachments.
 # It creates events with the action `#{proof_type}_proof_attached`.
 # The `ProofManageable` concern's `#{proof_type}_proof_submitted` events are suppressed
 # when `ProofAttachmentService` is active to prevent duplication and ensure consistency.

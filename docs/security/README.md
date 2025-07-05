@@ -8,9 +8,9 @@ This directory contains operational security documentation for the Mat Vulcan ap
 - **`baseline_policy.md`** - Comprehensive security policy document for Maryland DoIT compliance  
 - **`authentication_system.md`** - Technical documentation of the current authentication and 2FA system
 
-## Recent Updates
+## Key Features
 
-- **2025-05-31**: PII encryption implementation completed using Rails ActiveRecord Encryption for all sensitive database columns
+- **PII Encryption**: All sensitive PII in the database is encrypted using Rails ActiveRecord Encryption.
 
 ## Purpose
 
