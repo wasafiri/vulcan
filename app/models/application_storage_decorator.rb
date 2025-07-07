@@ -139,8 +139,11 @@ class ApplicationStorageDecorator
     @metadata_cache[:"#{name}_exists"] ||= if @preloaded_attachments.present?
                                              @preloaded_attachments.include?(name)
                                            else
-                                             # Fallback query - should ideally not be hit from index view now
-                                             Rails.logger.warn "PERFORMANCE: Falling back to DB query for attachment existence: #{name} on Application #{application.id}"
+                                             # Fallback query - indicates attachment preloading failed
+                                             Rails.logger.warn "PERFORMANCE: Falling back to DB query for attachment existence: #{name} on App #{application.id}"
+                                             Rails.logger.warn '  → This suggests attachment preloading failed in the controller'
+                                             Rails.logger.warn '  → Check ApplicationDataLoading#preload_attachments_for_applications method'
+
                                              ActiveStorage::Attachment.exists?(record_type: 'Application',
                                                                                record_id: application.id,
                                                                                name: name)

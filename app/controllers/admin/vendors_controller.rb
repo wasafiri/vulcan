@@ -2,6 +2,7 @@
 
 module Admin
   class VendorsController < ApplicationController
+    include TurboStreamResponseHandling
     before_action :authenticate_user!
     before_action :require_admin!
     before_action :set_vendor, only: %i[show edit update]
@@ -24,9 +25,22 @@ module Admin
 
     def update
       if @vendor.update(vendor_params)
-        redirect_to admin_vendor_path(@vendor), notice: 'Vendor was successfully updated.'
+        AuditEventService.log(
+          action: 'vendor_updated',
+          actor: current_user,
+          auditable: @vendor,
+          metadata: { changes: @vendor.saved_changes }
+        )
+        handle_success_response(
+          html_redirect_path: admin_vendor_path(@vendor),
+          html_message: 'Vendor was successfully updated.',
+          turbo_message: 'Vendor was successfully updated.'
+        )
       else
-        render :edit, status: :unprocessable_entity
+        handle_error_response(
+          html_render_action: :edit,
+          error_message: 'Failed to update vendor.'
+        )
       end
     end
 
@@ -44,8 +58,10 @@ module Admin
     def require_admin!
       return if current_user&.admin?
 
-      flash[:alert] = 'You are not authorized to perform this action'
-      redirect_to root_path
+      handle_error_response(
+        html_redirect_path: root_path,
+        error_message: 'You are not authorized to perform this action'
+      )
     end
   end
 end

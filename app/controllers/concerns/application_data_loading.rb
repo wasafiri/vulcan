@@ -75,27 +75,11 @@ module ApplicationDataLoading
   # @param attachment_names [Array<String>] Names of attachments to preload
   # @return [Hash] Hash mapping application_id to Set of attachment names
   def preload_attachments_for_applications(applications, attachment_names: nil)
-    attachment_names ||= begin
-      self.class.const_get(:WANTED_ATTACHMENT_NAMES)
-    rescue StandardError
-      DEFAULT_ATTACHMENT_NAMES
-    end
-
+    attachment_names = resolve_attachment_names(attachment_names)
     ids = applications.map(&:id)
     return {} if ids.empty?
 
-    begin
-      ActiveStorage::Attachment
-        .where(record_type: 'Application', record_id: ids, name: attachment_names)
-        .group(:record_id, :name)
-        .pluck(:record_id, :name)
-        .group_by(&:first)
-        .transform_values { |rows| rows.to_set(&:second) }
-    rescue StandardError => e
-      # If the query fails, log the error and return an empty hash
-      Rails.logger.error "Error preloading attachments: #{e.message}"
-      {}
-    end
+    fetch_and_process_attachments(ids, attachment_names)
   end
 
   # Loads proof history data for income and residency proofs
@@ -154,7 +138,7 @@ module ApplicationDataLoading
 
     scope = scope.where.not(status: exclude_statuses) if exclude_statuses.any?
 
-    scope
+    scope.with_proof_blobs
   end
 
   # Loads notifications for an application with specific actions
@@ -198,6 +182,84 @@ module ApplicationDataLoading
   end
 
   private
+
+  # Resolves attachment names from parameter or constant
+  # @param attachment_names [Array<String>, nil] Names to use or nil for default
+  # @return [Array<String>] Resolved attachment names
+  def resolve_attachment_names(attachment_names)
+    return attachment_names if attachment_names
+
+    begin
+      self.class.const_get(:WANTED_ATTACHMENT_NAMES)
+    rescue StandardError
+      DEFAULT_ATTACHMENT_NAMES
+    end
+  end
+
+  # Fetches and processes attachment data with error handling
+  # @param ids [Array<Integer>] Application IDs
+  # @param attachment_names [Array<String>] Attachment names to fetch
+  # @return [Hash] Hash mapping application_id to Set of attachment names
+  def fetch_and_process_attachments(ids, attachment_names)
+    attachments_data = fetch_attachments_data(ids, attachment_names)
+    log_attachments_preload(attachments_data, ids)
+
+    result = transform_attachments_data(attachments_data)
+    log_missing_attachments(ids, result)
+
+    result
+  rescue StandardError => e
+    handle_attachments_error(e, ids)
+  end
+
+  # Fetches raw attachment data from database
+  # @param ids [Array<Integer>] Application IDs
+  # @param attachment_names [Array<String>] Attachment names to fetch
+  # @return [Array<Array>] Raw attachment data
+  def fetch_attachments_data(ids, attachment_names)
+    ActiveStorage::Attachment
+      .where(record_type: 'Application', record_id: ids, name: attachment_names)
+      .pluck(:record_id, :name)
+  end
+
+  # Logs attachment preloading information
+  # @param attachments_data [Array] The fetched attachment data
+  # @param ids [Array<Integer>] Application IDs
+  def log_attachments_preload(attachments_data, ids)
+    return unless ENV['VERBOSE_TESTS']
+
+    Rails.logger.debug { "Preloaded #{attachments_data.length} attachments for #{ids.length} applications" }
+  end
+
+  # Transforms raw attachment data into structured result
+  # @param attachments_data [Array<Array>] Raw attachment data
+  # @return [Hash] Hash mapping application_id to Set of attachment names
+  def transform_attachments_data(attachments_data)
+    attachments_data.group_by(&:first)
+                    .transform_values { |rows| rows.to_set(&:second) }
+  end
+
+  # Logs applications with missing attachments
+  # @param ids [Array<Integer>] All application IDs
+  # @param result [Hash] Result hash with application IDs as keys
+  def log_missing_attachments(ids, result)
+    return unless ENV['VERBOSE_TESTS']
+
+    missing_attachments = ids - result.keys
+    return unless missing_attachments.any?
+
+    Rails.logger.debug { "Applications with no attachments: #{missing_attachments}" }
+  end
+
+  # Handles errors during attachment processing
+  # @param error [StandardError] The error that occurred
+  # @param ids [Array<Integer>] Application IDs being processed
+  # @return [Hash] Empty hash as fallback
+  def handle_attachments_error(error, ids)
+    Rails.logger.error "Error preloading attachments for applications #{ids}: #{error.message}"
+    Rails.logger.error error.backtrace.join("\n") if ENV['VERBOSE_TESTS']
+    {}
+  end
 
   # Filters and sorts a collection by proof type
   # @param collection [ActiveRecord::Relation] The collection to filter

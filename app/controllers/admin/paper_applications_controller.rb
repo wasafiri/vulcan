@@ -56,8 +56,11 @@ module Admin
       )
 
       if service.create
-        redirect_to admin_application_path(service.application),
-                    notice: generate_success_message(service.application)
+        handle_success_response(
+          html_redirect_path: admin_application_path(service.application),
+          html_message: generate_success_message(service.application),
+          turbo_message: generate_success_message(service.application)
+        )
       else
         handle_service_failure(service)
       end
@@ -77,8 +80,11 @@ module Admin
       )
 
       if service.update(application)
-        redirect_to admin_application_path(application),
-                    notice: generate_success_message(application)
+        handle_success_response(
+          html_redirect_path: admin_application_path(application),
+          html_message: generate_success_message(application),
+          turbo_message: generate_success_message(application)
+        )
       else
         handle_service_failure(service, application)
       end
@@ -102,30 +108,41 @@ module Admin
       if communication_preference == 'email'
         ApplicationNotificationsMailer.income_threshold_exceeded(constituent_params_for_notification, notification_params)
                                       .deliver_later
-        flash[:notice] = 'Rejection notification has been sent.'
+        handle_success_response(
+          html_redirect_path: admin_applications_path,
+          html_message: 'Rejection notification has been sent.',
+          turbo_message: 'Rejection notification has been sent.'
+        )
       elsif communication_preference == 'letter'
-        flash[:notice] = 'Rejection letter has been queued for printing.' # Assuming a letter service exists
+        handle_success_response(
+          html_redirect_path: admin_applications_path,
+          html_message: 'Rejection letter has been queued for printing.',
+          turbo_message: 'Rejection letter has been queued for printing.'
+        ) # Assuming a letter service exists
+      else
+        handle_error_response(
+          html_redirect_path: admin_applications_path,
+          error_message: 'Invalid communication preference for rejection notification.'
+        )
       end
-      redirect_to admin_applications_path
     end
 
     private
 
     def handle_service_failure(service, existing_application = nil)
-      error_message(service)
-      repopulate_form_data(service, existing_application)
-      render (existing_application ? :edit : :new), status: :unprocessable_entity
-    end
+      error_msg = if service.errors.any?
+                    service.errors.join('; ')
+                  else
+                    'An unexpected error occurred.'
+                  end
+      Rails.logger.error "Paper application operation failed: #{error_msg}"
 
-    def error_message(service)
-      if service.errors.any?
-        error_message = service.errors.join('; ')
-        Rails.logger.error "Paper application operation failed: #{error_message}"
-        flash.now[:alert] = error_message
-      else
-        Rails.logger.error 'Paper application operation failed with no specific service errors.'
-        flash.now[:alert] = 'An unexpected error occurred.'
-      end
+      repopulate_form_data(service, existing_application)
+
+      handle_error_response(
+        html_render_action: (existing_application ? :edit : :new),
+        error_message: error_msg
+      )
     end
 
     def repopulate_form_data(service, existing_application)

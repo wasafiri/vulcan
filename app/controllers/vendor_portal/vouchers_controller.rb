@@ -160,8 +160,13 @@ module VendorPortal
     private
 
     def set_voucher
-      # Use params[:code] as defined in the routes, not params[:id]
-      @voucher = Voucher.find_by!(code: params[:code])
+      # Voucher lookup gracefully handles invalid codes by redirecting with error message
+      # This prevents RecordNotFound exceptions from bubbling up to the UI
+      @voucher = Voucher.find_by(code: params[:code])
+      return if @voucher
+
+      flash[:alert] = 'Invalid voucher code'
+      redirect_to vendor_vouchers_path
     end
 
     def check_voucher_active

@@ -19,7 +19,7 @@ module Applications
       applicant_data = applicant_data.deep_dup
       apply_contact_strategies(applicant_data)
 
-      return failure('Failed to create dependent') unless create_dependent(applicant_data)
+      return failure('Failed to create dependent') unless create_dependent?(applicant_data)
       return failure('Failed to create relationship') unless create_relationship(relationship_type)
 
       success(guardian: @guardian_user, dependent: @dependent_user)
@@ -46,19 +46,19 @@ module Applications
     def setup_guardian(guardian_id, new_guardian_attrs)
       if guardian_id.present?
         @guardian_user = User.find_by(id: guardian_id)
-        return add_error('Guardian not found') unless @guardian_user
+        return add_error?('Guardian not found') unless @guardian_user
       elsif attributes_present?(new_guardian_attrs)
         result = UserCreationService.new(new_guardian_attrs, is_managing_adult: true).call
         return false unless result.success?
 
         @guardian_user = result.data[:user]
       else
-        return add_error('Guardian information missing')
+        return add_error?('Guardian information missing')
       end
       true
     end
 
-    def create_dependent(applicant_data)
+    def create_dependent?(applicant_data)
       result = UserCreationService.new(applicant_data, is_managing_adult: false).call
       return false unless result.success?
 
@@ -67,7 +67,7 @@ module Applications
     end
 
     def create_relationship(relationship_type)
-      return add_error('Relationship type required') if relationship_type.blank?
+      return add_error?('Relationship type required') if relationship_type.blank?
 
       GuardianRelationship.create!(
         guardian_user: @guardian_user,
@@ -76,7 +76,7 @@ module Applications
       )
       true
     rescue ActiveRecord::RecordInvalid => e
-      add_error("Failed to create relationship: #{e.message}")
+      add_error?("Failed to create relationship: #{e.message}")
       false
     end
 
@@ -136,7 +136,7 @@ module Applications
       attrs.present? && attrs.values.any?(&:present?)
     end
 
-    def add_error(message)
+    def add_error?(message)
       @errors << message
       false
     end
@@ -146,7 +146,7 @@ module Applications
     end
 
     def failure(message)
-      add_error(message)
+      add_error?(message)
       Result.new(success: false, errors: @errors)
     end
   end

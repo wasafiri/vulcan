@@ -12,35 +12,46 @@ module Applications
 
     # Apply filters based on the provided parameters
     def apply_filters
-      result = scope
-
-      # Apply filter from params[:filter]
-      result = apply_status_filter(result, params[:filter]) if params[:filter].present?
-
-      # Apply explicit status filter
-      result = result.where(status: params[:status]) if params[:status].present?
-
-      # Apply date range filter
-      result = apply_date_range_filter(result) if params[:date_range].present?
-
-      # Apply search filter
-      result = apply_search_filter(result) if params[:q].present?
-
-      # Apply guardian relationship filters
-      result = apply_guardian_relationship_filters(result)
-
-      # Return success result with the filtered scope
-      # Use positional parameters to match the BaseService method definition
-      success(nil, result)
+      filtered_scope = build_filtered_scope
+      success(nil, filtered_scope)
     rescue StandardError => e
-      Rails.logger.error "Error applying filters: #{e.message}"
-      Rails.logger.error e.backtrace.join("\n")
-      # Return the original scope in the data field on failure, along with an error message.
-      # Use positional parameters to match the BaseService method definition
-      failure("Error applying filters: #{e.message}", scope)
+      handle_filter_error(e)
     end
 
     private
+
+    def build_filtered_scope
+      scope
+        .then { |result| apply_conditional_status_filter(result) }
+        .then { |result| apply_conditional_explicit_status_filter(result) }
+        .then { |result| apply_conditional_date_range_filter(result) }
+        .then { |result| apply_conditional_search_filter(result) }
+        .then { |result| apply_guardian_relationship_filters(result) }
+    end
+
+    def apply_conditional_status_filter(result)
+      params[:filter].present? ? apply_status_filter(result, params[:filter]) : result
+    end
+
+    def apply_conditional_explicit_status_filter(result)
+      params[:status].present? ? result.where(status: params[:status]) : result
+    end
+
+    def apply_conditional_date_range_filter(result)
+      params[:date_range].present? ? apply_date_range_filter(result) : result
+    end
+
+    def apply_conditional_search_filter(result)
+      params[:q].present? ? apply_search_filter(result) : result
+    end
+
+    def handle_filter_error(error)
+      Rails.logger.error "Error applying filters: #{error.message}"
+      Rails.logger.error error.backtrace.join("\n")
+      # Return the original scope in the data field on failure, along with an error message.
+      # Use positional parameters to match the BaseService method definition
+      failure("Error applying filters: #{error.message}", scope)
+    end
 
     def apply_status_filter(scope, filter)
       case filter
@@ -111,26 +122,39 @@ module Applications
     end
 
     def apply_guardian_relationship_filters(scope)
-      result = scope
+      scope
+        .then { |result| apply_managing_guardian_filter(result) }
+        .then { |result| apply_guardian_dependents_filter(result) }
+        .then { |result| apply_specific_dependent_filter(result) }
+        .then { |result| apply_only_dependents_filter(result) }
+        .then { |result| result || Application.none }
+    end
 
-      # Filter by managing guardian
-      result = result.where(managing_guardian_id: params[:managing_guardian_id]) if params[:managing_guardian_id].present?
+    def apply_managing_guardian_filter(scope)
+      return scope if params[:managing_guardian_id].blank?
 
-      # Filter by applications for dependents of a specific guardian
-      if params[:guardian_id].present?
-        # Use the scope defined in the Application model
-        guardian = User.find_by(id: params[:guardian_id])
-        result = result.for_dependents_of(guardian) if guardian.present?
-      end
+      scope.where(managing_guardian_id: params[:managing_guardian_id])
+    end
 
-      # Filter by applications for a specific dependent
-      result = result.where(user_id: params[:dependent_id]) if params[:dependent_id].present?
+    def apply_guardian_dependents_filter(scope)
+      return scope if params[:guardian_id].blank?
 
-      # Filter to show only applications for dependents
-      result = result.where.not(managing_guardian_id: nil) if params[:only_dependent_apps] == 'true'
+      guardian = User.find_by(id: params[:guardian_id])
+      return scope if guardian.blank?
 
-      # Always return a relation, even if filters didn't match anything
-      result || Application.none
+      scope.for_dependents_of(guardian)
+    end
+
+    def apply_specific_dependent_filter(scope)
+      return scope if params[:dependent_id].blank?
+
+      scope.where(user_id: params[:dependent_id])
+    end
+
+    def apply_only_dependents_filter(scope)
+      return scope unless params[:only_dependent_apps] == 'true'
+
+      scope.where.not(managing_guardian_id: nil)
     end
 
     def fiscal_year

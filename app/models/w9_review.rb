@@ -3,7 +3,7 @@
 class W9Review < ApplicationRecord
   # Associations
   belongs_to :vendor, class_name: 'User'
-  belongs_to :admin, class_name: 'User'
+  belongs_to :admin, -> { where(type: 'Users::Administrator') }, class_name: 'User'
 
   # Enums
   enum :status, { approved: 0, rejected: 1 }, prefix: true
@@ -18,9 +18,9 @@ class W9Review < ApplicationRecord
   validates :reviewed_at, presence: true
   validates :rejection_reason, presence: true, if: -> { status_rejected? }
   validates :rejection_reason_code, presence: true, if: -> { status_rejected? }
-  validate :admin_must_be_admin_type
   validate :vendor_must_be_vendor_type
   validate :validate_rejection_fields
+  validate :admin_must_be_admin_type
 
   # Callbacks
   before_validation :set_reviewed_at, on: :create
@@ -38,10 +38,6 @@ class W9Review < ApplicationRecord
     self.reviewed_at ||= Time.current
   end
 
-  def admin_must_be_admin_type
-    errors.add(:admin, 'must be an administrator') unless admin&.admin?
-  end
-
   def vendor_must_be_vendor_type
     # Check that vendor exists and is actually a vendor type (either Users::Vendor or Vendor)
     return if vendor.nil? # Let the presence validation handle nil vendors
@@ -54,30 +50,44 @@ class W9Review < ApplicationRecord
     return if status.blank?
 
     begin
-      ActiveRecord::Base.transaction do
-        if status_rejected?
-          increment_rejections_if_rejected
-          check_max_rejections
-          update_vendor_status(:rejected)
-        else
-          update_vendor_status(:approved)
-        end
-      end
-
-      # Send appropriate notification based on status
-      if status_rejected?
-        send_notification('w9_rejected')
-      else
-        send_notification('w9_approved')
-      end
+      process_review_transaction
+      send_review_notification
     rescue StandardError => e
       Rails.logger.error "Failed to process W9 review actions: #{e.message}\n#{e.backtrace.join("\n")}"
       raise
     end
   end
 
+  def process_review_transaction
+    ActiveRecord::Base.transaction do
+      if status_rejected?
+        process_rejected_status
+      else
+        process_approved_status
+      end
+    end
+  end
+
+  def process_rejected_status
+    increment_rejections_if_rejected
+    check_max_rejections
+    update_vendor_status(:rejected)
+  end
+
+  def process_approved_status
+    update_vendor_status(:approved)
+  end
+
+  def send_review_notification
+    notification_type = status_rejected? ? 'w9_rejected' : 'w9_approved'
+    send_notification(notification_type)
+  end
+
   def update_vendor_status(new_status)
-    vendor.update_column(:w9_status, new_status)
+    vendor.update_column(:w9_status, Users::Vendor.w9_statuses[new_status])
+  rescue StandardError => e
+    Rails.logger.error "Failed to update vendor status: #{e.message}"
+    raise
   end
 
   def send_notification(action)
@@ -163,5 +173,9 @@ class W9Review < ApplicationRecord
       self.rejection_reason = nil
       self.rejection_reason_code = nil
     end
+  end
+
+  def admin_must_be_admin_type
+    errors.add(:admin, 'must be an administrator') unless admin&.admin?
   end
 end

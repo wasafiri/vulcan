@@ -16,17 +16,7 @@ module Applications
       deduplicated_logs = @audit_log_builder.build_deduplicated_audit_logs
 
       # Filter for certification-related events
-      deduplicated_logs.select do |event|
-        (event.is_a?(Notification) && event.action.to_s.include?('certification')) ||
-          (event.is_a?(ApplicationStatusChange) &&
-       # Use direct access, check both symbol and string keys for metadata
-       ((event.metadata && (event.metadata[:change_type] == 'medical_certification' || event.metadata['change_type'] == 'medical_certification')) ||
-        event.from_status.to_s.include?('certification') ||
-        event.to_status.to_s.include?('certification'))) ||
-          (event.is_a?(Event) &&
-           (event.action.to_s.include?('certification') ||
-            (event.metadata.is_a?(Hash) && event.metadata.to_s.include?('certification'))))
-      end
+      deduplicated_logs.select { |event| certification_related_event?(event) }
     end
 
     # Return request events identified and processed for display
@@ -34,22 +24,76 @@ module Applications
       events = certification_events
 
       # Identify which are request events
-      request_events = events.select do |event|
-        (event.is_a?(Notification) && event.action == 'medical_certification_requested') ||
-          (event.is_a?(ApplicationStatusChange) && event.to_status == 'requested') ||
-          (event.is_a?(Event) && (event.action == 'medical_certification_requested' ||
-                                 (event.metadata.is_a?(Hash) &&
-                                  event.metadata['details'].to_s.include?('certification requested')))) ||
-          (event.respond_to?(:metadata) &&
-           event.metadata.is_a?(Hash) &&
-           event.metadata.to_s.include?('certification requested'))
-      end
+      request_events = events.select { |event| request_event?(event) }
 
       # Process these events for display (admin views expect hash objects)
       process_request_events_for_display(request_events)
     end
 
     private
+
+    def certification_related_event?(event)
+      case event
+      when Notification
+        certification_related_notification?(event)
+      when ApplicationStatusChange
+        certification_related_status_change?(event)
+      when Event
+        certification_related_event_record?(event)
+      else
+        false
+      end
+    end
+
+    def certification_related_notification?(event)
+      event.action.to_s.include?('certification')
+    end
+
+    def certification_related_status_change?(event)
+      medical_certification_metadata?(event) ||
+        status_contains_certification?(event)
+    end
+
+    def certification_related_event_record?(event)
+      event.action.to_s.include?('certification') ||
+        (event.metadata.is_a?(Hash) && event.metadata.to_s.include?('certification'))
+    end
+
+    def medical_certification_metadata?(event)
+      return false unless event.metadata
+
+      event.metadata[:change_type] == 'medical_certification' ||
+        event.metadata['change_type'] == 'medical_certification'
+    end
+
+    def status_contains_certification?(event)
+      event.from_status.to_s.include?('certification') ||
+        event.to_status.to_s.include?('certification')
+    end
+
+    def request_event?(event)
+      case event
+      when Notification
+        event.action == 'medical_certification_requested'
+      when ApplicationStatusChange
+        event.to_status == 'requested'
+      when Event
+        request_event_record?(event)
+      else
+        generic_request_event?(event)
+      end
+    end
+
+    def request_event_record?(event)
+      event.action == 'medical_certification_requested' ||
+        (event.metadata.is_a?(Hash) && event.metadata['details'].to_s.include?('certification requested'))
+    end
+
+    def generic_request_event?(event)
+      event.respond_to?(:metadata) &&
+        event.metadata.is_a?(Hash) &&
+        event.metadata.to_s.include?('certification requested')
+    end
 
     def process_request_events_for_display(events)
       unique_requests = {}

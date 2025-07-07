@@ -36,6 +36,17 @@ module Admin
       # @email_template is set by before_action
       # @template_definition is set by before_action
 
+      # Expensive computation in controller
+      @sample_data = view_context.sample_data_for_template(@email_template.name)
+
+      # Render template with sample data for preview
+      begin
+        @rendered_subject, @rendered_body = @email_template.render(**@sample_data)
+      rescue StandardError => e
+        @rendered_subject = "Error rendering subject: #{e.message}"
+        @rendered_body = "Error rendering template: #{e.message}"
+      end
+
       log_audit_event('email_template_viewed')
     end
 
@@ -62,6 +73,9 @@ module Admin
     def edit
       # @email_template is set by before_action
       # @template_definition is set by before_action
+
+      # Expensive computation done in controller for form preview
+      @sample_data = view_context.sample_data_for_template(@email_template.name)
     end
 
     # PATCH/PUT /admin/email_templates/:id
@@ -75,6 +89,8 @@ module Admin
         log_template_update_event
         redirect_to admin_email_template_path(@email_template), notice: 'Email template was successfully updated.'
       else
+        # Re-prepare sample data for form re-render on validation failure
+        @sample_data = view_context.sample_data_for_template(@email_template.name)
         flash.now[:alert] = "Failed to update template: #{@email_template.errors.full_messages.join(', ')}"
         render :edit, status: :unprocessable_entity
       end

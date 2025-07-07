@@ -5,20 +5,21 @@ import * as ActiveStorage from "@rails/activestorage"
 // import { Chart, registerables } from "chart.js"
 import * as WebAuthnJSON from "@github/webauthn-json"
 import Auth from "./auth"
+import "./services/notification_service" // Ensure AppNotifications is available globally
 
 // Temporarily commented out Chart.js registration to fix system test issues
 // Chart.register(...registerables)
 
 // Provide Chart.js stub for compatibility
 window.Chart = {
-  register: () => {},
+  register: () => { },
   defaults: {
     responsive: false,
     maintainAspectRatio: false,
     animation: false
   },
   // Provide a safe constructor that does nothing
-  Chart: function() { return { destroy: () => {}, update: () => {}, render: () => {} }; }
+  Chart: function () { return { destroy: () => { }, update: () => { }, render: () => { } }; }
 }
 
 import "./controllers"

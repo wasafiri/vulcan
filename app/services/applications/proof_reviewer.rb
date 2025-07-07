@@ -10,77 +10,74 @@ module Applications
     def review(proof_type:, status:, rejection_reason: nil, notes: nil)
       Rails.logger.info "Starting review with proof_type: #{proof_type.inspect}, status: #{status.inspect}"
 
-      # Store the string values we'll need for application status
       @proof_type_key = proof_type.to_s
       @status_key = status.to_s
 
       Rails.logger.info "Converted values - proof_type: #{@proof_type_key.inspect}, status: #{@status_key.inspect}"
 
-      # Create or update the proof review and update application status in a transaction
       ApplicationRecord.transaction do
-        Rails.logger.info 'Finding or initializing proof review record'
-
-        find_attributes = {
-          proof_type: @proof_type_key,
-          status: @status_key
-        }
-        # Only include rejection_reason in find query if status is rejected
-        # If rejection_reason is nil, it will match existing records with nil rejection_reason
-        find_attributes[:rejection_reason] = rejection_reason if @status_key == 'rejected'
-
-        @proof_review = @application.proof_reviews.find_or_initialize_by(find_attributes)
-
-        @proof_review.assign_attributes(
-          admin: @admin,
-          notes: notes
-        )
-
-        # If it's an existing record being updated, the `on: :create` `set_reviewed_at` callback
-        # won't run. We need to explicitly update `reviewed_at` to reflect this new review action.
-        # If it's a new record, the `on: :create` callback will set it.
-        # `reviewed_at` is validated for presence, so it must be set before save!.
-        if @proof_review.new_record?
-          # `set_reviewed_at` callback will handle it via `before_validation :set_reviewed_at, on: :create`
-        else
-          @proof_review.reviewed_at = Time.current
-        end
-
-        @proof_review.save! # This will run validations.
-
-        Rails.logger.info "Saved ProofReview ID: #{@proof_review.id}, status: #{@proof_review.status}, proof_type: #{@proof_review.proof_type}, new_record: #{@proof_review.previously_new_record?}"
-
-        # Update application status directly
+        create_or_update_proof_review(rejection_reason, notes)
         update_application_status
-        Rails.logger.info 'Updated application status'
-
-        # Explicitly purge if status was set to rejected
         purge_if_rejected
-        Rails.logger.info 'Checked for purge after status update'
       end
 
-      # Return true to indicate success
-      # Notifications are handled by ProofReview model callbacks
       true
     rescue StandardError => e
       Rails.logger.error "Proof review failed: #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
-      raise # Re-raise to ensure errors are visible
+      raise
     end
 
     private
 
+    def create_or_update_proof_review(rejection_reason, notes)
+      Rails.logger.info 'Finding or initializing proof review record'
+
+      find_attributes = build_find_attributes(rejection_reason)
+      @proof_review = @application.proof_reviews.find_or_initialize_by(find_attributes)
+
+      @proof_review.assign_attributes(admin: @admin, notes: notes)
+      set_reviewed_at_if_needed
+      @proof_review.save!
+
+      Rails.logger.info "Saved ProofReview ID: #{@proof_review.id}, status: #{@proof_review.status},
+      proof_type: #{@proof_review.proof_type}, new_record: #{@proof_review.previously_new_record?}"
+    end
+
+    def build_find_attributes(rejection_reason)
+      find_attributes = { proof_type: @proof_type_key, status: @status_key }
+      find_attributes[:rejection_reason] = rejection_reason if @status_key == 'rejected'
+      find_attributes
+    end
+
+    def set_reviewed_at_if_needed
+      # If it's an existing record being updated, the `on: :create` `set_reviewed_at` callback
+      # won't run. We need to explicitly update `reviewed_at` to reflect this new review action.
+      # If it's a new record, the `on: :create` callback will set it.
+      # `reviewed_at` is validated for presence, so it must be set before save!.
+      @proof_review.reviewed_at = Time.current unless @proof_review.new_record?
+    end
+
     def update_application_status
       Rails.logger.info "Updating application status for proof_type: #{@proof_type_key}, status: #{@status_key}"
 
-      # First validate if the specific proof being updated is attached if we're approving it
-      if @status_key == 'approved'
-        attachment = @application.send("#{@proof_type_key}_proof")
-        unless attachment.attached?
-          raise ActiveRecord::RecordInvalid.new(@application),
-                "#{@proof_type_key.capitalize} proof must be attached to approve"
-        end
-      end
+      validate_proof_attachment_if_approved
+      update_proof_status_column
+      @application.reload
+      check_for_auto_approval
+    end
 
+    def validate_proof_attachment_if_approved
+      return unless @status_key == 'approved'
+
+      attachment = @application.send("#{@proof_type_key}_proof")
+      return if attachment.attached?
+
+      raise ActiveRecord::RecordInvalid.new(@application),
+            "#{@proof_type_key.capitalize} proof must be attached to approve"
+    end
+
+    def update_proof_status_column
       # IMPORTANT: Using update_column bypasses ActiveRecord callbacks and validations.
       # This means after_save callbacks like purge_proof_if_rejected won't be triggered.
       # We must explicitly call purge_if_rejected method below for rejected proofs.
@@ -88,15 +85,6 @@ module Applications
       column_name = "#{@proof_type_key}_proof_status"
       status_enum_value = Application.send(column_name.pluralize.to_s).fetch(@status_key.to_sym)
       @application.update_column(column_name, status_enum_value)
-      column_name = "#{@proof_type_key}_proof_status"
-      status_enum_value = Application.send(column_name.pluralize.to_s).fetch(@status_key.to_sym)
-      @application.update_column(column_name, status_enum_value)
-
-      # Reload the application to ensure it has the latest data
-      @application.reload
-
-      # Check if auto-approval is now possible
-      check_for_auto_approval
     end
 
     # Explicitly call purge logic on the application if the status was just set to rejected

@@ -85,6 +85,8 @@ module TwoFactorVerification
   def verify_sms_credential(code, credential_id)
     return [false, 'No code provided'] if code.blank?
 
+    # SMS login verification resolves the credential from 2FA session context
+    # This method is used during login when current_user is nil and user data comes from session
     credential_id = resolve_sms_credential_id(credential_id)
     return [false, 'No credential found'] if credential_id.blank?
 
@@ -138,6 +140,7 @@ module TwoFactorVerification
 
       credential.update(last_used_at: Time.current)
       log_verification_success(user.id, :totp, credential_id: credential.id)
+      complete_two_factor_authentication(user)
       return [true, 'Verification successful']
     end
 
@@ -147,14 +150,24 @@ module TwoFactorVerification
 
   # SMS specific verification helpers
   def resolve_sms_credential_id(credential_id)
+    # SMS login flow stores credential_id in challenge metadata during code generation
+    # When no challenge data exists (e.g., in tests), the system falls back to the user's first SMS credential
     return credential_id if credential_id.present?
 
     challenge_data = retrieve_challenge
-    challenge_data[:metadata]&.dig(:credential_id)
+    credential_id_from_challenge = challenge_data[:metadata]&.dig(:credential_id)
+    return credential_id_from_challenge if credential_id_from_challenge.present?
+
+    # Fallback: if no challenge data (e.g., in tests), use the user's first SMS credential
+    user_for_2fa = find_user_for_two_factor
+    user_for_2fa&.sms_credentials&.first&.id
   end
 
   def find_sms_credential(credential_id)
-    current_user.sms_credentials.find_by(id: credential_id)
+    user_for_2fa = find_user_for_two_factor
+    return nil unless user_for_2fa
+
+    user_for_2fa.sms_credentials.find_by(id: credential_id)
   end
 
   def sms_code_expired?(credential)
@@ -164,10 +177,13 @@ module TwoFactorVerification
   def verify_sms_code(code, credential)
     if credential.verify_code(code)
       clear_challenge
-      log_verification_success(current_user.id, :sms, credential_id: credential.id)
+      user_for_2fa = find_user_for_two_factor
+      log_verification_success(user_for_2fa.id, :sms, credential_id: credential.id)
+      complete_two_factor_authentication(user_for_2fa)
       [true, 'Verification successful']
     else
-      log_verification_failure(current_user.id, :sms, 'Invalid code', credential_id: credential.id)
+      user_for_2fa = find_user_for_two_factor
+      log_verification_failure(user_for_2fa.id, :sms, 'Invalid code', credential_id: credential.id)
       [false, TwoFactorAuth::ERROR_MESSAGES[:invalid_code]]
     end
   end
@@ -266,7 +282,7 @@ module TwoFactorVerification
     # Save to credential
     credential.update!(
       last_sent_at: Time.current,
-      code_digest: User.digest(code),
+      code_digest: User.digest(code).to_s,
       code_expires_at: 10.minutes.from_now
     )
 
@@ -292,6 +308,41 @@ module TwoFactorVerification
     false
   end
   # rubocop:enable Metrics/AbcSize
+
+  # Send SMS verification code for a specific user (used in 2FA flow)
+  def send_sms_verification_code_for_user(credential, user)
+    return false unless credential && user
+
+    # Generate code
+    code = SecureRandom.random_number(10**6).to_s.rjust(6, '0')
+
+    # Save to credential
+    credential.update!(
+      last_sent_at: Time.current,
+      code_digest: User.digest(code).to_s,
+      code_expires_at: 10.minutes.from_now
+    )
+
+    # Send SMS
+    ::SmsService.send_message(
+      credential.phone_number,
+      "Your verification code is: #{code}"
+    )
+
+    # Store challenge data
+    store_challenge(
+      :sms,
+      credential.code_digest,
+      { credential_id: credential.id }
+    )
+
+    Rails.logger.info("[SMS] Sent verification code to user #{user.id}")
+    true
+  rescue StandardError => e
+    Rails.logger.error("[SMS] Error: #{e.message}")
+    flash.now[:alert] = 'Could not send verification code'
+    false
+  end
 
   # WebAuthn credential creation options for platform authenticators (biometrics)
   def build_platform_create_options

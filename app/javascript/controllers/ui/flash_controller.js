@@ -8,10 +8,9 @@ import { Controller } from "@hotwired/stimulus"
  */
 export default class extends Controller {
   connect() {
-    // This controller now primarily acts as a bridge for legacy flash messages
-    // and delegates to the new global AppNotifications service.
-    // It also processes any queued messages from server-rendered partials.
-    this.processQueuedMessages();
+    // This controller acts as a bridge for legacy flash messages and delegates to the new global AppNotifications service.
+    // Note: Flash message processing is now handled centrally by the NotificationService on turbo:load
+    // No need to duplicate processing here since NotificationService handles the rails-flash-messages script tag
   }
 
   /**
@@ -21,7 +20,11 @@ export default class extends Controller {
    */
   handleFlashEvent(event) {
     const { message, type } = event.detail;
-    window.AppNotifications.show(message, type);
+    if (window.AppNotifications) {
+      window.AppNotifications.show(message, type);
+    } else {
+      console.warn("AppNotifications not available when handling flash event.");
+    }
   }
 
   /**
@@ -56,6 +59,16 @@ export default class extends Controller {
    */
   show(message, type = 'info') {
     window.AppNotifications.show(message, type);
+  }
+
+  /**
+   * Legacy method - no longer used.
+   * Flash message processing is now handled centrally by NotificationService.
+   * This method is kept for backwards compatibility during transition.
+   */
+  processQueuedMessages() {
+    // No-op: NotificationService handles this centrally on turbo:load
+    // Keeping this method to avoid breaking any legacy code that might call it directly
   }
 
   /**

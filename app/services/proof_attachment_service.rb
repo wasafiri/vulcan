@@ -264,8 +264,20 @@ class ProofAttachmentService
     end
 
     def log_error(error)
-      Rails.logger.error "Proof attachment error: #{error.message}"
-      Rails.logger.error error.backtrace&.join("\n") || 'No backtrace available'
+      message = "Proof attachment error: #{error.message}"
+
+      # In the test environment we intentionally trigger mismatched-digest errors with
+      # fabricated files.  Logging them at ERROR level creates noisy output without
+      # adding signal, so downgrade to DEBUG when we detect that scenario.
+      if Rails.env.test? && error.message.to_s.match?(/mismatched digest/i)
+        Rails.logger.debug(message)
+      else
+        Rails.logger.error(message)
+      end
+
+      backtrace = error.backtrace&.join("\n")
+      Rails.logger.debug(backtrace) if backtrace && Rails.env.test?
+      Rails.logger.error(backtrace || 'No backtrace available') unless Rails.env.test?
     end
 
     def log_failure_audit_event(error, context)

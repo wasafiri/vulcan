@@ -107,9 +107,7 @@ module Applications
       case event
       when ApplicationStatusChange
         3
-      when ProofReview
-        2
-      when Event
+      when ProofReview, Event
         2
       when Notification
         1

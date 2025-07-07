@@ -42,17 +42,17 @@ module Applications
 
     def find_existing_application
       current_user.applications.find_or_initialize_by(id: params[:id]) do |app|
-        set_default_application_attributes(app)
+        apply_default_attributes(app)
       end
     end
 
     def create_new_application
       current_user.applications.new.tap do |app|
-        set_default_application_attributes(app)
+        apply_default_attributes(app)
       end
     end
 
-    def set_default_application_attributes(app)
+    def apply_default_attributes(app)
       app.status = :draft
       app.application_date = Time.current
       app.submission_method = :online

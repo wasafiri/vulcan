@@ -117,6 +117,8 @@ export default class extends Controller {
       const showDependentSections = dependentRadioSelected && guardianChosen;
       if (this.hasSectionsForDependentWithGuardianTarget) {
         setVisible(this.sectionsForDependentWithGuardianTarget, showDependentSections);
+        // Disable form fields in hidden dependent section to prevent form submission conflicts
+        this._toggleFormFieldsDisabled(this.sectionsForDependentWithGuardianTarget, !showDependentSections);
         if (process.env.NODE_ENV !== 'production') {
           console.log(`ApplicantTypeController: Dependent Sections ${showDependentSections ? "SHOWN" : "HIDDEN"}`);
         }
@@ -133,6 +135,8 @@ export default class extends Controller {
       const showAdultSection = !dependentRadioSelected && !guardianChosen;
       if (this.hasAdultSectionTarget) {
         setVisible(this.adultSectionTarget, showAdultSection);
+        // Disable form fields in hidden adult section to prevent form submission conflicts
+        this._toggleFormFieldsDisabled(this.adultSectionTarget, !showAdultSection);
       }
 
       // Disable radio buttons if a guardian is chosen and add title
@@ -195,5 +199,28 @@ export default class extends Controller {
     if (radioToSelect && !radioToSelect.checked) {
       radioToSelect.checked = true;
     }
+  }
+
+  /**
+   * Toggle disabled state of form fields within a section
+   * @param {HTMLElement} section - The section containing form fields
+   * @param {boolean} disabled - Whether to disable the fields
+   * @private
+   */
+  _toggleFormFieldsDisabled(section, disabled) {
+    if (!section) return;
+    
+    // Find all form fields within the section
+    const formFields = section.querySelectorAll('input, select, textarea');
+    
+    formFields.forEach(field => {
+      if (disabled) {
+        field.disabled = true;
+        field.setAttribute('disabled', 'disabled');
+      } else {
+        field.disabled = false;
+        field.removeAttribute('disabled');
+      }
+    });
   }
 }

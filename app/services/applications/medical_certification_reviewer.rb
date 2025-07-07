@@ -20,42 +20,67 @@ module Applications
     def reject(rejection_reason:, notes: nil)
       Rails.logger.info "Rejecting medical certification for Application ##{application.id}"
 
-      # Validate inputs
+      # Validate all inputs and prerequisites
+      validation_result = validate_rejection_inputs(rejection_reason)
+      return validation_result if validation_result.failure?
+
+      # Process the rejection through the dedicated service
+      service_result = process_rejection(rejection_reason, notes)
+      return service_result if service_result.failure?
+
+      # Create additional note if provided
+      note_result = create_rejection_note(notes)
+      return note_result if note_result.failure?
+
+      success('Medical certification rejected successfully')
+    end
+
+    private
+
+    def validate_rejection_inputs(rejection_reason)
       return failure('Rejection reason is required') if rejection_reason.blank?
       return failure('Admin user is required') if admin.blank?
 
-      # Check if application has a medical provider with contact info
+      validate_medical_provider_info
+    end
+
+    def validate_medical_provider_info
       return failure('Application does not have medical provider information') if application.medical_provider_name.blank?
+      return failure('No contact method available for medical provider') if no_contact_methods_available?
 
-      # Make sure there's at least one way to contact the provider
-      return failure('No contact method available for medical provider') if application.medical_provider_email.blank? && application.medical_provider_fax.blank?
+      success
+    end
 
-      # Call the dedicated service to handle rejection logic (updates status, creates events/notifications)
+    def no_contact_methods_available?
+      application.medical_provider_email.blank? && application.medical_provider_fax.blank?
+    end
+
+    def process_rejection(rejection_reason, notes)
       service_result = MedicalCertificationAttachmentService.reject_certification(
         application: application,
         admin: admin,
         reason: rejection_reason,
-        notes: notes # Pass notes to the service, it includes them in notification/status change metadata
+        notes: notes
       )
 
-      # Convert hash result to BaseService::Result
       return failure(service_result[:error]&.message || 'Medical certification service failed') unless service_result[:success]
 
-      # If the service call succeeded and notes were provided, create the specific ApplicationNote
-      if notes.present?
-        begin
-          application.application_notes.create!(
-            admin: admin, # Correct association name
-            content: "Medical certification rejected: #{notes}"
-            # Removed non-existent note_type attribute
-          )
-        rescue StandardError => e
-          Rails.logger.error("Failed to create application note: #{e.message}")
-          return failure("Medical certification rejected successfully, but note creation failed: #{e.message}")
-        end
-      end
+      success
+    end
 
-      success('Medical certification rejected successfully')
+    def create_rejection_note(notes)
+      return success if notes.blank?
+
+      begin
+        application.application_notes.create!(
+          admin: admin,
+          content: "Medical certification rejected: #{notes}"
+        )
+        success
+      rescue StandardError => e
+        Rails.logger.error("Failed to create application note: #{e.message}")
+        failure("Medical certification rejected successfully, but note creation failed: #{e.message}")
+      end
     end
   end
 end

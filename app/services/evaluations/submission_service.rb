@@ -9,32 +9,32 @@ module Evaluations
 
     def submit
       ApplicationRecord.transaction do
-        @evaluation.assign_attributes(submission_params)
-        @evaluation.status = :completed # Directly set the intended final status
-
-        # --- Targeted Debugging ---
-        Rails.logger.info '--- Debugging before save! ---'
-        Rails.logger.info "Attempting to save evaluation ID: #{@evaluation.id}"
-        Rails.logger.info "Current status before save: #{@evaluation.status}"
-        Rails.logger.info "Changes before save: #{@evaluation.changes.inspect}"
-        is_valid = @evaluation.validate # Manually trigger validation
-        Rails.logger.info "Is valid according to .validate?: #{is_valid}"
-        Rails.logger.info "Validation errors before save: #{@evaluation.errors.full_messages.join(', ')}"
-        # Debugging removed
-
-        @evaluation.save! # Attempt to save
+        prepare_evaluation
+        save_evaluation!
         notify_constituent
-        # update_application_status # Removed - Application status should update via its own callbacks/logic
       end
       true
     rescue ActiveRecord::RecordInvalid => e
-      # Log actual validation errors if save! fails
-      Rails.logger.error "Evaluation submission FAILED for ID #{@evaluation&.id}: #{e.message}"
-      Rails.logger.error "Validation errors: #{@evaluation&.errors&.full_messages&.join(', ')}"
+      handle_record_invalid(e)
       false
     end
 
     private
+
+    def prepare_evaluation
+      @evaluation.assign_attributes(submission_params)
+      @evaluation.status = :completed # Directly set the intended final status
+    end
+
+    def save_evaluation!
+      @evaluation.save! # Attempt to save
+    end
+
+    def handle_record_invalid(exception)
+      Rails.logger.error "Evaluation submission FAILED for ID #{@evaluation&.id}: #{exception.message}"
+      validation_errors = @evaluation&.errors&.full_messages
+      Rails.logger.error "Validation errors: #{validation_errors&.join(', ')}" if validation_errors.present?
+    end
 
     def submission_params
       @params.require(:evaluation).permit(
@@ -51,7 +51,5 @@ module Evaluations
     def notify_constituent
       EvaluatorMailer.evaluation_submission_confirmation(@evaluation).deliver_later
     end
-
-    # Removed update_application_status method
   end
 end

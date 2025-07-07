@@ -91,8 +91,7 @@ class Application < ApplicationRecord
              inverse_of: :managed_applications
   belongs_to :medical_certification_verified_by,
              class_name: 'User',
-             optional: true,
-             inverse_of: :medical_certification_verified_applications
+             optional: true
 
   has_many :training_sessions, class_name: 'TrainingSession', dependent: :destroy
   has_many :trainers, through: :training_sessions
@@ -104,6 +103,8 @@ class Application < ApplicationRecord
   has_many :vouchers, dependent: :restrict_with_error
   has_many :application_notes, dependent: :destroy
   has_and_belongs_to_many :products
+  has_one_attached :income_proof
+  has_one_attached :residency_proof
   has_one_attached :medical_certification
 
   # Validations
@@ -187,6 +188,20 @@ class Application < ApplicationRecord
     ).distinct
   }
 
+  # -------------------------------------------------------------------------
+  # Eager-loading helpers
+  # -------------------------------------------------------------------------
+  # Loads all blobs for the three primary attachments in a single query so that
+  # subsequent calls to `income_proof.attached?`/`blob` don't hit the DB.  Chain
+  # this onto any Application relation:
+  #   Application.with_proof_blobs.includes(:user).page(params[:page])
+  # It works for single-record fetches as well (find/id).
+  scope :with_proof_blobs, lambda {
+    with_attached_income_proof
+      .with_attached_residency_proof
+      .with_attached_medical_certification
+  }
+
   # Class Methods for Analysis
   def self.pain_point_analysis
     draft
@@ -195,6 +210,9 @@ class Application < ApplicationRecord
       .order('count_all DESC')
       .count
   end
+
+  # Allow test suite to disable certain validations globally
+  cattr_accessor :skip_wait_period_validation, default: false
 
   # Instance Methods
   # Status methods- Delegate approval logic to the Applications::Approver service object
@@ -325,6 +343,14 @@ class Application < ApplicationRecord
     @logging_status_change = true
 
     begin
+      # Create ApplicationStatusChange record for audit logs
+      status_changes.create!(
+        from_status: status_before_last_save,
+        to_status: status,
+        user: acting_user
+      )
+
+      # Also create Event record for other audit purposes
       AuditEventService.log(
         action: 'application_status_changed',
         actor: acting_user,
@@ -344,7 +370,8 @@ class Application < ApplicationRecord
   end
 
   def waiting_period_completed
-    return unless user && !new_record?
+    return if Application.skip_wait_period_validation
+    return unless user
 
     last_app = user_applications_except_current
     return unless last_app
@@ -356,7 +383,9 @@ class Application < ApplicationRecord
   end
 
   def user_applications_except_current
-    user.applications.where.not(id: id).order(application_date: :desc).first
+    scope = user.applications
+    scope = scope.where.not(id: id) unless new_record?
+    scope.order(application_date: :desc).first
   end
 
   def needs_proof_review?

@@ -17,7 +17,7 @@
 class PrintQueueItem < ApplicationRecord
   belongs_to :constituent, class_name: 'User'
   belongs_to :application, optional: true
-  belongs_to :admin, optional: true, class_name: 'User'
+  belongs_to :admin, -> { where(type: 'Users::Administrator') }, optional: true, class_name: 'User'
 
   has_one_attached :pdf_letter
 

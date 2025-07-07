@@ -6,24 +6,24 @@ import { setVisible } from "../../utils/visibility"
 class UserSearchController extends BaseFormController {
   static targets = [
     "searchInput",
-    "searchResults", 
+    "searchResults",
     "guardianForm",
     "createButton",
     "guardianFormField",
     "clearSearchButton"
   ]
-  
+
   static outlets = ["guardian-picker", "flash"]
-  
+
   static values = {
     searchUrl: String,
-    createUserUrl: String, 
+    createUserUrl: String,
     defaultRole: { type: String, default: "guardian" }
   }
 
   connect() {
     super.connect()
-    
+
     // Add debounced search listener using our new pattern
     if (this.safeTarget('searchInput')) {
       this.addDebouncedListener(
@@ -37,7 +37,7 @@ class UserSearchController extends BaseFormController {
 
   async performSearch(event) {
     const q = event.target.value.trim()
-    
+
     if (q.length === 0) {
       this.clearResults()
       return
@@ -89,22 +89,35 @@ class UserSearchController extends BaseFormController {
       input.value = ""
       input.focus()
     })
-    
+
     this.clearResults()
-    
+
     // DON'T clear the guardian selection here - that would undo the selection we just made!
     // The guardian picker outlet should maintain its selected state
   }
-  
+
+  showCreateForm() {
+    // Try multiple approaches to find and show the form
+    const form = this.element.querySelector('[data-admin-user-search-target="guardianForm"]') ||
+      this.element.querySelector('.guardian-search-form')
+
+    if (form) {
+      form.style.display = 'block'
+      form.style.visibility = 'visible'
+    } else {
+      console.error('Guardian form not found')
+    }
+  }
+
   // Separate method for when we actually want to clear everything
   clearSearchAndSelection() {
     this.withTarget('searchInput', (input) => {
       input.value = ""
       input.focus()
     })
-    
+
     this.clearResults()
-    
+
     if (this.hasGuardianPickerOutlet) {
       this.guardianPickerOutlet.clearSelection()
     }
@@ -113,18 +126,18 @@ class UserSearchController extends BaseFormController {
   // Handle guardian creation from button click events (matching HTML and documentation)
   async createGuardian(event) {
     event.preventDefault()
-    
+
     // Collect form data from guardian fields since they're not in an actual form element
     const formData = new FormData()
-    
+
     // Find all guardian input fields within our controller element
     const guardianFields = this.element.querySelectorAll('input[name^="guardian_attributes"], select[name^="guardian_attributes"]')
-    
+
     if (guardianFields.length === 0) {
       console.error('Guardian form fields not found')
       return
     }
-    
+
     // Collect all field values and convert guardian_attributes[field] to direct field names
     guardianFields.forEach(field => {
       if (field.type === 'radio' || field.type === 'checkbox') {
@@ -139,10 +152,10 @@ class UserSearchController extends BaseFormController {
         formData.append(fieldName, field.value)
       }
     })
-    
+
     // Clear any previous errors
     this.clearFieldErrors()
-    
+
     // Validate required fields
     const validationResult = await this.validateBeforeSubmit(formData)
     if (!validationResult.valid) {
@@ -186,7 +199,7 @@ class UserSearchController extends BaseFormController {
     } catch (error) {
       console.error('Guardian creation error:', error)
       this.showErrorNotification(error.message || 'Failed to create guardian')
-      
+
       // Restore button state on error
       const button = event.target
       button.disabled = false
@@ -205,17 +218,17 @@ class UserSearchController extends BaseFormController {
 
     // Use safe HTML escaping for security
     const displayHTML = this.buildUserDisplayHTML(this.escapeHtml(userName), userData)
-    
+
     if (this.hasGuardianPickerOutlet) {
       this.guardianPickerOutlet.selectGuardian(userId, displayHTML)
     }
-    
+
     this.clearResults()
   }
 
   buildUserDisplayHTML(userName, userData) {
     const { userEmail, userPhone, userAddress1, userAddress2, userCity, userState, userZip, userDependentsCount = '0' } = userData
-    
+
     // Escape all user data for XSS prevention
     const safeEmail = userEmail ? this.escapeHtml(userEmail) : ''
     const safePhone = userPhone ? this.escapeHtml(userPhone) : ''
@@ -224,18 +237,18 @@ class UserSearchController extends BaseFormController {
     const safeCity = userCity ? this.escapeHtml(userCity) : ''
     const safeState = userState ? this.escapeHtml(userState) : ''
     const safeZip = userZip ? this.escapeHtml(userZip) : ''
-    
+
     let html = `<span class="font-medium">${userName}</span>`
-    
+
     // Contact info
     const contactInfo = []
     if (safeEmail) contactInfo.push(`<span class="text-indigo-700">${safeEmail}</span>`)
     if (safePhone) contactInfo.push(`<span class="text-gray-600">Phone: ${safePhone}</span>`)
-    
+
     if (contactInfo.length > 0) {
       html += `<div class="text-sm text-gray-600 mt-1">${contactInfo.join(' • ')}</div>`
     }
-    
+
     // Address
     const addressParts = [safeAddress1, safeAddress2, safeCity, safeState, safeZip].filter(Boolean)
     if (addressParts.length > 0) {
@@ -243,12 +256,12 @@ class UserSearchController extends BaseFormController {
     } else {
       html += `<div class="text-sm text-gray-600 mt-1 italic">No address information available</div>`
     }
-    
+
     // Dependents
     const dependentsCount = parseInt(userDependentsCount) || 0
     const dependentsText = dependentsCount === 1 ? "1 dependent" : `${dependentsCount} dependents`
     html += `<div class="text-sm text-gray-600 mt-1">Currently has ${dependentsText}</div>`
-    
+
     return html
   }
 
@@ -268,9 +281,9 @@ class UserSearchController extends BaseFormController {
     const firstName = data instanceof FormData ? data.get('first_name') : data.first_name
     const lastName = data instanceof FormData ? data.get('last_name') : data.last_name
     const email = data instanceof FormData ? data.get('email') : data.email
-    
+
     if (!firstName || !lastName || !email) {
-      return { 
+      return {
         valid: false,
         errors: {
           first_name: !firstName ? 'First name is required' : null,
@@ -288,7 +301,7 @@ class UserSearchController extends BaseFormController {
     this.element.querySelectorAll('input.border-red-500').forEach(input => {
       input.classList.remove('border-red-500')
     })
-    
+
     // Remove error messages
     this.element.querySelectorAll('.field-error-message').forEach(errorEl => {
       errorEl.remove()
@@ -341,11 +354,11 @@ class UserSearchController extends BaseFormController {
         userDependentsCount: '0'
       }
     )
-    
+
     if (this.hasGuardianPickerOutlet) {
       this.guardianPickerOutlet.selectGuardian(user.id.toString(), displayHTML)
     }
-    
+
     this.clearSearchAndShowForm()
   }
 
@@ -369,7 +382,7 @@ class UserSearchController extends BaseFormController {
   disconnect() {
     // Clean up managed event listeners
     this.cleanupAllEventHandlers()
-    
+
     // Call parent disconnect
     super.disconnect()
   }
@@ -377,10 +390,10 @@ class UserSearchController extends BaseFormController {
   // Add event handler management mixin methods
   addDebouncedListener(element, event, handler, wait = 300) {
     if (!element) return
-    
+
     const debounced = this.debounce(handler.bind(this), wait)
     element.addEventListener(event, debounced)
-    
+
     // Store for cleanup
     this._managedListeners = this._managedListeners || []
     this._managedListeners.push({ element, event, handler: debounced })

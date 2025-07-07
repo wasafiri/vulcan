@@ -11,8 +11,12 @@ module ApplicationFormHandling
   # Common form error handling
   def render_form_errors(form, application = nil)
     @application = application || Application.new(filtered_application_params)
-    form.errors.each do |error|
-      @application.errors.add(error.attribute, error.message)
+
+    # Only process form errors if form is present
+    if form.respond_to?(:errors)
+      form.errors.each do |error|
+        @application.errors.add(error.attribute, error.message)
+      end
     end
 
     initialize_address_and_provider_for_form
@@ -36,9 +40,7 @@ module ApplicationFormHandling
 
   # Common success message determination
   def determine_success_message(application, is_submission = false)
-    if is_submission
-      'Application submitted successfully!'
-    elsif application.status_in_progress?
+    if is_submission || application.status_in_progress?
       'Application submitted successfully!'
     else
       'Application saved successfully.'

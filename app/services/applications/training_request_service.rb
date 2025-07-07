@@ -12,7 +12,7 @@ module Applications
 
     def call
       return failure('Only approved applications are eligible for training.') unless validate_eligibility
-      return failure('You have used all of your available training sessions.') unless check_session_limit
+      return failure('You have used all of your available training sessions.') unless check_session_limit?
 
       create_notifications
       log_request
@@ -25,7 +25,7 @@ module Applications
       application.status_approved?
     end
 
-    def check_session_limit
+    def check_session_limit?
       max_sessions = Policy.get('max_training_sessions') || 3
       application.training_sessions.count < max_sessions
     end

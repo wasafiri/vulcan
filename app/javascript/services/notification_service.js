@@ -7,7 +7,7 @@
  */
 class NotificationService {
   constructor() {
-    this.container = this.getOrCreateContainer();
+    this.container = null; // Will be lazily created when needed
     this.maxNotifications = 5; // Limit the number of notifications displayed at once
     this.hideDelay = 3000; // Default hide delay for success/info
     this.errorHideDelay = 5000; // Hide delay for errors
@@ -17,9 +17,20 @@ class NotificationService {
   /**
    * Gets or creates the main container for notifications.
    * The container is marked with `data-turbo-permanent` to persist across Turbo navigations.
-   * @returns {HTMLElement} The notification container element.
+   * @returns {HTMLElement|null} The notification container element, or null if DOM is not ready.
    */
   getOrCreateContainer() {
+    // Return cached container if available
+    if (this.container) {
+      return this.container;
+    }
+
+    // Check if DOM is ready
+    if (!document.body) {
+      console.warn('[NotificationService] document.body not available yet, deferring container creation');
+      return null;
+    }
+
     let container = document.getElementById('notification-container');
     if (!container) {
       container = document.createElement('div');
@@ -28,6 +39,9 @@ class NotificationService {
       container.setAttribute('data-turbo-permanent', ''); // Persist across Turbo navigations
       document.body.appendChild(container);
     }
+    
+    // Cache the container
+    this.container = container;
     return container;
   }
 
@@ -96,10 +110,17 @@ class NotificationService {
    *   - permanent {boolean}: If true, notification will not auto-hide and will persist until manually dismissed.
    */
   show(message, type = 'info', options = {}) {
+    // Ensure container is available
+    const container = this.getOrCreateContainer();
+    if (!container) {
+      console.warn('[NotificationService] Container not available, cannot show notification:', message);
+      return;
+    }
+    
     this.cleanupOldNotifications();
 
     const notificationElement = this.createNotificationElement(message, type);
-    this.container.appendChild(notificationElement);
+    container.appendChild(notificationElement);
 
     const autoHide = options.permanent ? false : (options.autoHide ?? true);
     const delay = options.hideDelay || (type === 'error' ? this.errorHideDelay : this.hideDelay);
@@ -233,10 +254,13 @@ class NotificationService {
   processQueuedMessages() {
     // Check for messages embedded in a script tag (e.g., from Rails flash)
     const flashDataElement = document.getElementById('rails-flash-messages');
+    
     if (flashDataElement && flashDataElement.textContent) {
       try {
         const messages = JSON.parse(flashDataElement.textContent);
-        messages.forEach(msg => this.show(msg.message, msg.type));
+        messages.forEach(msg => {
+          this.show(msg.message, msg.type);
+        });
       } catch (e) {
         console.error('Error parsing queued flash messages:', e);
       }
@@ -256,7 +280,12 @@ class NotificationService {
    * Removes the oldest notifications if the limit is exceeded.
    */
   cleanupOldNotifications() {
-    const existingNotifications = Array.from(this.container.children);
+    const container = this.getOrCreateContainer();
+    if (!container) {
+      return; // Nothing to clean up if container doesn't exist
+    }
+    
+    const existingNotifications = Array.from(container.children);
     if (existingNotifications.length >= this.maxNotifications) {
       const toRemoveCount = existingNotifications.length - this.maxNotifications + 1;
       for (let i = 0; i < toRemoveCount; i++) {

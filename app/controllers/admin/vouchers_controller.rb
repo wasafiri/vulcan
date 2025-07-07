@@ -3,6 +3,7 @@
 module Admin
   class VouchersController < Admin::BaseController
     include Pagy::Backend
+    include TurboStreamResponseHandling
 
     before_action :set_voucher, only: %i[show update cancel]
     before_action :require_admin!
@@ -24,28 +25,49 @@ module Admin
       @transactions = @voucher.transactions.includes(:vendor)
                               .order(processed_at: :desc)
 
-      @audit_logs = Event.where('metadata @> ?', { voucher_id: @voucher.id }.to_json)
-                         .or(Event.where('metadata @> ?', { voucher_code: @voucher.code }.to_json))
-                         .includes(:user)
-                         .order(created_at: :desc)
+      @audit_logs = Vouchers::VoucherAuditLogBuilder.new(@voucher).build_deduplicated_audit_logs
     end
 
     def update
       if @voucher.update(voucher_params)
-        log_event!('Updated voucher details')
-        redirect_to [:admin, @voucher], notice: 'Voucher updated successfully'
+        AuditEventService.log(
+          action: 'voucher_updated',
+          actor: current_user,
+          auditable: @voucher,
+          metadata: { changes: @voucher.saved_changes }
+        )
+        handle_success_response(
+          html_redirect_path: [:admin, @voucher],
+          html_message: 'Voucher updated successfully',
+          turbo_message: 'Voucher updated successfully'
+        )
       else
-        render :show, status: :unprocessable_entity
+        handle_error_response(
+          html_render_action: :show,
+          error_message: 'Failed to update voucher.'
+        )
       end
     end
 
     def cancel
       if @voucher.can_cancel?
         @voucher.update!(status: :cancelled)
-        log_event!('Cancelled voucher')
-        redirect_to [:admin, @voucher], notice: 'Voucher cancelled successfully'
+        AuditEventService.log(
+          action: 'voucher_cancelled',
+          actor: current_user,
+          auditable: @voucher,
+          metadata: { reason: @voucher.notes } # Assuming notes might contain cancellation reason
+        )
+        handle_success_response(
+          html_redirect_path: [:admin, @voucher],
+          html_message: 'Voucher cancelled successfully',
+          turbo_message: 'Voucher cancelled successfully'
+        )
       else
-        redirect_to [:admin, @voucher], alert: 'Cannot cancel this voucher'
+        handle_error_response(
+          html_redirect_path: [:admin, @voucher],
+          error_message: 'Cannot cancel this voucher'
+        )
       end
     end
 
@@ -187,21 +209,6 @@ module Admin
 
     def format_date(date)
       date&.strftime('%Y-%m-%d')
-    end
-
-    def log_event!(action)
-      Event.create!(
-        user: current_user,
-        action: action,
-        metadata: {
-          voucher_id: @voucher.id,
-          voucher_code: @voucher.code,
-          application_id: @voucher.application_id,
-          changes: @voucher.saved_changes,
-          admin_id: current_user.id,
-          timestamp: Time.current.iso8601
-        }
-      )
     end
   end
 end

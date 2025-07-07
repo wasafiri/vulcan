@@ -13,7 +13,7 @@ class VoucherTransaction < ApplicationRecord
                      numericality: { greater_than: 0 }
   validates :reference_number, presence: true, uniqueness: true
   validates :processed_at, presence: true
-  validate :amount_within_voucher_limit, if: :redemption?
+  validate :amount_within_voucher_limit?, if: :redemption?
 
   before_validation :set_processed_at, on: :create
   before_validation :generate_reference_number, on: :create
@@ -62,7 +62,7 @@ class VoucherTransaction < ApplicationRecord
 
   private
 
-  def amount_within_voucher_limit
+  def amount_within_voucher_limit?
     return true unless voucher && amount && redemption?
 
     if BigDecimal(amount.to_s) > BigDecimal(voucher.remaining_value.to_s)
@@ -81,7 +81,8 @@ class VoucherTransaction < ApplicationRecord
     return if reference_number.present?
 
     # Format: TX-[voucher-code-part]-[timestamp]-[random]
-    voucher_part = voucher&.code&.first(6)&.upcase || 'NOTX'
+    voucher_code = voucher&.code
+    voucher_part = voucher_code&.first(6)&.upcase || 'NOTX'
     timestamp = Time.current.strftime('%y%m%d%H%M')
     random = SecureRandom.hex(3).upcase
 

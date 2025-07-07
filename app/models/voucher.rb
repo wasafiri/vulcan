@@ -247,23 +247,8 @@ class Voucher < ApplicationRecord
   end
 
   def log_status_change
-    # Determine the actor safely - if both Current.user and system_user fail,
-    # we'll skip logging rather than break the voucher operation
-    actor = Current.user
-    if actor.nil?
-      begin
-        actor = User.system_user
-      rescue StandardError => e
-        Rails.logger.error("Failed to get system user for voucher status change logging: #{e.message}")
-        return # Skip logging if we can't determine an actor
-      end
-    end
-
-    # Verify the actor actually exists in the database to prevent foreign key constraint violations
-    unless actor&.persisted? && User.exists?(actor.id)
-      Rails.logger.warn("Skipping voucher status change audit - actor user (ID: #{actor&.id}) does not exist in database")
-      return
-    end
+    actor = determine_actor_for_logging
+    return unless actor && valid_actor?(actor)
 
     AuditEventService.log(
       action: "status_changed_to_#{status}",
@@ -300,6 +285,25 @@ class Voucher < ApplicationRecord
 
   def generate_reference_number
     "TXN-#{SecureRandom.hex(6).upcase}"
+  end
+
+  def determine_actor_for_logging
+    actor = Current.user
+    return actor if actor.present?
+
+    begin
+      User.system_user
+    rescue StandardError => e
+      Rails.logger.error("Failed to get system user for voucher status change logging: #{e.message}")
+      nil
+    end
+  end
+
+  def valid_actor?(actor)
+    return true if actor&.persisted? && User.exists?(actor.id)
+
+    Rails.logger.warn("Skipping voucher status change audit - actor user (ID: #{actor&.id}) does not exist in database")
+    false
   end
 
   def set_initial_values

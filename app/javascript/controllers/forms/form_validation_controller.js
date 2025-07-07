@@ -6,7 +6,7 @@ import { Controller } from "@hotwired/stimulus"
  * Provides client-side validation for paper application forms.
  * Works in conjunction with HTML5 validation and server-side validation.
  */
-export default class extends Controller {
+export default class FormValidationController extends Controller {
   static targets = [
     "form",
     "errorContainer",
@@ -85,6 +85,7 @@ export default class extends Controller {
     const hasRejectTarget = `has${rejectTarget.charAt(0).toUpperCase() + rejectTarget.slice(1)}`;
     const hasFileTarget = `has${fileTarget.charAt(0).toUpperCase() + fileTarget.slice(1)}`;
     const hasReasonTarget = `has${reasonTarget.charAt(0).toUpperCase() + reasonTarget.slice(1)}`;
+    
     
     // Early return if critical targets are missing - this indicates markup mismatch
     if (!this[hasAcceptTarget] && !this[hasRejectTarget]) {

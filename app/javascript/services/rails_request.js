@@ -131,112 +131,52 @@ export class RailsRequestService {
    * Parse successful response based on content type
    */
   async parseSuccessResponse(response) {
+    // Always work on a cloned response so that we never attempt to read
+    // the original body more than once.  This avoids the
+    // "Failed to execute 'text' on 'Response': body stream already read"
+    // error that occurs in headless browsers used in our system tests.
     const contentType = response.headers?.get('content-type') || ''
-    
-    // Debug logging for development
-    if (process.env.NODE_ENV !== 'production') {
-      console.debug('parseSuccessResponse:', {
-        contentType,
-        hasJsonProperty: !!response.json,
-        jsonIsFunction: typeof response.json === 'function',
-        hasTextProperty: !!response.text,
-        textIsFunction: typeof response.text === 'function'
-      })
-    }
-    
-    // For HTML responses, always use text parsing
-    if (contentType.includes('text/html') || contentType.includes('text/vnd.turbo-stream.html')) {
-      // @rails/request.js sometimes pre-processes HTML responses incorrectly, causing conflicts
-      // Try each method carefully and suppress specific errors
-      
-      // Method 1: Try original response if available
-      const originalResponse = response.response || response
-      if (typeof originalResponse.text === 'function') {
-        try {
-          return await originalResponse.text()
-        } catch (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.debug('parseSuccessResponse: originalResponse.text() failed:', error.message)
-          }
-        }
-      }
-      
-      // Method 2: Try standard fetch response
-      if (typeof response.text === 'function') {
-        try {
-          return await response.text()
-        } catch (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.debug('parseSuccessResponse: response.text() failed:', error.message)
-          }
-        }
-      }
-      
-      // Method 3: Try pre-processed promise, but catch and suppress @rails/request.js errors
-      if (response.text && typeof response.text !== 'function') {
-        // Wrap the promise to handle unhandled rejections
-        const textPromise = Promise.resolve(response.text).catch(error => {
-          // Specifically catch and suppress the @rails/request.js JSON parsing error
-          if (error.message && error.message.includes('Expected a JSON response')) {
-            if (process.env.NODE_ENV !== 'production') {
-              console.debug('parseSuccessResponse: Suppressed @rails/request.js JSON parsing error for HTML response')
-            }
-            // Return empty string since we can't get the actual content
-            return ''
-          }
-          // Re-throw other errors
-          throw error
-        })
-        
-        try {
-          return await textPromise
-        } catch (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.debug('parseSuccessResponse: textPromise failed:', error.message)
-          }
-          return ''
-        }
-      }
-      
-      // Fallback for HTML responses
-      return ''
-    }
-    
-    // For JSON responses
-    if (contentType.includes('application/json')) {
-      // Check if @rails/request.js already resolved json
-      if (response.json && typeof response.json !== 'function') {
-        try {
-          return await response.json
-        } catch (error) {
-          console.warn('parseSuccessResponse: pre-processed JSON failed:', error.message)
-          return {}
-        }
-      }
-      // Use standard fetch json() method
+
+    // If @rails/request.js has already parsed the body it monkey-patches
+    // `response.json` with a *Promise*, **not** the original function – we
+    // can just await and return that value with no further processing.
+    if (response.json && typeof response.json !== 'function') {
       try {
-        return await response.json()
-      } catch (error) {
-        console.warn('parseSuccessResponse: response.json() failed:', error.message)
-        return {}
+        return await response.json
+      } catch (_) {
+        // fall through to safe parsing below
       }
     }
-    
-    // Default to text for unknown content types
-    if (response.text && typeof response.text !== 'function') {
-      try {
-        return await response.text
-      } catch (error) {
-        console.warn('parseSuccessResponse: pre-processed text failed:', error.message)
-        return ''
-      }
+
+    // If the body has already been consumed we can't read it again – return
+    // a sensible empty value so callers can handle it gracefully.
+    if (response.bodyUsed) {
+      return contentType.includes('application/json') ? {} : ''
     }
-    
+
+    // Clone before reading so that we never consume the original body – this
+    // keeps us compatible with any other consumer that might also need it.
+    const clone = response.clone()
+
     try {
-      return await response.text()
+      if (contentType.includes('application/json')) {
+        return await clone.json()
+      }
+
+      if (contentType.includes('text/html') || contentType.includes('text/vnd.turbo-stream.html')) {
+        return await clone.text()
+      }
+
+      // Unknown/other – attempt JSON then text as a fallback.
+      try {
+        return await clone.json()
+      } catch (_) {
+        return await clone.text()
+      }
+
     } catch (error) {
-      console.warn('parseSuccessResponse: response.text() fallback failed:', error.message)
-      return ''
+      console.warn('RailsRequestService.parseSuccessResponse failed:', error.message)
+      return contentType.includes('application/json') ? {} : ''
     }
   }
 

@@ -4,7 +4,7 @@
 class ProofReview < ApplicationRecord
   # Associations
   belongs_to :application
-  belongs_to :admin, class_name: 'User'
+  belongs_to :admin, -> { where(type: 'Users::Administrator') }, class_name: 'User'
 
   # Enums (using the original syntax to avoid argument errors)
   enum :proof_type, { income: 0, residency: 1 }, prefix: true
@@ -16,9 +16,9 @@ class ProofReview < ApplicationRecord
   validates :status, presence: true
   validates :reviewed_at, presence: true
   validates :rejection_reason, presence: true, if: :status_rejected?
-  validate :admin_must_be_admin_type
   validate :application_must_be_active
   validate :proof_must_be_attached, if: :should_validate_proof_attachment?
+  validate :admin_must_be_admin_type
 
   # Callbacks
   before_validation :set_reviewed_at, on: :create
@@ -35,15 +35,6 @@ class ProofReview < ApplicationRecord
 
   def set_reviewed_at
     self.reviewed_at ||= Time.current
-  end
-
-  def admin_must_be_admin_type
-    Rails.logger.info "ProofReview validation - Admin: #{admin.inspect}, Admin type: #{admin&.type}, Admin#admin? result: #{admin&.admin?}"
-
-    return if admin&.admin?
-
-    Rails.logger.error "Admin validation failed: #{admin&.inspect} (type: #{admin&.type}) - admin? method returned false"
-    errors.add(:admin, 'must be an administrator')
   end
 
   def application_must_be_active
@@ -80,34 +71,45 @@ class ProofReview < ApplicationRecord
   end
 
   def handle_post_review_actions
+    log_initial_status
+    return if status.blank?
+
+    begin
+      process_rejection_flow
+      send_status_notification
+    rescue StandardError => e
+      Rails.logger.error "Failed to process proof review actions: #{e.message}\n#{e.backtrace.join("\n")}"
+      raise
+    end
+  end
+
+  def log_initial_status
     Rails.logger.info "Starting handle_post_review_actions for ProofReview ID: #{id}"
     Rails.logger.info "Initial status check - status: #{status.inspect}, blank?: #{status.blank?}"
     return if status.blank?
 
     Rails.logger.info "Processing proof review for Application ID: #{application.id}"
     Rails.logger.info "Status details: raw: #{status.inspect}, before type cast: #{status_before_type_cast.inspect}, rejected?: #{status_rejected?}"
+  end
 
-    begin
-      ActiveRecord::Base.transaction do
-        if status_rejected?
-          Rails.logger.info 'Status is rejected, handling rejection flow'
-          increment_rejections_if_rejected
-          check_max_rejections
-        else
-          Rails.logger.info 'Status is approved, skipping rejection flow'
-        end
-      end
-
-      # Send appropriate notification based on status
+  def process_rejection_flow
+    ActiveRecord::Base.transaction do
       if status_rejected?
-        send_notification('proof_rejected', :proof_rejected,
-                          { proof_type: proof_type, rejection_reason: rejection_reason })
+        Rails.logger.info 'Status is rejected, handling rejection flow'
+        increment_rejections_if_rejected
+        check_max_rejections
       else
-        send_notification('proof_approved', :proof_approved, { proof_type: proof_type })
+        Rails.logger.info 'Status is approved, skipping rejection flow'
       end
-    rescue StandardError => e
-      Rails.logger.error "Failed to process proof review actions: #{e.message}\n#{e.backtrace.join("\n")}"
-      raise
+    end
+  end
+
+  def send_status_notification
+    if status_rejected?
+      send_notification('proof_rejected', :proof_rejected,
+                        { proof_type: proof_type, rejection_reason: rejection_reason })
+    else
+      send_notification('proof_approved', :proof_approved, { proof_type: proof_type })
     end
   end
 
@@ -138,7 +140,8 @@ class ProofReview < ApplicationRecord
 
   def increment_rejections_if_rejected
     application.with_lock do
-      application.increment!(:total_rejections)
+      application.total_rejections += 1
+      application.save!
     end
   rescue StandardError => e
     errors.add(:base, "Failed to update rejection count. Please try again. Status: #{e.message}")
@@ -147,33 +150,37 @@ class ProofReview < ApplicationRecord
 
   def check_max_rejections
     application.with_lock do
-      if application.total_rejections >= 8
-        # Log the audit event first
-        AuditEventService.log(
-          action: 'max_rejections_warning',
-          actor: admin,
-          auditable: application,
-          metadata: { recipient_id: User.admins.first.id }
-        )
-
-        # Then, send the notification without the audit flag
-        NotificationService.create_and_deliver!(
-          type: 'max_rejections_warning',
-          recipient: User.admins.first,
-          actor: admin,
-          notifiable: application,
-          channel: :email
-        )
-      end
-      if application.total_rejections > 8
-        application.update!(status: :archived)
-        ApplicationNotificationsMailer.max_rejections_reached(application).deliver_later
-      end
+      send_max_rejections_warning if application.total_rejections >= 8
+      archive_application_if_exceeded if application.total_rejections > 8
     end
   rescue StandardError => e
     Rails.logger.error "Failed to process max rejections: #{e.message}"
     errors.add(:base, 'Failed to process rejection limits')
     raise ActiveRecord::Rollback
+  end
+
+  def send_max_rejections_warning
+    # Log the audit event first
+    AuditEventService.log(
+      action: 'max_rejections_warning',
+      actor: admin,
+      auditable: application,
+      metadata: { recipient_id: User.admins.first.id }
+    )
+
+    # Then, send the notification without the audit flag
+    NotificationService.create_and_deliver!(
+      type: 'max_rejections_warning',
+      recipient: User.admins.first,
+      actor: admin,
+      notifiable: application,
+      channel: :email
+    )
+  end
+
+  def archive_application_if_exceeded
+    application.update!(status: :archived)
+    ApplicationNotificationsMailer.max_rejections_reached(application).deliver_later
   end
 
   def check_all_proofs_approved
@@ -193,5 +200,9 @@ class ProofReview < ApplicationRecord
     end
   rescue StandardError => e
     Rails.logger.error "Failed to process all proofs approved: #{e.message}\n#{e.backtrace.join("\n")}"
+  end
+
+  def admin_must_be_admin_type
+    errors.add(:admin, 'must be an administrator') unless admin&.admin?
   end
 end

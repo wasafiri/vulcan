@@ -27,6 +27,14 @@ class DocumentProofHandlerController extends Controller {
   connect() {
     // Set initial state based on selected radio button
     this.updateVisibility();
+    
+    // Add event listener for rejection reason selection
+    this.withTarget('rejectionReasonSelect', (target) => {
+      target.addEventListener('change', () => {
+        this.previewRejectionReason();
+        this.populateRejectionNotes();
+      });
+    });
   }
 
   /**
@@ -119,6 +127,44 @@ class DocumentProofHandlerController extends Controller {
     };
     
     return reasonMessages[reasonCode] || 'This document was rejected. Please provide a valid document.';
+  }
+
+  /**
+   * Populate the rejection notes field with appropriate text based on selected reason
+   */
+  populateRejectionNotes() {
+    this.withTarget('rejectionNotes', (notesTarget) => {
+      this.withTarget('rejectionReasonSelect', (selectTarget) => {
+        const selectedReason = selectTarget.value;
+        
+        if (selectedReason && !notesTarget.value) {
+          // Only populate if the field is empty
+          const reasonText = this.formatRejectionReason(selectedReason);
+          const instructionalText = this.getInstructionalText(selectedReason);
+          notesTarget.value = `${reasonText} ${instructionalText}`;
+        }
+      });
+    });
+  }
+
+  /**
+   * Get instructional text for rejection reasons
+   * @param {string} reasonCode The rejection reason code
+   * @returns {string} Instructional text
+   */
+  getInstructionalText(reasonCode) {
+    const instructions = {
+      'address_mismatch': 'Please provide a document that shows your current address.',
+      'expired': 'Please provide a current document that is not expired.',
+      'missing_name': 'Please provide a document that clearly shows your name.',
+      'wrong_document': 'Please provide an acceptable document type for this proof.',
+      'missing_amount': 'Please provide a document that clearly shows the income amount.',
+      'exceeds_threshold': 'Unfortunately, your income exceeds the program eligibility threshold.',
+      'outdated_ss_award': 'Please provide your most recent Social Security award letter.',
+      'other': 'Please contact us for more information about the required documentation.'
+    };
+    
+    return instructions[reasonCode] || 'Please provide the required documentation.';
   }
 }
 
