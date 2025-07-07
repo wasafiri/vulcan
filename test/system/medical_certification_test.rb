@@ -14,6 +14,7 @@ class MedicalCertificationTest < ApplicationSystemTestCase
     @constituent = create(:constituent)
     @application = create(:application,
                           user: @constituent,
+                          status: 'in_progress',
                           medical_provider_name: 'Dr. Jane Smith',
                           medical_provider_email: 'drsmith@example.com',
                           medical_provider_phone: '555-555-5555')

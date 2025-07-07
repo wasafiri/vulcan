@@ -193,11 +193,15 @@ create(:application, :with_all_mocked_attachments)
 # Real attachments (for integration tests)
 create(:application, :with_real_income_proof)
 create(:application, :with_all_real_attachments)
+
+# Waiting period handling (for tests creating multiple applications per user)
+create(:application, :old_enough_for_new_application, user: @user)
 ```
 
 ### When to Use Each
 - **Mocked attachments**: Unit tests, performance-sensitive tests, when you only care about presence/absence
 - **Real attachments**: Integration tests, when testing file processing, when testing ActiveStorage behavior
+- **`:old_enough_for_new_application`**: Tests that create multiple applications for the same user (avoids waiting period validation conflicts)
 
 ## Common Issues & Solutions
 
@@ -217,6 +221,35 @@ create(:application, :with_all_real_attachments)
 - Use `enhanced_sign_in(user)` for Cuprite-specific tests
 - Verify with `assert_authenticated_as(user)`
 - Add `wait_for_turbo` after navigation
+
+### 1a. Waiting Period Validation Errors
+**Problem**: Tests fail with "You must wait 3 years before submitting a new application" when creating multiple applications for the same user.
+
+**Root Cause**: The waiting period validation prevents users from creating new applications within 3 years of their last application.
+
+**Solution**: Use the `:old_enough_for_new_application` factory trait for the first application:
+
+```ruby
+setup do
+  @user = create(:constituent)
+  # Create an application that's old enough to allow new applications
+  @application = create(:application, :old_enough_for_new_application, user: @user)
+  sign_in_for_integration_test(@user)
+end
+
+# Now tests can create new applications for @user without validation conflicts
+test 'user can submit new application' do
+  post constituent_portal_applications_path, params: { ... }
+  # This will succeed because @application is 4 years old
+end
+```
+
+**When to Use**:
+- Tests that create multiple applications for the same user
+- Integration tests testing form submissions
+- Any test setup that creates a "baseline" application and then tests creating new ones
+
+**Alternative Approach**: Create different users for each application instead of using the same user multiple times.
 
 ### 2. Element Not Found (`Capybara::ElementNotFound`)
 **Problem**: Tests can't find or interact with elements.
@@ -253,6 +286,7 @@ create(:application, :with_all_real_attachments)
 - Analyze backtraces for error origins
 - Ensure valid test data creation
 - ✅ **Use Shared Helpers**: Leverage `setup_fpl_policies` and `setup_paper_application_context`
+- ✅ **Waiting Period Conflicts**: Use `:old_enough_for_new_application` trait when creating multiple applications for the same user
 - Check for proper Current attributes context setup
 
 ### 6. FPL Threshold Issues
@@ -735,6 +769,122 @@ When an ActionMailbox test fails:
 - **Accept both 'processed' and 'delivered'** as valid email states
 - **Use `assert_changes` and `assert_difference`** to verify effects
 - **Check audit events** to verify the complete workflow
+
+## DirectUpload Conflict Resolution - RESOLVED (January 2025)
+
+### The DirectUpload Architecture Issue
+
+**MAJOR INSIGHT**: System test failures in proof upload forms were caused by **conflicting DirectUpload implementations**, not application bugs. The routing errors (`No route matches [POST] "/constituent_portal/applications/16/proofs/new/income"`) were symptoms of competing upload systems.
+
+#### Root Cause Analysis
+**Problem**: Two DirectUpload implementations trying to handle the same file field:
+1. **Rails' Built-in DirectUpload** - Activated by `direct_upload: true` attribute
+2. **Custom Upload Controller** - Activated by `data-controller="upload"`
+
+**Symptoms**:
+- Form posting to current page URL instead of form action URL
+- `ActionController::RoutingError` on proof submission
+- JavaScript conflicts between upload systems
+- Tests passing but real functionality broken
+
+#### The Intended Architecture (Per Documentation)
+
+Based on analysis of `docs/proof_logic_consolidation.md` and `docs/proofattachment_and_auditeventservice_logic_cleanup.md`, the **intended approach is to use ProofAttachmentService directly** via standard form submission:
+
+**✅ CORRECT PATTERN**:
+```ruby
+# Simple Rails form → Controller → ProofAttachmentService
+<%= form_with url: resubmit_path, method: :post do |form| %>
+  <%= form.file_field :proof_upload, accept: ".pdf,.jpg,.jpeg,.png" %>
+  <%= form.submit "Submit Document" %>
+<% end %>
+
+# Controller handles via service
+result = ProofAttachmentService.attach_proof({
+  application: @application,
+  proof_type: params[:proof_type],
+  blob_or_file: params[:proof_upload],
+  status: :not_reviewed,
+  admin: current_user,
+  submission_method: :web
+})
+```
+
+**❌ PROBLEMATIC PATTERN**:
+```erb
+<!-- Conflicting DirectUpload implementations -->
+<%= form_with data: { controller: "upload" } do |form| %>
+  <%= form.file_field :proof_upload, 
+      direct_upload: true,  <!-- Rails DirectUpload -->
+      data: { 
+        upload_target: "input",  <!-- Custom upload controller -->
+        direct_upload_url: rails_direct_uploads_path 
+      } %>
+<% end %>
+```
+
+#### Resolution Steps
+
+**Step 1: Remove Conflicting DirectUpload**
+```erb
+<!-- BEFORE: Conflicting implementations -->
+<%= form_with data: { controller: "upload" } do |form| %>
+  <%= form.file_field :proof_upload, 
+      direct_upload: true,  <!-- REMOVED -->
+      data: { upload_target: "input" } %>  <!-- REMOVED -->
+<% end %>
+
+<!-- AFTER: Clean form submission -->
+<%= form_with url: resubmit_path, method: :post do |form| %>
+  <%= form.file_field :proof_upload, accept: ".pdf,.jpg,.jpeg,.png" %>
+  <%= form.submit "Submit Document" %>
+<% end %>
+```
+
+**Step 2: Remove Custom Upload Controller References**
+- Removed `data-controller="upload"` from form
+- Removed upload controller data attributes
+- Removed progress bar and upload UI elements
+- Simplified help text
+
+**Step 3: Verify Architecture Alignment**
+- Form submits directly to controller action
+- Controller calls `ProofAttachmentService.attach_proof()`
+- Service handles file validation, attachment, and audit trails
+- No JavaScript upload interference
+
+#### Test Results
+
+**Before Fix**:
+```
+ActionController::RoutingError (No route matches [POST] "/constituent_portal/applications/16/proofs/new/income")
+```
+
+**After Fix**:
+```
+1 runs, 1 assertions, 0 failures, 0 errors, 0 skips
+```
+
+#### Key Lessons
+
+1. **Architecture Documentation is Critical**: The intended approach was clearly documented but not implemented consistently
+2. **Conflicting JavaScript Controllers**: Multiple upload systems can interfere with each other
+3. **Test Symptoms vs Root Cause**: Routing errors were symptoms of JavaScript conflicts, not route configuration issues
+4. **Service-First Architecture**: ProofAttachmentService should be the single source of truth for file handling
+
+#### Prevention Strategies
+
+**For Future Upload Features**:
+- Choose ONE upload approach: either Rails DirectUpload OR custom controller, never both
+- Document the chosen approach clearly
+- Test with real file uploads, not just mocked attachments
+- Verify form action URLs match expected controller routes
+
+**For Testing Upload Functionality**:
+- Test actual file submission end-to-end
+- Verify form posts to correct URLs
+- Check for JavaScript console errors
+- Test with different file types and sizes
 
 ## Critical Testing Anti-Patterns: Over-Stubbing and Missing Data
 

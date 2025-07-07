@@ -25,7 +25,7 @@ module Admin
       visit new_constituent_portal_application_path
 
       # Fill in minimum required fields
-      fill_in 'Household size', with: '2'
+      fill_in 'Household Size', with: '2'
       fill_in 'Annual income', with: '30000'
       check 'Maryland resident'
       check 'Self-certify disability'
@@ -63,26 +63,24 @@ module Admin
       visit new_admin_paper_application_path
 
       # Fill in constituent info
-      within '#constituent-section' do
-        fill_in 'First name', with: 'John'
+      within '#self-info-section' do
+        fill_in 'First Name', with: 'John'
         fill_in 'Last name', with: 'Paper'
         fill_in 'Email', with: 'john.paper@example.com'
         fill_in 'Phone', with: '555-987-6543'
         check 'Hearing disability'
       end
 
-      # Fill in application info
-      within '#application-section' do
-        fill_in 'Household size', with: '3'
-        fill_in 'Annual income', with: '45000'
-        check 'Maryland resident'
-        check 'Self-certify disability'
+      # Fill in application info (these fields are in the main form)
+      fill_in 'Household size', with: '3'
+      fill_in 'Annual income', with: '45000'
+      check 'Maryland resident'
+      check 'Self-certify disability'
 
-        # Fill in medical provider info
-        fill_in 'Medical provider name', with: 'Dr. Jones'
-        fill_in 'Medical provider email', with: 'jones@example.com'
-        fill_in 'Medical provider phone', with: '555-333-4444'
-      end
+      # Fill in medical provider info
+      fill_in 'Name', with: 'Dr. Jones'
+      fill_in 'Email', with: 'jones@example.com'
+      fill_in 'Phone', with: '555-333-4444'
 
       # Submit the form
       click_button 'Submit Paper Application'

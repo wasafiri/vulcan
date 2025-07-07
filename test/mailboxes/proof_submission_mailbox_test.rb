@@ -516,10 +516,7 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
 
       # Debug: Verify the application state
       @application.reload
-      puts "DEBUG: Application total_rejections: #{@application.total_rejections}"
-      puts "DEBUG: Policy max_proof_rejections: #{Policy.get('max_proof_rejections')}"
-      puts "DEBUG: Application status: #{@application.status}"
-      puts "DEBUG: Application user email: #{@application.user.email}"
+      # Check rejection count and policy settings
 
       # First, ensure the mail object is correctly delivered before the bounce
       mail_double = mock('Mail')
@@ -613,7 +610,7 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
 
       # Check for any processing errors or exceptions - comprehensive debugging
       if inbound_email.status == 'delivered'
-        puts "\n🔍 DEBUGGING 'delivered' STATUS:"
+        # Check email status
 
         # Check for related events that might explain the issue
         related_events = Event.where("metadata ->> 'inbound_email_id' = ?", inbound_email.id.to_s)

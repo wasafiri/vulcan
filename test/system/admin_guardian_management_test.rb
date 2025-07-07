@@ -10,8 +10,19 @@ class AdminGuardianManagementTest < ApplicationSystemTestCase
     @admin = create(:admin, verified: true, email_verified: true)
     @guardian = create(:constituent, email: 'guardian.admin.view@example.com', phone: '5555550030')
     @dependent = create(:constituent, email: 'dependent.admin.view@example.com', phone: '5555550031')
-    GuardianRelationship.create!(guardian_user: @guardian, dependent_user: @dependent, relationship_type: 'Parent')
-    @application_for_dependent = create(:application, user: @dependent, managing_guardian: @guardian)
+    GuardianRelationship.create!(guardian_id: @guardian.id, dependent_id: @dependent.id, relationship_type: 'Parent')
+    @application_for_dependent = create(:application,
+                                        user: @dependent,
+                                        managing_guardian: @guardian,
+                                        status: 'in_progress',
+                                        application_date: Date.current,
+                                        maryland_resident: true,
+                                        medical_provider_name: 'Test Provider',
+                                        medical_provider_phone: '555-123-4567',
+                                        medical_provider_email: 'provider@example.com',
+                                        household_size: 2,
+                                        annual_income: 30_000,
+                                        self_certify_disability: true)
 
     # Use enhanced sign-in method for better authentication
     enhanced_sign_in(@admin)
@@ -77,7 +88,7 @@ class AdminGuardianManagementTest < ApplicationSystemTestCase
     assert_text 'Parent'
 
     # Verify the relationship exists in the database
-    assert GuardianRelationship.exists?(guardian_user: @guardian, dependent_user: @dependent)
+    assert GuardianRelationship.exists?(guardian_id: @guardian.id, dependent_id: @dependent.id)
   end
 
   test 'admin can verify guardian relationship exists' do
@@ -89,6 +100,6 @@ class AdminGuardianManagementTest < ApplicationSystemTestCase
     assert_text @dependent.full_name
 
     # Verify the relationship exists in the database
-    assert GuardianRelationship.exists?(guardian_user: @guardian, dependent_user: @dependent)
+    assert GuardianRelationship.exists?(guardian_id: @guardian.id, dependent_id: @dependent.id)
   end
 end

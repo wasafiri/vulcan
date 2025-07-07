@@ -15,7 +15,7 @@ FactoryBot.define do
     medical_certification_status { :not_requested }
 
     # Other required fields
-    application_date { Time.current }
+    application_date { 4.years.ago }
     maryland_resident { true }
     self_certify_disability { true }
     medical_provider_name { generate(:medical_provider_name) }
@@ -65,6 +65,13 @@ FactoryBot.define do
       medical_release_authorized { true }
       application_date { 8.years.ago }
       last_activity_at { 8.years.ago }
+    end
+
+    # Trait for applications that are old enough to allow new applications
+    # Use this when tests need to create multiple applications for the same user
+    trait :old_enough_for_new_application do
+      application_date { 4.years.ago } # Older than the 3-year waiting period
+      last_activity_at { 4.years.ago }
     end
 
     trait :with_rejected_proofs do
@@ -148,6 +155,11 @@ FactoryBot.define do
       with_medical_certification
     end
 
+    # Trait for testing medical certification upload workflow
+    trait :with_medical_certification_requested do
+      medical_certification_status { :requested }
+    end
+
     trait :in_progress_with_pending_proofs do
       status { :in_progress }
       income_proof_status { :not_reviewed }
@@ -156,6 +168,32 @@ FactoryBot.define do
 
       after(:create) do |application|
         # Attach proofs that need review
+
+        application.income_proof.attach(
+          io: Rails.root.join('test/fixtures/files/medical_certification_valid.pdf').open,
+          filename: 'income_proof.pdf',
+          content_type: 'application/pdf'
+        )
+
+        application.residency_proof.attach(
+          io: Rails.root.join('test/fixtures/files/medical_certification_valid.pdf').open,
+          filename: 'residency_proof.pdf',
+          content_type: 'application/pdf'
+        )
+      rescue StandardError => e
+        raise e
+      end
+    end
+
+    trait :in_progress_with_rejected_proofs do
+      status { :in_progress }
+      income_proof_status { :rejected }
+      residency_proof_status { :rejected }
+      needs_review_since { Time.current }
+      last_activity_at { Time.current }
+
+      after(:create) do |application|
+        # Attach proofs that were rejected
         application.income_proof.attach(
           io: Rails.root.join('test/fixtures/files/medical_certification_valid.pdf').open,
           filename: 'income_proof.pdf',

@@ -11,6 +11,7 @@ module VendorPortal
 
     test 'updating a Vendor profile and accepting terms' do
       visit edit_vendor_profile_url
+      wait_for_turbo
 
       assert_selector 'h1', text: 'Edit Vendor Profile'
 
@@ -18,6 +19,7 @@ module VendorPortal
       check 'I accept the terms and conditions' # Assuming the checkbox label is "I accept the terms and conditions"
 
       click_on 'Update Profile'
+      wait_for_turbo
 
       assert_text 'Profile was successfully updated.' # Assuming a success message is displayed
       assert_current_path vendor_dashboard_path # Assuming redirection to dashboard after update
@@ -29,6 +31,7 @@ module VendorPortal
 
       # Optional: Visit the edit page again to confirm the saved values in the form
       visit edit_vendor_profile_url
+      wait_for_turbo
       assert_selector "input[value='Updated Vendor Business Name']"
       assert find_field('I accept the terms and conditions').checked?
     end

@@ -13,7 +13,11 @@ module Admin
       @approved_app = create(:application, :approved)
 
       # Create applications with proofs needing review
-      @app_with_pending_proof = create(:application, :in_progress_with_pending_proofs)
+      @app_with_pending_proof = create(:application, 
+        status: 'in_progress',
+        income_proof_status: 'not_reviewed',
+        residency_proof_status: 'not_reviewed'
+      )
 
       # Create application with medical certification received
       @app_with_medical_cert = create(:application, :in_progress)
@@ -35,8 +39,8 @@ module Admin
 
       # Verify status cards section
       assert_selector "section[aria-labelledby='status-cards-heading']"
-      assert_selector 'h3#in-progress-heading', text: 'In Progress Applications'
-      assert_selector 'h3#approved-heading', text: 'Approved'
+      assert_selector 'h3', text: /In Progress Applications/i
+      assert_selector 'h3', text: /^Approved/i
 
       # Verify common tasks section
       assert_selector "section[aria-labelledby='common-tasks-heading']"

@@ -80,21 +80,26 @@ class DisabilityValidationTest < ActiveSupport::TestCase
     # Test each disability type individually
     disability_types = %i[hearing vision speech mobility cognition]
 
-    disability_types.each do |disability_type|
-      # Reset all disabilities to false
-      @constituent.update(
-        hearing_disability: false,
-        vision_disability: false,
-        speech_disability: false,
-        mobility_disability: false,
-        cognition_disability: false
+    disability_types.each_with_index do |disability_type, index|
+      # Create a new constituent for each disability type to avoid 3-year validation
+      constituent = Constituent.create!(
+        email: "test_user_#{Time.now.to_i}_#{index}@example.com",
+        password: 'password123',
+        first_name: 'Test',
+        last_name: 'User'
       )
 
-      # Set just one disability to true
-      @constituent.update("#{disability_type}_disability" => true)
+      # Reset all disabilities to false, then set just one disability to true
+      constituent.update(
+        hearing_disability: disability_type == :hearing,
+        vision_disability: disability_type == :vision,
+        speech_disability: disability_type == :speech,
+        mobility_disability: disability_type == :mobility,
+        cognition_disability: disability_type == :cognition
+      )
 
       application = create(:application,
-                           user: @constituent,
+                           user: constituent,
                            status: :draft,
                            household_size: 1,
                            annual_income: 30_000)

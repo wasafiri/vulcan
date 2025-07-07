@@ -11,8 +11,10 @@
 # Credential management (creation, deletion) is handled by TwoFactorCredentialsController.
 class TwoFactorAuthenticationsController < ApplicationController
   include TwoFactorVerification
+  include TurboStreamResponseHandling
 
-  before_action :authenticate_user!
+  before_action :ensure_two_factor_initiated, except: %i[setup]
+  before_action :authenticate_user!, only: %i[setup]
   skip_before_action :authenticate_user!, only: %i[verify verify_method process_verification verification_options setup]
 
   # GET /two_factor_authentication/setup
@@ -57,8 +59,7 @@ class TwoFactorAuthenticationsController < ApplicationController
       redirect_to verify_method_two_factor_authentication_path(type: 'webauthn')
     end
 
-    # If multiple methods available, show choice screen
-    # The view will be rendered automatically
+    # If multiple methods available, show choice screen. The view will be rendered automatically
   end
 
   # POST /two_factor_authentication/verify_code
@@ -68,18 +69,28 @@ class TwoFactorAuthenticationsController < ApplicationController
     code = params[:code]
     result = false
 
+    # Find the user in the 2FA flow
+    @user = find_user_for_two_factor
+    unless @user
+      redirect_to sign_in_path, alert: 'Session expired. Please sign in again.'
+      return
+    end
+
     # Verify based on method type
     if method == 'totp'
-      result = totp_code_valid?(code)
+      result, = verify_totp_credential(code)
     elsif method == 'sms'
-      result = sms_code_valid?(code)
+      result, = verify_sms_credential(code, nil)
     end
 
     if result
-      complete_authentication
+      # Call the method from ApplicationController to finalize the session
+      complete_two_factor_authentication(@user)
     else
-      flash.now[:alert] = TwoFactorAuth::ERROR_MESSAGES[:invalid_code]
-      render :verify
+      handle_error_response(
+        html_render_action: :verify,
+        error_message: TwoFactorAuth::ERROR_MESSAGES[:invalid_code]
+      )
     end
   end
 
@@ -126,21 +137,27 @@ class TwoFactorAuthenticationsController < ApplicationController
       if @webauthn_enabled
         render 'verify_webauthn', layout: 'application'
       else
-        redirect_to setup_two_factor_authentication_path,
-                    alert: 'No security keys are registered. Please set up a security key first.'
+        handle_error_response(
+          html_redirect_path: setup_two_factor_authentication_path,
+          error_message: 'No security keys are registered. Please set up a security key first.'
+        )
       end
     when 'totp'
       if @totp_enabled
         render 'verify_totp', layout: 'application'
       else
-        redirect_to setup_two_factor_authentication_path,
-                    alert: 'No authenticator app is set up. Please set up TOTP authentication first.'
+        handle_error_response(
+          html_redirect_path: setup_two_factor_authentication_path,
+          error_message: 'No authenticator app is set up. Please set up TOTP authentication first.'
+        )
       end
     when 'sms'
       handle_sms_verification
     else
-      redirect_to verify_two_factor_authentication_path,
-                  alert: 'Invalid verification method'
+      handle_error_response(
+        html_redirect_path: verify_two_factor_authentication_path,
+        error_message: 'Invalid verification method'
+      )
     end
   end
 
@@ -148,18 +165,22 @@ class TwoFactorAuthenticationsController < ApplicationController
   def handle_sms_verification
     if @user.sms_credentials.exists?
       credential = @user.sms_credentials.first
-      send_sms_verification_code(credential)
+      send_sms_verification_code_for_user(credential, @user)
       render 'verify_sms', layout: 'application'
     else
-      redirect_to verify_two_factor_authentication_path,
-                  alert: 'SMS verification not available'
+      handle_error_response(
+        html_redirect_path: verify_two_factor_authentication_path,
+        error_message: 'SMS verification not available'
+      )
     end
   end
 
   # POST /two_factor_authentication/verify/:type
   def process_verification
     @type = params[:type]
+
     verification_params = get_verification_params(@type)
+
     success, message = verify_credential(@type, verification_params)
 
     respond_to do |format|
@@ -270,10 +291,10 @@ class TwoFactorAuthenticationsController < ApplicationController
   # Handle successful verification response
   def handle_successful_verification(format)
     @user = find_user_for_two_factor
+    complete_two_factor_authentication(@user)
 
-    format.html { complete_two_factor_authentication(@user) }
+    format.html { redirect_to root_path, notice: 'Signed in successfully.' }
     format.json do
-      _create_and_set_session_cookie(@user)
       return_to = session.delete(:return_to) || root_path
       render json: { status: 'success', redirect_url: return_to }
     end
@@ -281,12 +302,46 @@ class TwoFactorAuthenticationsController < ApplicationController
 
   # Handle failed verification response
   def handle_failed_verification(format, message)
+    # Determine appropriate status code based on error message
+    status = determine_error_status(message)
+
     format.html do
-      flash.now[:alert] = message
+      # Set up instance variables needed by the verification templates
+      @user = find_user_for_two_factor
+      @webauthn_enabled = @user.webauthn_credentials.exists?
+      @totp_enabled = @user.totp_credentials.exists?
+      @sms_enabled = @user.sms_credentials.exists?
+
       template = verification_template_for_type(@type)
-      render template
+      handle_error_response(
+        html_render_action: template,
+        error_message: message,
+        status: status
+      )
     end
-    format.json { render json: { error: message }, status: :not_found }
+    format.turbo_stream do
+      # Set up instance variables needed by the verification templates
+      @user = find_user_for_two_factor
+      @webauthn_enabled = @user.webauthn_credentials.exists?
+      @totp_enabled = @user.totp_credentials.exists?
+      @sms_enabled = @user.sms_credentials.exists?
+
+      handle_error_response(
+        error_message: message,
+        status: status
+      )
+    end
+    format.json { render json: { error: message }, status: status }
+  end
+
+  # Determine appropriate HTTP status code based on error message
+  def determine_error_status(message)
+    case message
+    when /credential not found/i, /not found/i
+      :not_found
+    else
+      :unprocessable_entity
+    end
   end
 
   # Get template name for verification type
@@ -298,22 +353,13 @@ class TwoFactorAuthenticationsController < ApplicationController
     end
   end
 
-  # Process successful authentication
-  def complete_authentication
-    # Mark session as verified with standardized helper
-    TwoFactorAuth.mark_verified(session)
-
-    # Redirect to intended destination or default
-    redirect_to session.delete(:return_to) || root_path
-  end
-
-  # Verify a TOTP code using the concern's unified verification method
+  # Verify a TOTP code
   def totp_code_valid?(code)
     success, _message = verify_totp_credential(code)
     success
   end
 
-  # Verify an SMS code using the concern's unified verification method
+  # Verify an SMS code
   def sms_code_valid?(code)
     success, _message = verify_sms_credential(code, nil)
     success

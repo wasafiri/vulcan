@@ -70,33 +70,55 @@ class W9ReviewTest < ActiveSupport::TestCase
   end
 
   test 'creating approved review updates vendor status' do
-    assert_equal 'pending_review', @vendor.w9_status
+    # Use truncation strategy for this test to ensure after_commit callbacks fire
+    DatabaseCleaner.strategy = :truncation
+    DatabaseCleaner.clean
+    
+    # Recreate test data since we cleaned the database
+    vendor = create(:vendor, :with_w9)
+    admin = create(:admin)
+    
+    assert_equal 'pending_review', vendor.w9_status
 
     W9Review.create!(
-      vendor: @vendor,
-      admin: @admin,
+      vendor: vendor,
+      admin: admin,
       status: :approved,
       reviewed_at: Time.current
     )
 
-    @vendor.reload
-    assert_equal 'approved', @vendor.w9_status
+    vendor.reload
+    assert_equal 'approved', vendor.w9_status
+  ensure
+    # Restore transaction strategy for other tests
+    DatabaseCleaner.strategy = :transaction
   end
 
   test 'creating rejected review updates vendor status' do
-    assert_equal 'pending_review', @vendor.w9_status
+    # Use truncation strategy for this test to ensure after_commit callbacks fire
+    DatabaseCleaner.strategy = :truncation
+    DatabaseCleaner.clean
+    
+    # Recreate test data since we cleaned the database
+    vendor = create(:vendor, :with_w9)
+    admin = create(:admin)
+    
+    assert_equal 'pending_review', vendor.w9_status
 
     W9Review.create!(
-      vendor: @vendor,
-      admin: @admin,
+      vendor: vendor,
+      admin: admin,
       status: :rejected,
       rejection_reason_code: :address_mismatch,
       rejection_reason: "Address doesn't match records",
       reviewed_at: Time.current
     )
 
-    @vendor.reload
-    assert_equal 'rejected', @vendor.w9_status
+    vendor.reload
+    assert_equal 'rejected', vendor.w9_status
+  ensure
+    # Restore transaction strategy for other tests
+    DatabaseCleaner.strategy = :transaction
   end
 
   test 'admin must be an admin type' do

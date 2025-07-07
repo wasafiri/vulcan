@@ -8,12 +8,8 @@ class AssignTrainerTest < ApplicationSystemTestCase
     @application = create(:application, :approved)
     @trainer = create(:user, :trainer)
 
-    # Sign in as admin
-    visit sign_in_path
-    fill_in 'Email Address', with: @admin.email
-    fill_in 'Password', with: 'password123'
-    click_button 'Sign In'
-    assert_text 'Dashboard' # Verify we're signed in
+    # Sign in as admin via system test helper for reliability
+    system_test_sign_in(@admin)
   end
 
   test 'admin can assign trainer to an approved application' do
@@ -37,6 +33,7 @@ class AssignTrainerTest < ApplicationSystemTestCase
     assert_text 'Trainer successfully assigned'
 
     # Verify trainer is now displayed in the application details
-    assert_text 'Trainer: Jane Trainer'
+    assert_text 'Current Trainer'
+    assert_text 'Jane Trainer'
   end
 end

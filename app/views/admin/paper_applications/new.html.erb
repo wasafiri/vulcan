@@ -19,8 +19,11 @@
             </div>
           <% end %>
 
+          <!-- Error container for form validation -->
+          <div id="form-error-container" class="hidden" data-form-validation-target="errorContainer"></div>
+
           <%= form_with(url: admin_paper_applications_path, method: :post, multipart: true,
-            data: { controller: "paper-application form-validation applicant-type", "applicant-type-guardian-picker-outlet": "[data-controller='guardian-picker']" }) do |form| %>
+            data: { controller: "paper-application form-validation applicant-type", "applicant-type-guardian-picker-outlet": "[data-controller='guardian-picker']", form_validation_target: "form" }) do |form| %>
             <!-- Applicant Type Selection -->
             <fieldset class="mb-6 p-4 border border-gray-200 rounded" data-applicant-type-target="radioSection" data-action="change->applicant-type#updateApplicantTypeDisplay">
               <legend class="text-lg font-medium">Who is this application for?</legend>
@@ -45,7 +48,7 @@
             </div>
 
             <!-- Guardian Picker Wrapper -->
-            <fieldset class="mb-6 p-4 border border-gray-200 rounded hidden" data-controller="guardian-picker" data-applicant-type-target="guardianSection">
+            <fieldset id="guardian-info-section" class="mb-6 p-4 border border-gray-200 rounded hidden" data-controller="guardian-picker" data-applicant-type-target="guardianSection">
               <legend class="text-lg font-medium">Guardian Information</legend>
 
               <!-- Search Pane -->
@@ -434,24 +437,24 @@
                 <h3 class="text-md font-medium mb-2">Income Proof</h3>
                 <div class="flex items-center space-x-4 mb-4">
                   <div>
-                    <input type="radio" id="accept_income_proof" name="income_proof_action" value="accept" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" checked data-action="change->document-proof-handler#toggleProofAction" data-document-proof-handler-target="acceptRadio">
+                    <input type="radio" id="accept_income_proof" name="income_proof_action" value="accept" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" checked data-action="change->document-proof-handler#toggleProofAction" data-document-proof-handler-target="acceptRadio" data-form-validation-target="acceptIncomeProof">
                     <label for="accept_income_proof" class="ml-2 text-sm text-gray-700">Accept Income Proof and Upload</label>
                   </div>
                   <div>
-                    <input type="radio" id="reject_income_proof" name="income_proof_action" value="reject" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" data-action="change->document-proof-handler#toggleProofAction" data-document-proof-handler-target="rejectRadio">
+                    <input type="radio" id="reject_income_proof" name="income_proof_action" value="reject" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" data-action="change->document-proof-handler#toggleProofAction" data-document-proof-handler-target="rejectRadio" data-form-validation-target="rejectIncomeProof">
                     <label for="reject_income_proof" class="ml-2 text-sm text-gray-700">Reject Income Proof</label>
                   </div>
                 </div>
                 <!-- File upload field (shown when Accept is selected) -->
                 <div id="income_proof_upload" class="mb-4" data-document-proof-handler-target="uploadSection">
                   <!-- Direct file input control to match constituent portal -->
-                  <input type="file" name="income_proof" id="income_proof" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" accept=".pdf,.jpg,.jpeg,.png" data-document-proof-handler-target="fileInput" />
+                  <input type="file" name="income_proof" id="income_proof" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" accept=".pdf,.jpg,.jpeg,.png" data-document-proof-handler-target="fileInput" data-form-validation-target="incomeProofFile" />
                   <p class="mt-1 text-xs text-gray-500"> Please select a PDF or image file containing income verification </p>
                 </div>
                 <!-- Rejection reason (shown when Reject is selected) -->
                 <div id="income_proof_rejection" class="hidden mb-4" data-document-proof-handler-target="rejectionSection">
                   <label class="block text-sm font-medium text-gray-700 mb-1">Rejection Reason</label>
-                  <select name="income_proof_rejection_reason" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md" data-document-proof-handler-target="rejectionReasonSelect">
+                  <select name="income_proof_rejection_reason" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md" data-document-proof-handler-target="rejectionReasonSelect" data-form-validation-target="incomeProofRejectionReason">
                     <option value="">Select a reason</option>
                     <option value="address_mismatch">Address Mismatch</option>
                     <option value="expired">Expired Documentation</option>
@@ -477,24 +480,24 @@
                 <h3 class="text-md font-medium mb-2">Residency Proof</h3>
                 <div class="flex items-center space-x-4 mb-4">
                   <div>
-                    <input type="radio" id="accept_residency_proof" name="residency_proof_action" value="accept" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" checked data-action="change->document-proof-handler#toggleProofAction" data-document-proof-handler-target="acceptRadio">
+                    <input type="radio" id="accept_residency_proof" name="residency_proof_action" value="accept" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" checked data-action="change->document-proof-handler#toggleProofAction" data-document-proof-handler-target="acceptRadio" data-form-validation-target="acceptResidencyProof">
                     <label for="accept_residency_proof" class="ml-2 text-sm text-gray-700">Accept Residency Proof and Upload</label>
                   </div>
                   <div>
-                    <input type="radio" id="reject_residency_proof" name="residency_proof_action" value="reject" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" data-action="change->document-proof-handler#toggleProofAction" data-document-proof-handler-target="rejectRadio">
+                    <input type="radio" id="reject_residency_proof" name="residency_proof_action" value="reject" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" data-action="change->document-proof-handler#toggleProofAction" data-document-proof-handler-target="rejectRadio" data-form-validation-target="rejectResidencyProof">
                     <label for="reject_residency_proof" class="ml-2 text-sm text-gray-700">Reject Residency Proof</label>
                   </div>
                 </div>
                 <!-- File upload field (shown when Accept is selected) -->
                 <div id="residency_proof_upload" class="mb-4" data-document-proof-handler-target="uploadSection">
                   <!-- Direct file input control to match constituent portal -->
-                  <input type="file" name="residency_proof" id="residency_proof" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" accept=".pdf,.jpg,.jpeg,.png" data-document-proof-handler-target="fileInput" />
+                  <input type="file" name="residency_proof" id="residency_proof" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" accept=".pdf,.jpg,.jpeg,.png" data-document-proof-handler-target="fileInput" data-form-validation-target="residencyProofFile" />
                   <p class="mt-1 text-xs text-gray-500"> Please select a PDF or image file verifying Maryland residency </p>
                 </div>
                 <!-- Rejection reason (shown when Reject is selected) -->
                 <div id="residency_proof_rejection" class="hidden mb-4" data-document-proof-handler-target="rejectionSection">
                   <label class="block text-sm font-medium text-gray-700 mb-1">Rejection Reason</label>
-                  <select name="residency_proof_rejection_reason" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md" data-document-proof-handler-target="rejectionReasonSelect">
+                  <select name="residency_proof_rejection_reason" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md" data-document-proof-handler-target="rejectionReasonSelect" data-form-validation-target="residencyProofRejectionReason">
                     <option value="">Select a reason</option>
                     <option value="address_mismatch">Address Mismatch</option>
                     <option value="expired">Expired Documentation</option>

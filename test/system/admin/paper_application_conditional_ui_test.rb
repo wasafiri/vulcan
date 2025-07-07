@@ -69,15 +69,15 @@ module Admin
       # Fill in search and select guardian
       within_fieldset_tagged('Guardian Information') do
         fill_in 'guardian_search_q', with: guardian.email
-        # Add a brief pause for debounce and Turbo Stream processing.
-        # This is often necessary in system tests for JS-driven updates.
-        sleep 1.0 # Wait for debounce (300ms) + some network/render time
+        # Trigger search by pressing Enter key to ensure Turbo request fires
+        find('#guardian_search_q').send_keys(:enter)
+        # Wait for Turbo response
+        sleep 1.0
 
         # Use `within` with a CSS selector for the turbo-frame, not `within_frame`
         within 'turbo-frame#guardian_search_results' do
           # Wait for the specific list item to appear, indicating search results are loaded.
-          expect_result_item = find("li[data-user-id='#{guardian.id}']", wait: 10) # Increased wait time
-          assert expect_result_item.visible?, 'Guardian search result item not visible'
+          expect_result_item = find('li', text: guardian.full_name, wait: 10)
           expect_result_item.click
         end
       end

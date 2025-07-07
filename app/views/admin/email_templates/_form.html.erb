@@ -37,8 +37,8 @@
     <h3 class="text-lg font-medium text-gray-700 mb-3">Template Preview with Sample Data</h3>
     
     <% 
-      # Get sample data for this template
-      sample_data = sample_data_for_template(email_template.name)
+      # Use sample data provided by controller - fallback to empty hash if not available
+      sample_data = @sample_data || {}
       
       # Render template with sample data
       begin

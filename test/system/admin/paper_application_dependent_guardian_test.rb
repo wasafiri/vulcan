@@ -30,8 +30,11 @@ module Admin
 
       # Step 4: Fill out guardian creation form
       within '#guardian-info-section' do
-        # Ensure we're in the "Create new guardian" tab
-        click_on 'Create new guardian' if page.has_link?('Create new guardian')
+        # Click the "Create new guardian" button to show the form
+        click_button 'Create new guardian'
+
+        # Wait for the form to become visible
+        assert_selector '[data-admin--user-search-target="guardianForm"]', visible: true, wait: 3
 
         # Fill guardian form
         fill_in 'guardian_attributes[first_name]', with: 'Guardian'
@@ -69,7 +72,7 @@ module Admin
         choose 'email_strategy_dependent'
 
         # Select relationship type
-        select 'Child', from: 'relationship_type'
+        select 'Parent', from: 'relationship_type'
 
         # Add disability information
         check 'constituent[hearing_disability]'
@@ -129,7 +132,7 @@ module Admin
                    'Guardian relationship dependent should match application user'
       assert guardian_relationship.guardian.first_name.include?('Guardian'),
              'Guardian relationship should have the correct guardian'
-      assert_equal 'child', guardian_relationship.relationship_type,
+      assert_equal 'Parent', guardian_relationship.relationship_type,
                    'Relationship type should be set correctly'
     end
 
@@ -143,7 +146,11 @@ module Admin
 
       # Try to create guardian with missing required fields
       within '#guardian-info-section' do
-        click_on 'Create new guardian' if page.has_link?('Create new guardian')
+        # Click the "Create new guardian" button to show the form
+        click_button 'Create new guardian'
+
+        # Wait for the form to become visible
+        assert_selector '[data-admin--user-search-target="guardianForm"]', visible: true, wait: 3
 
         # Leave required fields empty and try to submit
         fill_in 'guardian_attributes[first_name]', with: ''
@@ -175,7 +182,7 @@ module Admin
 
       # Search for existing guardian
       within '#guardian-info-section' do
-        fill_in 'Search guardians...', with: 'Existing'
+        fill_in 'Search by Name or Email', with: 'Existing'
 
         # Wait for search results
         assert_text 'Existing Guardian', wait: 5
@@ -198,7 +205,11 @@ module Admin
 
       # Create a guardian
       within '#guardian-info-section' do
-        click_on 'Create new guardian' if page.has_link?('Create new guardian')
+        # Click the "Create new guardian" button to show the form
+        click_button 'Create new guardian'
+
+        # Wait for the form to become visible
+        assert_selector '[data-admin--user-search-target="guardianForm"]', visible: true, wait: 3
 
         fill_in 'guardian_attributes[first_name]', with: 'Selected'
         fill_in 'guardian_attributes[last_name]', with: 'Guardian'

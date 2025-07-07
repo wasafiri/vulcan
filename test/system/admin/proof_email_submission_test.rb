@@ -8,11 +8,11 @@ module Admin
     include ActionMailboxTestHelper
 
     setup do
-      # Create users and application using factories
+      # Create users and application using factories with unique email
       @admin = create(:admin)
-      @constituent = create(:constituent)
-      @application = create(:application, user: @constituent)
-      @constituent.update(email: 'constituent@example.com')
+      @constituent_email = "constituent_#{Time.now.to_i}_#{rand(10000)}@example.com"
+      @constituent = create(:constituent, email: @constituent_email)
+      @application = create(:application, :old_enough_for_new_application, user: @constituent)
 
       # Set up ApplicationMailbox routing for testing
       ApplicationMailbox.instance_eval do
@@ -20,10 +20,8 @@ module Admin
       end
 
       # Log in as admin
-      visit new_session_path
-      fill_in 'Email', with: @admin.email
-      fill_in 'Password', with: 'password123'
-      click_on 'Sign in'
+      system_test_sign_in(@admin)
+      wait_for_turbo
     end
 
     test 'admin can view and approve proof submitted via email' do
@@ -34,7 +32,7 @@ module Admin
       # Create and process an inbound email
       inbound_email = create_inbound_email_with_attachment(
         to: 'proof@example.com',
-        from: @constituent.email,
+        from: @constituent_email,
         subject: 'Income Proof Submission',
         body: 'Please find my income proof attached.',
         attachment_path: file_path,
@@ -71,7 +69,7 @@ module Admin
       # Create and process an inbound email
       inbound_email = create_inbound_email_with_attachment(
         to: 'proof@example.com',
-        from: @constituent.email,
+        from: @constituent_email,
         subject: 'Income Proof Submission',
         body: 'Please find my income proof attached.',
         attachment_path: file_path,
@@ -111,7 +109,7 @@ module Admin
 
       # Create a raw email with multiple attachments
       mail = Mail.new do
-        from @constituent.email
+        from @constituent_email
         to 'proof@example.com'
         subject 'Income Proof Submission'
 

@@ -66,7 +66,9 @@ module ConstituentPortal
       attach_file 'Income Verification', Rails.root.join('test/fixtures/files/income_proof.pdf'), visible: false
 
       # Fill in medical provider information
-      fill_in 'Name', with: 'Dr. Smith'
+      within('section', text: 'Medical Professional Information') do
+        fill_in 'Name', with: 'Dr. Smith', match: :first
+      end
       fill_in 'Phone', with: '5551234567'
       fill_in 'Email', with: 'dr.smith@example.com'
 

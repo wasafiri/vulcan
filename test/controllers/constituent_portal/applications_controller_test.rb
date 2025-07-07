@@ -34,6 +34,11 @@ module ConstituentPortal
 
     # Test that the checkbox handling works correctly
     test 'should handle array values for self_certify_disability' do
+      # Create a unique user for this test to avoid 3-year validation
+      unique_user = create(:constituent, :with_disabilities, 
+                           email: "checkbox_test_#{Time.now.to_i}_#{rand(1000)}@example.com")
+      sign_in_for_integration_test(unique_user)
+
       # Simulate a form submission with an array value for self_certify_disability
       post constituent_portal_applications_path, params: {
         application: {
@@ -73,6 +78,11 @@ module ConstituentPortal
 
     # Test creating a draft application
     test 'should create application as draft' do
+      # Create a unique user for this test to avoid 3-year validation
+      unique_user = create(:constituent, :with_disabilities, 
+                           email: "draft_test_#{Time.now.to_i}_#{rand(1000)}@example.com")
+      sign_in_for_integration_test(unique_user)
+
       # Submit a draft application
       assert_difference('Application.count') do
         post constituent_portal_applications_path, params: {
@@ -105,6 +115,11 @@ module ConstituentPortal
 
     # Test creating an application as submitted with required proofs
     test 'should create application as submitted' do
+      # Create a unique user for this test to avoid 3-year validation
+      unique_user = create(:constituent, :with_disabilities, 
+                           email: "submitted_test_#{Time.now.to_i}_#{rand(1000)}@example.com")
+      sign_in_for_integration_test(unique_user)
+
       # Submit an application with required proofs
       assert_difference('Application.count') do
         post constituent_portal_applications_path, params: {
@@ -270,18 +285,18 @@ module ConstituentPortal
 
     # Test submitting a draft application
     test 'should submit draft application' do
-      # Create a new draft application
-      application = create(:application,
-                           user: @user,
-                           status: :draft,
-                           household_size: 3,
-                           annual_income: 50_000,
-                           medical_provider_name: 'Dr. Smith',
-                           medical_provider_phone: '2025551234',
-                           medical_provider_email: 'drsmith@example.com')
+      # Use the existing application and set it to draft status instead of creating a new one
+      @application.update!(
+        status: :draft,
+        household_size: 3,
+        annual_income: 50_000,
+        medical_provider_name: 'Dr. Smith',
+        medical_provider_phone: '2025551234',
+        medical_provider_email: 'drsmith@example.com'
+      )
 
       # Submit the draft application
-      patch constituent_portal_application_path(application), params: {
+      patch constituent_portal_application_path(@application), params: {
         application: {
           household_size: 4,
           annual_income: 60_000,
@@ -307,11 +322,11 @@ module ConstituentPortal
       }
 
       # Verify the submission was successful
-      assert_redirected_to constituent_portal_application_path(application)
+      assert_redirected_to constituent_portal_application_path(@application)
 
       # Reload the application and verify status change
-      application.reload
-      assert_equal 'in_progress', application.status
+      @application.reload
+      assert_equal 'in_progress', @application.status
     end
 
     # Test that submitted applications cannot be updated
@@ -505,8 +520,13 @@ module ConstituentPortal
     end
 
     test 'should save address information to user during application creation' do
+      # Create a unique user for this test to avoid 3-year validation
+      unique_user = create(:constituent, :with_disabilities,
+                           email: "address_creation_test_#{Time.now.to_i}_#{rand(1000)}@example.com")
+      sign_in_for_integration_test(unique_user)
+
       # Ensure the user starts with no address information
-      @user.update!(
+      unique_user.update!(
         physical_address_1: nil,
         physical_address_2: nil,
         city: nil,
@@ -549,17 +569,22 @@ module ConstituentPortal
       assert_equal 'draft', application.status
 
       # CRITICAL: Verify that the address information was saved to the user model
-      @user.reload
-      assert_equal '134 main st', @user.physical_address_1, 'Address line 1 should be saved to user'
-      assert_equal 'Apt 2B', @user.physical_address_2, 'Address line 2 should be saved to user'
-      assert_equal 'baltimore', @user.city, 'City should be saved to user'
-      assert_equal 'MD', @user.state, 'State should be saved to user'
-      assert_equal '21201', @user.zip_code, 'ZIP code should be saved to user'
+      unique_user.reload
+      assert_equal '134 main st', unique_user.physical_address_1, 'Address line 1 should be saved to user'
+      assert_equal 'Apt 2B', unique_user.physical_address_2, 'Address line 2 should be saved to user'
+      assert_equal 'baltimore', unique_user.city, 'City should be saved to user'
+      assert_equal 'MD', unique_user.state, 'State should be saved to user'
+      assert_equal '21201', unique_user.zip_code, 'ZIP code should be saved to user'
     end
 
     test 'should save address information to user during application submission' do
+      # Create a unique user for this test to avoid 3-year validation
+      unique_user = create(:constituent, :with_disabilities,
+                           email: "address_submission_test_#{Time.now.to_i}_#{rand(1000)}@example.com")
+      sign_in_for_integration_test(unique_user)
+
       # Ensure the user starts with no address information
-      @user.update!(
+      unique_user.update!(
         physical_address_1: nil,
         physical_address_2: nil,
         city: nil,
@@ -604,12 +629,12 @@ module ConstituentPortal
       assert_equal 'in_progress', application.status
 
       # CRITICAL: Verify that the address information was saved to the user model
-      @user.reload
-      assert_equal '456 Oak Street', @user.physical_address_1, 'Address line 1 should be saved to user'
-      assert_equal '', @user.physical_address_2, 'Address line 2 should be saved to user (empty string)'
-      assert_equal 'Silver Spring', @user.city, 'City should be saved to user'
-      assert_equal 'MD', @user.state, 'State should be saved to user'
-      assert_equal '20901', @user.zip_code, 'ZIP code should be saved to user'
+      unique_user.reload
+      assert_equal '456 Oak Street', unique_user.physical_address_1, 'Address line 1 should be saved to user'
+      assert_equal '', unique_user.physical_address_2, 'Address line 2 should be saved to user (empty string)'
+      assert_equal 'Silver Spring', unique_user.city, 'City should be saved to user'
+      assert_equal 'MD', unique_user.state, 'State should be saved to user'
+      assert_equal '20901', unique_user.zip_code, 'ZIP code should be saved to user'
     end
 
     test 'should save address information to dependent user when guardian creates application' do

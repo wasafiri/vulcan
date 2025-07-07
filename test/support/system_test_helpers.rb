@@ -58,23 +58,20 @@ module SystemTestHelpers
   def scroll_to_element(selector_or_element)
     element = selector_or_element.is_a?(String) ? find(selector_or_element) : selector_or_element
 
-    if page.driver.respond_to?(:scroll_to)
-      # Use Cuprite's native scroll_to method if available
-      begin
-        page.driver.scroll_to(element.native, align: :center)
-      rescue StandardError => e
-        # Fallback if native scroll fails
-        puts "Native scroll failed: #{e.message}, using JS fallback"
-        # Simple JS scroll that's more compatible
-        page.execute_script('arguments[0].scrollIntoView()', element)
+    # Prefer JS scrollIntoView – Ferrum native scroll occasionally throws SyntaxError in headless Chrome
+    begin
+      page.execute_script('arguments[0].scrollIntoView({block: "center", inline: "nearest"})', element)
+    rescue StandardError => e
+      puts "JS scrollIntoView failed: #{e.class} #{e.message}; falling back to native scroll" if ENV['VERBOSE_TESTS']
+      if page.driver.respond_to?(:scroll_to)
+        begin
+          page.driver.scroll_to(element.native)
+        rescue StandardError => e2
+          puts "Native scroll also failed: #{e2.class} #{e2.message}" if ENV['VERBOSE_TESTS']
+        end
       end
-    else
-      # Fallback to simpler JavaScript without options object
-      # This is more compatible across different browsers/drivers
-      page.execute_script('arguments[0].scrollIntoView()', element)
     end
 
-    # Return the element for chaining
     element
   end
 
@@ -105,8 +102,20 @@ module SystemTestHelpers
 
   # Helper for filling in form fields with automatic scrolling
   def safe_fill_in(selector, with:)
-    element = scroll_to_element(selector)
-    element.fill_in(with: with)
+    # If selector looks like a raw ID (no prefix, no spaces/attrs), prepend '#'
+    css_selector = if selector.is_a?(String) && !selector.start_with?('#', '.', '[', 'input') && selector !~ /\s|\[|>/
+                     "##{selector}"
+                   else
+                     selector
+                   end
+
+    begin
+      element = scroll_to_element(css_selector)
+      element.fill_in(with: with)
+    rescue Capybara::ElementNotFound
+      # Fallback to label-based fill_in for robustness
+      fill_in selector.to_s.humanize, with: with
+    end
   end
 
   # Helper for selecting options from dropdowns with automatic scrolling
@@ -123,6 +132,16 @@ module SystemTestHelpers
 
     # Minimal wait only needed when animations are happening
     sleep 0.05
+  end
+
+  # Wait until Stimulus controllers are initialised (window.Stimulus present)
+  def ensure_stimulus_loaded(timeout: 3)
+    Capybara.using_wait_time(timeout) do
+      page.evaluate_script('typeof window.Stimulus !== "undefined"')
+    end
+  rescue Capybara::NotSupportedByDriverError, Capybara::ElementNotFound
+    # If evaluation not supported just proceed
+    true
   end
 
   # Save a screenshot to the tmp/screenshots directory
@@ -149,5 +168,19 @@ module SystemTestHelpers
     puts "Current Path: #{current_path}"
     puts "Page HTML summary: #{page.html.to_s.slice(0, 500)}..."
     take_screenshot("debug-#{Time.now.to_i}")
+  end
+
+  # Wrapper similar to CupriteTestBridge#safe_interaction but generic
+  def safe_browser_action
+    yield
+  rescue StandardError => e
+    puts "safe_browser_action recovered from #{e.class}: #{e.message}"
+    Capybara.reset_sessions! if defined?(Capybara)
+    raise e if ENV['RAISE_BROWSER_ERRORS'] == 'true'
+  end
+
+  # Backwards-compatibility alias used by some older system tests
+  def sign_in_as(user, **options)
+    sign_in(user, **options) # `sign_in` is defined in ApplicationSystemTestCase
   end
 end

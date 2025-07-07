@@ -80,7 +80,7 @@
     <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="guardian-dependent-info-title">
       <h2 id="guardian-dependent-info-title" class="text-xl font-semibold text-gray-900 mb-4">Guardian/Dependent Information</h2>
 
-      <% if @user.is_guardian? %>
+      <% if @user.guardian? %>
         <div class="mb-6">
           <h3 class="text-lg font-medium text-gray-900 mb-2">Dependents Managed by <%= @user.full_name %></h3>
           <% if @user.dependents.any? %>
@@ -120,7 +120,7 @@
     <% end %>
   </div>
 <% end %>
-      <% if @user.is_dependent? %>
+      <% if @user.dependent? %>
         <div class="mb-4">
           <%= link_to 'Back to Application Dashboard', admin_applications_path,
               class: 'inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500',
@@ -164,7 +164,7 @@
         </div>
       <% end %>
 
-      <% if !@user.is_guardian? && !@user.is_dependent? %>
+      <% if !@user.guardian? && !@user.dependent? %>
         <p class="text-gray-500 text-sm">This user is neither a guardian nor a dependent in a recorded relationship.</p>
         <%# Removed message about unimplemented add/remove functionality %>
       <% end %>

@@ -10,8 +10,8 @@ class FormInputsTest < ActionDispatch::IntegrationTest
   setup do
     # Use factories instead of fixtures
     @user = create(:constituent)
-    # Create an application associated with this user
-    @application = create(:application, user: @user)
+    # Create an application associated with this user that's old enough to allow new applications
+    @application = create(:application, :old_enough_for_new_application, user: @user)
 
     # Sign in the user for all tests
     sign_in_for_integration_test(@user)

@@ -40,7 +40,7 @@ class ProofUploadsTest < ApplicationSystemTestCase
     # Create an application with the in_progress_with_rejected_proofs trait
     # This will automatically attach the proof files in the factory's after(:build) hook
     @application = with_timeout(15) do
-      FactoryBot.create(
+      create(
         :application,
         :in_progress_with_rejected_proofs,
         user: @user,

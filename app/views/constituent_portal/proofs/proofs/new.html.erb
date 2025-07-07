@@ -40,7 +40,7 @@
             </div>
           </div>
 
-          <%= form_with url: resubmit_proof_document_constituent_portal_application_path(@application), method: :post, html: { class: "space-y-6", data: { controller: "upload" } } do |form| %>
+          <%= form_with url: constituent_portal_application_proofs_resubmit_path(@application), method: :post, html: { class: "space-y-6" } do |form| %>
             <%= hidden_field_tag :proof_type, @proof_type %>
             
             <div>
@@ -54,33 +54,10 @@
               <div class="mt-2">
                 <%= form.file_field "#{@proof_type}_proof_upload", 
                     class: "block w-full text-sm text-gray-900 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500",
-                    direct_upload: true,
                     accept: ".pdf,.jpg,.jpeg,.png",
-                    data: { 
-                      upload_target: "input",
-                      action: "change->upload#handleFileSelect",
-                      direct_upload_url: rails_direct_uploads_path
-                    },
                     "aria-describedby": "file-description" %>
               </div>
-              
-              <!-- Progress bar (hidden initially) -->
-              <div class="mt-2 hidden" data-upload-target="progress">
-                <div class="w-full bg-gray-200 rounded-full h-2.5">
-                  <div class="bg-indigo-600 h-2.5 rounded-full w-0" style="transition: width 0.3s" role="progressbar" aria-valuemin="0" aria-valuemax="100"></div>
-                </div>
-                <p class="mt-1 text-xs text-gray-500">
-                  Uploading: <span data-upload-target="percentage">0%</span>
-                </p>
-              </div>
-              
-              <!-- Cancel button (hidden initially) -->
-              <button type="button" 
-                class="mt-2 hidden text-sm text-red-600 hover:text-red-800" 
-                data-upload-target="cancel"
-                data-action="click->upload#cancelUpload">
-                Cancel upload
-              </button>
+
             </div>
             
             <div class="flex justify-end">
@@ -90,8 +67,7 @@
                 Cancel
               </button>
               <%= form.submit "Submit Document", 
-                  class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                  data: { upload_target: "submit" } %>
+                  class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
             </div>
           <% end %>
         </div>
@@ -115,8 +91,7 @@
               <ol class="list-decimal pl-5 space-y-2">
                 <li>Click the "Choose File" button above.</li>
                 <li>Select your document from your device.</li>
-                <li>Wait for the upload to complete (you'll see a progress bar).</li>
-                <li>Click "Submit Document" to finish.</li>
+                <li>Click "Submit Document" to upload and submit.</li>
               </ol>
               <p class="mt-3">If you're having trouble, make sure your document:</p>
               <ul class="list-disc pl-5 space-y-2">

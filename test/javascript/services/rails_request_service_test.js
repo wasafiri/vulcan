@@ -33,8 +33,16 @@ describe('RailsRequestService', () => {
         get: jest.fn()
       },
       json: jest.fn(),
-      text: jest.fn()
+      text: jest.fn(),
+      clone: jest.fn(),
+      bodyUsed: false
     }
+    
+    // Make clone return a copy of the response
+    mockResponse.clone.mockReturnValue({
+      ...mockResponse,
+      clone: jest.fn() // Clone should also be cloneable
+    })
     
     // Reset mocks
     mockFetchRequestConstructor.mockClear()
@@ -69,7 +77,11 @@ describe('RailsRequestService', () => {
 
     it('performs a basic GET request', async () => {
       mockResponse.headers.get.mockReturnValue('application/json')
-      mockResponse.json.mockResolvedValue({ data: 'test' })
+      const clonedResponse = {
+        json: jest.fn().mockResolvedValue({ data: 'test' }),
+        text: jest.fn()
+      }
+      mockResponse.clone.mockReturnValue(clonedResponse)
 
       const result = await service.perform({ url: '/api/test' })
 
@@ -88,7 +100,11 @@ describe('RailsRequestService', () => {
     it('performs a POST request with JSON body', async () => {
       const requestBody = { name: 'test', value: 123 }
       mockResponse.headers.get.mockReturnValue('application/json')
-      mockResponse.json.mockResolvedValue({ success: true })
+      const clonedResponse = {
+        json: jest.fn().mockResolvedValue({ success: true }),
+        text: jest.fn()
+      }
+      mockResponse.clone.mockReturnValue(clonedResponse)
 
       await service.perform({
         method: 'post',
@@ -108,7 +124,11 @@ describe('RailsRequestService', () => {
     it('performs a request with string body (no JSON conversion)', async () => {
       const requestBody = 'raw string data'
       mockResponse.headers.get.mockReturnValue('text/html')
-      mockResponse.text.mockResolvedValue('<div>success</div>')
+      const clonedResponse = {
+        json: jest.fn(),
+        text: jest.fn().mockResolvedValue('<div>success</div>')
+      }
+      mockResponse.clone.mockReturnValue(clonedResponse)
 
       await service.perform({
         method: 'patch',
@@ -128,7 +148,11 @@ describe('RailsRequestService', () => {
     it('includes custom headers', async () => {
       const customHeaders = { 'X-Custom': 'value', 'Accept': 'application/json' }
       mockResponse.headers.get.mockReturnValue('application/json')
-      mockResponse.json.mockResolvedValue({})
+      const clonedResponse = {
+        json: jest.fn().mockResolvedValue({}),
+        text: jest.fn()
+      }
+      mockResponse.clone.mockReturnValue(clonedResponse)
 
       await service.perform({
         url: '/api/test',
@@ -146,7 +170,11 @@ describe('RailsRequestService', () => {
 
     it('tracks requests with keys for cancellation', async () => {
       mockResponse.headers.get.mockReturnValue('application/json')
-      mockResponse.json.mockResolvedValue({})
+      const clonedResponse = {
+        json: jest.fn().mockResolvedValue({}),
+        text: jest.fn()
+      }
+      mockResponse.clone.mockReturnValue(clonedResponse)
 
       const requestPromise = service.perform({
         url: '/api/test',
@@ -168,7 +196,11 @@ describe('RailsRequestService', () => {
       service.activeRequests.set('duplicate-key', mockController)
 
       mockResponse.headers.get.mockReturnValue('application/json')
-      mockResponse.json.mockResolvedValue({})
+      const clonedResponse = {
+        json: jest.fn().mockResolvedValue({}),
+        text: jest.fn()
+      }
+      mockResponse.clone.mockReturnValue(clonedResponse)
 
       await service.perform({
         url: '/api/test',
@@ -183,7 +215,11 @@ describe('RailsRequestService', () => {
       const customSignal = customController.signal
 
       mockResponse.headers.get.mockReturnValue('application/json')
-      mockResponse.json.mockResolvedValue({})
+      const clonedResponse = {
+        json: jest.fn().mockResolvedValue({}),
+        text: jest.fn()
+      }
+      mockResponse.clone.mockReturnValue(clonedResponse)
 
       await service.perform({
         url: '/api/test',
@@ -201,7 +237,11 @@ describe('RailsRequestService', () => {
 
     it('defaults to text parsing for unknown content types', async () => {
       mockResponse.headers.get.mockReturnValue('application/octet-stream')
-      mockResponse.text.mockResolvedValue('raw data')
+      const clonedResponse = {
+        json: jest.fn().mockRejectedValue(new Error('Not JSON')),
+        text: jest.fn().mockResolvedValue('raw data')
+      }
+      mockResponse.clone.mockReturnValue(clonedResponse)
 
       const result = await service.perform({ url: '/api/test' })
 
@@ -214,7 +254,9 @@ describe('RailsRequestService', () => {
         ok: true,
         status: 200,
         headers: { get: () => 'application/json' },
-        json: Promise.resolve({ message: 'success from rails request' })
+        json: Promise.resolve({ message: 'success from rails request' }),
+        bodyUsed: false,
+        clone: jest.fn()
       }
       
       mockPerform.mockResolvedValue(railsResponse)
@@ -225,19 +267,29 @@ describe('RailsRequestService', () => {
     })
 
     it('handles @rails/request.js response where text is already a Promise', async () => {
-      // Simulate @rails/request.js response structure
+      // For HTML responses, the implementation will check if bodyUsed is true first,
+      // then fall through to clone() and use clone.text()
+      // Since we're testing the @rails/request.js case where text is a Promise,
+      // we need to ensure the response looks like it came from @rails/request.js
       const railsResponse = {
         ok: true,
         status: 200,
         headers: { get: () => 'text/html' },
-        text: Promise.resolve('<div>HTML from rails request</div>')
+        text: Promise.resolve('<div>HTML from rails request</div>'),
+        bodyUsed: false,
+        clone: jest.fn().mockReturnValue({
+          json: jest.fn().mockRejectedValue(new Error('Not JSON')),
+          text: jest.fn().mockResolvedValue('<div>HTML from rails request</div>')
+        })
       }
       
       mockPerform.mockResolvedValue(railsResponse)
 
       const result = await service.perform({ url: '/api/test' })
 
+      // The implementation will use clone().text() for HTML responses
       expect(result.data).toBe('<div>HTML from rails request</div>')
+      expect(railsResponse.clone).toHaveBeenCalled()
     })
   })
 
@@ -300,34 +352,53 @@ describe('RailsRequestService', () => {
 
     it('parses JSON responses', async () => {
       mockResponse.headers.get.mockReturnValue('application/json')
-      mockResponse.json.mockResolvedValue({ message: 'success' })
+      const clonedResponse = {
+        json: jest.fn().mockResolvedValue({ message: 'success' }),
+        text: jest.fn()
+      }
+      mockResponse.clone.mockReturnValue(clonedResponse)
 
       const result = await service.perform({ url: '/api/test' })
 
       expect(result.data).toEqual({ message: 'success' })
+      expect(clonedResponse.json).toHaveBeenCalled()
     })
 
     it('parses HTML responses', async () => {
       mockResponse.headers.get.mockReturnValue('text/html')
-      mockResponse.text.mockResolvedValue('<div>Hello</div>')
+      const clonedResponse = {
+        json: jest.fn(),
+        text: jest.fn().mockResolvedValue('<div>Hello</div>')
+      }
+      mockResponse.clone.mockReturnValue(clonedResponse)
 
       const result = await service.perform({ url: '/api/test' })
 
       expect(result.data).toBe('<div>Hello</div>')
+      expect(clonedResponse.text).toHaveBeenCalled()
     })
 
     it('parses Turbo Stream responses', async () => {
       mockResponse.headers.get.mockReturnValue('text/vnd.turbo-stream.html')
-      mockResponse.text.mockResolvedValue('<turbo-stream action="replace">...</turbo-stream>')
+      const clonedResponse = {
+        json: jest.fn(),
+        text: jest.fn().mockResolvedValue('<turbo-stream action="replace">...</turbo-stream>')
+      }
+      mockResponse.clone.mockReturnValue(clonedResponse)
 
       const result = await service.perform({ url: '/api/test' })
 
       expect(result.data).toBe('<turbo-stream action="replace">...</turbo-stream>')
+      expect(clonedResponse.text).toHaveBeenCalled()
     })
 
     it('defaults to text parsing for unknown content types', async () => {
       mockResponse.headers.get.mockReturnValue('application/octet-stream')
-      mockResponse.text.mockResolvedValue('raw data')
+      const clonedResponse = {
+        json: jest.fn().mockRejectedValue(new Error('Not JSON')),
+        text: jest.fn().mockResolvedValue('raw data')
+      }
+      mockResponse.clone.mockReturnValue(clonedResponse)
 
       const result = await service.perform({ url: '/api/test' })
 
@@ -419,55 +490,44 @@ describe('RailsRequestService', () => {
   })
 
   describe('tryShowFlash', () => {
-    let dispatchEventSpy
+    let mockAppNotifications
 
     beforeEach(() => {
-      dispatchEventSpy = jest.spyOn(document, 'dispatchEvent').mockImplementation(() => true)
+      mockAppNotifications = {
+        show: jest.fn()
+      }
+      global.window.AppNotifications = mockAppNotifications
     })
 
     afterEach(() => {
-      dispatchEventSpy.mockRestore()
+      delete global.window.AppNotifications
     })
 
     it('dispatches rails-request:flash event with message and type', () => {
       const result = service.tryShowFlash('Test message', 'error')
 
       expect(result).toBe(true)
-      expect(dispatchEventSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'rails-request:flash',
-          detail: {
-            message: 'Test message',
-            type: 'error'
-          }
-        })
-      )
+      expect(mockAppNotifications.show).toHaveBeenCalledWith('Test message', 'error')
     })
 
     it('defaults to error type when type not specified', () => {
-      service.tryShowFlash('Test message')
+      const result = service.tryShowFlash('Test message')
 
-      expect(dispatchEventSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          detail: {
-            message: 'Test message',
-            type: 'error'
-          }
-        })
-      )
+      expect(result).toBe(true)
+      expect(mockAppNotifications.show).toHaveBeenCalledWith('Test message', 'error')
     })
 
     it('handles event dispatch errors gracefully', () => {
-      dispatchEventSpy.mockImplementation(() => {
-        throw new Error('Event dispatch failed')
-      })
-
+      // Remove AppNotifications to simulate unavailability
+      delete global.window.AppNotifications
+      
       const result = service.tryShowFlash('Test message')
 
       expect(result).toBe(false)
-      expect(global.console.debug).toHaveBeenCalledWith(
-        'Flash event dispatch failed:',
-        expect.any(Error)
+      expect(global.console.warn).toHaveBeenCalledWith(
+        'AppNotifications service not available to show flash message:',
+        'Test message',
+        'error'
       )
     })
   })

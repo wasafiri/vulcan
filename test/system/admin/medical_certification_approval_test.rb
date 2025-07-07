@@ -8,8 +8,8 @@ module Admin
     include SystemTestAuthentication
 
     setup do
-      @admin = users(:admin)
-      @application = applications(:active)
+      @admin = FactoryBot.create(:admin)
+      @application = FactoryBot.create(:application, :old_enough_for_new_application, :with_medical_certification_requested)
       sign_in(@admin)
     end
 
@@ -17,32 +17,33 @@ module Admin
       visit admin_application_path(@application)
 
       # Verify the upload form is present
-      assert_selector 'h3', text: 'Upload Faxed Medical Certification'
+      assert_selector 'h3', text: 'Upload Medical Certification'
 
       # Select approve option and attach file
-      find('input[value="accepted"]').click
+      find('input[value="approved"]').click
       attach_file('medical_certification', Rails.root.join('test/fixtures/files/medical_certification_valid.pdf'))
 
       # Submit the form
       click_button 'Process Certification'
 
       # Assert success message
-      assert_text 'Medical certification successfully uploaded and approved'
+      assert_text(/certification.*uploaded.*approved/i)
 
       # Verify the certification was attached
       assert @application.reload.medical_certification.attached?
-      assert_equal 'accepted', @application.medical_certification_status
+      assert_equal 'approved', @application.medical_certification_status
     end
 
     test 'admin can reject medical certification with reason' do
       visit admin_application_path(@application)
 
+      # Ensure upload form heading is present
+      assert_selector 'h3', text: 'Upload Medical Certification'
       # Select reject option
       find('input[value="rejected"]').click
 
-      # Select rejection reason and add notes
-      select 'Missing Information', from: 'medical_certification_rejection_reason'
-      fill_in 'medical_certification_rejection_notes', with: 'The form is missing required patient information.'
+      # Wait for the rejection reason dropdown to appear after selecting "Reject Certification"
+      find('select#medical_certification_rejection_reason', wait: 3).select('Missing Information')
 
       # Submit the form
       click_button 'Process Certification'
@@ -58,26 +59,25 @@ module Admin
       visit admin_application_path(@application)
 
       # Select approve option but don't attach a file
-      find('input[value="accepted"]').click
+      find('input[value="approved"]').click
 
       # Submit the form
       click_button 'Process Certification'
 
       # Assert error message
-      assert_text 'Please select a file to upload'
+      assert_text(/file.*upload/i)
     end
 
     test 'admin must select a rejection reason when rejecting' do
       visit admin_application_path(@application)
 
-      # Select reject option but don't select a reason
+      # Select reject option but intentionally skip selecting a reason to trigger validation
       find('input[value="rejected"]').click
 
-      # Submit the form
       click_button 'Process Certification'
 
-      # Assert error message
-      assert_text 'Please select a rejection reason'
+      # Expect an error related to missing rejection reason
+      assert_text(/rejection reason is required|select.*rejection.*reason/i)
     end
   end
 end

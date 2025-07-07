@@ -21,7 +21,7 @@ class WebauthnRecoveryFlowTest < ApplicationSystemTestCase
     click_button 'Sign In'
 
     # Should be on WebAuthn page now
-    assert_text 'Use one of your security keys to sign in'
+    assert_text 'Use your registered security key to complete sign-in.'
 
     # Check for recovery link
     assert_link "I've lost my security key"
@@ -107,10 +107,9 @@ class WebauthnRecoveryFlowTest < ApplicationSystemTestCase
     # Go to the recovery request details page
     visit admin_recovery_request_path(request)
 
-    # Approve the request
-    accept_confirm do
-      click_button 'Approve Security Key Reset'
-    end
+    # Approve the request (confirmation dialog removed in UI)
+    click_button 'Approve Security Key Reset'
+    wait_for_turbo
 
     # Verify success message
     assert_text 'Security key recovery request approved successfully'

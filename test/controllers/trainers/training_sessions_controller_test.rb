@@ -8,7 +8,7 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
   setup do
     # Create a constituent for the application
     constituent = create(:constituent)
-    @application = create(:application, user: constituent) # Keep application for association
+    @application = create(:application, :old_enough_for_new_application, user: constituent) # Keep application for association
     @trainer = create(:trainer)
     @admin = create(:admin)
 
@@ -22,12 +22,12 @@ class Trainers::TrainingSessionsControllerTest < ActionDispatch::IntegrationTest
 
     # Setup for other_trainer_session test (Keep for now, might need adjustment later)
     @other_trainer = create(:trainer)
-    @other_application = create(:application, user: create(:constituent))
+    @other_application = create(:application, :old_enough_for_new_application, user: create(:constituent))
     @other_trainer_session = create(:training_session, :scheduled, trainer: @other_trainer, application: @other_application)
 
     # Setup for constituent_cancelled_sessions_count test (Keep for now, might need adjustment later)
     @constituent = @application.user
-    @app2 = create(:application, user: @constituent) # Another app for the same constituent
+    @app2 = create(:application, :old_enough_for_new_application, user: @constituent) # Another app for the same constituent
     @session1_cancelled = create(:training_session, :cancelled, application: @application, trainer: @trainer)
     @session2_no_show = create(:training_session, :no_show, application: @app2, trainer: @trainer)
   end

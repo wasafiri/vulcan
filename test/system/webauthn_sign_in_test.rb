@@ -85,7 +85,7 @@ class WebauthnSignInTest < ApplicationSystemTestCase
     assert_selector 'a', text: 'Set Up Two-Factor Authentication'
 
     # Test the "Skip for now" option
-    click_link 'Skip for now'
+    click_link 'Skip and Continue to Dashboard'
     assert_current_path root_path
 
     # Header should show the security reminder
@@ -103,7 +103,12 @@ class WebauthnSignInTest < ApplicationSystemTestCase
     visit welcome_path
 
     # Should be redirected to dashboard - adapt to actual path
-    assert ['/constituent/dashboard', '/constituent_portal/dashboard'].include?(current_path),
+    # The welcome page shows "Continue to Dashboard" when user has WebAuthn
+    assert_text 'Continue to Dashboard'
+    click_link 'Continue to Dashboard'
+    
+    # Should be redirected to dashboard
+    assert ['/constituent/dashboard', '/constituent_portal/dashboard', '/'].include?(current_path),
            "Expected to be redirected to dashboard but was at #{current_path}"
 
     # Should not see security reminder in header

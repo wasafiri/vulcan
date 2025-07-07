@@ -2,527 +2,451 @@
 
 require 'test_helper'
 
-class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
-  # Don't load fixtures automatically - system tests use seeded data instead
-  # fixtures :all # Commented out to avoid conflicts with seeded data
+# Helper Modules – defined before use
 
-  include SystemTestAuthentication # Include authentication helper
-  include SystemTestHelpers # Include helpers for working with Cuprite
+# SeedLookupHelpers -----------------------------------------------------------
+module SeedLookupHelpers
+  EMAILS = {
+    admin: 'admin@example.com',
+    admin_david: 'admin@example.com',
+    confirmed_user: 'user@example.com',
+    confirmed_user2: 'user2@example.com',
+    unconfirmed_user: 'unconfirmed@example.com',
+    trainer: 'trainer@example.com',
+    evaluator: 'evaluator@example.com',
+    medical_provider: 'medical@example.com',
+    constituent_john: 'john.doe@example.com',
+    constituent_jane: 'jane.doe@example.com',
+    constituent_alex: 'alex.smith@example.com',
+    constituent_rex: 'rex.canine@example.com',
+    vendor_raz: 'raz@testemail.com',
+    vendor_teltex: 'teltex@testemail.com',
+    constituent_alice: 'alice.doe@example.com'
+  }.freeze
 
-  # Include URL helpers as a module to isolate them and prevent them from being treated as test methods
-  module UrlHelpers
-    include Rails.application.routes.url_helpers
-  end
-  include UrlHelpers
-
-  # Configure default URL options for system tests
-  Rails.application.routes.default_url_options[:host] = 'www.example.com'
-
-  # Configure the browser with settings optimized per the testing guide
-  # NOTE: This must be at the class level, not inside a setup block
-  driven_by :cuprite, using: :chromium, screen_size: [1400, 1400] do |driver_options|
-    # Use more reasonable timeouts - the guide suggests 300s was too aggressive
-    driver_options.timeout = 120             # 2 minutes for actions
-    driver_options.process_timeout = 120     # 2 minutes for browser startup
-    driver_options.js_errors = false         # Don't fail on JS errors per guide
-    driver_options.skip_image_loading = true # Skip loading images for faster tests
-    driver_options.browser_options = {       # Additional browser options
-      'disable-gpu': nil,                     # Disable GPU for more stable headless mode
-      'disable-dev-shm-usage': nil,           # Disable /dev/shm usage to prevent crashes
-      'disable-web-security': nil,            # Disable web security for easier testing
-      'no-sandbox': nil,                      # Required for running in CI environments
-      'disable-background-timer-throttling': nil, # Prevent timer throttling
-      'disable-backgrounding-occluded-windows': nil, # Prevent window backgrounding
-      'disable-renderer-backgrounding': nil,  # Prevent renderer backgrounding
-      'disable-features': 'TranslateUI,VizDisplayCompositor', # Disable problematic features
-      'remote-debugging-port': 9222,          # Enable remote debugging
-      'disable-extensions': nil,              # Disable all extensions
-      'disable-plugins': nil,                 # Disable all plugins
-      'disable-hang-monitor': nil,            # Disable hang monitor
-      'disable-prompt-on-repost': nil,        # Disable repost prompts
-      'disable-sync': nil,                    # Disable sync
-      'disable-translate': nil,               # Disable translate
-      'disable-background-networking': nil,   # Disable background networking
-      'disable-default-apps': nil,            # Disable default apps
-      'disable-component-extensions-with-background-pages': nil, # Disable component extensions
-      headless: %w[0 false].exclude?(ENV.fetch('HEADLESS', 'true')) # Support HEADLESS env var per guide
-    }
-    # Enable JavaScript but configure to ignore errors
-    driver_options.js_enabled = true
-    # Add slowmo support for debugging per the guide
-    driver_options.slowmo = ENV['SLOWMO']&.to_f if ENV['SLOWMO']
-  end
-
-  # Add setup and teardown blocks for browser state management (per testing guide)
-  setup do
-    # Start with a clean session per the guide
-    Capybara.reset_sessions!
-    
-    # Ensure we have basic test data available (from seeds)
-    ensure_test_data_available
-    
-    # Clear any test identity from previous runs (per authentication guide)
-    clear_test_identity if respond_to?(:clear_test_identity)
-    
-    # Inject JavaScript to prevent getComputedStyle loops in tests
-    inject_test_javascript_fixes if defined?(page) && page&.driver.present?
-  rescue StandardError => e
-    debug_puts "Warning: Error in system test setup: #{e.message}"
-  end
-
-  teardown do
-    # Clean up authentication per the guide
-    system_test_sign_out if respond_to?(:system_test_sign_out)
-  rescue StandardError => e
-    # Log but don't fail if cleanup has an issue
-    debug_puts "Warning: Authentication cleanup failed: #{e.message}"
-  ensure
-    # Always reset session and test identity per the guide
-    Capybara.reset_sessions!
-    clear_test_identity if respond_to?(:clear_test_identity)
-    
-    # Clean up after each test to prevent state leakage
-    reset_browser_state if defined?(page) && page&.driver.present?
-  end
-
-  # Enhanced helper to resolve pending connections with improved robustness
-  # This addresses the PendingConnectionsError and timeout issues
-  def clear_pending_connections(timeout = 8)
-    debug_puts "Attempting to clear pending connections with #{timeout}s timeout..."
-
-    # First, try to stop any active navigation
-    begin
-      if page.driver.browser.respond_to?(:stop)
-        page.driver.browser.stop
-        debug_puts 'Stopped active navigation'
-      end
-    rescue StandardError => e
-      debug_puts "Warning: Error stopping navigation: #{e.message}"
-    end
-
-    # Then clear JavaScript errors and dialogs
-    begin
-      if page.driver.browser.respond_to?(:reset)
-        page.driver.browser.reset
-        debug_puts 'Browser state reset'
-      end
-    rescue StandardError => e
-      debug_puts "Warning: Error resetting browser state: #{e.message}"
-    end
-
-    # Now handle pending network connections
-    begin
-      Timeout.timeout(timeout) do
-        # Check for pending connections using Ferrum's network traffic API
-        if defined?(page.driver.browser.network) && page.driver.browser.respond_to?(:network)
-          # First try to get and clear traffic
-          5.times do |attempt|
-            # Ensure all exchanges are finished
-            pending_requests = page.driver.browser.network.traffic.reject(&:finished?)
-
-            break if pending_requests.empty?
-
-            debug_puts "Attempt #{attempt + 1}: Found #{pending_requests.count} pending network requests..."
-
-            # Wait a bit between clear attempts
-            sleep 0.5
-
-            # Force clear traffic
-            page.driver.browser.network.clear(:traffic)
-          end
-
-          # Double-check and wait if still pending
-          pending_requests = page.driver.browser.network.traffic.reject(&:finished?)
-          if pending_requests.any?
-            debug_puts "Still have #{pending_requests.count} pending requests after initial clearing. Waiting..."
-
-            # More aggressive waiting and clearing
-            wait_time = 0
-            while pending_requests.any? && wait_time < (timeout - 1) # Leave buffer
-              sleep 0.5
-              wait_time += 0.5
-
-              # Clear traffic again
-              page.driver.browser.network.clear(:traffic)
-
-              # Check again
-              pending_requests = page.driver.browser.network.traffic.reject(&:finished?)
-              break if pending_requests.empty?
-            end
-
-            if pending_requests.any?
-              debug_puts "WARNING: Still have #{pending_requests.count} pending requests after waiting. Forcing final clear."
-              page.driver.browser.network.clear(:traffic)
-            else
-              debug_puts 'Successfully cleared all pending requests after waiting.'
-            end
-          else
-            debug_puts 'All pending requests cleared successfully.'
-          end
-        else
-          # Fallback to a simple sleep if network API is not available or compatible
-          debug_puts 'Network API not available, using fallback sleep strategy'
-          sleep(timeout.positive? ? [timeout / 2, 2].min : 0.5) # Shorter sleep as fallback
-        end
-      end
-    rescue Timeout::Error
-      # Clear traffic if timeout occurs during the waiting/checking phase
-      debug_puts 'Timeout waiting for pending connections. Forcefully clearing network traffic.'
-      if defined?(page.driver.browser.network) && page.driver.browser.respond_to?(:network)
-        page.driver.browser.network.clear(:traffic)
-      end
-    rescue Ferrum::PendingConnectionsError => e
-      # This might still be raised by Capybara actions if called immediately after this method
-      debug_puts "Ferrum::PendingConnectionsError rescued in clear_pending_connections: #{e.message}. Attempting final reset."
-
-      # Last resort: try to reuse the same page but force a clean state
-      begin
-        page.driver.browser.execute_script('window.stop(); window.localStorage.clear(); window.sessionStorage.clear();')
-        page.driver.browser.network.clear(:cache) if page.driver.browser.respond_to?(:network) &&
-                                                     page.driver.browser.network.respond_to?(:clear)
-        debug_puts 'Executed emergency browser state cleanup via JavaScript'
-      rescue StandardError => e
-        debug_puts "Warning: Error during emergency cleanup: #{e.message}"
-      end
-    rescue StandardError => e
-      # Catch other potential errors during the process
-      debug_puts "Error in clear_pending_connections: #{e.class} - #{e.message}"
-    end
-
-    # Always try to GC at the end to clean up any lingering objects
-    GC.start if defined?(GC) && GC.respond_to?(:start)
-  end
-
-  # Add a method to fully reset browser state between tests
-  def reset_browser_state
-    # Don't continue if page is not initialized
-    return unless defined?(page) && page&.driver&.browser
-
-    # Stop any active navigation and clear pending traffic
-    begin
-      clear_pending_connections(1) # Use shorter timeout for teardown
-    rescue StandardError => e
-      debug_puts "Warning: Error clearing pending connections: #{e.message}"
-    end
-
-    # Try to go to a blank page to reset the browser state
-    begin
-      # Using rescue nil to safely handle any errors
-      begin
-        visit('about:blank')
-      rescue StandardError
-        nil
-      end
-
-      # Try to reset the session safely
-      begin
-        Capybara.reset_sessions!
-        debug_puts 'Browser navigated to blank page and sessions reset'
-      rescue StandardError => e
-        debug_puts "Warning: Error resetting sessions: #{e.message}"
-      end
-    rescue StandardError => e
-      debug_puts "Warning: Error navigating to blank page: #{e.message}"
-    end
-
-    # Reset environment variables used for test authentication
-    ENV['TEST_USER_ID'] = nil
-
-    # Reset Current module if it exists
-    Current.reset if defined?(Current) && Current.respond_to?(:reset)
-  end
-
-  # Helper to suppress common warnings in system tests
-  def suppress_common_warnings
-    # Capture warnings before they hit the log
-    old_stderr = $stderr
-    $stderr = StringIO.new
-    yield
-  ensure
-    # Restore stderr, filter warnings, and only print non-suppressed ones
-    warnings = $stderr.string
-    $stderr = old_stderr
-
-    # Filter out common warnings we want to suppress
-    filtered_warnings = warnings.lines.reject do |line|
-      line.include?('BiDi must be enabled') ||
-        line.include?('invalid argument: \'handle\'') ||
-        line.include?('no such window: target window already closed')
-    end
-
-    # Print any remaining warnings
-    filtered_warnings.each { |line| warn line }
-  end
-
-  # Helper method to ensure required test data exists
-  def ensure_test_data_available
-    # Check if we have basic users needed for tests
-    unless User.exists?(email: 'admin@example.com')
-      debug_puts "Warning: Basic test users not found. You may need to run: RAILS_ENV=test bin/rails db:seed"
-    end
-  end
-
-  # Helper method to access users by fixture name (since we removed fixtures :all)
-  # This allows tests to use users(:fixture_name) syntax with seeded data
-  def users(fixture_name)
+  def users(key)
+    key = key.to_sym
     @users_cache ||= {}
-    return @users_cache[fixture_name] if @users_cache[fixture_name]
-
-    user = case fixture_name.to_sym
-           when :admin
-             User.find_by(email: 'admin@example.com')
-           when :confirmed_user
-             User.find_by(email: 'user@example.com')
-           when :confirmed_user2
-             User.find_by(email: 'user2@example.com')
-           when :unconfirmed_user
-             User.find_by(email: 'unconfirmed@example.com')
-           when :trainer
-             User.find_by(email: 'trainer@example.com')
-           when :evaluator
-             User.find_by(email: 'evaluator@example.com')
-           when :medical_provider
-             User.find_by(email: 'medical@example.com')
-           when :constituent_john
-             User.find_by(email: 'john.doe@example.com')
-           when :constituent_jane
-             User.find_by(email: 'jane.doe@example.com')
-           when :constituent_alex
-             User.find_by(email: 'alex.smith@example.com')
-           when :constituent_rex
-             User.find_by(email: 'rex.canine@example.com')
-           when :vendor_raz
-             User.find_by(email: 'raz@testemail.com')
-           when :vendor_teltex
-             User.find_by(email: 'teltex@testemail.com')
-           else
-             debug_puts "Warning: Unknown user fixture '#{fixture_name}'"
-             nil
-           end
-
-    @users_cache[fixture_name] = user
-    user
-  end
-
-  # Alias for compatibility with existing tests
-  def sign_in(user, options = {})
-    system_test_sign_in(user, options)
-  end
-
-  # Authentication assertion methods from the testing guide
-  def assert_authenticated_as(expected_user, msg = nil)
-    # In system tests, we primarily rely on UI indicators rather than Current.user
-    # since Current.user may not be properly set in the test environment
-
-    # Verify UI state
-    assert_no_match(/Sign In|Login/i, page.text, msg || 'Found sign in link when user should be authenticated')
-    assert_includes page.text, 'Sign Out', msg || 'Could not find sign out link'
-    assert_not_equal sign_in_path, current_path, msg || 'On sign in page when should be authenticated'
-
-    # Check for user-specific content if possible
-    return unless expected_user.respond_to?(:first_name) && expected_user.first_name.present?
-
-    assert page.has_text?("Hello #{expected_user.first_name}") ||
-           page.has_text?(expected_user.first_name),
-           msg || "Couldn't find user's name on page"
-  end
-
-  def assert_not_authenticated(msg = nil)
-    # Verify Current context if available
-    assert_nil Current.user, msg || 'Expected no authenticated user' if defined?(Current) && Current.respond_to?(:user)
-
-    # Verify UI state or redirect
-    if page.has_text?('Sign In')
-      assert_includes page.text, 'Sign In', msg || 'Could not find sign in link'
-      assert_not_includes page.text, 'Sign Out', msg || 'Found sign out link when not authenticated'
-    elsif current_path == sign_in_path
-      assert_equal sign_in_path, current_path, msg || 'Not on sign in page'
-    else
-      # We might have been redirected without rendering, so check path
-      assert_match(/sign_in/, current_url, msg || 'Not redirected to sign in page')
+    @users_cache[key] ||= begin
+      email = EMAILS[key]
+      debug_puts "Unknown user fixture '#{key}'" unless email
+      User.find_by(email: email)
     end
   end
 
-  # Helper method to run code with authenticated user (from the guide)
-  def with_authenticated_user(user)
-    system_test_sign_in(user)
-    yield
-  ensure
-    system_test_sign_out
-  end
-
-  # Enhanced interaction helpers from the testing guide
-  def scroll_to_and_click(selector)
-    element = scroll_to_element(selector)
-    element.click
-    element
-  end
-
-  # Wait for Turbo navigation to complete without sleeping (from guide)
-  def wait_for_turbo
-    Capybara.using_wait_time(5) do
-      has_no_css?('.turbo-progress-bar')
+  def applications(key)
+    case key.to_sym
+    when :submitted_application then Application.where(status: %w[submitted in_progress]).first
+    when :approved_application  then Application.find_by(status: 'approved')
+    when :pending_application   then Application.find_by(status: 'pending')
+    else Application.first
     end
   end
 
-  # Helper method to create test objects (for compatibility with FactoryBot usage)
-  # Per the testing guide, system tests should use seeded data when possible
-  def create(factory_name, *args)
-    # Handle different argument patterns:
-    # create(:user) - no args
-    # create(:user, :trait) - trait symbol
-    # create(:user, attributes) - attributes hash
-    # create(:user, :trait, attributes) - trait symbol + attributes hash
-    
-    traits = []
-    attributes = {}
-    
-    args.each do |arg|
-      if arg.is_a?(Symbol)
-        traits << arg
-      elsif arg.is_a?(Hash)
-        attributes.merge!(arg)
-      end
-    end
-    
-    case factory_name
-    when :admin
-      users(:admin)
-    when :constituent, :user
-      # Handle both :constituent and :user factory calls
-      if attributes[:email]
-        # Look for existing user first
-        User.find_by(email: attributes[:email]) || users(:confirmed_user)
-      else
-        users(:confirmed_user)
-      end
-    when :vendor
-      if traits.include?(:approved) || attributes[:approved] || attributes[:status] == :approved
-        users(:vendor_raz) # Use approved vendor
-      else
-        users(:vendor_teltex) # Use another vendor for non-approved cases
-      end
-    when :application
-      # For applications, look up from seeded data or return nil to let test handle it
-      # This is more complex, so tests should use seeded Application records
-      debug_puts "Warning: create(:application) should use seeded Application records from db/seeds.rb"
-      Application.first # Return first seeded application as fallback
-    when :invoice
-      # For invoices, we need to look up from seeded data
-      debug_puts "Warning: create(:invoice) should use seeded Invoice records from db/seeds.rb"
-      Invoice.first # Return first seeded invoice as fallback
-    else
-      debug_puts "Warning: create(#{factory_name}) not implemented - tests should use seeded data per testing guide"
-      nil
-    end
-  end
-
-  # Helper to create test lists (for create_list compatibility)
-  def create_list(factory_name, count, *args)
-    debug_puts "Warning: create_list(#{factory_name}) should use seeded data per testing guide"
-    Array.new(count) { create(factory_name, *args) }.compact
-  end
-
-  # Inject JavaScript fixes to prevent common system test issues
-  def inject_test_javascript_fixes
-    return unless defined?(page) && page&.driver&.browser
-
-    begin
-      # This will be executed on every page load during tests
-      page.execute_script(<<~JS)
-        // Disable Chart.js completely in system tests
-        if (typeof window.Chart !== 'undefined') {
-          window.Chart = {
-            register: function() {},
-            defaults: {},
-            Chart: function() { 
-              return { 
-                destroy: function() {}, 
-                update: function() {}, 
-                render: function() {} 
-              }; 
-            }
-          };
-        }
-        
-        // Prevent getComputedStyle recursion
-        if (!window._getComputedStyleFixed) {
-          const originalGetComputedStyle = window.getComputedStyle;
-          let callDepth = 0;
-          
-          window.getComputedStyle = function(element, pseudoElement) {
-            if (callDepth > 50) {
-              console.warn('getComputedStyle recursion prevented');
-              return {};
-            }
-            
-            callDepth++;
-            try {
-              const result = originalGetComputedStyle.call(this, element, pseudoElement);
-              callDepth--;
-              return result;
-            } catch (error) {
-              callDepth = 0;
-              return {};
-            }
-          };
-          
-          window._getComputedStyleFixed = true;
-        }
-      JS
-    rescue StandardError => e
-      debug_puts "Warning: Could not inject JavaScript fixes: #{e.message}"
-    end
+  def print_queue_items(key)
+    @print_queue_items_cache ||= {}
+    @print_queue_items_cache[key] ||= build_print_queue_item(key.to_sym)
   end
 
   private
 
-  # Only output debug messages when VERBOSE_TESTS is enabled
-  def debug_puts(message)
-    puts message if ENV['VERBOSE_TESTS'] || ENV['DEBUG_AUTH']
+  def build_print_queue_item(key)
+    case key
+    when :pending_letter_1
+      letter_item(key, 'application_approved', users(:confirmed_user), 1.day.ago)
+    when :pending_letter_2
+      letter_item(key, 'income_proof_rejected', users(:confirmed_user2), 2.days.ago)
+    else
+      PrintQueueItem.first
+    end
   end
 
-  # Enhanced debugging helper from the guide
-  def debug_page
-    puts "Current URL: #{current_url}"
-    puts "Current Path: #{current_path}"
-    puts "Page title: #{page.title}"
-    puts "Page HTML summary: #{page.html[0..500]}..."
-    take_screenshot("debug-#{Time.now.to_i}")
+  def letter_item(key, type, constituent, timestamp)
+    # Create a minimal valid PDF content instead of just text
+    pdf_content = "%PDF-1.4\n1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\n2 0 obj\n<<\n/Type /Pages\n/Kids [3 0 R]\n/Count 1\n>>\nendobj\n3 0 obj\n<<\n/Type /Page\n/Parent 2 0 R\n/MediaBox [0 0 612 792]\n>>\nendobj\nxref\n0 4\n0000000000 65535 f \n0000000010 00000 n \n0000000053 00000 n \n0000000125 00000 n \ntrailer\n<<\n/Size 4\n/Root 1 0 R\n>>\nstartxref\n174\n%%EOF"
+
+    item = PrintQueueItem.new(
+      letter_type: type,
+      status: 'pending',
+      constituent: constituent,
+      created_at: timestamp,
+      updated_at: timestamp
+    )
+
+    # Attach the PDF BEFORE saving so presence validation passes
+    item.pdf_letter.attach(
+      io: StringIO.new(pdf_content),
+      filename: "#{key}.pdf",
+      content_type: 'application/pdf'
+    )
+
+    item.save!
+    item
   end
 
-  # Screenshot helper with proper directory creation
+  def debug_puts(msg)
+    puts msg if ENV['VERBOSE_TESTS']
+  end
+end
+
+# FactoryAdapter --------------------------------------------------------------
+module FactoryAdapter
+  def create(factory_name, *args)
+    traits, attrs = args.partition { |a| a.is_a? Symbol }
+    # The factory adapter filters and merges attributes safely
+    # Arrays and non-Hash objects are filtered out to prevent merge errors
+    attrs = attrs.each_with_object({}) { |a, memo| memo.merge!(a) if a.is_a?(Hash) }
+
+    case factory_name
+    when :admin                            then users(:admin)
+    when :constituent, :user               then resolve_user_factory(traits, attrs)
+    when :vendor, :vendor_user             then traits.include?(:approved) ? users(:vendor_raz) : users(:vendor_teltex)
+    when :application                      then build_application(traits, attrs)
+    when :invoice                          then Invoice.first
+    else delegate_to_factory_bot(factory_name, args)
+    end
+  end
+
+  def create_list(factory_name, count, *)
+    args = Array(*)
+    Array.new(count) { create(factory_name, *args) }
+  end
+
+  private
+
+  def resolve_user_factory(traits, attrs)
+    return users(:evaluator)        if traits.include?(:evaluator)
+    return users(:medical_provider) if traits.include?(:medical_provider)
+    return users(:trainer)          if traits.include?(:trainer)
+
+    # Check for email in attrs and create a new user if provided
+    if attrs[:email] || attrs['email']
+      email = attrs[:email] || attrs['email']
+      existing_user = User.find_by(email: email)
+      return existing_user if existing_user
+
+      # Create a new constituent with the provided attributes
+      Users::Constituent.create!(attrs.merge(
+                                   password: 'password123',
+                                   first_name: attrs[:first_name] || 'Test',
+                                   last_name: attrs[:last_name] || 'User',
+                                   date_of_birth: attrs[:date_of_birth] || 30.years.ago,
+                                   hearing_disability: true
+                                 ))
+    else
+      users(:confirmed_user)
+    end
+  end
+
+  def build_application(traits, attrs)
+    return Application.first if traits.empty? && attrs.empty?
+
+    # Ensure skip validation flag is set for this thread
+    Application.skip_wait_period_validation = true
+
+    user = attrs.delete(:user) || create_unique_user_for_application
+
+    # Filter out transient attributes that don't belong on the Application model
+    transient_attrs = %w[skip_proofs use_mock_attachments]
+    filtered_attrs = attrs.reject { |key, _| transient_attrs.include?(key.to_s) }
+
+    # Set application_date to avoid waiting period validation for test applications
+    # This mimics the :old_enough_for_new_application trait behavior
+    base_attrs = default_app_attrs(traits).merge(filtered_attrs).merge(user: user)
+    base_attrs[:application_date] = 4.years.ago unless base_attrs.key?(:application_date)
+
+    Application.create!(base_attrs)
+  rescue ActiveRecord::RecordInvalid => e
+    raise "Neutered Exception #{e.class}: #{e.message}" if e.message.include?('You must wait 3 years')
+
+    raise
+  end
+
+  def create_unique_user_for_application
+    # Create a unique constituent for each application to avoid 3-year validation
+    timestamp = Time.now.to_i
+    random_suffix = rand(10_000)
+    email = "system_test_user_#{timestamp}_#{random_suffix}@example.com"
+    phone = "555-#{format('%03d', rand(1000))}-#{format('%04d', rand(10_000))}"
+
+    Users::Constituent.create!(
+      email: email,
+      password: 'password123',
+      first_name: 'Test',
+      last_name: 'User',
+      date_of_birth: 30.years.ago,
+      phone: phone,
+      hearing_disability: true
+    )
+  end
+
+  def default_app_attrs(traits)
+    base = {
+      maryland_resident: true,
+      self_certify_disability: true,
+      medical_provider_name: 'Test Provider',
+      medical_provider_phone: '555-123-4567',
+      medical_provider_email: 'provider@example.com',
+      household_size: 2,
+      annual_income: 30_000,
+      status: 'in_progress'
+    }
+
+    if traits.include?(:draft)
+      base.merge(status: 'draft')
+    elsif traits.include?(:approved)
+      base.merge(status: 'approved', medical_certification_status: 'approved')
+    elsif traits.include?(:in_progress_with_rejected_proofs)
+      base.merge(income_proof_status: 'rejected', residency_proof_status: 'rejected')
+    elsif traits.include?(:in_progress_with_pending_proofs)
+      base.merge(income_proof_status: 'not_reviewed', residency_proof_status: 'not_reviewed')
+    else
+      base
+    end
+  end
+
+  def delegate_to_factory_bot(factory_name, args)
+    return FactoryBot.create(factory_name, *args) if defined?(FactoryBot)
+
+    debug_puts "FactoryBot unavailable for #{factory_name}"
+    nil
+  rescue StandardError => e
+    debug_puts "FactoryBot create failed: #{e.class}: #{e.message}"
+    nil
+  end
+
+  def debug_puts(msg)
+    puts msg if ENV['VERBOSE_TESTS']
+  end
+end
+
+# ApplicationSystemTestCase --------------------------------------------------
+# Central hub for *all* browser‑driven system tests.
+#
+# ▸ Keeps infrastructure (driver, DB strategy, life‑cycle) in this file.
+# ▸ Everything domain‑specific lives in tiny mix‑ins to keep the class tidy.
+class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
+  # Browser -----------------------------------------------------------------
+  CUCRITE_OPTIONS = {
+    js_errors: ENV.fetch('JS_ERRORS', 'false') == 'true',
+    slowmo: ENV.fetch('SLOWMO', 0).to_f,
+    process_timeout: 45,
+    timeout: 25,
+    window_size: [1400, 1400],
+    headless: ENV.fetch('HEADLESS', 'true') != 'false',
+
+    # Chrome stability flags – *do not remove* unless you know what breaks
+    browser_options: {
+      'no-sandbox' => nil,
+      'disable-gpu' => nil,
+      'disable-dev-shm-usage' => nil,
+      'disable-web-security' => nil,
+      'disable-features' => 'VizDisplayCompositor',
+      'disable-ipc-flooding-protection' => nil,
+      'disable-backgrounding-occluded-windows' => nil,
+      'disable-background-timer-throttling' => nil,
+      'disable-renderer-backgrounding' => nil,
+      'disable-domain-reliability' => nil,
+      'disable-breakpad' => nil,
+      'disable-sync' => nil,
+      'disable-popup-blocking' => nil,
+      'metrics-recording-only' => nil,
+      'no-first-run' => nil,
+      'no-default-browser-check' => nil,
+      'disable-blink-features' => 'AutomationControlled',
+      'memory-pressure-off' => nil,
+      'max_old_space_size' => '2048'
+    },
+
+    # Block noisy external requests
+    url_blacklist: [
+      %r{\Ahttps://www\.google-analytics\.com/},
+      %r{\Ahttps://googletagmanager\.com/},
+      %r{\Ahttps://fonts\.googleapis\.com/},
+      %r{\Ahttps://fonts\.gstatic\.com/}
+    ],
+
+    page_options: {
+      'enable-automation' => true,
+      'disable-web-security' => true,
+      'disable-features' => 'VizDisplayCompositor'
+    }
+  }.freeze
+
+  Capybara.register_driver(:cuprite_rails) do |app|
+    Capybara::Cuprite::Driver.new(app, **CUCRITE_OPTIONS)
+  end
+
+  driven_by :cuprite_rails, using: :chrome, screen_size: [1400, 1400]
+
+  # Routing helpers ---------------------------------------------------------
+  include Rails.application.routes.url_helpers
+  Rails.application.routes.default_url_options[:host] = 'www.example.com'
+
+  # Domain‑level helpers – mix‑ins only, no logic here ----------------------
+  include SystemTestAuthentication     # sign‑in helpers
+  include SystemTestHelpers            # scrolling / safe_click etc.
+  include FplPolicyHelpers             # setup_fpl_policies
+  include SeedLookupHelpers            # users(:admin) etc. (now defined above)
+  include FactoryAdapter               # create(:application) wrapper (now defined above)
+
+  # Test life‑cycle ---------------------------------------------------------
+  setup do
+    Capybara.default_max_wait_time = extended_wait_required? ? 8 : 3
+
+    # System tests need to bypass the waiting period validation for test data creation
+    Application.skip_wait_period_validation = true
+
+    Capybara.reset_sessions!
+    clear_pending_connections_fast # must run *before* any page nav
+    ensure_test_data_available
+    setup_fpl_policies if respond_to?(:setup_fpl_policies)
+    setup_paper_application_context if respond_to?(:setup_paper_application_context)
+    clear_test_identity if respond_to?(:clear_test_identity)
+    inject_test_javascript_fixes if page&.driver
+  end
+
+  teardown do
+    system_test_sign_out if respond_to?(:system_test_sign_out)
+    clear_pending_connections_fast
+    Capybara.reset_sessions!
+    clear_test_identity if respond_to?(:clear_test_identity)
+    teardown_paper_application_context if respond_to?(:teardown_paper_application_context)
+  end
+
+  # DB cleaning – truncation is required because browser ≠ test thread
+  def self.use_transactional_tests?
+    false
+  end
+
+  # High‑level helpers ---------------------------------------------------------
+
+  # Wait for DOM ready plus network quiet and sweep stray connections afterwards
+  def wait_for_page_load(timeout: 5)
+    page.has_selector?('body', wait: timeout)
+    clear_pending_connections_fast
+  end
+
+  # Robust Turbo wait with Ferrum edge‑case handling
+  def wait_for_turbo(timeout: 3)
+    page.has_no_selector?('.turbo-progress-bar', wait: timeout)
+  rescue Capybara::ElementNotFound
+    # progress bar never appeared – likely a fast nav
+  rescue Ferrum::NodeNotFoundError
+    sleep 0.1 # element disappeared mid‑query – retry once
+    retry
+  ensure
+    clear_pending_connections_fast
+  end
+
+  # Auth assertion helpers – many tests rely on these
+  def assert_authenticated_as(user, msg = nil)
+    assert_no_match(/Sign (In|Up)/i, page.text, msg || 'Found sign‑in link for authenticated user')
+    assert_includes page.text, 'Sign Out', msg || 'Missing sign‑out link'
+    assert_not_equal sign_in_path, current_path, msg || 'Still on sign‑in page'
+    return unless user.respond_to?(:first_name) && user.first_name.present?
+
+    assert_match(/#{Regexp.escape(user.first_name)}/, page.text, msg || 'User name missing from UI')
+  end
+
+  def assert_not_authenticated(msg = nil)
+    assert_match(/Sign (In|Up)/i, page.text, msg || 'Missing sign‑in link when logged‑out')
+    assert_not_includes page.text, 'Sign Out', msg || 'Sign‑out link present when logged‑out'
+  end
+
+  def with_authenticated_user(user)
+    system_test_sign_in(user)
+    yield if block_given?
+  ensure
+    system_test_sign_out
+  end
+
+  # Sign in method that doesn't require a block and doesn't automatically sign out
+  # This is for tests that manage their own authentication lifecycle
+  def sign_in(user)
+    system_test_sign_in(user)
+  end
+
+  # Misc utilities kept for backwards compatibility ------------------------------------
+  def toggle_password_visibility(field_id)
+    field  = find("input##{field_id}")
+    button = field.sibling('button[aria-label]')
+    page.execute_script('arguments[0].click()', button)
+  end
+
+  def fixture_file_upload(rel_path, mime_type = nil)
+    Rack::Test::UploadedFile.new(Rails.root.join(rel_path), mime_type || Mime[:pdf].to_s)
+  end
+
   def take_screenshot(name = nil)
     name ||= "screenshot-#{Time.current.strftime('%Y%m%d%H%M%S')}"
     path = Rails.root.join("tmp/screenshots/#{name}.png")
-    FileUtils.mkdir_p(Rails.root.join('tmp/screenshots'))
-
-    begin
-      page.save_screenshot(path.to_s)
-      puts "Screenshot saved to #{path}" if ENV['VERBOSE_TESTS']
-    rescue StandardError => e
-      debug_puts "Warning: Could not save screenshot: #{e.message}"
-    end
-
+    FileUtils.mkdir_p(path.dirname)
+    page.save_screenshot(path.to_s) # rubocop:disable Lint/Debugger
+    puts "Screenshot saved to #{path}" if ENV['VERBOSE_TESTS']
     path
+  rescue StandardError => e
+    debug_puts "Screenshot failed: #{e.message}"
+    nil
   end
 
-  # Environment variable support for test configuration
-  def self.configure_test_environment
-    # Set log level based on VERBOSE_TESTS environment variable
-    if ENV['VERBOSE_TESTS']
-      Rails.logger.level = :debug
-    else
-      Rails.logger.level = :warn
-    end
-
-    # Configure database strategy
-    if ENV['USE_TRUNCATION']
-      self.use_transactional_tests = false
-      DatabaseCleaner.strategy = :truncation
-    end
+  def debug_page
+    puts "URL: #{current_url}\nHTML: #{page.html[0, 400]}…"
+    take_screenshot("debug-#{Time.now.to_i}")
   end
 
-  # Call configuration when class is loaded
-  configure_test_environment
+  private
+
+  # If we need longer waits for heavy email template rendering tests
+  def extended_wait_required?
+    self.class.name.include?('EmailTemplatesTest')
+  end
+
+  # Aggressively clear Cuprite's CDP network cache; extra steps for email tests
+  def clear_pending_connections_fast
+    return unless page&.driver.is_a?(Capybara::Cuprite::Driver)
+
+    browser = page.driver.browser
+    browser.network.clear_cache
+    browser.runtime.run_if_waiting_for_debugger
+
+    if extended_wait_required?
+      browser.runtime.evaluate('window.stop && window.stop()')
+      sleep 0.1
+    end
+  rescue StandardError => e
+    debug_puts "Connection clear failed: #{e.message}"
+  end
+
+  # Inject JS patches that stop Chart.js + getComputedStyle recursion loops
+  def inject_test_javascript_fixes
+    page.execute_script <<~JS
+      // Disable Chart.js globally (prevents huge CPU during screenshots)
+      if (window.Chart) {
+        window.Chart = { register: ()=>{}, defaults:{}, Chart: ()=>({ destroy:()=>{}, update:()=>{}, render:()=>{} }) };
+      }
+      // Guard against getComputedStyle infinite recursion (Ferrum bug)
+      if (!window._getComputedStylePatched) {
+        const original = window.getComputedStyle;
+        let depth = 0;
+        window.getComputedStyle = function(el, pseudo) {
+          if (depth > 50) { console.warn('getComputedStyle recursion avoided'); return {}; }
+          depth++; const result = original.call(this, el, pseudo); depth--; return result;
+        };
+        window._getComputedStylePatched = true;
+      }
+    JS
+  rescue StandardError => e
+    debug_puts "JS injection failed: #{e.message}"
+  end
+
+  def ensure_test_data_available
+    return if User.exists?(email: 'admin@example.com')
+
+    debug_puts 'Seed data missing – run `RAILS_ENV=test rails db:seed`'
+  end
+
+  def debug_puts(msg)
+    puts msg if ENV['VERBOSE_TESTS'] || ENV['DEBUG_AUTH']
+  end
 end

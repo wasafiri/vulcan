@@ -18,12 +18,9 @@ module ConstituentPortal
       Policy.find_or_create_by(key: 'fpl_8_person').update(value: 50_000)
       Policy.find_or_create_by(key: 'fpl_modifier_percentage').update(value: 400)
 
-      # Sign in
-      visit sign_in_path
-      fill_in 'Email Address', with: @user.email
-      fill_in 'Password', with: 'password123'
-      click_button 'Sign In'
-      assert_text 'Dashboard' # Verify we're signed in
+      # Reliable sign in via shared helper
+      system_test_sign_in(@user)
+      assert_authenticated_as(@user)
     end
 
     test 'income threshold calculation in JavaScript matches server calculation' do

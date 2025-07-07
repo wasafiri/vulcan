@@ -12,20 +12,9 @@ class PaperApplicationModeSwitchingTest < ActionDispatch::IntegrationTest
     Policy.find_or_create_by!(key: 'fpl_2_person') { |policy| policy.value = '21150' }
     Policy.find_or_create_by!(key: 'fpl_modifier_percentage') { |policy| policy.value = '400' }
 
-    # Create sample proofs for testing using file content directly
-    sample_pdf_content = File.read(Rails.root.join('test/fixtures/files/sample.pdf'))
-
-    @income_blob = ActiveStorage::Blob.create_and_upload!(
-      io: StringIO.new(sample_pdf_content),
-      filename: 'income_proof.pdf',
-      content_type: 'application/pdf'
-    )
-
-    @residency_blob = ActiveStorage::Blob.create_and_upload!(
-      io: StringIO.new(sample_pdf_content),
-      filename: 'residency_proof.pdf',
-      content_type: 'application/pdf'
-    )
+    # Create sample proofs for testing using fixture files directly
+    @income_proof_file = fixture_file_upload('test/fixtures/files/income_proof.pdf', 'application/pdf')
+    @residency_proof_file = fixture_file_upload('test/fixtures/files/residency_proof.pdf', 'application/pdf')
   end
 
   test 'paper application service properly handles mode switching between accept and reject' do
@@ -35,7 +24,6 @@ class PaperApplicationModeSwitchingTest < ActionDispatch::IntegrationTest
                           phone: "555-#{rand(100..999)}-#{rand(1000..9999)}")
 
     # Step 1: First create application with income proof attached but residency proof rejected
-    # For testing, directly use the file rather than creating a blob
     post admin_paper_applications_path, params: {
       # Pass constituent attributes instead of just ID
       constituent: {
@@ -67,7 +55,7 @@ class PaperApplicationModeSwitchingTest < ActionDispatch::IntegrationTest
         medical_release_authorized: true
       },
       income_proof_action: 'accept',
-      income_proof_signed_id: @income_blob.signed_id, # Use signed_id
+      income_proof: @income_proof_file, # Use fixture file directly
       residency_proof_action: 'reject',
       residency_proof_rejection_reason: 'missing_name',
       residency_proof_rejection_notes: 'Name is missing on document'
@@ -86,10 +74,6 @@ class PaperApplicationModeSwitchingTest < ActionDispatch::IntegrationTest
     assert_equal 'rejected', application.residency_proof_status
 
     # Step 2: Switch the modes - reject income and accept residency
-    puts "DEBUG: About to patch application #{application.id} with income_proof_action=reject and residency_proof_action=accept"
-    puts "DEBUG: Application before patch - income_proof_status: #{application.income_proof_status}, residency_proof_status: #{application.residency_proof_status}"
-    puts "DEBUG: Income proof attached? #{application.income_proof.attached?}, Residency proof attached? #{application.residency_proof.attached?}"
-
     # Paper applications are created through admin/paper_applications but then become regular applications
     # For updating proof status, we need to use the update_proof_status action
 
@@ -104,11 +88,9 @@ class PaperApplicationModeSwitchingTest < ActionDispatch::IntegrationTest
 
     # For the residency proof, we need to first attach the file
     # We'll use direct attachment instead of the service
-    application.residency_proof.attach(@residency_blob)
+    application.residency_proof.attach(@residency_proof_file)
     application.update_column(:residency_proof_status, Application.residency_proof_statuses[:not_reviewed])
     application.reload
-
-    puts "DEBUG: After attaching residency proof - residency_proof attached? #{application.residency_proof.attached?}" if ENV['VERBOSE_TESTS']
 
     # Now we can approve the residency proof
     patch update_proof_status_admin_application_path(application), params: {
@@ -116,7 +98,6 @@ class PaperApplicationModeSwitchingTest < ActionDispatch::IntegrationTest
       status: 'approved'
     }
 
-    puts "DEBUG: Response status: #{response.status}, Flash alert: #{flash[:alert]}"
     assert_response :redirect
     application.reload
 
@@ -125,15 +106,8 @@ class PaperApplicationModeSwitchingTest < ActionDispatch::IntegrationTest
     assert_equal 'rejected', application.income_proof_status
 
     # Verify residency proof is now attached and approved
-    # Verify residency proof is now attached and approved
-    puts "DEBUG: Before final assertion - residency_proof attached? #{application.residency_proof.attached?}" # ADDED DEBUG
-    assert application.residency_proof.attached?, 'Residency proof should be attached after approval' # Added message
+    assert application.residency_proof.attached?, 'Residency proof should be attached after approval'
     assert_equal 'approved', application.residency_proof_status
-
-    # Debug output to see what proof reviews we have
-    puts "DEBUG: All proof reviews: #{application.proof_reviews.map do |pr|
-      "#{pr.proof_type}:#{pr.status}:#{pr.rejection_reason}"
-    end.join(', ')}"
 
     # Verify we have the correct proof reviews
     income_review = application.proof_reviews.find_by(proof_type: :income, status: :rejected, rejection_reason: 'expired')
@@ -147,7 +121,6 @@ class PaperApplicationModeSwitchingTest < ActionDispatch::IntegrationTest
     # We should also have a proof review for the approved residency proof
     # The ProofReviewer service creates a proof review with status 'approved' when approving a proof
     residency_approved_reviews = application.proof_reviews.where(proof_type: :residency, status: :approved)
-    puts "DEBUG: Residency approved reviews: #{residency_approved_reviews.map(&:inspect).join(', ')}"
 
     # Check if we have any approved residency proof reviews
     assert residency_approved_reviews.exists?, 'Should have at least one approved residency proof review'

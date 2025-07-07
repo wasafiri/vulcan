@@ -66,9 +66,10 @@ class PaperApplicationContextTest < ActionDispatch::IntegrationTest
     assert_nil Thread.current[:paper_application_context], 'Context should be nil after exception and cleanup'
 
     # Verify normal validation runs again after context is cleared
-    # Create a fresh application to avoid cached validation state
+    # Create a fresh constituent and application to avoid 3-year waiting period validation
+    fresh_constituent = FactoryBot.create(:constituent)
     fresh_application = FactoryBot.create(:application,
-                                          user: @constituent,
+                                          user: fresh_constituent,
                                           status: :in_progress,
                                           income_proof_status: :approved) # Invalid state - approved but no proof attached
 

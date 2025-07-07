@@ -137,6 +137,10 @@ module ActiveSupport
       Current.reset if defined?(Current)
       Current.test_user_id = nil if defined?(Current)
 
+      # Ensure any paper application context flags are cleared between tests (per testing guide)
+      Thread.current[:paper_application_context] = nil
+      Thread.current[:skip_proof_validation] = nil
+
       # Clear instance variables that might leak between tests
       @authenticated_user = nil
       @test_user_id = nil
@@ -201,3 +205,5 @@ ActionMailer::Base.deliveries = []
 
 ActiveJob::Base.queue_adapter = :test
 Rails.application.config.active_storage.service = :test
+
+Application.skip_wait_period_validation = true

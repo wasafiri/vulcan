@@ -81,8 +81,16 @@ module Admin
 
       # Now visit the page to verify it shows correctly
       visit admin_application_path(@application)
-      assert_text 'Medical Certification'
-      assert_text 'Approved'
+
+      # Wait for the page to fully load
+      assert_text "Application ##{@application.id} Details"
+
+      # Look for medical certification section and approved status
+      # Medical Certification has its own section, not in attachments
+      within '[data-testid="medical-certification-section"]' do
+        assert_text 'Medical Certification'
+        assert_text 'Approved'
+      end
     end
 
     test 'factory-created application can have proofs approved and trigger certification request' do

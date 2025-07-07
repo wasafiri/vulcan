@@ -94,22 +94,9 @@
     <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="template-preview-title">
       <h2 id="template-preview-title" class="text-xl font-semibold text-gray-900 mb-4">Rendered Preview</h2>
       
-      <% 
-        # Get sample data for this template
-        sample_data = sample_data_for_template(@email_template.name)
-        
-        # Render template with sample data
-        begin
-          rendered_subject, rendered_body = @email_template.render(**sample_data)
-        rescue => e
-          rendered_subject = "Error rendering subject: #{e.message}"
-          rendered_body = "Error rendering template: #{e.message}"
-        end
-      %>
-      
       <div class="mb-4">
         <h3 class="text-lg font-medium text-gray-900 mb-2">
-          Subject: <span class="font-normal"><%= rendered_subject %></span>
+          Subject: <span class="font-normal"><%= @rendered_subject %></span>
         </h3>
       </div>
       
@@ -121,10 +108,10 @@
         <div class="border border-gray-300 rounded-lg shadow-sm p-4 bg-white">
           <% if @email_template.format == 'html' %>
             <div class="email-preview">
-              <%= raw rendered_body %>
+              <%= raw @rendered_body %>
             </div>
           <% else %>
-            <pre class="whitespace-pre-wrap text-sm"><%= rendered_body %></pre>
+            <pre class="whitespace-pre-wrap text-sm"><%= @rendered_body %></pre>
           <% end %>
         </div>
       </div>

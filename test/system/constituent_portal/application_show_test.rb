@@ -78,7 +78,7 @@ module ConstituentPortal
       # Verify we're redirected to the show page with safe interaction
       measure_time('Verify redirect and content') do
         safe_interaction do
-          assert_text 'Application saved as draft.', wait: 10
+          assert_text(/Application saved as draft/i, wait: 10)
           assert_current_path %r{/constituent_portal/applications/\d+}
 
           # Debug: Print the current user's attributes
@@ -163,7 +163,7 @@ module ConstituentPortal
       # Verify success with safe interaction
       measure_time('Verify success') do
         safe_interaction do
-          assert_text 'Application saved as draft', wait: 10
+          assert_text(/Application saved as draft/i, wait: 10)
         end
       end
 
@@ -218,7 +218,7 @@ module ConstituentPortal
       # Verify we're redirected to the show page with safe interaction
       measure_time('Verify redirect and updated content') do
         safe_interaction do
-          assert_text 'Application saved successfully.', wait: 10
+          assert_text(/Application saved as draft/i, wait: 10)
 
           # Debug: Print the application attributes after update
           application = Application.find(application_id)
@@ -289,7 +289,7 @@ module ConstituentPortal
       # Verify success with safe interaction
       measure_time('Verify success and disability info') do
         safe_interaction do
-          assert_text 'Application saved as draft', wait: 10
+          assert_text(/Application saved as draft/i, wait: 10)
 
           # Get the application ID from the URL
           current_url =~ %r{/applications/(\d+)}

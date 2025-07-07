@@ -6,28 +6,9 @@ module VendorPortal
   class VoucherRedemptionFlowTest < ApplicationSystemTestCase
     def setup
       # Create vendor with proper approvals to process vouchers
-      @vendor = Vendor.create!(
-        first_name: 'Vendor',
-        last_name: 'Flow',
-        email: 'vendor.flow@example.com',
-        password: 'password',
-        password_confirmation: 'password',
-        status: 'approved',
-        business_name: 'Flow Business',
-        business_tax_id: '111222333',
-        terms_accepted_at: Time.current,
-        w9_status: 'approved'
-      )
+      @vendor = create(:vendor, :approved)
 
-      # Attach a W9 form to the vendor to pass validation for can_process_vouchers?
-      @vendor.w9_form.attach(
-        io: File.open(file_fixture('sample_w9.pdf')),
-        filename: 'sample_w9.pdf',
-        content_type: 'application/pdf'
-      )
-
-      # Ensure the W9 status is approved
-      @vendor.update!(w9_status: :approved)
+      # Vendor is already set up with approved status and W9 form from seeded data
 
       # Create constituent who will receive the voucher
       @constituent = User.create!(
@@ -37,6 +18,7 @@ module VendorPortal
         email: 'alice@example.com',
         password: 'password',
         password_confirmation: 'password',
+        date_of_birth: 25.years.ago.to_date,
         vision_disability: true,
         hearing_disability: true,
         mobility_disability: false,
@@ -93,8 +75,18 @@ module VendorPortal
       # Sign in as vendor
       sign_in_as_vendor
 
-      # Navigate directly to the voucher redemption page
+      # Navigate to the voucher redemption page (will redirect to verification first)
       visit redeem_vendor_voucher_path(@voucher.code)
+
+      # Should be redirected to verification page
+      assert_text 'Identity Verification'
+      assert_text @voucher.code
+
+      # Complete verification with constituent's date of birth
+      fill_in 'date_of_birth', with: @constituent.date_of_birth.strftime('%Y-%m-%d')
+      click_button 'Verify Identity'
+
+      # Now should be on redemption page
       assert_text 'Voucher Redemption'
       assert_text @voucher.code
 
@@ -118,10 +110,9 @@ module VendorPortal
       fill_in 'voucher_code', with: @voucher.code
       click_button 'Verify Voucher'
 
-      assert_current_path redeem_vendor_voucher_path(@voucher.code)
-      assert_text 'Voucher Redemption'
-      assert_text @voucher.code
-      assert_text '$100.00' # Current balance
+      # Should be redirected to verification page first
+      assert_current_path verify_vendor_voucher_path(@voucher.code)
+      assert_text 'Identity Verification'
     end
 
     test 'vendor sees error when verifying an invalid voucher code' do
@@ -132,12 +123,17 @@ module VendorPortal
       click_button 'Verify Voucher'
 
       assert_text 'Invalid voucher code'
-      assert_current_path vendor_dashboard_path
+      assert_current_path vendor_vouchers_path
     end
 
     test 'vendor can select multiple products with different quantities' do
       sign_in_as_vendor
       visit redeem_vendor_voucher_path(@voucher.code)
+
+      # Complete verification first
+      assert_text 'Identity Verification'
+      fill_in 'date_of_birth', with: @constituent.date_of_birth.strftime('%Y-%m-%d')
+      click_button 'Verify Identity'
 
       # Verify we're on the redemption page
       assert_text 'Voucher Redemption'
@@ -169,6 +165,12 @@ module VendorPortal
       sign_in_as_vendor
       visit redeem_vendor_voucher_path(@voucher.code)
 
+      # Complete verification first
+      assert_text 'Identity Verification'
+      fill_in 'date_of_birth', with: @constituent.date_of_birth.strftime('%Y-%m-%d')
+      click_button 'Verify Identity'
+      assert_text 'Voucher Redemption'
+
       # Try to submit without selecting any products
       find_by_id('redemption-amount').set('50.0')
 
@@ -187,6 +189,12 @@ module VendorPortal
     test 'vendor cannot redeem more than voucher balance' do
       sign_in_as_vendor
       visit redeem_vendor_voucher_path(@voucher.code)
+
+      # Complete verification first
+      assert_text 'Identity Verification'
+      fill_in 'date_of_birth', with: @constituent.date_of_birth.strftime('%Y-%m-%d')
+      click_button 'Verify Identity'
+      assert_text 'Voucher Redemption'
 
       # Try to submit with amount greater than balance
       find_by_id('redemption-amount').set('150.0')
@@ -207,10 +215,8 @@ module VendorPortal
     private
 
     def sign_in_as_vendor
-      visit sign_in_path
-      fill_in 'Email', with: @vendor.email
-      fill_in 'Password', with: 'password'
-      find('input[type="submit"][value="Sign In"]').click
+      sign_in(@vendor)
+      visit vendor_dashboard_path
       assert_text 'Vendor Dashboard'
     end
   end

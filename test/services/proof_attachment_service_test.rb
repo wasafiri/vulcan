@@ -79,10 +79,11 @@ class ProofAttachmentServiceTest < ActiveSupport::TestCase
     # Clear events before the test
     Event.delete_all
 
-    # Stub the transaction method itself to raise an error
-    ActiveRecord::Base.stubs(:transaction).raises(StandardError, 'Test error during transaction')
+    # Stub a more specific method that won't interfere with ActiveRecord internals
+    # Mock the actual attachment method to raise an error
+    @application.stubs(:income_proof).raises(StandardError, 'Test error during transaction')
 
-    # Now call the service - the transaction block should raise the error
+    # Call the service
     result = ProofAttachmentService.attach_proof({
                                                    application: @application,
                                                    proof_type: 'income',

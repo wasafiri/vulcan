@@ -16,28 +16,13 @@
     ].flatten.to_json %>
   </script>
 
-  <%# Fallback method: Legacy window._queuedFlashMessages for smooth transition %>
-  <script type="module">
-    // Fallback support for legacy flash controllers during transition
-    if (!window.AppNotifications) {
-      <% flash.each do |type, message| %>
-        const legacyEventData = {
-          message: <%= message.to_json %>,
-          type: "<%= j case type.to_s
-                       when 'notice' then 'success'
-                       when 'alert' then 'warning'  
-                       when 'info' then 'info'
-                       else 'error'
-                       end %>"
-        };
-        
-        window._queuedFlashMessages = window._queuedFlashMessages || [];
-        window._queuedFlashMessages.push(legacyEventData);
-        
-        if (window._queuedFlashMessages.length > 10) {
-          window._queuedFlashMessages = window._queuedFlashMessages.slice(-10);
-        }
-      <% end %>
-    }
-  </script>
+  <%# Fallback: Render HTML elements for accessibility and testing %>
+  <%# These will be hidden by CSS but provide semantic structure %>
+  <div class="sr-only" aria-live="polite">
+    <% flash.each do |type, message| %>
+      <div role="alert" class="flash-message flash-<%= type %>">
+        <%= message %>
+      </div>
+    <% end %>
+  </div>
 <% end %>

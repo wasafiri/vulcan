@@ -131,14 +131,19 @@ module ConstituentPortal
       # Test each disability type individually
       disability_types = %i[hearing vision speech mobility cognition]
 
-      disability_types.each do |disability_type|
-        # Reset all disabilities
-        @constituent.update(
-          hearing_disability: false,
-          vision_disability: false,
-          speech_disability: false,
-          mobility_disability: false,
-          cognition_disability: false
+      disability_types.each_with_index do |disability_type, index|
+        # Create a unique constituent for each disability type to avoid 3-year validation
+        constituent = create(:constituent, 
+                             email: "disability_test_#{Time.now.to_i}_#{index}@example.com")
+        sign_in_for_integration_test(constituent)
+
+        # Set all disabilities to false, then set the target disability to true
+        constituent.update(
+          hearing_disability: disability_type == :hearing,
+          vision_disability: disability_type == :vision,
+          speech_disability: disability_type == :speech,
+          mobility_disability: disability_type == :mobility,
+          cognition_disability: disability_type == :cognition
         )
 
         # Create params with just this disability
@@ -148,7 +153,7 @@ module ConstituentPortal
         post constituent_portal_applications_path, params: params.merge(submit_application: true)
 
         assert_redirected_to constituent_portal_application_path(Application.last)
-        assert @constituent.reload.send("#{disability_type}_disability"),
+        assert constituent.reload.send("#{disability_type}_disability"),
                "#{disability_type}_disability should be true after submission"
       end
     end

@@ -6,14 +6,20 @@ module Admin
   class MedicalCertificationUploadTest < ApplicationSystemTestCase
     setup do
       @admin = create(:admin)
-      @application = create(:application, :in_progress)
+      @application = create(:application, 
+        status: 'in_progress',
+        household_size: 2,
+        annual_income: 30000,
+        maryland_resident: true,
+        self_certify_disability: true,
+        medical_provider_name: 'Dr. Test Provider',
+        medical_provider_phone: '555-123-4567',
+        medical_provider_email: 'provider@example.com'
+      )
       @application.update(medical_certification_status: 'requested')
 
-      # Sign in as admin
-      visit new_user_session_path
-      fill_in 'Email', with: @admin.email
-      fill_in 'Password', with: 'password'
-      click_button 'Sign In'
+      # Sign in as admin using system test helper
+      system_test_sign_in(@admin)
     end
 
     test 'admin can approve a medical certification during upload' do
@@ -23,7 +29,7 @@ module Admin
       assert_selector '[data-testid="medical-certification-upload-form"]'
 
       # Select the "Approve" option
-      choose 'Accept Certification and Upload'
+      choose 'Approve Certification and Upload'
 
       # Attach a test file to the upload form
       file_path = Rails.root.join('test/fixtures/files/test_document.pdf')
@@ -56,11 +62,11 @@ module Admin
       choose 'Reject Certification'
 
       # Wait for rejection section to become visible
-      assert_selector 'select[name="rejection_reason"]', visible: true
+      assert_selector 'select[name="medical_certification_rejection_reason"]', visible: true
 
       # Select a rejection reason and add notes
-      select 'Incomplete Form', from: 'rejection_reason'
-      fill_in 'notes', with: 'The certification form is missing required signatures'
+      select 'Missing Information', from: 'medical_certification_rejection_reason'
+      fill_in 'medical_certification_rejection_notes', with: 'The certification form is missing required signatures'
 
       # Submit the form
       click_button 'Process Certification'
@@ -83,7 +89,7 @@ module Admin
       visit admin_application_path(@application)
 
       # Select the "Approve" option
-      choose 'Accept Certification and Upload'
+      choose 'Approve Certification and Upload'
 
       # Try to submit without attaching a file
       click_button 'Process Certification'

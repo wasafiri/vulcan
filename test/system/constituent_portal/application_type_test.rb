@@ -26,12 +26,25 @@ module ConstituentPortal
       fill_in 'Household Size', with: 3
       fill_in 'Annual Income', with: 45_999
 
+      # Fill in address information
+      fill_in 'Street Address', with: '123 Test St'
+      fill_in 'City', with: 'Baltimore'
+      select 'Maryland', from: 'State'
+      fill_in 'Zip Code', with: '21201'
+
+      # Fill in disability information
+      check 'I certify that I have a disability that affects my ability to access telecommunications services'
+      check 'Hearing'
+
       # Fill in medical provider info - use the actual fieldset identifier
-      within 'section', text: 'Medical Provider Information' do
+      within(:xpath, "//section[contains(., 'Medical Provider Information') or contains(., 'Medical Professional Information')]") do
         fill_in 'Name', with: 'Dr. Test Provider'
         fill_in 'Phone', with: '2025551234'
         fill_in 'Email', with: 'test@example.com'
       end
+
+      # Check the medical authorization checkbox
+      check 'I authorize the release and sharing of my medical information as described above'
 
       # Save the application
       click_button 'Save Application'
@@ -80,6 +93,12 @@ module ConstituentPortal
       fill_in 'Household Size', with: 3
       fill_in 'Annual Income', with: 45_999
 
+      # Fill in address information
+      fill_in 'Street Address', with: '123 Test St'
+      fill_in 'City', with: 'Baltimore'
+      select 'Maryland', from: 'State'
+      fill_in 'Zip Code', with: '21201'
+
       # Use a more reliable method to check the self-certify checkbox
       # Use find + check to ensure we're finding the right element
       within 'section', text: 'Disability Information' do
@@ -92,11 +111,14 @@ module ConstituentPortal
       end
 
       # Fill in medical provider info - use the actual section identifier
-      within 'section', text: 'Medical Provider Information' do
+      within(:xpath, "//section[contains(., 'Medical Provider Information') or contains(., 'Medical Professional Information')]") do
         fill_in 'Name', with: 'Dr. Test Provider'
         fill_in 'Phone', with: '2025551234'
         fill_in 'Email', with: 'test@example.com'
       end
+
+      # Check the medical authorization checkbox
+      check 'I authorize the release and sharing of my medical information as described above'
 
       # Take a screenshot to debug if needed
 

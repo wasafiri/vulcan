@@ -28,10 +28,10 @@ module Admin
         )
       end
 
-      # Set the proof statuses to 'pending'
+      # Set the proof statuses to 'not_reviewed'
       @application.update!(
-        income_proof_status: :pending,
-        residency_proof_status: :pending
+        income_proof_status: :not_reviewed,
+        residency_proof_status: :not_reviewed
       )
 
       # Set the MAILER_HOST environment variable for the test

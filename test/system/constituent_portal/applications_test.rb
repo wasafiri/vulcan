@@ -80,8 +80,8 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
     # Save as draft
     # This will need to be updated to match the actual save button
 
-    # Verify success
-    assert_text 'Application saved', wait: 5
+    # Verify success (flash now includes period)
+    assert_text(/Application saved as draft\.?/, wait: 5)
   end
 
   test 'dashboard shows correct application status after submission' do
@@ -226,7 +226,7 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
     fill_in 'Annual Income', with: '60000'
 
     # Guardian information
-    check 'I am applying on behalf of someone under 18'
+    choose 'A dependent I manage'
     select 'Parent', from: 'Relationship to Applicant'
 
     # Disability information
@@ -291,7 +291,7 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
     assert_checked_field 'I certify that I am a resident of Maryland'
     assert_field 'Household Size', with: '4'
     assert_field 'Annual Income', with: '60000'
-    assert_checked_field 'I am applying on behalf of someone under 18'
+    assert_checked_field 'A dependent I manage'
     assert_select 'Relationship to Applicant', selected: 'Parent'
     assert_checked_field 'I certify that I have a disability that affects my ability to access telecommunications services'
     assert_checked_field 'Hearing'

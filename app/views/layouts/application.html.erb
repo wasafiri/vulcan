@@ -22,8 +22,8 @@
   
   <body class="font-sans antialiased bg-gray-50">
     <%= render "shared/header" %>
-    <div id="flash">
-      <%= render "layouts/flash" %>
+    <div id="flash" data-controller="ui--flash">
+      <%= render "shared/flash" %>
     </div>
     
     <main>

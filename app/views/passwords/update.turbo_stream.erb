@@ -1,6 +1,6 @@
 <%# Prepend the flash notice to the main flash container %>
 <%= turbo_stream.prepend "flash" do %>
-  <%= render "layouts/flash" %>
+  <%= render "shared/flash" %>
 <% end %>
 
 <%# Replace the password form container with a success message %>

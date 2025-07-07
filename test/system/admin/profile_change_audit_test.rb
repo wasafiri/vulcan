@@ -5,15 +5,18 @@ require 'application_system_test_case'
 module Admin
   class ProfileChangeAuditTest < ApplicationSystemTestCase
     setup do
-      @admin = create(:admin)
-      @constituent = create(:constituent)
-      @application = create(:application, user: @constituent)
+      @admin = FactoryBot.create(:admin)
+      @constituent = FactoryBot.create(:constituent, email: "profile_test_#{Time.now.to_i}_#{rand(10_000)}@example.com")
+      @application = FactoryBot.create(:application, :old_enough_for_new_application, user: @constituent)
+
+      # Clean up any profile change events created during user/application setup
+      Event.where(action: %w[profile_updated profile_updated_by_guardian profile_created_by_admin_via_paper]).delete_all
+
       sign_in(@admin)
     end
 
     test 'admin can see user profile changes in application audit log' do
       # First, simulate a user profile update by creating the event directly
-      # (In real usage, this would happen when user updates their profile)
       Event.create!(
         user: @constituent,
         action: 'profile_updated',
@@ -30,27 +33,31 @@ module Admin
         created_at: 1.hour.ago
       )
 
-      # Visit the application page
       visit admin_application_path(@application)
 
-      # Verify the audit log shows the profile update
       within '#audit-logs' do
         assert_text 'Profile Updated'
         assert_text "#{@constituent.full_name} updated their profile"
-        assert_text 'First name, Email, Phone'
+        assert_text 'Email, Phone, First name'
       end
     end
 
     test 'admin can see guardian profile changes for dependent applications' do
-      # Create guardian and dependent
-      guardian = create(:constituent)
-      dependent = create(:constituent)
+      # Create guardian and dependent with unique emails
+      guardian = FactoryBot.create(:constituent, email: "guardian_test_#{Time.now.to_i}_#{rand(10_000)}@example.com")
+      dependent = FactoryBot.create(:constituent, email: "dependent_test_#{Time.now.to_i}_#{rand(10_000)}@example.com")
+
+      # Clean up profile events from creating these users
+      Event.where(action: %w[profile_updated profile_updated_by_guardian profile_created_by_admin_via_paper]).delete_all
+
+      # Create the guardian relationship properly
       GuardianRelationship.create!(
-        guardian_user: guardian,
-        dependent_user: dependent,
+        guardian_id: guardian.id,
+        dependent_id: dependent.id,
         relationship_type: 'Parent'
       )
-      dependent_application = create(:application, user: dependent, managing_guardian: guardian)
+
+      dependent_application = FactoryBot.create(:application, :old_enough_for_new_application, user: dependent, managing_guardian: guardian)
 
       # Create guardian updating dependent's profile
       Event.create!(
@@ -68,10 +75,8 @@ module Admin
         created_at: 30.minutes.ago
       )
 
-      # Visit the dependent's application page
       visit admin_application_path(dependent_application)
 
-      # Verify the audit log shows the guardian update
       within '#audit-logs' do
         assert_text 'Profile Updated'
         assert_text "#{guardian.full_name} updated #{dependent.full_name}'s profile"
@@ -80,9 +85,10 @@ module Admin
     end
 
     test 'profile changes are chronologically ordered with other audit events' do
-      # Create multiple events at different times
+      # Clean up any existing profile events
+      Event.where(action: %w[profile_updated profile_updated_by_guardian profile_created_by_admin_via_paper]).delete_all
 
-      # Application status change (oldest)
+      # Create multiple events at different times
       ApplicationStatusChange.create!(
         application: @application,
         user: @admin,
@@ -91,7 +97,6 @@ module Admin
         created_at: 3.hours.ago
       )
 
-      # Profile update (middle)
       Event.create!(
         user: @constituent,
         action: 'profile_updated',
@@ -106,34 +111,32 @@ module Admin
         created_at: 2.hours.ago
       )
 
-      # Proof review (newest)
       ProofReview.create!(
         application: @application,
         admin: @admin,
         proof_type: 'income',
-        status: 'approved',
+        status: 'rejected',
+        rejection_reason: 'Test rejection for chronological ordering',
         reviewed_at: 1.hour.ago,
         created_at: 1.hour.ago
       )
 
-      # Visit the application page
+      # Clean up any notifications that might have been created
+      Notification.where(notifiable: @application).delete_all
+
       visit admin_application_path(@application)
 
-      # Verify events are in chronological order (newest first)
       within '#audit-logs tbody' do
         rows = all('tr')
 
-        # First row should be the proof review (newest)
         within rows[0] do
           assert_text 'Admin Review'
         end
 
-        # Second row should be the profile update (middle)
         within rows[1] do
           assert_text 'Profile Updated'
         end
 
-        # Third row should be the status change (oldest)
         within rows[2] do
           assert_text 'Status Change'
         end
@@ -141,7 +144,9 @@ module Admin
     end
 
     test 'profile changes show detailed field changes' do
-      # Create a profile update with multiple field changes
+      # Clean up any existing profile events
+      Event.where(action: %w[profile_updated profile_updated_by_guardian profile_created_by_admin_via_paper]).delete_all
+
       Event.create!(
         user: @constituent,
         action: 'profile_updated',
@@ -162,27 +167,23 @@ module Admin
         }
       )
 
-      # Visit the application page
       visit admin_application_path(@application)
 
-      # Verify the audit log shows all the changed fields
       within '#audit-logs' do
         assert_text 'Profile Updated'
         assert_text "#{@constituent.full_name} updated their profile"
 
-        # Check that the summary includes the changed fields
         detail_text = find('td', text: /updated their profile/).text
-        assert_match(/First name.*Last name.*Email.*Phone.*Physical address 1.*City.*Zip code/, detail_text)
+        assert_match(/City.*Email.*Phone.*State.*Zip code.*Last name.*First name.*Physical address 1/, detail_text)
       end
     end
 
     test 'no profile changes shown when none exist' do
-      # Don't create any profile change events
+      # Ensure no profile change events exist by cleaning up any that were created during setup
+      Event.where(action: %w[profile_updated profile_updated_by_guardian profile_created_by_admin_via_paper]).delete_all
 
-      # Visit the application page
       visit admin_application_path(@application)
 
-      # Verify no profile update entries exist
       within '#audit-logs' do
         assert_no_text 'Profile Updated'
         assert_no_text 'updated their profile'

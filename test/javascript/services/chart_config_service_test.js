@@ -47,21 +47,51 @@ describe('ChartConfigService', () => {
     it('returns base configuration object', () => {
       const config = service.getBaseConfig()
 
-      expect(config).toEqual(expect.objectContaining({
-        responsive: true,
+      expect(config).toEqual({
         maintainAspectRatio: false,
-        interaction: expect.objectContaining({
+        interaction: {
           mode: 'index',
-          intersect: false
-        }),
-        animation: expect.objectContaining({
-          duration: expect.any(Number)
-        }),
-        plugins: expect.objectContaining({
-          legend: expect.any(Object),
-          tooltip: expect.any(Object)
-        })
-      }))
+          intersect: false,
+          includeInvisible: true
+        },
+        animation: {
+          duration: 800,
+          easing: 'easeOutQuart'
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              usePointStyle: true,
+              padding: 15,
+              font: {
+                size: 14
+              }
+            }
+          },
+          title: {
+            display: false,
+            font: {
+              size: 16,
+              weight: 'bold'
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            titleFont: {
+              size: 16,
+              weight: 'bold'
+            },
+            bodyFont: {
+              size: 14
+            },
+            cornerRadius: 6,
+            padding: 12,
+            displayColors: true
+          }
+        }
+      })
     })
 
     it('sets performance optimizations', () => {

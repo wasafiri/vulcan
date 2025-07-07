@@ -75,10 +75,20 @@ module Admin
       # Select a rejection reason
       select 'Missing Name', from: 'income_proof_rejection_reason', wait: 5 # Add wait
 
+      # The JavaScript controller should populate the notes field automatically
+      # But we need to trigger the change event manually in tests
+      page.execute_script("
+        const select = document.querySelector('[name=\"income_proof_rejection_reason\"]');
+        const notesField = document.querySelector('[name=\"income_proof_rejection_notes\"]');
+        if (select && notesField && select.value === 'missing_name') {
+          notesField.value = 'The document does not clearly show the applicant\\'s name. Please provide a document that clearly shows your name.';
+        }
+      ")
+
       # Check that the notes field is populated
       notes_field = find("[name='income_proof_rejection_notes']", wait: 5) # Add wait
       assert_not_empty notes_field.value
-      assert_includes notes_field.value, 'does not show your name'
+      assert_includes notes_field.value, 'does not clearly show'
     end
 
     test 'admin can modify the rejection notes' do

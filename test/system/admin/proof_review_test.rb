@@ -5,31 +5,8 @@ require 'application_system_test_case'
 module AdminTests
   class ProofReviewTest < ApplicationSystemTestCase
     setup do
-      @admin = users(:admin_david)
-      @application = applications(:submitted_application)
-
-      # Ensure all necessary attachments are present
-      unless @application.income_proof.attached?
-        @application.income_proof.attach(
-          io: Rails.root.join('test/fixtures/files/income_proof.pdf').open,
-          filename: 'income_proof.pdf',
-          content_type: 'application/pdf'
-        )
-      end
-
-      unless @application.residency_proof.attached?
-        @application.residency_proof.attach(
-          io: Rails.root.join('test/fixtures/files/residency_proof.pdf').open,
-          filename: 'residency_proof.pdf',
-          content_type: 'application/pdf'
-        )
-      end
-
-      # Set the proof statuses to not_reviewed
-      @application.update!(
-        income_proof_status: :not_reviewed,
-        residency_proof_status: :not_reviewed
-      )
+      @admin = create(:admin)
+      @application = create(:application, :in_progress_with_pending_proofs)
 
       # Sign in as admin
       sign_in(@admin)
@@ -49,7 +26,12 @@ module AdminTests
 
         # Open the income proof review modal
         within '#attachments-section' do
-          click_on 'Review Proof'
+          if has_button?('Review Proof', wait: 2)
+            first(:button, 'Review Proof').click
+          else
+            # Fallback: try link
+            first(:link_or_button, 'Review Proof').click
+          end
         end
 
         # Modal should prevent body scroll
@@ -90,7 +72,7 @@ module AdminTests
 
         # Open modal
         within '#attachments-section' do
-          click_on 'Review Proof'
+          first(:button, 'Review Proof').click
         end
 
         assert_body_not_scrollable
@@ -124,7 +106,7 @@ module AdminTests
 
       # First modal open
       within '#attachments-section' do
-        first('button', text: 'Review Proof').click
+        first(:button, 'Review Proof').click
       end
 
       assert_body_not_scrollable
@@ -137,7 +119,7 @@ module AdminTests
 
       # Second modal open
       within '#attachments-section' do
-        all('button', text: 'Review Proof')[1].click
+        all(:button, 'Review Proof')[1].click
       end
 
       assert_body_not_scrollable
