@@ -268,8 +268,8 @@ module Admin
     def process_certification_rejection
       reviewer = Applications::MedicalCertificationReviewer.new(@application, current_user)
       result = reviewer.reject(
-        rejection_reason: params[:rejection_reason],
-        notes: params[:notes]
+        rejection_reason: params[:medical_certification_rejection_reason],
+        notes: params[:medical_certification_rejection_notes]
       )
 
       if result.success?
@@ -304,7 +304,7 @@ module Admin
         certification: params[:medical_certification],
         status: status,
         verified_by: current_user,
-        rejection_reason: params[:rejection_reason]
+        rejection_reason: params[:medical_certification_rejection_reason]
       )
 
       if success
@@ -370,7 +370,7 @@ module Admin
       if status == 'approved'
         process_accepted_certification
       elsif status == 'rejected'
-        process_rejected_certification
+        process_certification_rejection
       end
     end
 

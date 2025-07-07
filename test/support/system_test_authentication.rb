@@ -252,6 +252,7 @@ module SystemTestAuthentication
     # Set thread identity and Current.user
     store_test_user_id(user.id)
     update_current_user(user)
+    Current.user = user
 
     debug_auth "Successfully signed in as #{user.email}"
     user
