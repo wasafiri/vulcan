@@ -132,13 +132,19 @@ module ApplicationDataLoading
 
   # Builds a base scope for application queries with common includes
   # @param exclude_statuses [Array<Symbol>] Statuses to exclude (default: [:rejected, :archived])
+  # @param preload_proof_blobs [Boolean] Whether to eager-load proof blobs
   # @return [ActiveRecord::Relation] The base scope
-  def build_application_base_scope(exclude_statuses: %i[rejected archived])
+  def build_application_base_scope(exclude_statuses: %i[rejected archived], preload_proof_blobs: true)
     scope = Application.includes(:user, :managing_guardian).distinct
 
     scope = scope.where.not(status: exclude_statuses) if exclude_statuses.any?
 
-    scope.with_proof_blobs
+    # Only eager-load proof blobs when explicitly requested. This avoids loading
+    # large ActiveStorage associations for list views where we rely on
+    # `preload_attachments_for_applications` + `ApplicationStorageDecorator`.
+    scope = scope.with_proof_blobs if preload_proof_blobs
+
+    scope
   end
 
   # Loads notifications for an application with specific actions

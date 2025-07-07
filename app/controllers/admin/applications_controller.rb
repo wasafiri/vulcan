@@ -39,7 +39,8 @@ module Admin
       # This populates instance variables like @open_applications_count, @proofs_needing_review_count, etc.
       load_dashboard_metrics
 
-      scoped = filtered_scope(build_application_base_scope)
+      # Skip heavy ActiveStorage eager-loading; we preload attachment existence separately
+      scoped = filtered_scope(build_application_base_scope(preload_proof_blobs: false))
       @pagy, page_of_apps = paginate(scoped)
       # ApplicationDataLoading concern: Efficiently preloads attachments for multiple applications
       # Flow: preload_attachments_for_applications -> groups attachments by application_id to avoid N+1 queries

@@ -95,19 +95,25 @@ end
 def clear_existing_data
   seed_puts 'Clearing existing data...'
 
-  # Clear sessions first to avoid foreign key constraint violations
+  # Clear Session records first to avoid foreign key constraint violations
   seed_puts '  Clearing Session records...'
   Session.in_batches(of: 100).delete_all
 
-  # Then clear other models
-  [
-    Invoice, ApplicationStatusChange, Evaluation, ProofReview, Notification, RoleCapability,
-    PolicyChange, EmailTemplate, Product, Event, Policy, Application, User
-  ].each do |model|
+  # Define the order of deletion to respect foreign key constraints.
+  # Models with foreign keys (e.g., W9Review) must be cleared before the models
+  # they point to (e.g., User).
+
+  # Clear models with dependencies first. User is cleared last.
+  [W9Review, Invoice, ApplicationStatusChange, Evaluation, ProofReview,
+   Notification, RoleCapability, PolicyChange, EmailTemplate, Product, Event, Policy, Application].each do |model|
     seed_puts "  Clearing #{model.name} records..."
     # Delete records in small batches to avoid memory issues
     model.in_batches(of: 100).delete_all
   end
+
+  # Finally, clear the User model after all dependent records are gone.
+  seed_puts '  Clearing User records...'
+  User.in_batches(of: 100).delete_all
 end
 
 def create_products_from_fixtures
@@ -264,6 +270,19 @@ end
 def seed_email_templates
   seed_puts 'Seeding email templates...'
   load Rails.root.join('db/seeds/email_templates.rb')
+
+  # Ensure the registration confirmation template exists, as it's critical for sign-up.
+  # This is a common source of errors if the main email_templates.rb seed file is missed or incomplete.
+  # NOTE: Ideally, this would be in `db/seeds/email_templates.rb`, but adding it here for robustness.
+
+  reg_confirm_name = 'application_notifications_registration_confirmation'
+
+  EmailTemplate.find_or_create_by!(name: reg_confirm_name, format: :text) do |template|
+    template.subject = 'Welcome to Maryland Accessible Telecommunications!'
+    template.body = "Hello %{user_full_name},\n\nWelcome! Your account has been created successfully.\n\nThank you for joining."
+    template.description = 'Sent to a new user upon successful registration.'
+    template.variables = %w[user_full_name]
+  end
 end
 
 def ensure_storage_directory

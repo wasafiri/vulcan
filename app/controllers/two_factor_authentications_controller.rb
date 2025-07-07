@@ -291,11 +291,16 @@ class TwoFactorAuthenticationsController < ApplicationController
   # Handle successful verification response
   def handle_successful_verification(format)
     @user = find_user_for_two_factor
-    complete_two_factor_authentication(@user)
 
-    format.html { redirect_to root_path, notice: 'Signed in successfully.' }
+    format.html { complete_two_factor_authentication(@user) }
     format.json do
-      return_to = session.delete(:return_to) || root_path
+      # For JSON requests, we need to handle the authentication completion differently
+      # since complete_two_factor_authentication does a redirect
+      stored_location = TwoFactorAuth.get_return_path(session) || session.delete(:return_to)
+      TwoFactorAuth.complete_authentication(session)
+      _create_and_set_session_cookie(@user)
+
+      return_to = stored_location || _dashboard_for(@user)
       render json: { status: 'success', redirect_url: return_to }
     end
   end

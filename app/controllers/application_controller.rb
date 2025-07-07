@@ -38,15 +38,11 @@ class ApplicationController < ActionController::Base
   # Creates a session, sets the cookie, tracks sign-in, and redirects.
   # To be called after successful authentication (password or 2FA).
   def sign_in(user)
-    if Rails.env.test?
-      _create_and_set_session_cookie(user)
+    session_record = _create_and_set_session_cookie(user)
+    if session_record
+      redirect_to _dashboard_for(user), notice: 'Signed in successfully'
     else
-      session_record = _create_and_set_session_cookie(user)
-      if session_record
-        redirect_to _dashboard_for(user), notice: 'Signed in successfully'
-      else
-        redirect_to sign_in_path(email_hint: user.email), alert: 'Unable to create session.'
-      end
+      redirect_to sign_in_path(email_hint: user.email), alert: 'Unable to create session.'
     end
   end
 

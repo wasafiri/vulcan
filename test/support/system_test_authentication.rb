@@ -240,7 +240,7 @@ module SystemTestAuthentication
       assert sign_out_found, 'Could not find sign out link or authenticated user indicator'
     end
 
-    if !current_path.include?('two_factor_authentication') && !options[:verify_path]
+    if current_path.exclude?('two_factor_authentication') && !options[:verify_path]
       if user.first_name.present?
         greeting_pattern = /#{user.first_name}|Hello #{user.first_name}/i
         assert page.has_text?(greeting_pattern), 'User greeting not found after authentication'
@@ -253,6 +253,10 @@ module SystemTestAuthentication
     store_test_user_id(user.id)
     update_current_user(user)
     Current.user = user
+
+    # NOTE: For users with 2FA enabled in system tests, the session setup
+    # happens through the actual SessionsController flow when we submit the form
+    # We don't need to manually set up the 2FA session here
 
     debug_auth "Successfully signed in as #{user.email}"
     user

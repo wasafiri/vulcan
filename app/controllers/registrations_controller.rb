@@ -92,7 +92,7 @@ class RegistrationsController < ApplicationController
 
     return if result.success?
 
-    Rails.logger.error("Registration confirmation failed: #{result.error}")
+    Rails.logger.error("Registration confirmation failed: #{result.message}")
   end
 
   def registration_params

@@ -9,6 +9,7 @@
 # - Managing credential-specific flows (SMS verification, WebAuthn options)
 class TwoFactorCredentialsController < ApplicationController
   include TwoFactorVerification
+  include TurboStreamResponseHandling
 
   before_action :authenticate_user!
 
@@ -64,8 +65,10 @@ class TwoFactorCredentialsController < ApplicationController
     when 'sms'
       render 'sms_credentials/new'
     else
-      redirect_to setup_two_factor_authentication_path,
-                  alert: 'Invalid credential type'
+      handle_error_response(
+        html_redirect_path: setup_two_factor_authentication_path,
+        error_message: 'Invalid credential type'
+      )
     end
   end
 
@@ -81,8 +84,10 @@ class TwoFactorCredentialsController < ApplicationController
     when 'sms'
       create_sms_credential
     else
-      redirect_to setup_two_factor_authentication_path,
-                  alert: 'Invalid credential type'
+      handle_error_response(
+        html_redirect_path: setup_two_factor_authentication_path,
+        error_message: 'Invalid credential type'
+      )
     end
   end
 
@@ -107,12 +112,14 @@ class TwoFactorCredentialsController < ApplicationController
     @credential = current_user.sms_credentials.find_by(id: params[:id])
 
     unless @credential
-      redirect_to new_credential_two_factor_authentication_path(type: 'sms'),
-                  alert: 'SMS credential not found'
+      handle_error_response(
+        html_redirect_path: new_credential_two_factor_authentication_path(type: 'sms'),
+        error_message: 'SMS credential not found'
+      )
       return
     end
 
-    render 'two_factor_authentications/sms_credentials/verify'
+    render 'sms_credentials/verify'
   end
 
   # POST /two_factor_authentication/credentials/sms/:id/confirm
@@ -128,17 +135,24 @@ class TwoFactorCredentialsController < ApplicationController
     @credential = current_user.sms_credentials.find_by(id: params[:id])
 
     unless @credential
-      redirect_to new_credential_two_factor_authentication_path(type: 'sms'),
-                  alert: 'SMS credential not found'
+      handle_error_response(
+        html_redirect_path: new_credential_two_factor_authentication_path(type: 'sms'),
+        error_message: 'SMS credential not found'
+      )
       return
     end
 
     if send_sms_verification_code(@credential)
-      redirect_to verify_sms_credential_two_factor_authentication_path(id: @credential.id),
-                  notice: 'A new verification code has been sent'
+      handle_success_response(
+        html_redirect_path: verify_sms_credential_two_factor_authentication_path(id: @credential.id),
+        html_message: 'A new verification code has been sent',
+        turbo_message: 'A new verification code has been sent'
+      )
     else
-      redirect_to verify_sms_credential_two_factor_authentication_path(id: @credential.id),
-                  alert: 'Could not send verification code'
+      handle_error_response(
+        html_redirect_path: verify_sms_credential_two_factor_authentication_path(id: @credential.id),
+        error_message: 'Could not send verification code'
+      )
     end
   end
 
@@ -178,16 +192,53 @@ class TwoFactorCredentialsController < ApplicationController
   end
 
   # Destroy credential and log the action
+  # Delegates success/failure handling to smaller helpers to satisfy RuboCop ABC limits.
   def destroy_and_log_credential(credential, credential_name)
-    credential_id_for_log = credential.id # Capture ID before destroy
-
     if credential.destroy
-      Rails.logger.info("[2FA_CREDENTIAL] #{credential_name} (ID: #{credential_id_for_log}) removed successfully for user #{current_user.id}")
-      redirect_to edit_profile_path, notice: "#{credential_name} removed successfully"
+      handle_credential_destruction_success(credential_name, credential)
     else
-      Rails.logger.error("[2FA_CREDENTIAL] Failed to remove #{credential_name.downcase} (ID: #{credential_id_for_log}) for user #{current_user.id}")
-      redirect_to edit_profile_path, alert: "Failed to remove #{credential_name.downcase}"
+      handle_credential_destruction_failure(credential_name, credential.id)
     end
+  end
+
+  # Single-responsibility private helper methods
+  # Handles the HTML / Turbo Stream response and logging when a credential
+  # is successfully destroyed.
+  #
+  # @param credential_name [String] Friendly name (e.g., "Authenticator app")
+  # @param credential [ApplicationRecord] The destroyed credential instance
+  def handle_credential_destruction_success(credential_name, credential)
+    success_message = "#{credential_name} removed successfully"
+
+    Rails.logger.info(
+      "[2FA_CREDENTIAL] #{credential_name} (ID: #{credential.id}) removed successfully for user #{current_user.id}"
+    )
+
+    respond_to do |format|
+      format.html { redirect_to edit_profile_path, notice: success_message }
+      format.turbo_stream do
+        flash.now[:notice] = success_message
+        render turbo_stream: [
+          turbo_stream.update('flash', partial: 'shared/flash'),
+          turbo_stream.remove(credential)
+        ]
+      end
+    end
+  end
+
+  # Handles logging and error response when credential destruction fails.
+  #
+  # @param credential_name [String]
+  # @param credential_id [Integer]
+  def handle_credential_destruction_failure(credential_name, credential_id)
+    Rails.logger.error(
+      "[2FA_CREDENTIAL] Failed to remove #{credential_name.downcase} (ID: #{credential_id}) for user #{current_user.id}"
+    )
+
+    handle_error_response(
+      html_redirect_path: edit_profile_path,
+      error_message: "Failed to remove #{credential_name.downcase}"
+    )
   end
 
   def create_webauthn_credential
@@ -221,6 +272,10 @@ class TwoFactorCredentialsController < ApplicationController
     @credential = build_sms_credential(phone)
 
     if @credential.save
+      unless @credential.errors.empty?
+        Rails.logger.error("[2FA_CREDENTIAL] SMS credential save failed due to validation errors: #{@credential.errors.full_messages.join(', ')}")
+      end
+
       handle_sms_credential_success
     else
       handle_sms_credential_failure
@@ -230,8 +285,12 @@ class TwoFactorCredentialsController < ApplicationController
   def handle_totp_verification_failure
     message = TwoFactorAuth::ERROR_MESSAGES[:invalid_code]
     log_totp_setup_failure(message)
-    flash_totp_failure(message)
-    respond_to_totp_failure_formats
+
+    # Regenerate the QR code so the user can try again without losing the setup flow.
+    regenerate_qr_code_for_failed_setup
+
+    # Use the shared error handler to render the form again with an alert.
+    handle_error_response(html_render_action: 'totp_credentials/new', error_message: message)
   end
 
   def regenerate_qr_code_for_failed_setup
@@ -250,23 +309,31 @@ class TwoFactorCredentialsController < ApplicationController
 
   # SMS credential creation helper methods
   def render_invalid_phone_error
-    flash.now[:alert] = 'Invalid phone number format. Please try again.'
-    render 'two_factor_authentications/sms_credentials/new'
+    handle_error_response(
+      html_render_action: 'sms_credentials/new',
+      error_message: 'Invalid phone number format. Please try again.'
+    )
   end
 
   def build_sms_credential(phone)
-    current_user.sms_credentials.new(phone_number: phone)
+    current_user.sms_credentials.new(
+      phone_number: phone,
+      last_sent_at: Time.current # Set a default value to satisfy NOT NULL constraint
+    )
   end
 
   def handle_sms_credential_success
     log_sms_credential_created
+    Rails.logger.info("[2FA_CREDENTIAL] redirecting to url: #{verify_sms_credential_two_factor_authentication_path(id: @credential.id)}")
     send_verification_or_handle_failure
   end
 
   def handle_sms_credential_failure
     log_sms_credential_save_failure
-    flash.now[:alert] = "Could not set up SMS authentication: #{@credential.errors.full_messages.join(', ')}"
-    render 'two_factor_authentications/sms_credentials/new'
+    handle_error_response(
+      html_render_action: 'sms_credentials/new',
+      error_message: "Could not set up SMS authentication: #{@credential.errors.full_messages.join(', ')}"
+    )
   end
 
   def log_sms_credential_created
@@ -274,12 +341,24 @@ class TwoFactorCredentialsController < ApplicationController
   end
 
   def send_verification_or_handle_failure
-    if send_sms_verification_code(@credential)
-      redirect_to verify_sms_credential_two_factor_authentication_path(id: @credential.id)
+    Rails.logger.info("[SMS_DEBUG] About to send SMS for credential #{@credential.id}")
+    sms_result = send_sms_verification_code(@credential)
+    Rails.logger.info("[SMS_DEBUG] SMS send result: #{sms_result}")
+
+    if sms_result
+      Rails.logger.info('[SMS_DEBUG] SMS sent successfully, redirecting to verification')
+      handle_success_response(
+        html_redirect_path: verify_sms_credential_two_factor_authentication_path(id: @credential.id),
+        html_message: 'Verification code sent.',
+        turbo_message: 'Verification code sent.'
+      )
     else
+      Rails.logger.error('[SMS_DEBUG] SMS sending failed, staying on form')
       log_sms_send_failure
-      flash.now[:alert] = 'Could not send verification code'
-      render 'two_factor_authentications/sms_credentials/new'
+      handle_error_response(
+        html_render_action: 'sms_credentials/new',
+        error_message: 'Could not send verification code'
+      )
     end
   end
 
@@ -297,10 +376,6 @@ class TwoFactorCredentialsController < ApplicationController
     TwoFactorAuth.log_verification_failure(current_user.id, :totp, 'Invalid code during setup')
   end
 
-  def flash_totp_failure(message)
-    flash.now[:alert] = message
-  end
-
   def respond_to_totp_failure_formats
     respond_to do |format|
       format.html { handle_totp_html_failure }
@@ -309,8 +384,10 @@ class TwoFactorCredentialsController < ApplicationController
   end
 
   def handle_totp_html_failure
-    flash[:alert] = TwoFactorAuth::ERROR_MESSAGES[:invalid_code]
-    redirect_to new_credential_two_factor_authentication_path(type: 'totp', secret: @secret)
+    handle_error_response(
+      html_redirect_path: new_credential_two_factor_authentication_path(type: 'totp', secret: @secret),
+      error_message: TwoFactorAuth::ERROR_MESSAGES[:invalid_code]
+    )
   end
 
   def handle_totp_turbo_failure
@@ -330,13 +407,20 @@ class TwoFactorCredentialsController < ApplicationController
   end
 
   def handle_totp_credential_success
-    respond_to do |format|
-      credential = create_totp_credential_record
-      log_totp_credential_created(credential)
-      TwoFactorAuth.clear_challenge(session)
+    # Create the credential record and clear the session challenge first.
+    credential = create_totp_credential_record
+    log_totp_credential_created(credential)
+    TwoFactorAuth.clear_challenge(session)
 
-      format.html { redirect_to_totp_success }
-      format.turbo_stream { redirect_to_totp_success }
+    success_path = credential_success_two_factor_authentication_path(type: 'totp')
+    success_message = 'Authenticator app registered successfully'
+
+    respond_to do |format|
+      format.html { redirect_to success_path, notice: success_message }
+      format.turbo_stream do
+        flash[:notice] = success_message
+        redirect_to success_path, status: :see_other
+      end
     end
   end
 
@@ -352,17 +436,14 @@ class TwoFactorCredentialsController < ApplicationController
     Rails.logger.info("[2FA_CREDENTIAL] TOTP credential created for user #{current_user.id}, credential ID: #{credential.id}")
   end
 
-  def redirect_to_totp_success
-    redirect_to credential_success_two_factor_authentication_path(type: 'totp'),
-                notice: 'Authenticator app registered successfully'
-  end
-
   # SMS confirmation helper methods
   def find_sms_credential_for_confirmation
     credential = current_user.sms_credentials.find_by(id: params[:id])
     unless credential
-      redirect_to new_credential_two_factor_authentication_path(type: 'sms'),
-                  alert: 'SMS credential not found'
+      handle_error_response(
+        html_redirect_path: new_credential_two_factor_authentication_path(type: 'sms'),
+        error_message: 'SMS credential not found'
+      )
       return nil
     end
     credential
@@ -370,23 +451,37 @@ class TwoFactorCredentialsController < ApplicationController
 
   def handle_sms_confirmation_result
     code = params[:code]
-    success, message = verify_sms_credential(code, @credential.id)
 
-    if success
-      redirect_to_sms_confirmation_success
+    # SMS setup verification uses the credential's own verify_code method
+    # This differs from login verification which uses the TwoFactorVerification concern
+    # During setup, the user is already authenticated, so we verify directly against the credential
+    if @credential.verify_code(code)
+      respond_to do |format|
+        format.html { redirect_to_sms_confirmation_success }
+        format.turbo_stream { redirect_to_sms_confirmation_success }
+      end
     else
-      handle_sms_confirmation_failure(message)
+      message = TwoFactorAuth::ERROR_MESSAGES[:invalid_code]
+      respond_to do |format|
+        format.html { handle_sms_confirmation_failure(message) }
+        format.turbo_stream { handle_sms_confirmation_failure(message) }
+      end
     end
   end
 
   def redirect_to_sms_confirmation_success
-    redirect_to credential_success_two_factor_authentication_path(type: 'sms'),
-                notice: 'Phone number verified successfully'
+    handle_success_response(
+      html_redirect_path: credential_success_two_factor_authentication_path(type: 'sms'),
+      html_message: 'Phone number verified successfully',
+      turbo_message: 'Phone number verified successfully'
+    )
   end
 
   def handle_sms_confirmation_failure(message)
-    flash.now[:alert] = message
-    render 'two_factor_authentications/sms_credentials/verify'
+    handle_error_response(
+      html_render_action: 'sms_credentials/verify',
+      error_message: message
+    )
   end
 
   # WebAuthn credential creation helper methods
@@ -399,13 +494,7 @@ class TwoFactorCredentialsController < ApplicationController
   end
 
   def create_webauthn_from_params(nested_params)
-    log_webauthn_debug_info(nested_params)
     WebAuthn::Credential.from_create(nested_params)
-  end
-
-  def log_webauthn_debug_info(nested_params)
-    Rails.logger.debug { "[WEBAUTHN_DEBUG] Params passed to from_create: #{nested_params.inspect}" }
-    Rails.logger.debug { "[WEBAUTHN_DEBUG] Params class: #{nested_params.class}" }
   end
 
   def verify_webauthn_challenge(webauthn_credential)

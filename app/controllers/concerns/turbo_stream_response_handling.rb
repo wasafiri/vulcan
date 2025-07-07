@@ -70,17 +70,31 @@ module TurboStreamResponseHandling
   # @param turbo_message [String] Message for Turbo Stream response
   # @param turbo_updates [Hash] Updates for Turbo Stream response
   # @param turbo_modals_to_remove [Array<String>] Modals to remove for Turbo Stream
-  def handle_success_response(html_redirect_path:, html_message:, turbo_message: nil, turbo_updates: {}, turbo_modals_to_remove: [])
+  # @param turbo_redirect_path [String] Path to redirect for Turbo Stream (optional)
+  def handle_success_response(
+    html_redirect_path:,
+    html_message:,
+    turbo_message: nil,
+    turbo_updates: {},
+    turbo_modals_to_remove: [],
+    turbo_redirect_path: nil
+  )
     turbo_message ||= html_message
 
     respond_to do |format|
       format.html { redirect_to html_redirect_path, notice: html_message }
+
       format.turbo_stream do
-        handle_turbo_stream_success(
-          message: turbo_message,
-          updates: turbo_updates,
-          modals_to_remove: turbo_modals_to_remove
-        )
+        if turbo_redirect_path.present?
+          # Standard HTTP redirect – Turbo will convert this into a visit
+          redirect_to turbo_redirect_path, status: :see_other
+        else
+          handle_turbo_stream_success(
+            message: turbo_message,
+            updates: turbo_updates,
+            modals_to_remove: turbo_modals_to_remove
+          )
+        end
       end
     end
   end
