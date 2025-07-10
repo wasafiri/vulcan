@@ -36,13 +36,8 @@ module Admin
         'REMOTE_ADDR' => '127.0.0.1'
       }
 
-      # Sign in as admin
-      # PHASE 5 FIX: The application returns 204 (No Content) for sign-in instead of redirect
-      post sign_in_path,
-           params: { email: @admin.email, password: 'password123' },
-           headers: @headers
-
-      assert_response :no_content # 204 No Content
+      # Sign in as admin using the proper integration test helper
+      sign_in_for_integration_test(@admin)
 
       # Since there's no redirect to follow, we manually navigate to a page
       # to ensure authentication is active

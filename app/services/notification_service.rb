@@ -76,9 +76,19 @@ class NotificationService
         mailer_class, method_name = resolve_mailer(notification)
         return unless mailer_class && method_name
 
-        # Pass the notifiable and the notification itself, as some mailers may need both.
-        # The `proof_review` object is a good example of this pattern.
-        mailer_class.public_send(method_name, notification.notifiable, notification).deliver_later
+        # Handle special case for account_created which expects (constituent, temp_password)
+        if notification.action == 'account_created'
+          temp_password = notification.metadata&.dig('temp_password')
+          unless temp_password
+            Rails.logger.error "NotificationService: account_created notification missing temp_password in metadata for Notification ##{notification.id}"
+            return
+          end
+          mailer_class.public_send(method_name, notification.recipient, temp_password).deliver_later
+        else
+          # Pass the notifiable and the notification itself, as some mailers may need both.
+          # The `proof_review` object is a good example of this pattern.
+          mailer_class.public_send(method_name, notification.notifiable, notification).deliver_later
+        end
       when :sms, :webhook
         Rails.logger.info "NotificationService: Delivery for channel '#{channel}' not yet implemented for Notification ##{notification.id}."
       else

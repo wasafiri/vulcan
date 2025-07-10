@@ -15,11 +15,11 @@ module VendorPortal
       clear_pending_connections_fast
 
       assert_selector 'h1', text: 'Vendor Dashboard'
-      
+
       # Check for actual dashboard elements (not test-id attributes)
       assert_text 'Business Information'
       assert_text 'Recent Transactions'
-      
+
       # Look for navigation elements
       assert_link 'Process Voucher'
     end
@@ -40,11 +40,9 @@ module VendorPortal
       # Fill in other required fields if they exist
       fill_in 'Business Name', with: 'Test Business' if has_field?('Business Name')
       fill_in 'Tax ID (EIN/SSN)', with: '123456789' if has_field?('Tax ID (EIN/SSN)')
-      
+
       # Check terms if required
-      if has_unchecked_field?('I agree to the vendor terms and conditions')
-        check 'I agree to the vendor terms and conditions'
-      end
+      check 'I agree to the vendor terms and conditions' if has_unchecked_field?('I agree to the vendor terms and conditions')
 
       click_on 'Save Changes'
       clear_pending_connections_fast
@@ -100,11 +98,9 @@ module VendorPortal
 
       # Check for basic transaction page elements
       assert_text(/transaction|history/i)
-      
+
       # Look for transaction data in table
-      if has_selector?('table tbody tr', wait: 3)
-        assert_selector 'table tbody tr', minimum: 1
-      end
+      assert_selector 'table tbody tr', minimum: 1 if has_selector?('table tbody tr', wait: 3)
     end
 
     test 'exporting transactions to CSV' do
@@ -118,9 +114,7 @@ module VendorPortal
       clear_pending_connections_fast
 
       # Check response type if available
-      if page.response_headers['Content-Type']
-        assert_match(/csv|text/, page.response_headers['Content-Type'])
-      end
+      assert_match(/csv|text/, page.response_headers['Content-Type']) if page.response_headers['Content-Type']
     end
 
     test 'viewing invoice details' do
@@ -132,10 +126,8 @@ module VendorPortal
       # Check for invoice information
       assert_text "Invoice ##{invoice.id}"
       assert_text(/invoice paid|paid/i)
-      
-      if invoice.gad_invoice_reference.present?
-        assert_text invoice.gad_invoice_reference
-      end
+
+      assert_text invoice.gad_invoice_reference if invoice.gad_invoice_reference.present?
     end
 
     test 'custom date range filtering' do
@@ -145,12 +137,12 @@ module VendorPortal
       # Look for date filtering - this might not exist or be different
       if has_select?('Time Period', wait: 2)
         select 'Custom Range', from: 'Time Period'
-        
+
         # Check if custom range fields appear
         if has_field?('Start Date', wait: 2)
           fill_in 'Start Date', with: 1.month.ago.strftime('%Y-%m-%d')
           fill_in 'End Date', with: Time.current.strftime('%Y-%m-%d')
-          
+
           click_on 'Apply Filters' if has_button?('Apply Filters')
         else
           skip 'Custom date range functionality not available'
@@ -168,16 +160,10 @@ module VendorPortal
       clear_pending_connections_fast
 
       # Look for any warning or alert messages
-      if has_text?(/pending|review|approval/i, wait: 3)
-        assert_text(/pending|review|approval/i)
-      end
+      assert_text(/pending|review|approval/i) if has_text?(/pending|review|approval/i, wait: 3)
 
       # Check for W9 warnings if applicable
-      unless @vendor.w9_form.attached?
-        if has_text?(/w9|form|upload/i, wait: 2)
-          assert_text(/w9|form|upload/i)
-        end
-      end
+      assert_text(/w9|form|upload/i) if !@vendor.w9_form.attached? && has_text?(/w9|form|upload/i, wait: 2)
     end
 
     private

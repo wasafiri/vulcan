@@ -40,7 +40,24 @@ module ActionMailboxTestHelper
 
   # Helper to create an inbound email with attachments
   def create_inbound_email_with_attachment(to:, from:, subject:, body:, attachment_path:, content_type:)
-    file = File.read(attachment_path)
+    # Read the file content, but ensure it meets minimum size requirements
+    file_content = File.read(attachment_path)
+
+    # If the file is too small (less than 1KB), pad it with valid content
+    if file_content.bytesize < 1024
+      file_content = case content_type
+                     when 'application/pdf'
+                       # Create a minimal valid PDF structure that's over 1KB
+                       generate_minimal_pdf_content
+                     when 'image/jpeg', 'image/png'
+                       # For images, pad with valid binary data
+                       file_content + ("\x00" * (1024 - file_content.bytesize + 100))
+                     else
+                       # For other types, just pad with text
+                       file_content + ('A' * (1024 - file_content.bytesize + 100))
+                     end
+    end
+
     mail = Mail.new do
       to to
       from from
@@ -50,7 +67,8 @@ module ActionMailboxTestHelper
         body body
       end
 
-      add_file filename: File.basename(attachment_path), content: file,
+      add_file filename: File.basename(attachment_path),
+               content: file_content,
                content_type: content_type
     end
 
@@ -72,9 +90,13 @@ module ActionMailboxTestHelper
         end
 
         attachments.each do |attachment|
+          # Ensure attachment content meets minimum size requirements
+          content = attachment[:content]
+          content += ('A' * (1024 - content.bytesize + 100)) if content.bytesize < 1024
+
           add_file(
             filename: attachment[:filename],
-            content: attachment[:content],
+            content: content,
             content_type: attachment[:content_type]
           )
         end
@@ -84,5 +106,24 @@ module ActionMailboxTestHelper
     inbound_email = ActionMailbox::InboundEmail.create_and_extract_message_id!(mail.to_s)
     inbound_email.route
     inbound_email
+  end
+
+  private
+
+  def generate_minimal_pdf_content
+    # Generate a minimal valid PDF that's over 1KB
+    pdf_header = "%PDF-1.4\n"
+    pdf_content = "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+    pdf_content += "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+    pdf_content += "3 0 obj\n<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>\nendobj\n"
+    pdf_content += "4 0 obj\n<< /Length 44 >>\nstream\nBT\n/F1 12 Tf\n100 700 Td\n(Test PDF) Tj\nET\nendstream\nendobj\n"
+
+    # Pad to ensure it's over 1KB
+    padding = '%' + ('A' * (1024 - (pdf_header + pdf_content).bytesize + 100)) + "\n"
+    pdf_content += padding
+
+    pdf_trailer = "xref\n0 5\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n0000000179 00000 n \ntrailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n#{(pdf_header + pdf_content).bytesize}\n%%EOF\n"
+
+    pdf_header + pdf_content + pdf_trailer
   end
 end
