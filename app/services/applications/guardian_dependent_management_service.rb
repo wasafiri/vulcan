@@ -83,8 +83,14 @@ module Applications
     def apply_email_strategy(data)
       case params[:email_strategy]
       when 'guardian'
-        data[:dependent_email] = @guardian_user.email
-        data[:email] = "dependent-#{SecureRandom.uuid}@system.matvulcan.local"
+        if @guardian_user&.email.present?
+          data[:dependent_email] = @guardian_user.email
+          data[:email] = "dependent-#{SecureRandom.uuid}@system.matvulcan.local"
+        else
+          # Fallback: generate a unique email if guardian email is missing
+          data[:email] = "dependent-#{SecureRandom.uuid}@system.matvulcan.local"
+          data[:dependent_email] = data[:email]
+        end
       when 'dependent'
         if data[:dependent_email].present?
           data[:email] = data[:dependent_email]
@@ -94,6 +100,11 @@ module Applications
       else
         apply_email_strategy_with('guardian', data)
       end
+
+      # Final safety check: ensure email is always set
+      return if data[:email].present?
+
+      data[:email] = "dependent-#{SecureRandom.uuid}@system.matvulcan.local"
     end
 
     def apply_phone_strategy(data)

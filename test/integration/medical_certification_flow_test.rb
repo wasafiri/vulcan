@@ -16,17 +16,8 @@ class MedicalCertificationFlowTest < ActionDispatch::IntegrationTest
                           medical_provider_email: "drsmith_#{timestamp}@example.com",
                           medical_provider_phone: '555-555-5555')
 
-    # Sign in as admin
-    @headers = {
-      'HTTP_USER_AGENT' => 'Rails Testing',
-      'REMOTE_ADDR' => '127.0.0.1'
-    }
-
-    post sign_in_path,
-         params: { email: @admin.email, password: 'password123' },
-         headers: @headers
-
-    assert_response :no_content
+    # Sign in as admin using the proper integration test helper
+    sign_in_for_integration_test(@admin)
 
     # Since we can't follow a redirect, we'll navigate directly to where we need to go
   end
@@ -85,9 +76,7 @@ class MedicalCertificationFlowTest < ActionDispatch::IntegrationTest
     delete sign_out_path
 
     # Sign in as constituent
-    post sign_in_path,
-         params: { email: @constituent.email, password: 'password123' },
-         headers: @headers
+    sign_in_for_integration_test(@constituent)
 
     # Send a certification request as admin first
     sign_in_for_integration_test(@admin)

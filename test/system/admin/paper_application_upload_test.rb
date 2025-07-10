@@ -16,7 +16,7 @@ module Admin
 
       # Activate paper application context to bypass strict proof & duplicate validations
       setup_paper_application_context
-      
+
       # Also set Current context like the passing tests do
       Current.paper_context = true
 
@@ -25,14 +25,12 @@ module Admin
 
       # Set up common test path
       visit new_admin_paper_application_path
-      
+
       # Wait for the page to fully load and Stimulus controllers to initialize
       assert_selector 'h1', text: 'Upload Paper Application'
-      
+
       # Wait for form to be ready - check for the applicant type fieldset
       assert_selector 'fieldset', text: 'Who is this application for?'
-      
-
     end
 
     teardown do
@@ -41,16 +39,130 @@ module Admin
 
       # Always clear context to avoid thread-local leakage between examples
       teardown_paper_application_context
-      
+
       # Clean up Current context like the passing tests do
       Current.reset
+    end
+
+    # NEW TEST: Complete paper application flow with all required fields
+    test 'complete paper application flow with all fields including alternate contact and randomized disabilities' do
+      # Generate unique timestamp for this test run
+      timestamp = Time.current.to_f.to_s.gsub('.', '')
+
+      # 1. Navigate to /admin/paper_applications/new (already done in setup)
+      assert_current_path new_admin_paper_application_path
+
+      # 2. Select "An Adult (applying for themselves)" radio button
+      within 'fieldset', text: 'Who is this application for?' do
+        choose 'An Adult (applying for themselves)'
+      end
+
+      # Wait until the adult applicant information section is visible & enabled
+      find('fieldset[data-applicant-type-target="adultSection"]', visible: true, wait: 10)
+
+      # Also wait for the common sections (Application Details, etc.) to become visible
+      find('[data-applicant-type-target="commonSections"]', visible: true, wait: 10)
+
+      # Additional wait to ensure Stimulus controllers have fully processed the visibility changes
+      sleep 0.5
+
+      # 3. Fill in Applicant's Information
+      within 'fieldset[data-applicant-type-target="adultSection"]' do
+        fill_in 'constituent[first_name]', with: 'John'
+        fill_in 'constituent[last_name]', with: 'Doe'
+        fill_in 'constituent[date_of_birth]', with: 30.years.ago.strftime('%Y-%m-%d')
+        fill_in 'constituent[email]', with: "john.doe.#{timestamp}@example.com"
+        fill_in 'constituent[phone]', with: "202555#{timestamp[-4..]}"
+        fill_in 'constituent[physical_address_1]', with: '123 Main St'
+        fill_in 'constituent[city]', with: 'Baltimore'
+        fill_in 'constituent[state]', with: 'MD'
+        fill_in 'constituent[zip_code]', with: '21201'
+      end
+
+      # 4. Fill in Application Details within common sections
+      within '[data-applicant-type-target="commonSections"]' do
+        within 'fieldset', text: 'Application Details' do
+          fill_in 'application[household_size]', with: '2'
+          fill_in 'application[annual_income]', with: '10000' # Below threshold
+          check 'application_maryland_resident'
+        end
+
+        # 5. Fill in Disability Information with randomized selection
+        within 'fieldset', text: 'Disability Information (for the Applicant)' do
+          check 'applicant_attributes_self_certify_disability'
+
+          # Randomized disability selection - pick at least one from the available options
+          disabilities = %i[hearing vision speech mobility cognition]
+          selected_disability = disabilities.sample
+          check "applicant_attributes_#{selected_disability}_disability"
+        end
+
+        # 6. Fill in Medical Provider Information (including fax)
+        within 'fieldset', text: 'Medical Provider Information' do
+          fill_in 'application[medical_provider_name]', with: 'Dr. Jane Smith'
+          fill_in 'application[medical_provider_phone]', with: '555-987-6543'
+          fill_in 'application[medical_provider_fax]', with: '555-987-6544' # Optional fax field
+          fill_in 'application[medical_provider_email]', with: 'dr.smith@example.com'
+        end
+
+        # 7. Fill in Alternate Contact (optional) - This was missing from previous tests
+        within 'fieldset', text: 'Alternate Contact (optional)' do
+          fill_in 'application[alternate_contact_name]', with: 'Jane Doe'
+          fill_in 'application[alternate_contact_phone]', with: '555-123-4567'
+          fill_in 'application[alternate_contact_email]', with: 'jane.doe@example.com'
+        end
+
+        # 8. Handle Proof Documents
+        within 'fieldset', text: 'Proof Documents' do
+          # Income proof - select accept and upload file
+          within 'div[data-controller="document-proof-handler"][data-document-proof-handler-type-value="income"]' do
+            choose 'Accept Income Proof and Upload'
+            attach_file 'income_proof', Rails.root.join('test/fixtures/files/income_proof.pdf')
+          end
+
+          # Residency proof - select accept and upload file
+          within 'div[data-controller="document-proof-handler"][data-document-proof-handler-type-value="residency"]' do
+            choose 'Accept Residency Proof and Upload'
+            attach_file 'residency_proof', Rails.root.join('test/fixtures/files/residency_proof.pdf')
+          end
+        end
+      end
+
+      # 9. Submit the form
+      click_on 'Submit Paper Application'
+
+      # 10. Verify success response and redirect
+      # Check for successful redirect to the application show page
+      assert_current_path %r{/admin/applications/\d+}
+
+      # NOTE: Flash message may not be visible in headless tests due to JavaScript handling
+      # The important thing is that we're on the correct page and the application was created
+
+      # Verify we're on an application show page by checking for key elements
+      assert_selector 'h1', text: /Application #\d+ Details/
+
+      # Verify the application was created with all the data
+      application = Application.last
+      assert_equal 'John', application.user.first_name
+      assert_equal 'Doe', application.user.last_name
+      assert_equal "john.doe.#{timestamp}@example.com", application.user.email
+      assert_equal 2, application.household_size
+      assert_equal 10_000, application.annual_income
+      assert_equal 'Dr. Jane Smith', application.medical_provider_name
+      assert_equal 'dr.smith@example.com', application.medical_provider_email
+      assert_equal '555-987-6544', application.medical_provider_fax
+      assert_equal 'Jane Doe', application.alternate_contact_name
+      assert_equal '555-123-4567', application.alternate_contact_phone
+      assert_equal 'jane.doe@example.com', application.alternate_contact_email
+      assert application.user.date_of_birth.present?
+      assert_equal 'MD', application.user.state
     end
 
     # Fill in minimum required fields for form submission
     def fill_in_minimum_required_fields
       # Generate unique timestamp for this test run
       timestamp = Time.current.to_f.to_s.gsub('.', '')
-      
+
       # 1. Select applicant type and wait for Stimulus to reveal the adult section
       within 'fieldset', text: 'Who is this application for?' do
         choose 'An Adult (applying for themselves)'
@@ -59,10 +171,10 @@ module Admin
       # Wait until the adult applicant information section is visible & enabled
       # Use longer timeout to allow Stimulus controllers to fully initialize
       find('fieldset[data-applicant-type-target="adultSection"]', visible: true, wait: 10)
-      
+
       # Also wait for the common sections (Application Details, etc.) to become visible
       find('[data-applicant-type-target="commonSections"]', visible: true, wait: 10)
-      
+
       # Additional wait to ensure Stimulus controllers have fully processed the visibility changes
       sleep 0.5
 
@@ -142,7 +254,7 @@ module Admin
       # Signed ID hidden field may not exist in JS-less test environment; skip strict check
     end
 
-        test 'form requires files when accept is selected' do
+    test 'form requires files when accept is selected' do
       fill_in_minimum_required_fields
 
       # With default "accept" selected but no files uploaded, submission should fail
@@ -150,7 +262,7 @@ module Admin
 
       # Should see an error message about missing files (since accept is selected by default)
       assert_selector '.bg-red-100', text: /Please upload.*document/
-      
+
       # Should stay on the same page
       assert_current_path new_admin_paper_application_path
     end
@@ -207,18 +319,14 @@ module Admin
       assert_text 'Residency Proof'
     end
 
-
-
     private
 
     def setup_fpl_policies
       # Set up FPL policies for testing to match the passing tests
       (1..8).each do |household_size|
-        Policy.find_or_create_by(key: "fpl_#{household_size}_person").update(value: (15000 + (household_size * 5000)).to_s)
+        Policy.find_or_create_by(key: "fpl_#{household_size}_person").update(value: (15_000 + (household_size * 5000)).to_s)
       end
       Policy.find_or_create_by(key: 'fpl_modifier_percentage').update(value: '200')
     end
-
-
   end
 end

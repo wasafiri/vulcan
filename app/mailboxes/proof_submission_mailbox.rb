@@ -35,8 +35,21 @@ class ProofSubmissionMailbox < ApplicationMailbox
     # NOTE: This method only runs if ALL before_processing callbacks pass
     Rails.logger.info "PROOF SUBMISSION MAILBOX PROCESSING: Email from #{mail.from&.first} with subject '#{mail.subject}'"
 
-    # Create an audit record for the submission
-    create_audit_record
+    # Create initial event to track that the email was received
+    # Only create event if we have both constituent and application
+    if constituent && application
+      Event.create!(
+        user: constituent,
+        action: 'proof_submission_received',
+        metadata: {
+          application_id: application.id,
+          inbound_email_id: inbound_email.id,
+          email_subject: mail.subject,
+          email_from: mail.from&.first,
+          attachments_count: mail.attachments.count
+        }
+      )
+    end
 
     # Process each attachment
     mail.attachments.each do |attachment|
@@ -44,6 +57,7 @@ class ProofSubmissionMailbox < ApplicationMailbox
       proof_type = determine_proof_type(mail.subject, mail.body.decoded)
 
       # Attach the file to the application's proof
+      # ProofAttachmentService will create the correct audit event with submission_method: 'email'
       attach_proof(attachment, proof_type)
     end
 
@@ -54,19 +68,6 @@ class ProofSubmissionMailbox < ApplicationMailbox
   end
 
   private
-
-  def create_audit_record
-    Event.create!(
-      user: constituent,
-      action: 'proof_submission_received',
-      metadata: {
-        application_id: application.id,
-        inbound_email_id: inbound_email.id,
-        email_subject: mail.subject,
-        email_from: mail.from.first
-      }
-    )
-  end
 
   def determine_proof_type(subject, body)
     text = [subject, body].join(' ').to_s.downcase
@@ -85,6 +86,12 @@ class ProofSubmissionMailbox < ApplicationMailbox
   end
 
   def attach_proof(attachment, proof_type)
+    # Safety check: ensure we have an application before proceeding
+    unless application
+      Rails.logger.error "MAILBOX ERROR: No application found for email from #{mail.from&.first}"
+      raise 'No application found for email processing'
+    end
+
     # Create a blob from the attachment
     blob = ActiveStorage::Blob.create_and_upload!(
       io: StringIO.new(attachment.body.decoded),
@@ -103,7 +110,7 @@ class ProofSubmissionMailbox < ApplicationMailbox
                                                    metadata: {
                                                      ip_address: '0.0.0.0',
                                                      email_subject: mail.subject,
-                                                     email_from: mail.from.first,
+                                                     email_from: mail.from&.first,
                                                      inbound_email_id: inbound_email.id
                                                    }
                                                  })
@@ -131,6 +138,8 @@ class ProofSubmissionMailbox < ApplicationMailbox
   end
 
   def ensure_constituent
+    # Early return if the mail object itself is problematic, and ensure constituent is checked for presence before proceeding.
+    return if mail.from.blank?
     return if constituent
 
     bounce_with_notification(
@@ -272,7 +281,7 @@ class ProofSubmissionMailbox < ApplicationMailbox
     return @application if defined?(@application)
 
     # If we found a constituent, use their most recent application
-    @application = constituent.applications.order(created_at: :desc).first if constituent
+    @application = constituent&.applications&.order(created_at: :desc)&.first
 
     # If we still don't have an application but have a provider email, use the app found by that
     @application ||= app_from_provider_email

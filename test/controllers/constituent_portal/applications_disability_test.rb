@@ -50,7 +50,6 @@ module ConstituentPortal
       end
 
       assert_response :unprocessable_entity
-      puts "Validation errors: #{response.body}"
       assert_match(/At least one disability must be selected/, response.body)
     end
 
@@ -133,7 +132,7 @@ module ConstituentPortal
 
       disability_types.each_with_index do |disability_type, index|
         # Create a unique constituent for each disability type to avoid 3-year validation
-        constituent = create(:constituent, 
+        constituent = create(:constituent,
                              email: "disability_test_#{Time.now.to_i}_#{index}@example.com")
         sign_in_for_integration_test(constituent)
 
@@ -184,7 +183,6 @@ module ConstituentPortal
       }
 
       assert_response :unprocessable_entity
-      puts "Validation errors: #{response.body}"
       assert_match(/At least one disability must be selected/, response.body)
 
       # Now add a disability along with required fields

@@ -1,15 +1,35 @@
 # frozen_string_literal: true
 
 require 'application_system_test_case'
+require 'support/system_test_helpers'
 
 module AdminTests
   class ProofReviewTest < ApplicationSystemTestCase
+    include SystemTestHelpers
     setup do
       @admin = create(:admin)
-      @application = create(:application, :in_progress_with_pending_proofs)
+      @application = create(:application, :in_progress)
 
-      # Sign in as admin
-      sign_in(@admin)
+      # Manually attach proofs to ensure they exist and are reviewable.
+      # This is more reliable than factory traits for system tests.
+      @application.income_proof.attach(
+        io: Rails.root.join('test/fixtures/files/income_proof.pdf').open,
+        filename: 'income_proof.pdf',
+        content_type: 'application/pdf'
+      )
+      @application.residency_proof.attach(
+        io: Rails.root.join('test/fixtures/files/residency_proof.pdf').open,
+        filename: 'residency_proof.pdf',
+        content_type: 'application/pdf'
+      )
+      # Explicitly set proof statuses to 'not_reviewed' to ensure review buttons appear.
+      @application.update!(
+        income_proof_status: :not_reviewed,
+        residency_proof_status: :not_reviewed
+      )
+
+      # Sign in as admin using the correct helper for system tests
+      system_test_sign_in(@admin)
     end
 
     test 'modal properly handles scroll state when rejecting proof with letter_opener' do
@@ -43,7 +63,7 @@ module AdminTests
 
         # Fill in rejection form
         within '#proofRejectionModal' do
-          fill_in 'Reason for Rejection', with: 'Test rejection reason'
+          fill_in 'Rejection Reason', with: 'Test rejection reason'
           click_on 'Submit'
         end
 

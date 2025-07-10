@@ -6,7 +6,7 @@ class ApplicationStorageDecorator
   attr_reader :application, :preloaded_attachments
 
   # Accept preloaded attachment existence data (a Set of attachment names)
-  def initialize(application, preloaded_attachments = Set.new)
+  def initialize(application, preloaded_attachments = :not_preloaded)
     @application = application
     @preloaded_attachments = preloaded_attachments
     # Cache attachment metadata to avoid repeated DB queries
@@ -136,9 +136,7 @@ class ApplicationStorageDecorator
 
   # Use preloaded data if available, otherwise fallback (though fallback shouldn't be needed with controller change)
   def attachment_exists?(name)
-    @metadata_cache[:"#{name}_exists"] ||= if @preloaded_attachments.present?
-                                             @preloaded_attachments.include?(name)
-                                           else
+    @metadata_cache[:"#{name}_exists"] ||= if @preloaded_attachments == :not_preloaded
                                              # Fallback query - indicates attachment preloading failed
                                              Rails.logger.warn "PERFORMANCE: Falling back to DB query for attachment existence: #{name} on App #{application.id}"
                                              Rails.logger.warn '  → This suggests attachment preloading failed in the controller'

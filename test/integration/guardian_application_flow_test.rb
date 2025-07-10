@@ -7,15 +7,8 @@ class GuardianApplicationFlowTest < ActionDispatch::IntegrationTest
     # Setup a verified guardian user
     @guardian = create(:constituent, email: 'guardian@example.com', verified: true, email_verified: true)
 
-    # Use post with credentials to sign in
-    post sign_in_path, params: {
-      email: @guardian.email,
-      password: 'password123' # This should match what your factory creates
-    }
-
-    # Since in test environment sign_in doesn't redirect but just creates the session,
-    # we expect 204 No Content and then manually navigate to dashboard
-    assert_response :no_content
+    # Use the proper integration test helper to sign in
+    sign_in_for_integration_test(@guardian)
 
     # Now directly GET the dashboard (don't expect a redirect)
     get constituent_portal_dashboard_path

@@ -155,7 +155,17 @@ module FactoryAdapter
     base_attrs = default_app_attrs(traits).merge(filtered_attrs).merge(user: user)
     base_attrs[:application_date] = 4.years.ago unless base_attrs.key?(:application_date)
 
-    Application.create!(base_attrs)
+    application = Application.create!(base_attrs)
+
+    # Handle special traits that need file attachments
+    # This replicates the after(:create) hooks from the factory traits
+    if traits.include?(:in_progress_with_rejected_proofs)
+      attach_proof_files_for_rejected_proofs(application)
+    elsif traits.include?(:in_progress_with_pending_proofs)
+      attach_proof_files_for_pending_proofs(application)
+    end
+
+    application
   rescue ActiveRecord::RecordInvalid => e
     raise "Neutered Exception #{e.class}: #{e.message}" if e.message.include?('You must wait 3 years')
 
@@ -217,6 +227,42 @@ module FactoryAdapter
 
   def debug_puts(msg)
     puts msg if ENV['VERBOSE_TESTS']
+  end
+
+  # Helper methods to attach proof files for specific traits
+  # These replicate the after(:create) hooks from the factory traits
+  def attach_proof_files_for_rejected_proofs(application)
+    # Attach sample proofs to represent the uploaded-then-rejected scenario
+    application.income_proof.attach(
+      io: Rails.root.join('test/fixtures/files/medical_certification_valid.pdf').open,
+      filename: 'income_proof.pdf',
+      content_type: 'application/pdf'
+    )
+    application.residency_proof.attach(
+      io: Rails.root.join('test/fixtures/files/medical_certification_valid.pdf').open,
+      filename: 'residency_proof.pdf',
+      content_type: 'application/pdf'
+    )
+  rescue StandardError => e
+    debug_puts "Failed to attach rejected proof files: #{e.message}"
+    raise
+  end
+
+  def attach_proof_files_for_pending_proofs(application)
+    # Attach proofs that need review
+    application.income_proof.attach(
+      io: Rails.root.join('test/fixtures/files/medical_certification_valid.pdf').open,
+      filename: 'income_proof.pdf',
+      content_type: 'application/pdf'
+    )
+    application.residency_proof.attach(
+      io: Rails.root.join('test/fixtures/files/medical_certification_valid.pdf').open,
+      filename: 'residency_proof.pdf',
+      content_type: 'application/pdf'
+    )
+  rescue StandardError => e
+    debug_puts "Failed to attach pending proof files: #{e.message}"
+    raise
   end
 end
 

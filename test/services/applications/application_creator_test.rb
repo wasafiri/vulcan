@@ -207,6 +207,7 @@ module Applications
       ApplicationForm.new(
         current_user: user,
         annual_income: '50000',
+        household_size: 2,
         submission_method: 'online',
         hearing_disability: false,
         vision_disability: true,
@@ -224,6 +225,7 @@ module Applications
         current_user: guardian,
         user_id: dependent.id,
         annual_income: '50000',
+        household_size: 3,
         submission_method: 'online',
         hearing_disability: true,
         vision_disability: false,
@@ -241,6 +243,7 @@ module Applications
         current_user: user,
         application: application,
         annual_income: '60000',
+        household_size: 2,
         submission_method: 'online',
         hearing_disability: false,
         vision_disability: true,

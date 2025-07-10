@@ -59,7 +59,8 @@ module Admin
         handle_success_response(
           html_redirect_path: admin_application_path(service.application),
           html_message: generate_success_message(service.application),
-          turbo_message: generate_success_message(service.application)
+          turbo_message: generate_success_message(service.application),
+          turbo_redirect_path: admin_application_path(service.application)
         )
       else
         handle_service_failure(service)
@@ -83,7 +84,8 @@ module Admin
         handle_success_response(
           html_redirect_path: admin_application_path(application),
           html_message: generate_success_message(application),
-          turbo_message: generate_success_message(application)
+          turbo_message: generate_success_message(application),
+          turbo_redirect_path: admin_application_path(application)
         )
       else
         handle_service_failure(service, application)

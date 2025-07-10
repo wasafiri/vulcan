@@ -35,11 +35,13 @@ class ProofAttachmentValidator
   def validate(attachment)
     return validation_error(:no_attachment, 'No attachment provided') if attachment.nil?
 
-    if attachment.byte_size < MIN_FILE_SIZE
+    attachment_size = get_attachment_size(attachment)
+
+    if attachment_size < MIN_FILE_SIZE
       return validation_error(:file_too_small,
                               "File is too small (minimum #{MIN_FILE_SIZE} bytes)")
     end
-    if attachment.byte_size > MAX_FILE_SIZE
+    if attachment_size > MAX_FILE_SIZE
       return validation_error(:file_too_large,
                               "File is too large (maximum #{MAX_FILE_SIZE} bytes)")
     end
@@ -54,6 +56,24 @@ class ProofAttachmentValidator
   end
 
   private
+
+  def get_attachment_size(attachment)
+    # Handle different attachment types (Mail::Part vs ActiveStorage::Blob)
+    if attachment.respond_to?(:byte_size)
+      # ActiveStorage::Blob or similar
+      attachment.byte_size
+    elsif attachment.respond_to?(:decoded)
+      # Mail::Part - use decoded content size
+      attachment.decoded.bytesize
+    elsif attachment.respond_to?(:body) && attachment.body.respond_to?(:decoded)
+      # Mail::Part with body.decoded
+      attachment.body.decoded.bytesize
+    else
+      # Fallback - try to get size from content
+      content = attachment.respond_to?(:read) ? attachment.read : attachment.to_s
+      content.bytesize
+    end
+  end
 
   def validation_error(type, message)
     raise ValidationError.new(type, message)
@@ -79,7 +99,20 @@ class ProofAttachmentValidator
   end
 
   def pdf_malicious?(attachment)
-    content = attachment.download.to_s
+    # Handle different attachment types when getting content for PDF analysis
+    content = if attachment.respond_to?(:download)
+                # ActiveStorage::Blob
+                attachment.download.to_s
+              elsif attachment.respond_to?(:decoded)
+                # Mail::Part
+                attachment.decoded.to_s
+              elsif attachment.respond_to?(:body) && attachment.body.respond_to?(:decoded)
+                # Mail::Part with body.decoded
+                attachment.body.decoded.to_s
+              else
+                attachment.to_s
+              end
+
     content.include?('/JS') ||
       content.include?('/JavaScript') ||
       content.include?('/Launch') ||

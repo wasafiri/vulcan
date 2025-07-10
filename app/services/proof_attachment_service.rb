@@ -377,8 +377,11 @@ class ProofAttachmentService
     end
 
     def log_audit_event(context, event_metadata)
+      # Use 'submitted' for email submissions, 'attached' for other submissions
+      action_suffix = context.submission_method.to_s == 'email' ? 'submitted' : 'attached'
+
       AuditEventService.log(
-        action: "#{context.proof_type}_proof_attached",
+        action: "#{context.proof_type}_proof_#{action_suffix}",
         auditable: context.application,
         actor: context.admin || context.application.user,
         metadata: event_metadata
