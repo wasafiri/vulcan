@@ -78,6 +78,9 @@ module VendorPortal
       # Setup voucher with initial_value and remaining_value
       @voucher.update(initial_value: 500.0, remaining_value: 500.0)
 
+      # Create a test product for the redemption
+      @product = create(:product, name: 'Test Product', price: 50.0)
+
       # Stub can_redeem? check to always return true for this amount
       # Note: The controller doesn't actually call voucher.redeem! or can_redeem?,
       # it performs the checks directly. We need to ensure the controller's
@@ -92,8 +95,9 @@ module VendorPortal
       VoucherTransaction.any_instance.stubs(:save).returns(true) # Stub save to succeed
 
       # Process redemption using the confirmed correct path helper
+      # Include product_ids parameter since it's now required
       post process_redemption_vendor_voucher_path(@voucher.code),
-           params: { amount: 100.0 }
+           params: { amount: 100.0, product_ids: [@product.id] }
 
       # Check for redirect to dashboard on success
       assert_redirected_to vendor_dashboard_path

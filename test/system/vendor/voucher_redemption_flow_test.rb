@@ -4,27 +4,23 @@ require 'application_system_test_case'
 
 module VendorPortal
   class VoucherRedemptionFlowTest < ApplicationSystemTestCase
+    include SystemTestAuthentication
+
     def setup
       # Create vendor with proper approvals to process vouchers
       @vendor = create(:vendor, :approved)
 
-      # Vendor is already set up with approved status and W9 form from seeded data
-
       # Create constituent who will receive the voucher
-      @constituent = User.create!(
-        first_name: 'Alice',
-        last_name: 'Wonder',
-        type: 'Constituent',
-        email: 'alice@example.com',
-        password: 'password',
-        password_confirmation: 'password',
-        date_of_birth: 25.years.ago.to_date,
-        vision_disability: true,
-        hearing_disability: true,
-        mobility_disability: false,
-        cognition_disability: false,
-        speech_disability: false
-      )
+      @constituent = create(:constituent,
+                            first_name: 'Alice',
+                            last_name: 'Wonder',
+                            email: 'alice@example.com',
+                            date_of_birth: 25.years.ago.to_date,
+                            vision_disability: true,
+                            hearing_disability: true,
+                            mobility_disability: false,
+                            cognition_disability: false,
+                            speech_disability: false)
 
       # Create application for the constituent
       @application = create(:application,
@@ -37,35 +33,30 @@ module VendorPortal
                             medical_provider_phone: '555-123-4567')
 
       # Create voucher with a fixed code for testing
-      @voucher = Voucher.new(
-        application: @application,
-        initial_value: 100.00,
-        remaining_value: 100.00,
-        issued_at: Time.current,
-        status: 'active'
-      )
-      # Set a fixed code for testing
-      @voucher.code = 'TESTVOUCHER123'
-      @voucher.save!
+      @voucher = create(:voucher,
+                        application: @application,
+                        initial_value: 100.00,
+                        remaining_value: 100.00,
+                        code: 'TESTVOUCHER123',
+                        issued_at: Time.current,
+                        status: 'active')
 
       # Create test products with different prices
-      @product1 = Product.create!(
-        name: 'System Test Product 1',
-        manufacturer: 'Test Manufacturer',
-        model_number: 'STP-1',
-        device_types: ['Tablet'],
-        price: 20.0,
-        description: 'A product for system testing'
-      )
+      @product1 = create(:product,
+                         name: 'System Test Product 1',
+                         manufacturer: 'Test Manufacturer',
+                         model_number: 'STP-1',
+                         device_types: ['Tablet'],
+                         price: 20.0,
+                         description: 'A product for system testing')
 
-      @product2 = Product.create!(
-        name: 'System Test Product 2',
-        manufacturer: 'Test Manufacturer',
-        model_number: 'STP-2',
-        device_types: ['Smartphone'],
-        price: 35.0,
-        description: 'Another product for system testing'
-      )
+      @product2 = create(:product,
+                         name: 'System Test Product 2',
+                         manufacturer: 'Test Manufacturer',
+                         model_number: 'STP-2',
+                         device_types: ['Smartphone'],
+                         price: 35.0,
+                         description: 'Another product for system testing')
 
       # Create an invalid voucher code for testing error cases
       @invalid_voucher_code = 'INVALIDCODE12345'
@@ -86,21 +77,33 @@ module VendorPortal
       fill_in 'date_of_birth', with: @constituent.date_of_birth.strftime('%Y-%m-%d')
       click_button 'Verify Identity'
 
+      # Should see success message from locale file
+      assert_text 'Identity verification successful.'
+
       # Now should be on redemption page
       assert_text 'Voucher Redemption'
       assert_text @voucher.code
 
       # Fill in redemption details - partial amount of the voucher
       find_by_id('redemption-amount').set('50.0')
+
+      # Check the product checkbox
       check "product_#{@product1.id}"
+
+      # Verify the submit button is enabled after selecting a product
+      submit_button = find_by_id('submit-redemption')
+      assert_not submit_button.disabled?, 'Submit button should be enabled when products are selected'
+
       click_button 'Process Redemption'
-      assert_text 'Successfully processed voucher'
+
+      # Should be redirected to dashboard with success message (exact message from controller)
+      assert_text 'Voucher successfully processed'
 
       # Verify the voucher and application were updated
       @voucher.reload
       @application.reload
-      assert_equal 50.0, @voucher.remaining_value
-      assert_includes @application.products, @product1
+      assert_equal 50.0, @voucher.remaining_value, 'Voucher remaining value should be reduced by redemption amount'
+      assert_includes @application.products, @product1, 'Product should be associated with application'
     end
 
     test 'vendor can verify a valid voucher code' do
@@ -122,6 +125,7 @@ module VendorPortal
       fill_in 'voucher_code', with: @invalid_voucher_code
       click_button 'Verify Voucher'
 
+      # Exact message from controller
       assert_text 'Invalid voucher code'
       assert_current_path vendor_vouchers_path
     end
@@ -134,6 +138,9 @@ module VendorPortal
       assert_text 'Identity Verification'
       fill_in 'date_of_birth', with: @constituent.date_of_birth.strftime('%Y-%m-%d')
       click_button 'Verify Identity'
+
+      # Should see success message from locale file
+      assert_text 'Identity verification successful.'
 
       # Verify we're on the redemption page
       assert_text 'Voucher Redemption'
@@ -149,7 +156,8 @@ module VendorPortal
       find_by_id('redemption-amount').set(expected_total.to_s)
 
       click_button 'Process Redemption'
-      assert_text 'Successfully processed voucher'
+      # Exact message from controller
+      assert_text 'Voucher successfully processed'
 
       # Verify the association was created for both products
       @application.reload
@@ -169,15 +177,19 @@ module VendorPortal
       assert_text 'Identity Verification'
       fill_in 'date_of_birth', with: @constituent.date_of_birth.strftime('%Y-%m-%d')
       click_button 'Verify Identity'
+
+      # Should see success message from locale file
+      assert_text 'Identity verification successful.'
       assert_text 'Voucher Redemption'
 
-      # Try to submit without selecting any products
+      # Fill in amount but don't select any products
       find_by_id('redemption-amount').set('50.0')
 
-      # The button should be disabled, so we need to force the form submission
+      # Try to submit the form - this should be prevented by JavaScript
+      # If JavaScript fails, it should be caught by server-side validation
       page.execute_script("document.getElementById('redemption-form').submit()")
 
-      # Should stay on the same page with an error
+      # Should stay on same page with exact error message from controller
       assert_text 'Please select at least one product for this voucher redemption'
       assert_current_path redeem_vendor_voucher_path(@voucher.code)
 
@@ -194,17 +206,21 @@ module VendorPortal
       assert_text 'Identity Verification'
       fill_in 'date_of_birth', with: @constituent.date_of_birth.strftime('%Y-%m-%d')
       click_button 'Verify Identity'
+
+      # Should see success message from locale file
+      assert_text 'Identity verification successful.'
       assert_text 'Voucher Redemption'
 
       # Try to submit with amount greater than balance
       find_by_id('redemption-amount').set('150.0')
       check "product_#{@product1.id}"
 
-      # Submit the form
-      click_button 'Process Redemption'
+      # Submit the form using JavaScript to bypass HTML5 validation
+      page.execute_script("document.getElementById('redemption-form').submit()")
 
-      # Should stay on same page with an error
-      assert_text 'Amount exceeds remaining voucher balance'
+      # Should stay on same page with exact error message from controller
+      # The message includes the formatted amount, so we check for the key part
+      assert_text 'Cannot redeem more than the available amount'
       assert_current_path redeem_vendor_voucher_path(@voucher.code)
 
       # Voucher should remain unchanged
@@ -215,7 +231,7 @@ module VendorPortal
     private
 
     def sign_in_as_vendor
-      sign_in(@vendor)
+      system_test_sign_in(@vendor)
       visit vendor_dashboard_path
       assert_text 'Vendor Dashboard'
     end

@@ -78,9 +78,12 @@ module DefaultHeadersRequestPatch
       return
     end
 
-    # Only use session lookup for form-based authentication when no helper was used
-    # Don't interfere with header-based authentication
-    return if defined?(Current.test_user_id) && Current.test_user_id.present?
+    # If Current.test_user_id is set, use it to restore Current.user
+    if defined?(Current.test_user_id) && Current.test_user_id.present?
+      test_user = User.find_by(id: Current.test_user_id)
+      Current.user = test_user if test_user && defined?(Current)
+      return
+    end
 
     # For form-based authentication, look up the user from the most recent session
     # Shouldn't need to decrypt cookies

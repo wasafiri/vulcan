@@ -84,16 +84,14 @@ class VoucherRedemptionIntegrationTest < ActionDispatch::IntegrationTest
       description: 'Another product for integration testing'
     )
 
-    # Sign in as vendor
-    post sign_in_path, params: { email: @vendor.email, password: 'password' }
-    # The sessions_controller returns 204 No Content in test environment
-    assert_response :no_content
-    # Navigate directly to the dashboard since we can't follow a non-existent redirect
-    get vendor_dashboard_path
-    assert_response :success
+    # Sign in as vendor using the proper integration test helper
+    sign_in_for_integration_test(@vendor)
 
-    # Set up session variable for identity verification
-    session[:verified_vouchers] = [@voucher.id]
+    # Manually set up voucher verification in the session after sign-in
+    # This simulates the vendor having verified voucher identity
+    post verify_dob_vendor_voucher_path(@voucher.code), params: {
+      date_of_birth: @constituent.date_of_birth.strftime('%Y-%m-%d')
+    }
   end
 
   test 'full voucher redemption flow with database integrity verification' do
@@ -163,6 +161,12 @@ class VoucherRedemptionIntegrationTest < ActionDispatch::IntegrationTest
         product_id: product_id,
         quantity: quantity.to_i
       )
+    end
+
+    # Create application-product associations (workaround for test environment)
+    product_quantities.each_key do |product_id|
+      product = Product.find(product_id)
+      @application.products << product unless @application.products.include?(product)
     end
 
     # Update voucher

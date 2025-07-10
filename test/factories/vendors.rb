@@ -17,10 +17,12 @@ FactoryBot.define do
       terms_accepted_at { 1.day.ago }
       after(:create) do |vendor|
         vendor.w9_form.attach(
-          io: Rails.root.join('test/fixtures/files/sample_w9.txt').open,
-          filename: 'w9.txt',
-          content_type: 'text/plain'
+          io: Rails.root.join('test/fixtures/files/sample_w9.pdf').open,
+          filename: 'w9.pdf',
+          content_type: 'application/pdf'
         )
+        # Set w9_status to approved after file attachment to override callback
+        vendor.update_column(:w9_status, :approved)
       end
     end
 
@@ -83,9 +85,9 @@ FactoryBot.define do
       terms_accepted_at { 1.day.ago }
       after(:create) do |vendor|
         vendor.w9_form.attach(
-          io: Rails.root.join('test/fixtures/files/sample_w9.txt').open,
-          filename: 'w9.txt',
-          content_type: 'text/plain'
+          io: Rails.root.join('test/fixtures/files/sample_w9.pdf').open,
+          filename: 'w9.pdf',
+          content_type: 'application/pdf'
         )
       end
     end
