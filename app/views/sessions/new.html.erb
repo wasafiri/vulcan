@@ -2,12 +2,8 @@
   <section class="bg-white p-6 sm:p-8 rounded-lg shadow-md w-full max-w-md" aria-labelledby="signin-heading">
     <h1 id="signin-heading" class="text-2xl font-semibold mb-6 text-center text-gray-900">Sign In</h1>
 
-    <%# Flash Alert - Using paragraph inside for semantics %>
-    <% if flash[:alert] %>
-      <div role="alert" aria-live="assertive" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-        <p><%= flash[:alert] %></p>
-      </div>
-    <% end %>
+    <%# Standard flash message container, targeted by Turbo Streams %>
+    <%= render "shared/flash" %>
 
     <%# Error Summary Block %>
     <% if @errors&.any? %>

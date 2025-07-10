@@ -103,8 +103,12 @@
                   
                   <%= activity.created_at.strftime("%B %d, %Y at %I:%M %p") %>
                   
-                  <% if [:submission, :resubmission].include?(activity.activity_type) && activity.source.respond_to?(:submission_method) && activity.source.submission_method.present? %>
-                    <span class="text-xs text-gray-500">(via <%= activity.source.submission_method %>)</span>
+                  <% if [:submission, :resubmission].include?(activity.activity_type) %>
+                    <% if activity.source.respond_to?(:metadata) && activity.source.metadata.present? && activity.source.metadata['submission_method'].present? %>
+                      <span class="text-xs text-gray-500">(via <%= activity.source.metadata['submission_method'] %>)</span>
+                    <% else %>
+                      <span class="text-xs text-gray-500">(via application submission)</span>
+                    <% end %>
                   <% elsif [:approval, :rejection].include?(activity.activity_type) %>
                     by <%= activity.source.admin&.full_name || "Unknown Admin" %>
                   <% end %>
@@ -289,8 +293,12 @@
                   
                   <%= activity.created_at.strftime("%B %d, %Y at %I:%M %p") %>
                   
-                  <% if [:submission, :resubmission].include?(activity.activity_type) && activity.source.respond_to?(:submission_method) && activity.source.submission_method.present? %>
-                    <span class="text-xs text-gray-500">(via <%= activity.source.submission_method %>)</span>
+                  <% if [:submission, :resubmission].include?(activity.activity_type) %>
+                    <% if activity.source.respond_to?(:metadata) && activity.source.metadata.present? && activity.source.metadata['submission_method'].present? %>
+                      <span class="text-xs text-gray-500">(via <%= activity.source.metadata['submission_method'] %>)</span>
+                    <% else %>
+                      <span class="text-xs text-gray-500">(via application submission)</span>
+                    <% end %>
                   <% elsif [:approval, :rejection].include?(activity.activity_type) %>
                     by <%= activity.source.admin&.full_name || "Unknown Admin" %>
                   <% end %>

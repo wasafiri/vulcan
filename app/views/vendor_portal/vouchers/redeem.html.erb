@@ -57,7 +57,7 @@
         <% @products.each do |product| %>
           <div class="border rounded-lg p-4">
             <div class="flex items-center">
-              <%= f.check_box "product_ids[]", { class: "form-checkbox product-checkbox h-4 w-4 text-indigo-600", id: "product_#{product.id}" }, product.id, nil %>
+              <%= check_box_tag "product_ids[]", product.id, false, { class: "form-checkbox product-checkbox h-4 w-4 text-indigo-600", id: "product_#{product.id}" } %>
               <label for="product_<%= product.id %>" class="ml-3 block text-sm font-medium text-gray-700 flex-1">
                 <div class="flex justify-between items-center">
                   <span class="font-semibold"><%= product.name %></span>
@@ -96,17 +96,20 @@
 <script>
   document.addEventListener('DOMContentLoaded', function() {
     const productCheckboxes = document.querySelectorAll('.product-checkbox');
-    const redemptionAmount = document.getElementById('redemption-amount');
     const selectedCount = document.getElementById('selected-products-count');
     const submitButton = document.getElementById('submit-redemption');
     const noProductsWarning = document.getElementById('no-products-warning');
 
-    // Removed quantity field toggling as products are not stock-managed
-        updateSelectedCount();
-      });
+    console.log('JavaScript loaded:', {
+      productCheckboxes: productCheckboxes.length,
+      selectedCount: !!selectedCount,
+      submitButton: !!submitButton,
+      noProductsWarning: !!noProductsWarning
     });
 
-    <%# Removed quantity input event listener as products are not stock-managed %>
+    // Add event listeners to each checkbox
+    productCheckboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', updateSelectedCount);
     });
 
     function updateSelectedCount() {
@@ -116,13 +119,16 @@
           count++;
         }
       });
+      console.log('Updating count:', count);
       selectedCount.textContent = count;
       if (count === 0) {
         noProductsWarning.classList.remove('hidden');
         submitButton.disabled = true;
+        console.log('Button disabled');
       } else {
         noProductsWarning.classList.add('hidden');
         submitButton.disabled = false;
+        console.log('Button enabled');
       }
     }
 
