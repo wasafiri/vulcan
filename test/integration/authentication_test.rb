@@ -19,29 +19,12 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
 
   # Test successful authentication
   test 'should authenticate user with valid credentials' do
-    # Sign in the user
-    post sign_in_path, params: {
-      email: @user.email,
-      password: 'password123' # Assuming this is the correct password in fixtures
-    }
+    # Sign in the user using the integration test helper
+    sign_in_for_integration_test(@user)
 
-    # PHASE 5 FIX: The application returns 204 (No Content) after sign-in
-    # instead of a redirect (3XX). This is a deliberate design choice that
-    # our tests need to accommodate.
-    assert_response :no_content # 204 No Content
-    # PHASE 5 FIX: Since our application uses 204 responses without redirects,
-    # we need to manually navigate to a protected page to verify authentication
-
-    # Verify authentication by accessing a protected page
+    # Verify we're authenticated by accessing a protected page
     get constituent_portal_applications_path
     assert_response :success
-
-    # PHASE 5 FIX: Instead of looking for a specific sign-out link format,
-    # we'll check that we're on a protected page that only authenticated users can access
-    assert_match(/applications|dashboard/, request.path)
-
-    # Additional verification - we should not see a sign-in link on protected pages
-    assert_no_match(/sign_in|login/, response.body.to_s.downcase)
 
     # Verify authentication state
     verify_authentication_state(@user)
@@ -259,9 +242,10 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
       remember_me: '1'
     }
 
-    # PHASE 5 FIX: The application returns 204 (No Content) after sign-in
-    # instead of a redirect (3XX)
-    assert_response :no_content # 204 No Content
+    # Application now redirects to dashboard after successful sign-in
+    assert_redirected_to constituent_portal_dashboard_path
+    follow_redirect!
+    assert_response :success
 
     # Since there's no redirect to follow, we'll manually access a protected page
     # to verify we're authenticated

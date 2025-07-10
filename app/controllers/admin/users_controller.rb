@@ -714,11 +714,11 @@ module Admin
       end
 
       user.define_singleton_method(:available_capabilities) do
-        get_available_capabilities_for_user_type(type)
+        Admin::UsersController.get_available_capabilities_for_user_type(type)
       end
 
       user.define_singleton_method(:inherent_capabilities) do
-        get_inherent_capabilities_for_user_type(type)
+        Admin::UsersController.get_inherent_capabilities_for_user_type(type)
       end
     end
 
@@ -727,24 +727,26 @@ module Admin
       user.define_singleton_method(:role_type) { type&.demodulize || 'Unknown' }
     end
 
-    # Get available capabilities for a user type
-    def get_available_capabilities_for_user_type(user_type)
-      case user_type
-      when 'Users::Evaluator' then %w[can_evaluate]
-      when 'Users::Trainer' then %w[can_train]
-      when 'Users::Constituent' then %w[can_train can_evaluate]
-      else
-        []
+    class << self
+      # Get available capabilities for a user type
+      def get_available_capabilities_for_user_type(user_type)
+        case user_type
+        when 'Users::Evaluator' then %w[can_evaluate]
+        when 'Users::Trainer' then %w[can_train]
+        when 'Users::Constituent' then %w[can_train can_evaluate]
+        else
+          []
+        end
       end
-    end
 
-    # Get inherent capabilities for a user type
-    def get_inherent_capabilities_for_user_type(user_type)
-      case user_type
-      when 'Users::Evaluator' then %w[can_evaluate]
-      when 'Users::Trainer' then %w[can_train]
-      else
-        []
+      # Get inherent capabilities for a user type
+      def get_inherent_capabilities_for_user_type(user_type)
+        case user_type
+        when 'Users::Evaluator' then %w[can_evaluate]
+        when 'Users::Trainer' then %w[can_train]
+        else
+          []
+        end
       end
     end
   end
