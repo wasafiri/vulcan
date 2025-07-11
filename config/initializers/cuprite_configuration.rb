@@ -21,9 +21,6 @@ if defined?(Capybara::Cuprite)
   Capybara.default_driver = :cuprite
   Capybara.javascript_driver = :cuprite
 
-  # Set shorter waits for faster tests
-  Capybara.default_max_wait_time = 2
-
   # Disable animations in Capybara for faster tests
   Capybara.disable_animation = true if Capybara.respond_to?(:disable_animation=)
 

@@ -7,8 +7,8 @@
     <!-- Wrap the form container with an id for the skip link -->
     <div id="main-content" tabindex="-1" class="bg-white p-4 sm:p-8 rounded shadow-md">
       <h1 class="text-2xl font-semibold mb-6 text-center" id="form-title" data-dependent-selector-target="formTitle">
-        <% if @application.for_dependent? && @application.user.present? %>
-          New Application for <%= @application.user.full_name %>
+        <% if @applicant_type == 'dependent' && @selected_dependent_name.present? %>
+          New Application for <%= @selected_dependent_name %>
         <% else %>
           New Application
         <% end %>
@@ -25,7 +25,7 @@
           class: "space-y-6",
           "aria-labelledby": "form-title",
           data: { 
-            controller: "income-validation currency-formatter accessibility-announcer autosave", 
+            controller: "income-validation currency-formatter accessibility-announcer autosave dependent-selector", 
             autosave_target: "form",
             autosave_url_value: autosave_field_constituent_portal_applications_path,
             autosave_debounce_wait_value: 1000,
@@ -192,27 +192,35 @@
         </section>
 
         <!-- Applicant Selection Section -->
-        <section aria-labelledby="applicant-selection-title" class="space-y-4 p-4 bg-gray-50 rounded" data-controller="dependent-selector">
+        <section aria-labelledby="applicant-selection-title" class="space-y-4 p-4 bg-gray-50 rounded">
           <h2 id="applicant-selection-title" class="text-lg font-medium text-gray-900">Who is this application for?</h2>
           <div class="space-y-2">
             <div class="flex items-center">
-              <%= form.radio_button :for_self, "true", id: "apply_for_self", checked: !@application.for_dependent?,
+              <%= radio_button_tag "application[for_self]", "true", @applicant_type == 'self', 
+                     id: "apply_for_self",
                      class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
-                     data: { action: "change->dependent-selector#toggleAction" } %>
-              <%= form.label :for_self_true, "Myself", for: "apply_for_self", class: "ml-3 text-sm text-gray-700" %>
+                     data: { 
+                       action: "change->dependent-selector#toggleAction",
+                       "dependent-selector-target": "applySelfRadio"
+                     } %>
+              <%= label_tag "apply_for_self", "Myself", class: "ml-3 text-sm text-gray-700" %>
             </div>
             <% if current_user&.dependents&.any? %>
               <div class="flex items-center">
-                <%= form.radio_button :for_self, "false", id: "apply_for_dependent", checked: @application.for_dependent?,
+                <%= radio_button_tag "application[for_self]", "false", @applicant_type == 'dependent',
+                       id: "apply_for_dependent",
                        class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
-                       data: { action: "change->dependent-selector#toggleAction" } %>
-                <%= form.label :for_self_false, "A dependent I manage", for: "apply_for_dependent", class: "ml-3 text-sm text-gray-700" %>
+                       data: { 
+                         action: "change->dependent-selector#toggleAction",
+                         "dependent-selector-target": "applyDependentRadio"
+                       } %>
+                <%= label_tag "apply_for_dependent", "A dependent I manage", class: "ml-3 text-sm text-gray-700" %>
               </div>
             <% end %>
           </div>
 
           <% if current_user&.dependents&.any? %>
-            <div id="dependent-selection-fields" class="space-y-4" data-dependent-selector-target="dependentSection" style="<%= @application.for_dependent? ? 'display: block;' : 'display: none;' %>">
+            <div id="dependent-selection-fields" class="space-y-4" data-dependent-selector-target="dependentSection" style="<%= @applicant_type == 'dependent' ? 'display: block;' : 'display: none;' %>">
               <div>
                 <%= form.label :user_id, "Select Dependent", class: "block text-sm font-medium text-gray-700" %>
                 <%= form.select :user_id,

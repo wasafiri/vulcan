@@ -19,6 +19,8 @@ module CupriteTestBridge
 
   # Enhanced version of system_test_sign_in that's more resilient with Cuprite
   def enhanced_sign_in(user)
+    return nil unless user&.respond_to?(:sessions)
+
     # Create session record first, just like the original
     test_session = user.sessions.create!(
       user_agent: 'Rails System Test',

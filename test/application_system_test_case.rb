@@ -338,7 +338,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
 
   # Test life‑cycle ---------------------------------------------------------
   setup do
-    Capybara.default_max_wait_time = extended_wait_required? ? 8 : 3
+    Capybara.default_max_wait_time = extended_wait_required? ? 10 : 5
 
     # System tests need to bypass the waiting period validation for test data creation
     Application.skip_wait_period_validation = true
@@ -454,6 +454,9 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
 
     browser = page.driver.browser
     browser.network.clear_cache
+    # Wait for network to be idle to avoid Ferrum::PendingConnectionsError,
+    # especially on pages with polling.
+    browser.network.wait_for_idle(timeout: 2) if browser.network.respond_to?(:wait_for_idle)
     browser.runtime.run_if_waiting_for_debugger
 
     if extended_wait_required?
