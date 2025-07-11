@@ -31,7 +31,7 @@
               "aria-describedby": "certification_status_help",
               id: "accept_medical_certification",
               data: { "proof-status-target": "radioButtons", action: "change->proof-status#toggle" } %>
-          <%= f.label "medical_certification_status_approved", "Approve Certification and Upload",
+          <%= f.label "accept_medical_certification", "Approve Certification and Upload",
               class: "ml-2 text-sm text-gray-700" %>
         </div>
         <div>
@@ -40,7 +40,7 @@
               "aria-describedby": "certification_status_help",
               id: "reject_medical_certification",
               data: { "proof-status-target": "radioButtons", action: "change->proof-status#toggle" } %>
-          <%= f.label "medical_certification_status_rejected", "Reject Certification",
+          <%= f.label "reject_medical_certification", "Reject Certification",
               class: "ml-2 text-sm text-gray-700" %>
         </div>
       </div>
@@ -161,7 +161,7 @@
       <div class="mt-4"> <%# Add margin-top to position button at the bottom %>
         <%= medical_certification_link(@application, :button) %>
       </div>
-    <% elsif @application.medical_certification_status != "received" %>
+    <% else %>
       <%= medical_certification_link(@application, :link) %>
     <% end %>
   <% end %>

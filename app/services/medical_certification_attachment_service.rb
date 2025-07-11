@@ -129,6 +129,9 @@ class MedicalCertificationAttachmentService
   # Updates only the status fields and creates audit records without touching the attachment
   def self.update_certification_status_only(application, status, admin, submission_method, metadata)
     ActiveRecord::Base.transaction do
+      # Capture the old status before updating
+      old_status = application.medical_certification_status || 'requested'
+
       # Update certification status
       application.update!(
         medical_certification_status: status.to_s,
@@ -142,8 +145,9 @@ class MedicalCertificationAttachmentService
       ApplicationStatusChange.create!(
         application: application,
         user: admin,
-        from_status: application.medical_certification_status_was || 'requested',
+        from_status: old_status,
         to_status: status.to_s,
+        change_type: 'medical_certification',
         metadata: {
           change_type: 'medical_certification',
           submission_method: submission_method.to_s,
@@ -265,6 +269,10 @@ class MedicalCertificationAttachmentService
 
   # Rejection helper methods
   def self.update_rejection_status(params)
+    # Capture the old status before updating
+    old_status = params[:application].medical_certification_status || 'requested'
+    params[:old_status] = old_status
+
     params[:application].update!(
       medical_certification_status: 'rejected',
       medical_certification_verified_at: Time.current,
@@ -280,8 +288,9 @@ class MedicalCertificationAttachmentService
     ApplicationStatusChange.create!(
       application: app,
       user: admin,
-      from_status: app.medical_certification_status_was || 'requested',
+      from_status: params[:old_status] || 'requested',
       to_status: 'rejected',
+      change_type: 'medical_certification',
       metadata: {
         change_type: 'medical_certification',
         submission_method: params[:submission_method],

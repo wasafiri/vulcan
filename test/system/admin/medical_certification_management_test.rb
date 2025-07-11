@@ -1,0 +1,146 @@
+# frozen_string_literal: true
+
+require 'application_system_test_case'
+
+module Admin
+  # This is a consolidated test file for managing medical certifications in the admin panel.
+  # It covers UI states, approval/rejection workflows, and validation, combining the
+  # responsibilities of several older, redundant test files.
+  class MedicalCertificationManagementTest < ApplicationSystemTestCase
+    setup do
+      @admin = create(:admin)
+      # Create a base application that can be modified by each test
+      @application = create(:application,
+                            status: 'in_progress',
+                            medical_certification_status: 'not_requested', # Start from a neutral state
+                            medical_provider_name: 'Dr. Test Provider',
+                            medical_provider_email: 'provider@example.com')
+
+      # Sign in as admin using system test helper
+      system_test_sign_in(@admin)
+    end
+
+    # --- UI State Tests ---
+
+    test 'upload form is shown when certification is requested' do
+      @application.update!(medical_certification_status: 'requested')
+      visit admin_application_path(@application)
+
+      assert_selector '[data-testid="medical-certification-upload-form"]', text: 'Upload Medical Certification'
+      assert_no_text 'View Medical Certification Document'
+      assert_no_button 'Review Certification'
+    end
+
+    test 'review actions are shown when certification is received' do
+      # Simulate a received certification
+      @application.medical_certification.attach(io: StringIO.new('test content'), filename: 'cert.pdf', content_type: 'application/pdf')
+      @application.update!(medical_certification_status: 'received')
+      visit admin_application_path(@application)
+
+      assert_no_selector '[data-testid="medical-certification-upload-form"]'
+      assert_button 'Review Certification'
+    end
+
+    test 'view link is shown when certification is approved' do
+      # Simulate an approved certification
+      @application.medical_certification.attach(io: StringIO.new('test content'), filename: 'cert.pdf', content_type: 'application/pdf')
+      @application.update!(medical_certification_status: 'approved')
+      visit admin_application_path(@application)
+
+      assert_no_selector '[data-testid="medical-certification-upload-form"]'
+      assert_link 'View Medical Certification Document'
+    end
+
+    # --- Functional Tests ---
+
+    test 'admin can approve a medical certification during upload' do
+      @application.update!(medical_certification_status: 'requested')
+      visit admin_application_path(@application)
+
+      within '[data-testid="medical-certification-upload-form"]' do
+        choose 'Approve Certification and Upload'
+        attach_file 'medical_certification', Rails.root.join('test/fixtures/files/medical_certification_valid.pdf'), make_visible: true
+        click_button 'Process Certification'
+      end
+
+      assert_text 'Medical certification successfully uploaded and approved'
+      @application.reload
+      assert @application.medical_certification.attached?, 'Medical certification file should be attached'
+      assert_equal 'approved', @application.medical_certification_status
+      assert_audit_event('medical_certification_status_changed', actor: @admin, auditable: @application)
+    end
+
+    test 'admin can reject a medical certification without uploading' do
+      @application.update!(medical_certification_status: 'requested')
+      visit admin_application_path(@application)
+
+      within '[data-testid="medical-certification-upload-form"]' do
+        choose 'Reject Certification'
+        assert_selector 'select[name="medical_certification_rejection_reason"]', visible: true
+        select 'Missing Information', from: 'medical_certification_rejection_reason'
+        fill_in 'medical_certification_rejection_notes', with: 'The certification form is missing required signatures.'
+        click_button 'Process Certification'
+      end
+
+      assert_text 'Medical certification rejected and provider notified'
+      @application.reload
+      assert_equal 'rejected', @application.medical_certification_status
+      assert_equal 'Missing Information', @application.medical_certification_rejection_reason
+      assert_audit_event('medical_certification_status_changed', actor: @admin, auditable: @application)
+    end
+
+    # --- Validation Tests ---
+
+    test 'admin sees error when trying to approve without a file' do
+      visit admin_application_path(@application)
+
+      # Select the "Approve" option
+      choose 'Approve Certification and Upload'
+
+      # Try to submit without attaching a file
+      click_button 'Process Certification'
+
+      # Verify error message is displayed
+      assert_text 'Please select a file to upload'
+
+      # Verify status remained 'requested'
+      @application.reload
+      assert_equal 'requested', @application.medical_certification_status
+    end
+
+    test 'admin sees error when trying to reject without a reason' do
+      visit admin_application_path(@application)
+
+      # Select the "Reject" option
+      choose 'Reject Certification'
+
+      # Try to submit without selecting a rejection reason
+      click_button 'Process Certification'
+
+      # Verify error message is displayed
+      assert_text 'Please select a rejection reason'
+
+      # Verify status remained 'requested'
+      @application.reload
+      assert_equal 'requested', @application.medical_certification_status
+    end
+
+    test 'upload form is not shown when medical certification is already attached' do
+      # Prepare an application that already has a certification attached
+      @application.medical_certification.attach(
+        io: StringIO.new('test content'),
+        filename: 'already_attached.pdf',
+        content_type: 'application/pdf'
+      )
+      @application.update(medical_certification_status: 'received')
+
+      visit admin_application_path(@application)
+
+      # Verify upload form is not shown
+      assert_no_selector '[data-testid="medical-certification-upload-form"]'
+
+      # But the link to view the certification is shown
+      assert_text 'View Medical Certification Document'
+    end
+  end
+end
