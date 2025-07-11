@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_06_08_123537) do
+ActiveRecord::Schema[8.0].define(version: 2025_07_10_182223) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -77,6 +77,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_06_08_123537) do
     t.json "metadata"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "change_type"
     t.index ["application_id"], name: "index_application_status_changes_on_application_id"
     t.index ["changed_at"], name: "index_application_status_changes_on_changed_at"
     t.index ["user_id"], name: "index_application_status_changes_on_user_id"
