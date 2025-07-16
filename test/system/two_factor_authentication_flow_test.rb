@@ -42,7 +42,7 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
   end
 
   test 'user navigates through all 2FA setup options with screenshotting' do
-    sign_in_as(@user)
+    system_test_sign_in(@user)
 
     # Take screenshot of initial state
     take_screenshot('2fa-1-initial-state')
@@ -91,7 +91,7 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
     known_secret = 'JBSWY3DPEHPK3PXP' # A valid Base32 string
     ROTP::Base32.stubs(:random).returns(known_secret)
 
-    sign_in_as(@user)
+    system_test_sign_in(@user)
     visit new_credential_two_factor_authentication_path(type: 'totp')
 
     assert_text 'Set up Authenticator App'
@@ -101,8 +101,8 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
     totp = ROTP::TOTP.new(known_secret)
     valid_code = totp.now
 
-    fill_in 'Verification Code', with: valid_code
-    fill_in 'Nickname', with: 'My Auth App'
+    find_field('Verification Code').set(valid_code)
+    find_field('Nickname').set('My Auth App')
     # Use the button text from the application logs for accuracy
     click_button 'Verify & Complete Setup'
 
@@ -119,12 +119,12 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
   test 'user cannot submit TOTP setup form twice' do
     known_secret = 'JBSWY3DPEHPK3PXP'
     ROTP::Base32.stubs(:random).returns(known_secret)
-    sign_in_as(@user)
+    system_test_sign_in(@user)
     visit new_credential_two_factor_authentication_path(type: 'totp')
     totp = ROTP::TOTP.new(known_secret)
     valid_code = totp.now
-    fill_in 'Verification Code', with: valid_code
-    fill_in 'Nickname', with: 'My Resilient Auth App'
+    find_field('Verification Code').set(valid_code)
+    find_field('Nickname').set('My Resilient Auth App')
     click_button 'Verify & Complete Setup'
     assert_current_path credential_success_two_factor_authentication_path(type: 'totp')
     assert_text 'Authenticator app registered successfully'
@@ -150,11 +150,11 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
     valid_code = totp.now
 
     assert_selector 'input[name="code"]', wait: 5
-    fill_in 'code', with: valid_code
+    find_field('code').set(valid_code)
     click_button 'Verify'
 
-    # Wait for the form submission to complete
-    sleep 1
+    # Wait for the redirect and flash message to appear, which confirms sign-in.
+    assert_text 'Signed in successfully'
 
     # Should be redirected to dashboard/root - check for constituent dashboard first
     if current_path == constituent_portal_dashboard_path
@@ -162,7 +162,6 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
     else
       assert_current_path root_path
     end
-    assert_text 'Signed in successfully' # Or similar flash message
     assert page.has_button?('Sign Out') # Check for signed-in state indicator
     take_screenshot('2fa-8-totp-login-success')
   end
@@ -182,19 +181,16 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
     # Enter invalid code
     invalid_code = '000000'
     assert_selector 'input[name="code"]', wait: 5
-    fill_in 'code', with: invalid_code
+    find_field('code').set(invalid_code)
     click_button 'Verify'
-
-    # Wait for form submission
-    wait_for_turbo
-    sleep 1
-
-    # Should remain on verification page with error
-    assert_current_path verify_method_two_factor_authentication_path(type: 'totp')
 
     # The flash message is rendered by JavaScript, so we must wait for the element to appear.
     # Using a selector for an element with `role="alert"` is a robust and accessible way to find it.
+    # This also serves as a reliable wait for the form submission to complete.
     assert_selector '[role="alert"]', text: /Invalid verification code/i, wait: 5
+
+    # Should remain on verification page with error
+    assert_current_path verify_method_two_factor_authentication_path(type: 'totp')
   end
 
   test 'user logs in successfully using SMS' do
@@ -215,7 +211,7 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
 
     wait_for_turbo
 
-    fill_in 'code', with: known_code
+    find_field('code').set(known_code)
 
     click_button 'Verify'
 
@@ -244,7 +240,7 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
     # Enter invalid code
     invalid_code = '000000'
     assert_selector 'input[name="code"]', wait: 5
-    fill_in 'code', with: invalid_code
+    find_field('code').set(invalid_code)
     click_button 'Verify'
 
     take_screenshot('2fa-14-sms-login-failure')
@@ -331,7 +327,7 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
       totp = ROTP::TOTP.new(secret)
       valid_code = totp.now
       assert_selector 'input[name="code"]', wait: 5
-      fill_in 'code', with: valid_code
+      find_field('code').set(valid_code)
       click_button 'Verify'
     end
 
@@ -369,7 +365,7 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
       # Use the predictable test code that's generated in test environment
       known_code = '123456'
       assert_selector 'input[name="code"]', wait: 5
-      fill_in 'code', with: known_code
+      find_field('code').set(known_code)
       click_button 'Verify'
     end
 
@@ -473,8 +469,8 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
     # Sign in - capture a screenshot of the page after sign-in
     # to help diagnose what options are actually visible
     visit sign_in_path
-    fill_in 'Email', with: @user.email
-    fill_in 'Password', with: 'password123'
+    find_by_id('email-input').send_keys(@user.email)
+    find_by_id('password-input').send_keys('password123')
     click_button 'Sign In'
 
     # Wait for Turbo-driven redirect to complete
@@ -502,8 +498,8 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
 
     # Sign in to trigger 2FA flow
     visit sign_in_path
-    fill_in 'Email', with: @user.email
-    fill_in 'Password', with: 'password123'
+    find_by_id('email-input').send_keys(@user.email)
+    find_by_id('password-input').send_keys('password123')
     click_button 'Sign In'
 
     # Wait for Turbo-driven redirect to complete

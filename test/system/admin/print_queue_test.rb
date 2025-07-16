@@ -5,11 +5,12 @@ require 'application_system_test_case'
 module Admin
   class PrintQueueTest < ApplicationSystemTestCase
     setup do
-      @admin = users(:admin_david)
-      @pending_letter = print_queue_items(:pending_letter_1)
-      @pending_letter2 = print_queue_items(:pending_letter_2)
+      @admin = create(:admin)
 
-      # PDF files are already attached by the print_queue_items helper method
+      # Create print queue items using factories
+      @pending_letter = create(:print_queue_item, :pending, letter_type: :registration_confirmation)
+      @pending_letter2 = create(:print_queue_item, :pending, letter_type: :application_approved)
+      @printed_letter = create(:print_queue_item, letter_type: :account_created, admin: @admin)
 
       # Log in as admin
       sign_in(@admin)
@@ -102,8 +103,10 @@ module Admin
     test 'viewing individual letter' do
       visit admin_print_queue_index_path
 
-      # Find the "View PDF" link for the first data row (skip header)
-      view_link = find('tbody tr:first-child').find_link('View PDF', exact: false)
+      # Find the "View PDF" link in the pending letters table specifically
+      pending_table = find('h2', text: 'Pending Letters').find(:xpath, './following-sibling::*//table')
+
+      view_link = pending_table.find('tbody tr:first-child').find_link('View PDF', exact: false)
       if view_link
         new_window = window_opened_by { view_link.click }
 

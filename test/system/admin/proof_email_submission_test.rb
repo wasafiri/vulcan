@@ -116,7 +116,7 @@ module Admin
         click_on 'Wrong Document Type'
 
         # Fill out the additional notes field with our custom message
-        find('textarea[name="notes"]').set('Document is illegible')
+        fill_in 'notes', with: 'Document is illegible'
 
         click_on 'Submit'
       end

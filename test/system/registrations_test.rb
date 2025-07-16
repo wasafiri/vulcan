@@ -7,16 +7,16 @@ class RegistrationsTest < ApplicationSystemTestCase
     visit sign_up_path
     ensure_stimulus_loaded
 
-    # Fill in the password fields
-    fill_in 'Password', with: 'password123'
-    fill_in 'Confirm Password', with: 'password123'
+    # Fill in the password fields using the warning-free method
+    find_field('Password').set('password123')
+    find_field('Confirm Password').set('password123')
 
     # Initially the password should be hidden (type="password")
     assert_equal 'password', find_field('Password')[:type]
     assert_equal 'password', find_field('Confirm Password')[:type]
 
     # Find and click the toggle button for the password field (initial label)
-    password_toggle = find("button[data-action='visibility#togglePassword']", match: :first)
+    password_toggle = first("button[data-action='visibility#togglePassword']")
     password_toggle.click
 
     # The password should now be visible (type="text")
@@ -43,7 +43,7 @@ class RegistrationsTest < ApplicationSystemTestCase
     page.execute_script("document.querySelector('[data-visibility-timeout-value]').setAttribute('data-visibility-timeout-value', '2000')")
 
     # Fill in the password field
-    fill_in 'Password', with: 'password123'
+    find_field('Password').set('password123')
 
     # Click the toggle button
     find_field('Password').sibling("button[aria-label='Show password']").click
@@ -62,16 +62,16 @@ class RegistrationsTest < ApplicationSystemTestCase
     visit sign_up_path
     ensure_stimulus_loaded
 
-    fill_in 'Password', with: 'password123'
+    find_field('Password').set('password123')
 
-    toggle_btn = find("button[data-action='visibility#togglePassword']", match: :first)
+    toggle_btn = first("button[data-action='visibility#togglePassword']")
 
     # Trigger click via JS to simulate keyboard activation (Enter/Space behaves as click on button)
-    page.execute_script("arguments[0].click();", toggle_btn)
+    page.execute_script('arguments[0].click();', toggle_btn)
 
     assert_equal 'text', find_field('Password')[:type]
 
-    page.execute_script("arguments[0].click();", toggle_btn)
+    page.execute_script('arguments[0].click();', toggle_btn)
 
     assert_equal 'password', find_field('Password')[:type]
   end
@@ -80,12 +80,12 @@ class RegistrationsTest < ApplicationSystemTestCase
     visit sign_up_path
     ensure_stimulus_loaded
 
-    # Fill in both password fields
-    fill_in 'Password', with: 'password123'
-    fill_in 'Confirm Password', with: 'password123'
+    # Fill in both password fields using the warning-free method
+    find_field('Password').set('password123')
+    find_field('Confirm Password').set('password123')
 
     # Toggle the first password field
-    password_toggle = find("button[data-action='visibility#togglePassword']", match: :first)
+    password_toggle = first("button[data-action='visibility#togglePassword']")
     password_toggle.click
 
     # Only the first password should be visible
