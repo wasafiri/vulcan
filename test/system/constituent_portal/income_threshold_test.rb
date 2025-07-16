@@ -9,8 +9,8 @@ module ConstituentPortal
       sign_in(@constituent)
 
       # Set up FPL policies for testing
-      Policy.find_or_create_by(key: 'fpl_1_person').update(value: 15_000)
-      Policy.find_or_create_by(key: 'fpl_2_person').update(value: 20_000)
+      Policy.find_or_create_by(key: 'fpl_1_person').update(value: 15_650)
+      Policy.find_or_create_by(key: 'fpl_2_person').update(value: 21_150)
       Policy.find_or_create_by(key: 'fpl_modifier_percentage').update(value: 400)
     end
 
@@ -62,15 +62,15 @@ module ConstituentPortal
       assert_no_selector "input[name='submit_application'][disabled]"
 
       # Fill in remaining required fields
-      attach_file 'Proof of Residency', Rails.root.join('test/fixtures/files/residency_proof.pdf'), visible: false
-      attach_file 'Income Verification', Rails.root.join('test/fixtures/files/income_proof.pdf'), visible: false
+      attach_file 'Proof of Residency', Rails.root.join('test/fixtures/files/residency_proof.pdf')
+      attach_file 'Income Verification', Rails.root.join('test/fixtures/files/income_proof.pdf')
 
       # Fill in medical provider information
       within('section', text: 'Medical Professional Information') do
-        fill_in 'Name', with: 'Dr. Smith', match: :first
+        fill_in 'Name', with: 'Dr. Smith'
+        fill_in 'Phone', with: '5551234567'
+        fill_in 'Email', with: 'dr.smith@example.com'
       end
-      fill_in 'Phone', with: '5551234567'
-      fill_in 'Email', with: 'dr.smith@example.com'
 
       # Submit the application
       click_on 'Submit Application'

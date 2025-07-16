@@ -23,14 +23,14 @@ module ConstituentPortal
 
       # Verify the response contains the expected data
       assert_equal 400, json_response['modifier']
-      assert_equal 15_000, json_response['thresholds']['1']
-      assert_equal 20_000, json_response['thresholds']['2']
-      assert_equal 25_000, json_response['thresholds']['3']
-      assert_equal 30_000, json_response['thresholds']['4']
-      assert_equal 35_000, json_response['thresholds']['5']
-      assert_equal 40_000, json_response['thresholds']['6']
-      assert_equal 45_000, json_response['thresholds']['7']
-      assert_equal 50_000, json_response['thresholds']['8']
+      assert_equal 15_650, json_response['thresholds']['1']
+      assert_equal 21_150, json_response['thresholds']['2']
+      assert_equal 26_650, json_response['thresholds']['3']
+      assert_equal 32_150, json_response['thresholds']['4']
+      assert_equal 37_650, json_response['thresholds']['5']
+      assert_equal 43_150, json_response['thresholds']['6']
+      assert_equal 48_650, json_response['thresholds']['7']
+      assert_equal 54_150, json_response['thresholds']['8']
     end
 
     test 'income threshold calculation is correct' do
@@ -48,13 +48,13 @@ module ConstituentPortal
       # Test cases for different household sizes and incomes
       test_cases = [
         { household_size: 1, income: 59_999, expected_result: true },  # Below threshold
-        { household_size: 1, income: 60_001, expected_result: false }, # Above threshold
+        { household_size: 1, income: 62_601, expected_result: false }, # Above threshold (62,600 threshold)
         { household_size: 3, income: 99_999, expected_result: true },  # Below threshold
-        { household_size: 3, income: 100_001, expected_result: false }, # Above threshold
-        { household_size: 8, income: 199_999, expected_result: true },  # Below threshold
-        { household_size: 8, income: 200_001, expected_result: false }, # Above threshold
-        { household_size: 10, income: 199_999, expected_result: true },  # Above household size 8, use size 8 threshold
-        { household_size: 10, income: 200_001, expected_result: false }  # Above household size 8, use size 8 threshold
+        { household_size: 3, income: 106_601, expected_result: false }, # Above threshold
+        { household_size: 8, income: 216_599, expected_result: true },  # Below threshold
+        { household_size: 8, income: 216_601, expected_result: false }, # Above threshold
+        { household_size: 10, income: 216_599, expected_result: true },  # Above household size 8, use size 8 threshold
+        { household_size: 10, income: 216_601, expected_result: false }  # Above household size 8, use size 8 threshold
       ]
 
       # Verify each test case

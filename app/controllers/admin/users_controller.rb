@@ -167,7 +167,11 @@ module Admin
         end
 
         def guardian?
-          @guardian || false
+          (@dependents_count || 0).positive?
+        end
+
+        def dependent?
+          @has_guardian || false
         end
       end
     end
@@ -349,10 +353,39 @@ module Admin
       base_query = User.order(:last_name, :first_name)
 
       if @q.present?
-        query_term = "%#{@q.downcase}%"
-        base_query.where(
-          'LOWER(first_name) ILIKE :q OR LOWER(last_name) ILIKE :q OR LOWER(email) ILIKE :q', q: query_term
-        )
+        # Split search terms to handle multi-word searches like "Guardian Test"
+        search_terms = @q.strip.split(/\s+/)
+        
+        if search_terms.length == 1
+          # Single term search - search in first_name, last_name, or email
+          query_term = "%#{search_terms.first.downcase}%"
+          base_query.where(
+            'LOWER(first_name) ILIKE :q OR LOWER(last_name) ILIKE :q OR LOWER(email) ILIKE :q', q: query_term
+          )
+        else
+          # Multi-term search - try to match full name or individual terms
+          # First try to match the full query as a concatenated name
+          full_name_term = "%#{@q.downcase}%"
+          full_name_query = base_query.where(
+            "LOWER(CONCAT(first_name, ' ', last_name)) ILIKE :q OR LOWER(email) ILIKE :q", q: full_name_term
+          )
+          
+          # If no results from full name search, try individual terms
+          if full_name_query.empty?
+            conditions = []
+            params = {}
+            
+            search_terms.each_with_index do |term, index|
+              term_key = "term_#{index}".to_sym
+              params[term_key] = "%#{term.downcase}%"
+              conditions << "LOWER(first_name) ILIKE :#{term_key} OR LOWER(last_name) ILIKE :#{term_key} OR LOWER(email) ILIKE :#{term_key}"
+            end
+            
+            base_query.where(conditions.join(' OR '), params)
+          else
+            full_name_query
+          end
+        end
       else
         # If no query, return empty results
         base_query.none
@@ -405,7 +438,11 @@ module Admin
         end
 
         def guardian?
-          @guardian || false
+          (@dependents_count || 0).positive?
+        end
+
+        def dependent?
+          @has_guardian || false
         end
       end
     end
@@ -682,9 +719,8 @@ module Admin
       guardian_users = preloaded_data[:guardian_users]
 
       user.define_singleton_method(:dependents_count) { guardian_counts[id] || 0 }
-      user.define_singleton_method(:guardian?) { has_guardian_ids.include?(id) }
-      user.define_singleton_method(:guardian?) { dependents_count.positive? }
-      user.define_singleton_method(:dependent?) { guardian? }
+      user.define_singleton_method(:guardian?) { (guardian_counts[id] || 0).positive? }
+      user.define_singleton_method(:dependent?) { has_guardian_ids.include?(id) }
 
       add_guardian_relationship_methods(user, guardian_rels, guardian_users)
     end

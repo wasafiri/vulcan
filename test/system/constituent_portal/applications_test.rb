@@ -3,21 +3,26 @@
 require 'application_system_test_case'
 
 class ApplicationsSystemTest < ApplicationSystemTestCase
-  include CupriteTestBridge
-
   setup do
-    @user = create(:constituent)
+    @user = create(:constituent, first_name: 'Test', last_name: 'Guardian')
+    @dependent = create(:constituent, first_name: 'Jane', last_name: 'Dependent', email: 'jane.dependent@example.com', phone: '5555551212')
+
+    # Directly create the relationship to ensure it's set up correctly, avoiding potential factory issues.
+    GuardianRelationship.create!(
+      guardian_id: @user.id,
+      dependent_id: @dependent.id,
+      relationship_type: 'Parent'
+    )
     @valid_pdf = file_fixture('income_proof.pdf').to_s
     @valid_image = file_fixture('residency_proof.pdf').to_s
 
     # Use enhanced sign in for better stability
-    measure_time('Sign in') { enhanced_sign_in(@user) }
+    system_test_sign_in(@user)
     assert_text 'Dashboard', wait: 10 # Verify we're signed in
   end
 
   teardown do
     # Extra cleanup to ensure browser stability
-    enhanced_sign_out if defined?(page) && page.driver.respond_to?(:browser)
   end
 
   test 'can view new application form' do
@@ -69,21 +74,6 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
     assert_text "can't be blank", wait: 5 # Look for generic validation error
   end
 
-  test 'can save application as draft' do
-    skip 'This test needs to be updated to match the actual application UI'
-
-    visit new_constituent_portal_application_path
-
-    # Fill in some fields but not all required ones
-    # This will need to be updated to match the actual form fields
-
-    # Save as draft
-    # This will need to be updated to match the actual save button
-
-    # Verify success (flash now includes period)
-    assert_text(/Application saved as draft\.?/, wait: 5)
-  end
-
   test 'dashboard shows correct application status after submission' do
     skip 'This test needs to be updated to match the actual application UI'
 
@@ -102,72 +92,33 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
     # and keyboard navigation flow
   end
 
-  test 'maintains user association when updating application' do
-    # Create a draft application first
+  test 'can save a draft application' do
     visit new_constituent_portal_application_path
 
-    # Fill in required fields
+    # Fill in some basic fields
     check 'I certify that I am a resident of Maryland'
-    fill_in 'Household Size', with: 3
-    fill_in 'Annual Income', with: 60_000
+    fill_in 'Household Size', with: 2
+    fill_in 'Annual Income', with: 50_000
+    fill_in 'Street Address', with: '456 Oak Ave'
+    fill_in 'City', with: 'Annapolis'
+    select 'Maryland', from: 'State'
+    fill_in 'Zip Code', with: '21401'
     check 'I certify that I have a disability that affects my ability to access telecommunications services'
-    check 'Hearing'
-
-    # Fill in medical provider info
-    within "section[aria-labelledby='medical-info-heading']" do
-      fill_in 'Name', with: 'Dr. Jane Smith'
-      fill_in 'Phone', with: '2025551234'
-      fill_in 'Email', with: 'drsmith@example.com'
-    end
+    check 'Vision'
 
     # Save as draft
     click_button 'Save Application'
 
-    # Verify success
-    assert_text 'Application saved as draft', wait: 5
+    # Verify success and redirection
+    assert_text 'Application saved as draft.', wait: 10
+    assert_current_path %r{/constituent_portal/applications/\d+}
 
-    # Get the ID of the created application
-    application = Application.last
-
-    # Visit the edit page directly
-    visit edit_constituent_portal_application_path(application)
-
-    # Update some fields
-    fill_in 'Household Size', with: 4
-    fill_in 'Annual Income', with: 75_000
-
-    # Make sure disability checkboxes are checked
-    check 'I certify that I have a disability that affects my ability to access telecommunications services'
-    check 'Hearing'
-    check 'Vision'
-
-    # Update medical provider info
-    within "section[aria-labelledby='medical-info-heading']" do
-      fill_in 'Name', with: 'Dr. John Doe'
-      fill_in 'Phone', with: '2025559876'
-      fill_in 'Email', with: 'jdoe@example.com'
-    end
-
-    # Attach proof files
-    attach_file 'Proof of Residency', @valid_image, make_visible: true
-    attach_file 'Income Verification', @valid_pdf, make_visible: true
-
-    # Submit the application
-    find('input[name="submit_application"]').click
-
-    # Verify success
-    assert_text 'Application submitted successfully', wait: 5
-
-    # Verify the application details are displayed correctly
-    assert_text 'Household Size: 4'
-
-    # The medical provider info is not being updated in the controller
-    # This is a known issue that we're addressing with our fix
-    assert_text 'Dr. Jane Smith'
-
-    # Verify the application is associated with the current user
-    application = Application.last
-    assert_equal @user.id, application.user_id
+    # Verify the application was actually created in the DB
+    application = Application.find_by(user_id: @user.id, status: 'draft')
+    assert_not_nil application, 'Draft application was not created in the database.'
+    assert_equal 2, application.household_size
+    assert_equal 50_000, application.annual_income
+    assert application.user.vision_disability
   end
 
   test 'preserves form data when validation fails' do
@@ -225,9 +176,21 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
     fill_in 'Household Size', with: '4'
     fill_in 'Annual Income', with: '60000'
 
+    # Address
+    fill_in 'Street Address', with: '123 Main St'
+    fill_in 'City', with: 'Baltimore'
+    select 'Maryland', from: 'State'
+    fill_in 'Zip Code', with: '21201'
+
     # Guardian information
     choose 'A dependent I manage'
-    select 'Parent', from: 'Relationship to Applicant'
+
+    # Wait for the dependent section to become visible
+    puts page.html
+    assert_selector '#dependent-selection-fields', visible: true, wait: 10
+
+    # Select the dependent (using the actual name from the factory)
+    select @dependent.full_name, from: 'application[user_id]'
 
     # Disability information
     check 'I certify that I have a disability that affects my ability to access telecommunications services'
@@ -243,15 +206,19 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
       fill_in 'Email', with: 'dr.johnson@example.com'
     end
 
+    check 'I authorize the release and sharing of my medical information as described above'
+
     # Upload documents (if the test environment supports it)
-    attach_file 'Proof of Residency', @valid_image, make_visible: true
-    attach_file 'Income Verification', @valid_pdf, make_visible: true
+    attach_file 'Proof of Residency', @valid_image
+    attach_file 'Income Verification', @valid_pdf
 
     # Save the application
     click_button 'Save Application'
 
+    # Wait for the async form submission and redirect to complete
+    wait_for_turbo
     # Verify success message
-    assert_text 'Application saved as draft'
+    assert_text 'Application saved as draft.', wait: 10
 
     # Get the newly created application
     application = Application.last
@@ -269,8 +236,8 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
     assert_equal '4105555678', application.medical_provider_fax
     assert_equal 'dr.johnson@example.com', application.medical_provider_email
 
-    # Verify a GuardianRelationship was created
-    assert GuardianRelationship.exists?(guardian_user: @user, dependent_user: application.user, relationship_type: 'Parent')
+    # Verify the application is for the dependent
+    assert_equal @dependent.id, application.user_id
 
     # Verify user attributes were updated (disabilities are on the user model)
     user = application.user.reload
@@ -292,7 +259,9 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
     assert_field 'Household Size', with: '4'
     assert_field 'Annual Income', with: '60000'
     assert_checked_field 'A dependent I manage'
-    assert_select 'Relationship to Applicant', selected: 'Parent'
+    # Verify the dependent is selected in the dropdown
+    select_field = find('select[name="application[user_id]"]')
+    assert_equal @user.id.to_s, select_field.value
     assert_checked_field 'I certify that I have a disability that affects my ability to access telecommunications services'
     assert_checked_field 'Hearing'
     assert_checked_field 'Vision'

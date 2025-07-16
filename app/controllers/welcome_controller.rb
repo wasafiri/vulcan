@@ -27,7 +27,7 @@ class WelcomeController < ApplicationController
     elsif current_user.trainer?
       redirect_to trainers_dashboard_path
     elsif current_user.admin?
-      redirect_to admin_dashboard_path
+      redirect_to admin_applications_path
     else
       redirect_to root_path
     end

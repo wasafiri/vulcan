@@ -609,8 +609,14 @@ module Admin
       assert_response :success
 
       json_response = response.parsed_body # Use Rails' response.parsed_body helper
-      assert_equal 15_000, json_response['thresholds']['1']
-      assert_equal 20_000, json_response['thresholds']['2']
+      assert_equal 15_650, json_response['thresholds']['1']
+      assert_equal 21_150, json_response['thresholds']['2']
+      assert_equal 26_650, json_response['thresholds']['3']
+      assert_equal 32_150, json_response['thresholds']['4']
+      assert_equal 37_650, json_response['thresholds']['5']
+      assert_equal 43_150, json_response['thresholds']['6']
+      assert_equal 48_650, json_response['thresholds']['7']
+      assert_equal 54_150, json_response['thresholds']['8']
       assert_equal 400, json_response['modifier']
     end
 

@@ -7,10 +7,7 @@ module Admin
     include DashboardMetricsLoading
 
     def index
-      load_dashboard_metrics
-      scope = build_application_scope
-      scope = apply_filter(scope, params[:filter])
-      @pagy, @applications = pagy(scope, items: 20)
+      redirect_to admin_applications_path
     end
 
     private

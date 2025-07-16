@@ -371,6 +371,10 @@ module Admin
       if status == 'approved'
         process_accepted_certification
       elsif status == 'rejected'
+        if params[:medical_certification_rejection_reason].blank?
+          redirect_to admin_application_path(@application), alert: 'Please select a rejection reason'
+          return
+        end
         process_certification_rejection
       end
     end

@@ -35,7 +35,7 @@ module ConstituentPortal
     # Test that the checkbox handling works correctly
     test 'should handle array values for self_certify_disability' do
       # Create a unique user for this test to avoid 3-year validation
-      unique_user = create(:constituent, :with_disabilities, 
+      unique_user = create(:constituent, :with_disabilities,
                            email: "checkbox_test_#{Time.now.to_i}_#{rand(1000)}@example.com")
       sign_in_for_integration_test(unique_user)
 
@@ -79,7 +79,7 @@ module ConstituentPortal
     # Test creating a draft application
     test 'should create application as draft' do
       # Create a unique user for this test to avoid 3-year validation
-      unique_user = create(:constituent, :with_disabilities, 
+      unique_user = create(:constituent, :with_disabilities,
                            email: "draft_test_#{Time.now.to_i}_#{rand(1000)}@example.com")
       sign_in_for_integration_test(unique_user)
 
@@ -116,7 +116,7 @@ module ConstituentPortal
     # Test creating an application as submitted with required proofs
     test 'should create application as submitted' do
       # Create a unique user for this test to avoid 3-year validation
-      unique_user = create(:constituent, :with_disabilities, 
+      unique_user = create(:constituent, :with_disabilities,
                            email: "submitted_test_#{Time.now.to_i}_#{rand(1000)}@example.com")
       sign_in_for_integration_test(unique_user)
 
@@ -409,14 +409,14 @@ module ConstituentPortal
 
       # Verify expected threshold values
       # These are the exact values we set up in the setup_fpl_policies method
-      assert_equal 15_000, json_response['thresholds']['1']
-      assert_equal 20_000, json_response['thresholds']['2']
-      assert_equal 25_000, json_response['thresholds']['3']
-      assert_equal 30_000, json_response['thresholds']['4']
-      assert_equal 35_000, json_response['thresholds']['5']
-      assert_equal 40_000, json_response['thresholds']['6']
-      assert_equal 45_000, json_response['thresholds']['7']
-      assert_equal 50_000, json_response['thresholds']['8']
+      assert_equal 15_650, json_response['thresholds']['1']
+      assert_equal 21_150, json_response['thresholds']['2']
+      assert_equal 26_650, json_response['thresholds']['3']
+      assert_equal 32_150, json_response['thresholds']['4']
+      assert_equal 37_650, json_response['thresholds']['5']
+      assert_equal 43_150, json_response['thresholds']['6']
+      assert_equal 48_650, json_response['thresholds']['7']
+      assert_equal 54_150, json_response['thresholds']['8']
     end
 
     # Test that user association is maintained during update

@@ -20,16 +20,16 @@ class ConstituentProofsSubmissionTest < ActionDispatch::IntegrationTest
     # Use the sign_in helper from test_helper.rb
     sign_in_for_integration_test(@user)
 
-    # Set up rate limit policies using Policy.set as seen in system tests
-    Policy.set('proof_submission_rate_limit_web', 5)
-    Policy.set('proof_submission_rate_period', 1)
+    # Set up rate limit policies with proper user context for policy changes
+    proof_limit_policy = Policy.find_or_initialize_by(key: 'proof_submission_rate_limit_web')
+    proof_limit_policy.value = 5
+    proof_limit_policy.updated_by = @user
+    proof_limit_policy.save!
 
-    # Stub the log_change method to avoid validation errors
-    Policy.class_eval do
-      def log_change
-        # No-op in test environment
-      end
-    end
+    proof_period_policy = Policy.find_or_initialize_by(key: 'proof_submission_rate_period')
+    proof_period_policy.value = 1
+    proof_period_policy.updated_by = @user
+    proof_period_policy.save!
 
     # Set default host for Active Storage URL generation in tests
     Rails.application.routes.default_url_options[:host] = 'www.example.com'
