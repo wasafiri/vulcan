@@ -2,293 +2,168 @@
 
 # SystemTestAuthentication
 #
-# This module provides enhanced authentication capabilities for system tests.
-# It integrates with Capybara via Cuprite, Minitest, and the application's authentication system
-# to ensure consistent and reliable user authentication in system tests.
+# This module provides simplified and robust authentication capabilities for system tests.
+# It focuses on UI-based sign-in and sign-out with minimal error recovery logic.
 module SystemTestAuthentication
   extend ActiveSupport::Concern
   include AuthenticationCore
 
-  included do
-    # Reset the session and clear identity at the beginning of each test
-    # This ensures no stale state leaks into the first test
-    setup do
-      # Reset the browser session
-      Capybara.reset_sessions!
-      # Clear any test identity from previous runs
-      clear_test_identity
-      # Configure Cuprite for this test
-      self.class.configure_cuprite if defined?(self.class.configure_cuprite)
+  # Signs a user in through the UI.
+  def system_test_sign_in(user, verify_path: nil)
+    # Prevent sign-in attempts if already authenticated.
+    if page.has_text?('Sign Out', wait: 0)
+      puts "Already signed in. Skipping sign-in for #{user.email}."
+      return
     end
 
-    # Also reset the session in teardown for good measure
-    teardown do
-      # Clean up authentication
-      system_test_sign_out
-    rescue StandardError => e
-      # Log but don't fail if cleanup has an issue
-      debug_auth "Warning: Authentication cleanup failed: #{e.message}"
-    ensure
-      # Always reset session and test identity
-      Capybara.reset_sessions!
-      clear_test_identity
-    end
-  end
-
-  # Configure Cuprite for system tests if it hasn't been configured
-  def self.configure_cuprite
-    return if @cuprite_configured
-
-    Capybara.register_driver :cuprite do |app|
-      Capybara::Cuprite::Driver.new(app, {
-                                      js_errors: ENV.fetch('JS_ERRORS', 'false') == 'true',
-                                      headless: %w[0 false].exclude?(ENV.fetch('HEADLESS', nil)),
-                                      slowmo: ENV['SLOWMO']&.to_f,
-                                      process_timeout: 15,
-                                      timeout: 10,
-                                      browser_options: ENV['DOCKER'] ? { 'no-sandbox' => nil } : {}
-                                    })
-    end
-
-    # Disable CSS transitions and animations for faster tests
-    Capybara.disable_animation = true if Capybara.respond_to?(:disable_animation=)
-
-    @cuprite_configured = true
-  end
-
-  # Wait for Turbo navigation to complete without sleeping
-  def wait_for_turbo
-    Capybara.using_wait_time(5) do
-      has_no_css?('.turbo-progress-bar')
-    end
-  end
-
-  # Custom assertions for authentication
-  def assert_authenticated_as(expected_user, msg = nil)
-    # In system tests, we primarily rely on UI indicators rather than Current.user
-    # since Current.user may not be properly set in the test environment
-
-    # Verify UI state
-    assert_no_match(/Sign In|Login/i, page.text, msg || 'Found sign in link when user should be authenticated')
-    assert_includes page.text, 'Sign Out', msg || 'Could not find sign out link'
-    assert_not_equal sign_in_path, current_path, msg || 'On sign in page when should be authenticated'
-
-    # Check for user-specific content if possible
-    return unless expected_user.respond_to?(:first_name) && expected_user.first_name.present?
-
-    assert page.has_text?("Hello #{expected_user.first_name}") ||
-           page.has_text?(expected_user.first_name),
-           msg || "Couldn't find user's name on page"
-  end
-
-  def assert_not_authenticated(msg = nil)
-    # Verify Current context if available
-    assert_nil Current.user, msg || 'Expected no authenticated user' if defined?(Current) && Current.respond_to?(:user)
-
-    # Verify UI state or redirect
-    if page.has_text?('Sign In')
-      assert_includes page.text, 'Sign In', msg || 'Could not find sign in link'
-      assert_not_includes page.text, 'Sign Out', msg || 'Found sign out link when not authenticated'
-    elsif current_path == sign_in_path
-      assert_equal sign_in_path, current_path, msg || 'Not on sign in page'
-    else
-      # We might have been redirected without rendering, so check path
-      assert_match(/sign_in/, current_url, msg || 'Not redirected to sign in page')
-    end
-  end
-
-  def system_test_sign_in(user, options = {})
-    # Auto-create a fallback admin user if none supplied.
-    # Some legacy tests call system_test_sign_in(nil) – rather than blowing
-    # up with a NoMethodError, we create a minimal user so the rest of the
-    # flow can execute and the tests can focus on their actual intent.
-    if user.nil?
-      debug_auth 'No user supplied to system_test_sign_in – creating fallback Admin user' if respond_to?(:debug_auth)
-      user = FactoryBot.create(:admin)
-    end
-
-    # Check if already signed in as this user to avoid redundant sign-ins
-    begin
-      if user.first_name.present? &&
-         page.has_text?("Hello #{user.first_name}") &&
-         page.has_text?('Sign Out') &&
-         current_path.exclude?('sign_in')
-        debug_auth "Already signed in as #{user.first_name}, skipping sign-in process"
-        return user
-      end
-    rescue Ferrum::NodeNotFoundError, Ferrum::TimeoutError => e
-      debug_auth "Error checking if already signed in: #{e.message}"
-      # Continue with sign-in process
-    end
-
-    # Clear identity and visit sign-in page
-    clear_test_identity
+    # Visit sign-in page using Capybara's visit and wait helpers
     visit sign_in_path
-    wait_for_turbo
+    wait_for_network_idle
+    wait_for_stimulus_controller
 
-    # Debug information
-    debug_auth "Attempting to sign in as #{user.email}"
+    # Set session variable to bypass 2FA for system tests when using RackTest driver
+    page.set_rack_session(skip_2fa: true) if page.driver.is_a?(Capybara::RackTest::Driver)
 
-    # Try multiple form selectors since we have different sign-in forms
-    form_selectors = [
-      'form#sign_in_form',                        # For the partial with ID
-      'form[action*="sign_in"]',                  # For forms posting to sign_in path
-      'form:has(input[id="email-input"])',       # For forms with our specific email input
-      'form:has(input[type="email"])'            # Most general fallback
-    ]
+    # Wait for form to be ready with more specific selectors
+    assert_selector('form[action="/sign_in"]', wait: 10)
 
-    # Find the first matching form selector
-    form_selector = form_selectors.find do |selector|
-      page.has_selector?(selector, wait: 2)
-    end
-
-    # If no form found, use the most general one
-    form_selector ||= 'form:has(input[type="email"])'
-
-    debug_auth "Using form selector: #{form_selector}"
-
-    # Now use the form we found
-    begin
-      within form_selector do
-        # Use the specific field IDs from our form structure
-        find_by_id('email-input').set(user.email)
-        debug_auth 'Filled email using #email-input'
-
-        find_by_id('password-input').set(options[:password] || 'password123')
-        debug_auth 'Filled password using #password-input'
-
-        # Click the submit button
+    # Use a more robust form filling approach
+    perform_enqueued_jobs do
+      within('form[action="/sign_in"]') do
+        fill_in 'email-input', with: user.email
+        fill_in 'password-input', with: 'password123'
         click_button 'Sign In'
-        debug_auth 'Clicked Sign In button'
       end
-    rescue Ferrum::NodeNotFoundError, Capybara::ElementNotFound => e
-      debug_auth "Error during form interaction: #{e.message}"
-      debug_auth "Current URL: #{current_url}"
-      debug_auth "Page title: #{page.title}"
-      raise StandardError, e.message
     end
 
-    wait_for_turbo
+    # Wait for Turbo and any network activity to settle before checking redirect
+    wait_for_network_idle
 
-    # Verify successful authentication by visiting a protected page
-    if options[:verify_path]
-      assert_current_path(options[:verify_path])
+    # Handle different redirect scenarios based on verify_path
+    if verify_path.present?
+      # For 2FA flows, we expect to be redirected to verification page
+      assert_current_path(verify_path, wait: 10)
+      puts "Successfully redirected to verification page for #{user.email}"
+    elsif current_path.match?(%r{/two_factor_authentication/verify})
+      # Check if user has 2FA and we're on a verification page
+      puts "User #{user.email} has 2FA enabled, on verification page: #{current_path}"
+    # Don't assert dashboard path - let the test handle the verification flow
     else
-      target_path = admin_dashboard_path
-      visit target_path unless current_path.include?('two_factor_authentication')
-      wait_for_turbo
+      # For normal sign-in, we expect to be redirected to dashboard
+      expected_dashboard_path = user_dashboard_path(user)
+      assert_current_path(expected_dashboard_path, wait: 10)
+      # Assert that the sign-in was successful by looking for the dashboard header.
+      assert_selector 'h1', text: 'Dashboard', wait: 10
+      puts "Successfully signed in as #{user.email}"
+    end
+  rescue Capybara::ElementNotFound => e
+    puts "Sign-in failed: #{e.message}. Current page: #{current_path}"
+    take_screenshot('sign_in_failure')
+    raise
+  rescue Ferrum::NodeNotFoundError => e
+    puts "Node not found error during sign-in: #{e.message}. Current page: #{current_path}"
+    take_screenshot('node_not_found_failure')
+    # Retry once with fresh session
+    puts 'Retrying sign-in with fresh session...'
+    Capybara.reset_sessions!
+    clear_pending_network_connections
+
+    # Retry the sign-in process once
+    visit sign_in_path
+    wait_for_network_idle
+
+    within('form[action="/sign_in"]') do
+      fill_in 'email-input', with: user.email
+      fill_in 'password-input', with: 'password123'
+      click_button 'Sign In'
     end
 
-    # Assert authentication success using pure assertions
-    # These will automatically retry until timeout
-    assert_not_equal sign_in_path, current_path, 'Redirected to sign-in page after login attempt'
-    unless current_path.include?('two_factor_authentication') || options[:verify_path]
-      # Look for sign out link or button with various possible text
-      sign_out_found = page.has_selector?('a', text: 'Sign Out') ||
-                       page.has_selector?('a', text: 'Logout') ||
-                       page.has_selector?('a', text: 'Log Out') ||
-                       page.has_selector?('button', text: 'Sign Out') ||
-                       page.has_selector?('input[type="submit"][value*="Sign Out"]') ||
-                       page.has_text?('Secure Account') # Admin interface uses this
+    # Wait for redirect and handle 2FA or dashboard
+    wait_for_network_idle
 
-      assert sign_out_found, 'Could not find sign out link or authenticated user indicator'
-    end
-
-    if current_path.exclude?('two_factor_authentication') && !options[:verify_path]
-      if user.first_name.present?
-        greeting_pattern = /#{user.first_name}|Hello #{user.first_name}/i
-        assert page.has_text?(greeting_pattern), 'User greeting not found after authentication'
-      else
-        debug_auth 'Skipping greeting check - user has no first_name'
-      end
-    end
-
-    # Set thread identity and Current.user
-    store_test_user_id(user.id)
-    update_current_user(user)
-    Current.user = user
-
-    # NOTE: For users with 2FA enabled in system tests, the session setup
-    # happens through the actual SessionsController flow when we submit the form
-    # We don't need to manually set up the 2FA session here
-
-    debug_auth "Successfully signed in as #{user.email}"
-    user
-  end
-
-  def with_authenticated_user(user)
-    original_user_id = Thread.current[:test_user_id]
-    # Current.user restoration is handled by clear_test_identity in teardown
-
-    begin
-      system_test_sign_in(user) # Perform sign-in
-      yield if block_given?
-    ensure
-      # Restore original Thread.current state
-      store_test_user_id(original_user_id)
-      # system_test_sign_out (called in main teardown) will handle Capybara session reset
+    # Apply same logic as main flow for retry
+    if verify_path.present?
+      assert_current_path(verify_path, wait: 10)
+      puts "Successfully redirected to verification page for #{user.email} on retry"
+    elsif current_path.match?(%r{/two_factor_authentication/verify})
+      puts "User #{user.email} has 2FA enabled, on verification page: #{current_path} on retry"
+    else
+      assert_selector 'h1', text: 'Dashboard', wait: 10
+      puts "Successfully signed in as #{user.email} on retry"
     end
   end
 
+  def skip_2fa_and_sign_in(user)
+    # Set a session variable to bypass 2FA. This requires controller cooperation.
+    # Only works with RackTest driver, not Cuprite
+    page.set_rack_session(skip_2fa: true) if page.driver.is_a?(Capybara::RackTest::Driver)
+    system_test_sign_in(user)
+  end
+
+  # Signs the user out and resets the session state.
   def system_test_sign_out
-    # Clear test identity
-    clear_test_identity
-
-    # Use the shared cookie deletion logic
-    delete_session_cookie
-
-    # Attempt to click sign out link if visible - don't fail if not found
-    begin
-      if page.has_link?('Sign Out', wait: 1)
-        click_link 'Sign Out'
-        wait_for_turbo
-      elsif page.has_button?('Sign Out', wait: 1)
-        click_button 'Sign Out'
-        wait_for_turbo
-      end
-    rescue Capybara::ElementNotFound => e
-      debug_auth "No sign out element found: #{e.message}"
+    # Only try to sign out if a sign-out link/button is present.
+    if page.has_link?('Sign Out', wait: 1)
+      click_link 'Sign Out'
+      wait_for_network_idle
+      assert_current_path(sign_in_path, wait: 10)
+    elsif page.has_button?('Sign Out', wait: 1)
+      click_button 'Sign Out'
+      wait_for_network_idle
+      assert_current_path(sign_in_path, wait: 10)
     end
-
-    # Reset Capybara session
+  rescue Ferrum::DeadBrowserError
+    # If the browser is already dead, we can't interact with it.
+    puts 'Browser was already dead during sign-out. Continuing teardown.'
+  ensure
+    # Always clear identity and reset sessions to guarantee a clean state.
+    clear_test_identity
     Capybara.reset_sessions!
   end
 
-  # Scroll to an element then interact with it (helpful for Cuprite)
-  def scroll_to_element(selector)
-    element = find(selector)
-    page.driver.scroll_to(element.native, align: :center) if page.driver.respond_to?(:scroll_to)
-    element
+  private
+
+  # Determine the correct dashboard path based on user type
+  def user_dashboard_path(user)
+    case user.type
+    when 'Users::Administrator'
+      admin_dashboard_path
+    when 'Users::Constituent'
+      constituent_portal_dashboard_path
+    when 'Users::Evaluator'
+      evaluators_dashboard_path
+    when 'Users::Trainer'
+      trainers_dashboard_path
+    when 'Users::Vendor'
+      vendor_dashboard_path
+    else
+      # Default to root path if user type is unknown
+      root_path
+    end
   end
 
-  # Click an element after scrolling to it
-  def scroll_to_and_click(selector)
-    element = scroll_to_element(selector)
-    element.click
-    wait_for_turbo
-  end
-
-  # Flash a message in the browser (for debugging)
-  def flash_message(message, type = :notice)
-    page.execute_script(<<~JS)
-      (function() {
-        var flashDiv = document.createElement('div');
-        flashDiv.textContent = "#{message}";
-        flashDiv.className = "flash flash-#{type}";
-        flashDiv.style.position = 'fixed';
-        flashDiv.style.top = '0';
-        flashDiv.style.left = '0';
-        flashDiv.style.width = '100%';
-        flashDiv.style.padding = '10px';
-        flashDiv.style.backgroundColor = '#{type == :error ? 'red' : 'green'}';
-        flashDiv.style.color = 'white';
-        flashDiv.style.zIndex = '9999';
-        flashDiv.style.textAlign = 'center';
-        document.body.appendChild(flashDiv);
-        setTimeout(function() {
-          flashDiv.remove();
-        }, 3000);
-      })();
-    JS
+  # Robust visit method that handles pending connections gracefully
+  def visit_with_retry(path, max_retries: 3)
+    success = false
+    max_retries.times do |attempt|
+      visit path
+      wait_for_network_idle if respond_to?(:wait_for_network_idle)
+      success = true
+      break # Success
+    rescue Ferrum::PendingConnectionsError => e
+      puts "Visit attempt #{attempt + 1}: Pending connections error: #{e.message}"
+      if attempt < max_retries - 1
+        puts 'Retrying after clearing sessions...'
+        clear_pending_network_connections
+        # Use Capybara's waiting instead of static wait
+        using_wait_time(2) do
+          assert_selector 'body', wait: 2
+        end
+      else
+        puts "Failed after #{max_retries} attempts, continuing..."
+        # Don't raise - let the test continue and potentially fail on assertions
+      end
+    end
+    success
   end
 end

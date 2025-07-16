@@ -25,7 +25,28 @@ rescue LoadError
   warn "⚠️  DatabaseCleaner not found.  Add `gem 'database_cleaner-active_record', group: :test`."
 end
 
-Rails.application.load_seed if Rails.env.test?
+# Seed the database once, and only once, for the entire test suite.
+# Using a constant to ensure this block runs only one time.
+unless defined?(SEEDS_LOADED)
+  if Rails.env.test?
+    # Eagerly load the Invoice model to ensure its callbacks are registered before we try to modify them.
+    # This prevents an 'undefined callback' error during seeding.
+    Invoice.name
+
+    # Prevent the :send_payment_notification callback from firing during test seeding.
+    # This callback sends emails and updates records, which is unnecessary and slow for setting up test data.
+    # We rescue from ArgumentError in case the callback definition changes or is removed in the future,
+    # which would otherwise break the entire test suite.
+    begin
+      Invoice.skip_callback(:save, :after, :send_payment_notification)
+    rescue ArgumentError => e
+      # It's possible the callback is already removed or renamed. We can safely ignore this.
+      Rails.logger.warn "Could not skip :send_payment_notification callback on Invoice: #{e.message}"
+    end
+  end
+  Rails.application.load_seed
+  SEEDS_LOADED = true
+end
 
 # Core test libraries
 require 'minitest/mock'
@@ -124,14 +145,34 @@ module ActiveSupport
     # Shortcut occasionally used in controller tests
     attr_reader :product
 
-    # DatabaseCleaner (per-test) — use transactions for speed and less noise
-    if defined?(DatabaseCleaner)
-      # Use transaction strategy by default (much faster and less verbose)
-      # Only use truncation when explicitly needed (e.g., tests that require multiple DB connections)
-      DatabaseCleaner.strategy = ENV['USE_TRUNCATION'] ? :truncation : :transaction
+    # Enable parallel testing for unit and integration tests
+    parallelize(workers: ENV.fetch('PARALLEL_WORKERS', :number_of_processors), with: :processes)
 
-      setup    { DatabaseCleaner.start } # start transaction/setup
-      teardown { DatabaseCleaner.clean } # rollback transaction/clean
+    # Optimized DatabaseCleaner strategy
+    if defined?(DatabaseCleaner)
+      # Per-worker truncation (expensive but thorough isolation)
+      parallelize_setup do |_worker|
+        DatabaseCleaner.clean_with(:truncation)
+        load Rails.root.join('db/seeds.rb')
+      end
+
+      # Per-test transactions (fast and sufficient for most cases)
+      setup do
+        DatabaseCleaner.strategy = :transaction
+        DatabaseCleaner.start
+      end
+
+      teardown { DatabaseCleaner.clean }
+    end
+
+    # Lightweight blob creation helper - skip MIME sniffing for performance
+    def create_lightweight_blob(filename: 'test.pdf', content_type: 'application/pdf', content: 'stub')
+      ActiveStorage::Blob.create_after_upload!(
+        io: StringIO.new(content),
+        filename: filename,
+        content_type: content_type,
+        identify: false # Skip `file` process - saves ~3s per 1k blobs
+      )
     end
 
     # Clear authentication state between tests to prevent test pollution

@@ -15,13 +15,10 @@ Rails.application.configure do
   config.public_file_server.headers = { 'cache-control' => 'public, max-age=3600' }
   config.public_file_server.enabled = true
 
-  # Enable serving of assets in test environment
-  config.assets.enabled = true
-  config.assets.compile = true # Always allow compilation in test for reliability
-  config.assets.check_precompiled_asset = false # Don't check if assets are precompiled
-  config.assets.debug = false  # Don't expand asset pipeline in test
-  config.assets.quiet = true   # Reduce asset pipeline noise in test logs
-  config.assets.digest = false # Don't use digested filenames in test
+  # Enable serving of assets in test environment (Propshaft configuration)
+  # Propshaft doesn't use the same config.assets.* settings as Sprockets
+  # Instead, ensure assets are served from the public directory
+  config.public_file_server.enabled = true
 
   # Show full error reports.
   config.consider_all_requests_local = true

@@ -48,7 +48,7 @@ draft:
 
 in_review:
   user: confirmed_user
-  status: in_review
+  status: in_progress
   application_date: <%= Date.current - 15.days %>
   household_size: 4
   annual_income: 42000
@@ -237,3 +237,68 @@ pending_application:
   medical_provider_phone: "555-666-7777"
   medical_provider_email: "pending.provider@example.com"
   medical_certification_status: not_requested
+
+# Additional application statuses needed by SeedLookupHelpers
+training_request_application:
+  user: constituent_alice
+  status: approved
+  application_date: <%= Time.current - 1.week %>
+  household_size: 2
+  annual_income: 32000
+  income_proof_status: approved
+  residency_proof_status: approved
+  maryland_resident: true
+  self_certify_disability: true
+  medical_provider_name: "Training Provider"
+  medical_provider_phone: "555-333-4444"
+  medical_provider_email: "training.provider@example.com"
+  medical_certification_status: approved
+  submission_method: web
+
+submitted_status_application:
+  user: confirmed_user
+  status: in_progress
+  application_date: <%= Time.current - 5.days %>
+  household_size: 1
+  annual_income: 24000
+  income_proof_status: approved
+  residency_proof_status: approved
+  maryland_resident: true
+  self_certify_disability: true
+  medical_provider_name: "Submitted Provider"
+  medical_provider_phone: "555-777-8888"
+  medical_provider_email: "submitted.provider@example.com"
+  medical_certification_status: approved
+  submission_method: web
+
+awaiting_documents_application:
+  user: confirmed_user2
+  status: awaiting_documents
+  application_date: <%= Time.current - 10.days %>
+  household_size: 3
+  annual_income: 45000
+  income_proof_status: not_reviewed
+  residency_proof_status: not_reviewed
+  maryland_resident: true
+  self_certify_disability: true
+  medical_provider_name: "Awaiting Provider"
+  medical_provider_phone: "555-999-0000"
+  medical_provider_email: "awaiting.provider@example.com"
+  medical_certification_status: not_requested
+  submission_method: paper
+
+needs_information_application:
+  user: unconfirmed_user
+  status: needs_information
+  application_date: <%= Time.current - 1.month %>
+  household_size: 2
+  annual_income: 28000
+  income_proof_status: rejected
+  residency_proof_status: rejected
+  maryland_resident: true
+  self_certify_disability: true
+  medical_provider_name: "Needs Info Provider"
+  medical_provider_phone: "555-123-9999"
+  medical_provider_email: "needsinfo.provider@example.com"
+  medical_certification_status: not_requested
+  submission_method: web

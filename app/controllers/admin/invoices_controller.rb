@@ -58,6 +58,10 @@ module Admin
 
         redirect_to [:admin, @invoice], notice: notice
       else
+        # Set @transactions for the show template when rendering due to validation errors
+        @transactions = @invoice.voucher_transactions
+                                .includes(:voucher)
+                                .order(processed_at: :desc)
         render :show, status: :unprocessable_entity
       end
     end

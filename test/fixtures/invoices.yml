@@ -50,3 +50,14 @@ raz_approved:
   approved_at: <%= 2.days.ago %>
   created_at: <%= 5.days.ago %>
   updated_at: <%= 2.days.ago %>
+
+# Pending invoice with voucher_transactions totaling 99.99 for stable test assertions
+test_pending_99:
+  vendor: vendor_raz
+  start_date: <%= 1.week.ago.beginning_of_day %>
+  end_date: <%= 1.day.ago.end_of_day %>
+  total_amount: 99.99
+  invoice_number: INV-202504-TEST-99
+  status: invoice_pending
+  created_at: <%= 1.week.ago %>
+  updated_at: <%= 1.day.ago %>

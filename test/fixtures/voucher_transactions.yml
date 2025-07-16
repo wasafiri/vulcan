@@ -16,3 +16,24 @@ two:
   processed_at: <%= 2.weeks.ago %>
   reference_number: TXN-GHI789JKL012
   invoice: one
+
+# Transactions for test_pending_99 invoice that total exactly 99.99
+test_transaction_1:
+  voucher: one
+  vendor: vendor_raz
+  amount: 49.99
+  transaction_type: redemption
+  status: transaction_completed
+  processed_at: <%= 3.days.ago %>
+  reference_number: TXN-TEST-001
+  invoice: test_pending_99
+
+test_transaction_2:
+  voucher: fully_redeemed
+  vendor: vendor_raz
+  amount: 50.00
+  transaction_type: redemption
+  status: transaction_completed
+  processed_at: <%= 2.days.ago %>
+  reference_number: TXN-TEST-002
+  invoice: test_pending_99

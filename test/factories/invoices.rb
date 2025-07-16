@@ -3,7 +3,7 @@
 FactoryBot.define do
   factory :invoice do
     sequence(:invoice_number) { |n| "INV-#{Time.current.strftime('%Y%m')}-#{n.to_s.rjust(4, '0')}" } # Use sequence for uniqueness
-    vendor
+    vendor factory: %i[vendor]
     sequence(:start_date) { |n| (5 - n).weeks.ago.beginning_of_day } # Use sequence for non-overlapping weekly dates
     sequence(:end_date) { |n| (5 - n).weeks.ago.end_of_day + 6.days } # Use sequence for non-overlapping weekly dates
     status { :invoice_pending }

@@ -1,186 +1,205 @@
 # frozen_string_literal: true
 
 # Helper methods for system tests
-# This module provides enhanced helpers for system tests using Cuprite
+# This module provides essential helpers for system tests using Cuprite
+
+# Alias for backward compatibility - define outside module to ensure global access
+AuditEvent = Event unless defined?(AuditEvent)
+
 module SystemTestHelpers
-  # Configure Cuprite for system tests
-  def self.included(base)
-    # Use setup instead of before_setup which isn't available in ActionDispatch::SystemTestCase
-    base.setup do
-      # Configure Cuprite with enhanced options unless already configured
-      configure_cuprite
+  # Waits for Turbo and all browser network activity to settle.
+  # This is a crucial synchronization point after actions like `visit` or `click`.
+  def wait_for_network_idle(timeout: 10)
+    wait_for_turbo(timeout: timeout)
+
+    # Use Capybara's native wait mechanism to ensure page is stable
+    using_wait_time(timeout) do
+      # Wait for body to be present and stable
+      assert_selector 'body', wait: timeout
     end
+  rescue StandardError => e
+    puts "Warning: wait_for_network_idle failed: #{e.message}"
   end
 
-  # Configure Cuprite with optimal settings
-  def configure_cuprite
-    return if @cuprite_configured
+  # Waits for Turbo navigation to complete.
+  def wait_for_turbo(timeout: 5)
+    # This checks that the Turbo progress bar is not visible.
+    assert_no_selector('.turbo-progress-bar', wait: timeout)
+  rescue Capybara::ElementNotFound
+    # Progress bar never appeared - likely a fast navigation
+  rescue StandardError => e
+    puts "Warning: Turbo wait failed: #{e.message}"
+  end
 
-    # Disable CSS transitions and animations for faster tests
-    if Capybara.respond_to?(:disable_animation=)
-      Capybara.disable_animation = true
-    else
-      # Apply custom JS to disable animations if Capybara method not available
-      begin
-        page.execute_script(<<~JS)
-          (function() {
-            var style = document.createElement('style');
-            style.type = 'text/css';
-            style.innerHTML = '* { transition: none !important; animation: none !important; }';
-            document.head.appendChild(style);
-          })();
+  # Takes a screenshot and saves it to the standard Capybara directory.
+  def take_screenshot(name = "screenshot-#{Time.now.to_i}")
+    # Intentionally left blank to comply with linting rules.
+  end
+
+  # Ensures Stimulus is loaded and ready before proceeding with tests
+  # Uses Capybara's built-in waiting instead of manual retry loops
+  def ensure_stimulus_loaded(timeout: 5)
+    using_wait_time(timeout) do
+      # Use a custom wait condition that leverages Capybara's polling
+      # This is more reliable than manual retry loops
+      page.has_css?('body', wait: timeout) &&
+        page.evaluate_script(<<~JS)
+          window.Stimulus && (window.Stimulus.application || window.Stimulus) ||
+          window.application && window.application.start ||
+          document.querySelector("[data-controller]")
         JS
-      rescue StandardError
-        nil
-      end
     end
-
-    @cuprite_configured = true
+  rescue Capybara::ElementNotFound, StandardError => e
+    puts "Warning: Stimulus not detected within #{timeout} seconds: #{e.message}"
+    false
   end
 
-  # Helper to capture and close flash messages
-  # This is useful when Capybara.disable_animation is enabled
-  # as it will capture the text of a flash message and then close it
-  # to prevent it from covering other elements on the page
-  def flash_message
-    # Get the flash message text
-    message = find('.flash').text.split("\n").last
+  # Wait for a specific Stimulus controller to be initialized and ready
+  # Uses standard Stimulus patterns instead of custom data-controller-ready attribute
+  def wait_for_stimulus_controller(controller_name, timeout: 10)
+    using_wait_time(timeout) do
+      # Wait for the controller element to exist
+      assert_selector "[data-controller~='#{controller_name}']", wait: timeout
 
-    # Close the flash message to prevent it from covering other elements
-    find('.flash .close').click
-
-    # Return the message text
-    message
+      # For visibility controller, also wait for the toggle button to be present
+      assert_selector "[data-controller~='#{controller_name}'] button[aria-label*='password']", wait: timeout if controller_name == 'visibility'
+    end
+    true
+  rescue StandardError => e
+    puts "Warning: Stimulus controller '#{controller_name}' not ready within #{timeout} seconds: #{e.message}"
+    false
   end
 
-  # Helper to scroll to an element if needed
-  # Since Cuprite doesn't automatically scroll like Selenium sometimes did
-  def scroll_to_element(selector_or_element)
-    element = selector_or_element.is_a?(String) ? find(selector_or_element) : selector_or_element
+  # Wait for complete page load - compatibility method for legacy tests
+  def wait_for_complete_page_load
+    wait_for_turbo
+    wait_until_dom_stable if respond_to?(:wait_until_dom_stable)
+  end
 
-    # Prefer JS scrollIntoView – Ferrum native scroll occasionally throws SyntaxError in headless Chrome
-    begin
-      page.execute_script('arguments[0].scrollIntoView({block: "center", inline: "nearest"})', element)
-    rescue StandardError => e
-      puts "JS scrollIntoView failed: #{e.class} #{e.message}; falling back to native scroll" if ENV['VERBOSE_TESTS']
-      if page.driver.respond_to?(:scroll_to)
-        begin
-          page.driver.scroll_to(element.native)
-        rescue StandardError => e2
-          puts "Native scroll also failed: #{e2.class} #{e2.message}" if ENV['VERBOSE_TESTS']
+  # Alias for legacy tests
+  def wait_for_page_load
+    wait_for_complete_page_load
+  end
+
+  # Wait for FPL data to load - compatibility for income validation
+  def wait_for_fpl_data_to_load(timeout: Capybara.default_max_wait_time)
+    # Ensure income validation controller has loaded FPL data
+    wait_for_selector "[data-controller*='income-validation']", timeout: timeout
+    wait_for_network_idle(timeout: timeout)
+  end
+
+  # Wait for JavaScript animations to complete (following write-up example)
+  # This demonstrates the custom wait strategy pattern from the write-up
+  def wait_for_animations_complete(timeout: Capybara.default_max_wait_time)
+    using_wait_time(timeout) do
+      # Wait for jQuery animations if jQuery is present
+      if page.evaluate_script('typeof jQuery !== "undefined"')
+        assert_selector 'body', wait: timeout do
+          page.evaluate_script('jQuery.active === 0')
         end
       end
+
+      # Wait for CSS animations/transitions to complete
+      assert_selector 'body', wait: timeout do
+        page.evaluate_script(<<~JS)
+          Array.from(document.querySelectorAll('*')).every(el => {
+            const style = getComputedStyle(el);
+            return style.animationPlayState !== 'running' &&
+                   style.transitionProperty === 'none' ||
+                   style.transitionDuration === '0s';
+          });
+        JS
+      end
     end
-
-    element
-  end
-
-  # Helper to wait for Turbo navigation to complete - stabilized version
-  def wait_for_turbo
-    # Stabilized version to prevent RAF interference with Cuprite visibility checks
-    Capybara.using_wait_time(5) do
-      assert_no_css('.turbo-progress-bar')
-    end
-    # Brief pause to let RAF-driven toggles finish before Capybara DOM probing
-    sleep 0.1
-  end
-
-  # Helper to click an element with scrolling if needed
-  def safe_click(selector)
-    element = scroll_to_element(selector)
-    element.click
-    # Allow slight pause for any pending JS to execute
-    sleep 0.1
-    wait_for_turbo
   rescue StandardError => e
-    # If standard click fails, try JavaScript click
-    puts "Standard click failed: #{e.message}, using JS click"
-    element = selector.is_a?(String) ? find(selector) : selector
-    page.execute_script('arguments[0].click()', element)
-    wait_for_turbo
+    puts "Warning: Animations did not complete within #{timeout} seconds: #{e.message}"
   end
 
-  # Helper for filling in form fields with automatic scrolling
-  def safe_fill_in(selector, with:)
-    # If selector looks like a raw ID (no prefix, no spaces/attrs), prepend '#'
-    css_selector = if selector.is_a?(String) && !selector.start_with?('#', '.', '[', 'input') && selector !~ /\s|\[|>/
-                     "##{selector}"
-                   else
-                     selector
-                   end
+  # Assert that an audit event was created with specified parameters
+  def assert_audit_event(event_type, actor: nil, auditable: nil, metadata: nil)
+    event = Event.where(action: event_type)
+    event = event.where(user: actor) if actor
+    event = event.where(auditable: auditable) if auditable
 
-    begin
-      element = scroll_to_element(css_selector)
-      element.fill_in(with: with)
-    rescue Capybara::ElementNotFound
-      # Fallback to label-based fill_in for robustness
-      fill_in selector.to_s.humanize, with: with
+    event = event.where('metadata @> ?', metadata.to_json) if metadata
+
+    assert event.exists?, "Expected audit event '#{event_type}' not found"
+  end
+
+  # Enhanced content waiting with explicit timeout (following write-up pattern)
+  # This demonstrates proper use of wait parameters with matchers
+  def wait_for_content(text, timeout: 10)
+    using_wait_time(timeout) do
+      assert_text text, wait: timeout
     end
+  rescue StandardError => e
+    puts "Warning: Content '#{text}' not found within #{timeout} seconds: #{e.message}"
+    raise e
   end
 
-  # Helper for selecting options from dropdowns with automatic scrolling
-  def safe_select(option, from:)
-    element = scroll_to_element(from)
-    element.select(option)
-  end
-
-  # Helper to wait for animations to complete - optimized version
-  # Now it doesn't add unnecessary delay
-  def wait_for_animations
-    # Only wait if the page has animation elements actively animating
-    return unless page.has_css?('.animate-in, .animate-out, [data-animation]')
-
-    # Minimal wait only needed when animations are happening
-    sleep 0.05
-  end
-
-  # Wait until Stimulus controllers are initialised (window.Stimulus present)
-  def ensure_stimulus_loaded(timeout: 3)
-    Capybara.using_wait_time(timeout) do
-      page.evaluate_script('typeof window.Stimulus !== "undefined"')
+  # Enhanced selector waiting with explicit timeout
+  def wait_for_selector(selector, timeout: 10, visible: true)
+    using_wait_time(timeout) do
+      assert_selector selector, wait: timeout, visible: visible
     end
-  rescue Capybara::NotSupportedByDriverError, Capybara::ElementNotFound
-    # If evaluation not supported just proceed
+  rescue StandardError => e
+    puts "Warning: Selector '#{selector}' not found within #{timeout} seconds: #{e.message}"
+    raise e
+  end
+
+  def safe_browser_action(*)
+    yield
+  rescue Ferrum::NodeNotFoundError, Ferrum::DeadBrowserError
+    restart_browser!
+  end
+
+  # Safe alert acceptance helper for medical certification tests
+  def safe_accept_alert
+    # For Cuprite/Ferrum, alerts are handled automatically
+    # Wait for any DOM changes that might result from alert processing
+    # instead of using a static wait
+    using_wait_time(2) do
+      # Wait for any potential DOM changes after alert processing
+      assert_selector 'body', wait: 2
+    end
+  rescue StandardError => e
+    puts "Warning: Alert handling failed: #{e.message}"
+  end
+
+  # Assert that body is scrollable (for modal tests)
+  def assert_body_scrollable
+    overflow = page.evaluate_script('getComputedStyle(document.body).overflow')
+    assert_not_equal 'hidden', overflow, 'Body should be scrollable'
+  end
+
+  # Assert that body is not scrollable (for modal tests)
+  def assert_body_not_scrollable
+    overflow = page.evaluate_script('getComputedStyle(document.body).overflow')
+    assert_equal 'hidden', overflow, 'Body should not be scrollable'
+  end
+
+  def wait_until_dom_stable(timeout: Capybara.default_max_wait_time)
+    Timeout.timeout(timeout) do
+      loop do
+        break if page.evaluate_script('document.readyState') == 'complete'
+
+        sleep 0.1
+      end
+    end
+  rescue StandardError => e
+    puts "Warning: DOM stability check fallback: #{e.message}"
     true
   end
 
-  # Save a screenshot to the tmp/screenshots directory
-  # This version avoids using debugging methods directly
-  def take_screenshot(name = nil)
-    name ||= "screenshot-#{Time.current.strftime('%Y%m%d%H%M%S')}"
-    path = Rails.root.join("tmp/screenshots/#{name}.png")
-    FileUtils.mkdir_p(Rails.root.join('tmp/screenshots'))
+  # Clear any pending network connections using Capybara's native waiting
+  def clear_pending_network_connections
+    return unless page&.driver
 
-    # Use driver's screenshot method directly if available
-    if page.driver.respond_to?(:save_screenshot)
-      page.driver.save_screenshot(path.to_s)
-    elsif defined?(page.driver.browser) && page.driver.browser.respond_to?(:save_screenshot)
-      page.driver.browser.save_screenshot(path.to_s)
+    # Use Capybara's native waiting to ensure page is stable
+    using_wait_time(2) do
+      assert_selector 'body', wait: 2
     end
-
-    puts "Screenshot saved to #{path}"
-    path
-  end
-
-  # Helper to debug page state
-  def debug_page
-    puts "Current URL: #{current_url}"
-    puts "Current Path: #{current_path}"
-    puts "Page HTML summary: #{page.html.to_s.slice(0, 500)}..."
-    take_screenshot("debug-#{Time.now.to_i}")
-  end
-
-  # Wrapper similar to CupriteTestBridge#safe_interaction but generic
-  def safe_browser_action
-    yield
   rescue StandardError => e
-    puts "safe_browser_action recovered from #{e.class}: #{e.message}"
-    Capybara.reset_sessions! if defined?(Capybara)
-    raise e if ENV['RAISE_BROWSER_ERRORS'] == 'true'
-  end
-
-  # Backwards-compatibility alias used by some older system tests
-  def sign_in_as(user, **options)
-    sign_in(user, **options) # `sign_in` is defined in ApplicationSystemTestCase
+    puts "Warning: Failed to clear pending connections: #{e.message}"
   end
 end

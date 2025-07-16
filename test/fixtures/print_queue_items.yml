@@ -17,7 +17,7 @@ pending_letter_1:
   letter_type: registration_confirmation
   status: pending
   constituent: constituent_alex
-  application: active
+  application: submitted_application
   created_at: <%= Time.current %>
   updated_at: <%= Time.current %>
 
@@ -25,7 +25,7 @@ pending_letter_2:
   letter_type: proof_approved
   status: pending
   constituent: constituent_john
-  application: approved
+  application: approved_application
   created_at: <%= Time.current %>
   updated_at: <%= Time.current %>
 
@@ -33,7 +33,7 @@ printed_letter:
   letter_type: account_created
   status: printed
   constituent: constituent_alex
-  application: active
+  application: submitted_application
   admin: admin_david
   printed_at: <%= Time.current - 1.day %>
   created_at: <%= Time.current - 1.day %>

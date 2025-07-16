@@ -1,6 +1,14 @@
 # frozen_string_literal: true
 
 require 'factory_bot_rails'
+
+# Prevent payment notification callback during seeding
+begin
+  Invoice.skip_callback(:save, :after, :send_payment_notification)
+rescue StandardError => e
+  Rails.logger.debug { "[SEED ERROR] Failed to skip Invoice callback: #{e.message}" }
+end
+
 require 'yaml'
 require 'active_record/fixtures'
 
@@ -156,9 +164,9 @@ def create_policies
     'fpl_8_person' => 54_150,
     'max_training_sessions' => 3,
     'waiting_period_years' => 3,
-    'proof_submission_rate_limit_web' => 5,
-    'proof_submission_rate_limit_email' => 10,
-    'proof_submission_rate_period' => 1,
+    'proof_submission_rate_limit_web' => 10,
+    'proof_submission_rate_limit_email' => 5,
+    'proof_submission_rate_period' => 24,
     'max_proof_rejections' => 3,
     # Voucher policies
     'voucher_value_hearing_disability' => 500,
@@ -182,37 +190,50 @@ end
 
 def load_fixtures_data
   seed_puts 'Loading fixtures in order...'
-  fixtures_path = Rails.root.join('test/fixtures')
-  users_map = load_users_fixture(fixtures_path)
-  load_applications_fixture(fixtures_path, users_map)
-  load_invoices_fixture(fixtures_path, users_map)
+  users_map = create_users_with_factories
+  load_applications_fixture(Rails.root.join('test/fixtures'), users_map)
+  load_invoices_fixture(Rails.root.join('test/fixtures'), users_map)
 end
 
-def load_users_fixture(fixtures_path)
-  seed_puts 'Loading users fixture via ActiveRecord models...'
-  user_fixture_file = fixtures_path.join('users.yml')
+def create_users_with_factories
+  seed_puts 'Creating users with factories...'
   users_map = {}
 
-  if File.exist?(user_fixture_file)
-    # Disable uniqueness validation on plaintext email column for seeding
-    User._validators[:email].reject! { |v| v.is_a?(ActiveRecord::Validations::UniquenessValidator) }
-    user_data = YAML.safe_load(ERB.new(File.read(user_fixture_file)).result, permitted_classes: [Date, DateTime, Time])
-    user_data.each do |key, attributes|
-      seed_puts "  Creating user #{key}..."
-      # Map vendor fixture status 'approved' to valid user status 'active'
-      attributes['status'] = 'active' if attributes['status'] == 'approved'
-      user = User.new
-      attributes.each do |attr, value|
-        setter = "#{attr}="
-        user.send(setter, value) if user.respond_to?(setter)
-      end
-      user.save!(validate: false)
-      users_map[key] = user
-    end
-  else
-    seed_error "Users fixture not found at #{user_fixture_file}"
-  end
+  # Create users that SeedLookupHelpers expects
+  users_map['admin'] = create_user_with_factory(:admin, email: 'admin@example.com', first_name: 'Admin', last_name: 'User')
+  users_map['confirmed_user'] = create_user_with_factory(:constituent, email: 'user@example.com', first_name: 'Test', last_name: 'User', email_verified: true)
+  users_map['confirmed_user2'] = create_user_with_factory(:constituent, email: 'user2@example.com', first_name: 'Jane', last_name: 'Doe', email_verified: true)
+  users_map['unconfirmed_user'] = create_user_with_factory(:constituent, email: 'unconfirmed@example.com', first_name: 'New', last_name: 'User', email_verified: false)
+  users_map['trainer'] = create_user_with_factory(:trainer, email: 'trainer@example.com', first_name: 'Trainer', last_name: 'Person')
+  users_map['evaluator'] = create_user_with_factory(:evaluator, email: 'evaluator@example.com', first_name: 'Evaluator', last_name: 'Person')
+  users_map['medical_provider'] = create_user_with_factory(:user, :medical_provider, email: 'medical@example.com', first_name: 'Doctor', last_name: 'Smith')
+
+  # Create constituent users needed by applications
+  users_map['constituent_john'] = create_user_with_factory(:constituent, email: 'john.doe@example.com', first_name: 'John', last_name: 'Doe')
+  users_map['constituent_jane'] = create_user_with_factory(:constituent, email: 'jane.doe@example.com', first_name: 'Jane', last_name: 'Doe')
+  users_map['constituent_alex'] = create_user_with_factory(:constituent, email: 'alex.smith@example.com', first_name: 'Alex', last_name: 'Smith')
+  users_map['constituent_rex'] = create_user_with_factory(:constituent, email: 'rex.canine@example.com', first_name: 'Rex', last_name: 'Canine')
+  users_map['constituent_alice'] = create_user_with_factory(:constituent, email: 'alice.doe@example.com', first_name: 'Alice', last_name: 'Doe')
+  users_map['constituent_kenneth'] = create_user_with_factory(:constituent, email: 'kenneth.klein@example.com', first_name: 'Kenneth', last_name: 'Klein')
+  users_map['constituent_steven'] = create_user_with_factory(:constituent, email: 'steven.cooper@example.com', first_name: 'Steven', last_name: 'Cooper')
+  users_map['constituent_wilbur'] = create_user_with_factory(:constituent, email: 'wilbur.wright@example.com', first_name: 'Wilbur', last_name: 'Wright')
+  users_map['constituent_mark'] = create_user_with_factory(:constituent, email: 'mark.jones@example.com', first_name: 'Mark', last_name: 'Jones')
+
+  # Create vendors
+  users_map['vendor_raz'] = create_user_with_factory(:vendor_user, email: 'raz@testemail.com', first_name: 'Raz', last_name: 'Vendor')
+  users_map['vendor_teltex'] = create_user_with_factory(:vendor_user, email: 'teltex@testemail.com', first_name: 'Teltex', last_name: 'Vendor')
+
   users_map
+end
+
+def create_user_with_factory(factory_name, *traits, **attributes)
+  seed_puts "  Creating user with factory #{factory_name}..."
+  user = FactoryBot.create(factory_name, *traits, **attributes)
+  seed_success "  ✓ Created #{user.type || 'User'} #{user.email}"
+  user
+rescue StandardError => e
+  seed_error "Failed to create user with factory #{factory_name}: #{e.message}"
+  raise
 end
 
 def load_applications_fixture(fixtures_path, users_map)
@@ -242,8 +263,6 @@ def load_applications_fixture(fixtures_path, users_map)
 end
 
 def load_invoices_fixture(fixtures_path, users_map)
-  # Disable invoice payment notifications during seeding
-  Invoice.skip_callback(:save, :after, :send_payment_notification)
   seed_puts 'Loading invoices fixture via ActiveRecord models...'
   invoice_fixture_file = fixtures_path.join('invoices.yml')
   if File.exist?(invoice_fixture_file)
@@ -269,7 +288,13 @@ end
 
 def seed_email_templates
   seed_puts 'Seeding email templates...'
-  load Rails.root.join('db/seeds/email_templates.rb')
+  # Directly load the helper first, then all other individual email template seed files.
+  # This is more robust than loading a single manifest file.
+  load Rails.root.join('db/seeds/email_templates/email_template_helper.rb')
+  Rails.root.glob('db/seeds/email_templates/*.rb').each do |seed_file|
+    load seed_file unless seed_file.to_s.end_with?('email_template_helper.rb')
+  end
+  Rails.logger.debug 'Finished seeding email templates.' if ENV['VERBOSE_TESTS'] || Rails.env.development?
 
   # Ensure the registration confirmation template exists, as it's critical for sign-up.
   # This is a common source of errors if the main email_templates.rb seed file is missed or incomplete.
@@ -279,7 +304,7 @@ def seed_email_templates
 
   EmailTemplate.find_or_create_by!(name: reg_confirm_name, format: :text) do |template|
     template.subject = 'Welcome to Maryland Accessible Telecommunications!'
-    template.body = "Hello %{user_full_name},\n\nWelcome! Your account has been created successfully.\n\nThank you for joining."
+    template.body = "Hello %<user_full_name>s,\n\nWelcome! Your account has been created successfully.\n\nThank you for joining."
     template.description = 'Sent to a new user upon successful registration.'
     template.variables = %w[user_full_name]
   end

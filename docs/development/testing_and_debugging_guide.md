@@ -276,7 +276,7 @@ end
 - Use explicit waits with appropriate timeouts
 - Wait for Turbo navigation completion
 - Ensure background jobs complete before assertions
-- Use `sleep` sparingly for complex async sequences
+- Use `wait` sparingly for complex async sequences (sleep can cause race conditions)
 
 ### 5. Database/Backend Errors
 **Problem**: Tests trigger backend errors due to data issues.

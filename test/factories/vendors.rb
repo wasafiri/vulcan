@@ -14,6 +14,8 @@ FactoryBot.define do
 
     trait :approved do
       status { :approved }
+      sequence(:business_name) { |n| "Approved Vendor #{n}" }
+      sequence(:business_tax_id) { |n| "99-#{n.to_s.rjust(7, '0')}" }
       terms_accepted_at { 1.day.ago }
       after(:create) do |vendor|
         vendor.w9_form.attach(

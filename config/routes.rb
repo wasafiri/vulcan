@@ -313,7 +313,7 @@ Rails.application.routes.draw do
         get :verify
       end
     end
-    resources :vouchers, only: [:index], param: :code do
+    resources :vouchers, only: %i[index show], param: :code do
       member do
         get :verify
         post :verify_dob
