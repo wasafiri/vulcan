@@ -64,7 +64,7 @@ gem 'solid_queue'
 gem 'jsbundling-rails'
 
 group :development, :test do
-  gem 'brakeman', '~> 7.0', require: false
+  gem 'brakeman', '~> 7.1', require: false
   gem 'byebug'
   gem 'debug', require: 'debug/prelude'
 end
