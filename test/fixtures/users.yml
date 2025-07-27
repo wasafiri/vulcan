@@ -367,10 +367,10 @@ evaluator_betsy:
   zip_code: 21044
 
 # Vendor
-vendor_raz:
+vendor_ray:
   type: Users::Vendor
-  email: raz@testemail.com
-  first_name: Raz
+  email: ray@testemail.com
+  first_name: Ray
   last_name: Vendor
   password_digest: <%= User.digest('password123') %>
   phone: 555-555-0004
@@ -379,7 +379,7 @@ vendor_raz:
   locale: en
   email_verified: true
   status: approved
-  website_url: http://www.razmobility.com
+  website_url: http://www.raymobility.com
   physical_address_1: 8600 Georgia Avenue
   city: Silver Spring
   state: MD

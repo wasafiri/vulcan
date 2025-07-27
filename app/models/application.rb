@@ -403,10 +403,12 @@ class Application < ApplicationRecord
       NotificationService.create_and_deliver!(
         type: 'proof_submitted',
         recipient: admin,
-        actor: user,
-        notifiable: self,
-        metadata: { proof_types: pending_proof_types },
-        channel: :email
+        options: {
+          actor: user,
+          notifiable: self,
+          metadata: { proof_types: pending_proof_types },
+          channel: :email
+        }
       )
     rescue StandardError => e
       Rails.logger.error "Failed to notify admin #{admin.id} of new proofs for application #{id}: #{e.message}"
@@ -454,4 +456,5 @@ class Application < ApplicationRecord
     Rails.logger.info "Setting managing_guardian_id to #{guardian_relationship.guardian_id} for application #{id}"
     self.managing_guardian_id = guardian_relationship.guardian_id
   end
+
 end

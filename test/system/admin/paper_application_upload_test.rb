@@ -1,18 +1,16 @@
 # frozen_string_literal: true
 
 require 'application_system_test_case'
-require_relative '../../support/cuprite_test_bridge'
 require_relative '../../support/paper_application_context_helpers'
 
 module Admin
   class PaperApplicationUploadTest < ApplicationSystemTestCase
-    include CupriteTestBridge
     include PaperApplicationContextHelpers
 
     setup do
       @admin = create(:admin)
-      # Use enhanced sign-in for better reliability with Cuprite
-      measure_time('Sign in') { enhanced_sign_in(@admin) }
+      # Use standard sign-in
+      system_test_sign_in(@admin)
 
       # Activate paper application context to bypass strict proof & duplicate validations
       setup_paper_application_context
@@ -34,14 +32,11 @@ module Admin
     end
 
     teardown do
-      # Extra cleanup to ensure browser stability
-      enhanced_sign_out if defined?(page) && page.driver.respond_to?(:browser)
-
       # Always clear context to avoid thread-local leakage between examples
       teardown_paper_application_context
 
       # Clean up Current context like the passing tests do
-      Current.reset
+      Current.reset if defined?(Current) && Current.respond_to?(:reset)
     end
 
     # NEW TEST: Complete paper application flow with all required fields
@@ -66,17 +61,17 @@ module Admin
       # Additional wait to ensure Stimulus controllers have fully processed the visibility changes
       sleep 0.5
 
-      # 3. Fill in Applicant's Information
+      # 3. Fill in Applicant's Information (with explicit field clearing to prevent concatenation)
       within 'fieldset[data-applicant-type-target="adultSection"]' do
-        fill_in 'constituent[first_name]', with: 'John'
-        fill_in 'constituent[last_name]', with: 'Doe'
-        fill_in 'constituent[date_of_birth]', with: 30.years.ago.strftime('%Y-%m-%d')
-        fill_in 'constituent[email]', with: "john.doe.#{timestamp}@example.com"
-        fill_in 'constituent[phone]', with: "202555#{timestamp[-4..]}"
-        fill_in 'constituent[physical_address_1]', with: '123 Main St'
-        fill_in 'constituent[city]', with: 'Baltimore'
-        fill_in 'constituent[state]', with: 'MD'
-        fill_in 'constituent[zip_code]', with: '21201'
+        find('input[name="constituent[first_name]"]').set('').set('John')
+        find('input[name="constituent[last_name]"]').set('').set('Doe')
+        find('input[name="constituent[date_of_birth]"]').set('').set(30.years.ago.strftime('%Y-%m-%d'))
+        find('input[name="constituent[email]"]').set('').set("john.doe.#{timestamp}@example.com")
+        find('input[name="constituent[phone]"]').set('').set("202555#{timestamp[-4..]}")
+        find('input[name="constituent[physical_address_1]"]').set('').set('123 Main St')
+        find('input[name="constituent[city]"]').set('').set('Baltimore')
+        find('input[name="constituent[state]"]').set('').set('MD')  # This was causing MD->MDMD concatenation
+        find('input[name="constituent[zip_code]"]').set('').set('21201')
       end
 
       # 4. Fill in Application Details within common sections
@@ -178,20 +173,19 @@ module Admin
       # Additional wait to ensure Stimulus controllers have fully processed the visibility changes
       sleep 0.5
 
-      # 2. Fill constituent (adult) information using the exact field names from fields_for :constituent
+      # 2. Fill constituent (adult) information using explicit field clearing to prevent concatenation
       within 'fieldset[data-applicant-type-target="adultSection"]' do
-        # Use exact field names from the form (constituent[field_name])
-        # Be specific about targeting fields within this section to avoid ambiguous matches
-        find('input[name="constituent[first_name]"]').set('John')
-        find('input[name="constituent[last_name]"]').set('Doe')
-        find('input[name="constituent[date_of_birth]"]').set(30.years.ago.strftime('%Y-%m-%d'))
+        # Use explicit field clearing to prevent value concatenation between test runs
+        find('input[name="constituent[first_name]"]').set('').set('John')
+        find('input[name="constituent[last_name]"]').set('').set('Doe')
+        find('input[name="constituent[date_of_birth]"]').set('').set(30.years.ago.strftime('%Y-%m-%d'))
         # Use timestamp-based unique values to avoid conflicts
-        find('input[name="constituent[email]"]').set("john.doe.#{timestamp}@example.com")
-        find('input[name="constituent[phone]"]').set("202555#{timestamp[-4..]}")
-        find('input[name="constituent[physical_address_1]"]').set('123 Main St')
-        find('input[name="constituent[city]"]').set('Baltimore')
-        find('input[name="constituent[zip_code]"]').set('21201')
-        find('input[name="constituent[state]"]').set('MD')
+        find('input[name="constituent[email]"]').set('').set("john.doe.#{timestamp}@example.com")
+        find('input[name="constituent[phone]"]').set('').set("202555#{timestamp[-4..]}")
+        find('input[name="constituent[physical_address_1]"]').set('').set('123 Main St')
+        find('input[name="constituent[city]"]').set('').set('Baltimore')
+        find('input[name="constituent[zip_code]"]').set('').set('21201')
+        find('input[name="constituent[state]"]').set('').set('MD')  # Prevent MD->MDMD concatenation
       end
 
       # Now fill in the common sections that should be visible
@@ -224,28 +218,28 @@ module Admin
 
       # Test file input disabling when reject is selected
       # First for income proof
-      safe_interaction { find("input[id='reject_income_proof']", visible: :all).click }
+      find("input[id='reject_income_proof']", visible: :all).click
       assert find("input[name='income_proof']", visible: :all).disabled?,
              'Income proof file input should be disabled when reject is selected'
 
       # Then for residency proof
-      safe_interaction { find("input[id='reject_residency_proof']", visible: :all).click }
+      find("input[id='reject_residency_proof']", visible: :all).click
       assert find("input[name='residency_proof']", visible: :all).disabled?,
              'Residency proof file input should be disabled when reject is selected'
 
       # Test file input enabling when accept is selected
-      safe_interaction { find("input[id='accept_income_proof']", visible: :all).click }
+      find("input[id='accept_income_proof']", visible: :all).click
       assert_not find("input[name='income_proof']", visible: :all).disabled?,
                  'Income proof file input should be enabled when accept is selected'
 
       # Test file clearing when switching to reject after uploading
-      safe_interaction { find("input[id='accept_income_proof']", visible: :all).click }
+      find("input[id='accept_income_proof']", visible: :all).click
 
       # Use direct assignment for file input since we're testing the controller behavior not the UI
-      attach_file 'income_proof', Rails.root.join('test/fixtures/files/sample.pdf'), visible: :all
+      attach_file 'income_proof', Rails.root.join('test/fixtures/files/sample.pdf')
 
       # Now switch to reject
-      safe_interaction { find("input[id='reject_income_proof']", visible: :all).click }
+      find("input[id='reject_income_proof']", visible: :all).click
 
       # The file input should be empty now
       file_input = find("input[name='income_proof']", visible: :all)
@@ -258,7 +252,7 @@ module Admin
       fill_in_minimum_required_fields
 
       # With default "accept" selected but no files uploaded, submission should fail
-      safe_interaction { click_on 'Submit Paper Application' }
+      click_on 'Submit Paper Application'
 
       # Should see an error message about missing files (since accept is selected by default)
       assert_selector '.bg-red-100', text: /Please upload.*document/
@@ -272,21 +266,21 @@ module Admin
 
       # Handle proof documents properly
       # Income proof accept with file
-      safe_interaction { find("input[id='accept_income_proof']", visible: :all).click }
-      attach_file 'income_proof', Rails.root.join('test/fixtures/files/sample.pdf'), visible: :all
+      find("input[id='accept_income_proof']", visible: :all).click
+      attach_file 'income_proof', Rails.root.join('test/fixtures/files/sample.pdf')
 
       # Wait for the file field to have a value (simple poll instead of JS injection)
       assert find('input[name="income_proof"]', visible: :all).value.present?
 
       # Residency proof accept with file
-      safe_interaction { find("input[id='accept_residency_proof']", visible: :all).click }
-      attach_file 'residency_proof', Rails.root.join('test/fixtures/files/sample.pdf'), visible: :all
+      find("input[id='accept_residency_proof']", visible: :all).click
+      attach_file 'residency_proof', Rails.root.join('test/fixtures/files/sample.pdf')
 
       # Wait for the file field to have a value (simple poll instead of JS injection)
       assert find('input[name="residency_proof"]', visible: :all).value.present?
 
       # Submit the form
-      safe_interaction { click_on 'Submit Paper Application' }
+      click_on 'Submit Paper Application'
 
       # Should be redirected to the application view page
       assert_current_path %r{/admin/applications/\d+}
@@ -297,16 +291,16 @@ module Admin
       fill_in_minimum_required_fields
 
       # Handle proof documents - both rejected with reasons
-      safe_interaction { find("input[id='reject_income_proof']", visible: :all).click }
+      find("input[id='reject_income_proof']", visible: :all).click
       select 'Missing Income Amount', from: 'income_proof_rejection_reason'
       fill_in 'income_proof_rejection_notes', with: 'Please provide documentation showing income amounts'
 
-      safe_interaction { find("input[id='reject_residency_proof']", visible: :all).click }
+      find("input[id='reject_residency_proof']", visible: :all).click
       select 'Expired Documentation', from: 'residency_proof_rejection_reason'
       fill_in 'residency_proof_rejection_notes', with: 'Please provide current documentation'
 
       # Submit the form
-      safe_interaction { click_on 'Submit Paper Application' }
+      click_on 'Submit Paper Application'
 
       # Should be redirected to the application view page
       assert_current_path %r{/admin/applications/\d+}

@@ -52,10 +52,10 @@ module AddressHelper
   # @return [Array<String>] Array of error messages (empty if valid)
   def validate_address(address)
     errors = []
-    errors << 'Street address is required' unless address.physical_address_1.present?
-    errors << 'City is required' unless address.city.present?
-    errors << 'State is required' unless address.state.present?
-    errors << 'ZIP code is required' unless address.zip_code.present?
+    errors << 'Street address is required' if address.physical_address_1.blank?
+    errors << 'City is required' if address.city.blank?
+    errors << 'State is required' if address.state.blank?
+    errors << 'ZIP code is required' if address.zip_code.blank?
     errors
   end
 end

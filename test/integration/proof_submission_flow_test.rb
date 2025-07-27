@@ -10,6 +10,11 @@ class ProofSubmissionFlowTest < ActionDispatch::IntegrationTest
     # Use our clean test helper for consistent setup
     setup_clean_test_environment
 
+    # Create the required rate limit policies (per CLAUDE.md testing guidelines)
+    Policy.find_or_create_by!(key: 'proof_submission_rate_limit_web') { |p| p.value = 10 }
+    Policy.find_or_create_by!(key: 'proof_submission_rate_limit_email') { |p| p.value = 5 }
+    Policy.find_or_create_by!(key: 'proof_submission_rate_period') { |p| p.value = 24 }
+
     @user = create(:constituent, email: 'johnny-test@example.com')
     @application = create(:application, :paper_rejected_proofs, user: @user)
     @valid_pdf = fixture_file_upload('test/fixtures/files/medical_certification_valid.pdf', 'application/pdf')

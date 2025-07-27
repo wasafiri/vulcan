@@ -55,11 +55,11 @@ module Evaluators
       @evaluations = if current_user.admin?
                        Evaluation.where(status: %i[scheduled confirmed])
                                  .includes(:constituent)
-                                 .order(evaluation_datetime: :asc)
+                                 .order(evaluation_date: :asc)
                      else
                        current_user.evaluations.active
                                    .includes(:constituent)
-                                   .order(evaluation_datetime: :asc)
+                                   .order(evaluation_date: :asc)
                      end
       render :index
     end
@@ -145,7 +145,7 @@ module Evaluators
     end
 
     def schedule
-      @evaluation.evaluation_datetime = params[:evaluation_datetime]
+      @evaluation.evaluation_date = params[:evaluation_date]
       @evaluation.location = params[:location]
       @evaluation.notes = params[:notes]
       @evaluation.status = :scheduled
@@ -158,7 +158,7 @@ module Evaluators
     end
 
     def reschedule
-      @evaluation.evaluation_datetime = params[:evaluation_datetime]
+      @evaluation.evaluation_date = params[:evaluation_date]
       @evaluation.location = params[:location] if params[:location].present?
       @evaluation.reschedule_reason = params[:reschedule_reason]
       @evaluation.status = :scheduled # Reset to scheduled status
@@ -205,7 +205,7 @@ module Evaluators
         evaluation: [:constituent_id,
                      :application_id,
                      :evaluation_date,
-                     :evaluation_datetime,
+                     :evaluation_date,
                      :evaluation_type,
                      :status,
                      :notes,
@@ -243,19 +243,20 @@ module Evaluators
                        end
 
       # Apply appropriate order based on status
-      ordered_query = case status
-                      when 'completed'
-                        filtered_query.order(evaluation_date: :desc)
-                      when 'scheduled', 'confirmed'
-                        filtered_query.order(evaluation_datetime: :asc)
-                      when 'requested'
-                        filtered_query.order(created_at: :desc)
-                      when 'no_show', 'cancelled'
-                        filtered_query.order(updated_at: :desc)
-                      else
-                        # Default order
-                        filtered_query.order(updated_at: :desc)
-                      end
+      ordered_query =
+        case status
+        when 'completed'
+          filtered_query.order(evaluation_date: :desc)
+        when 'scheduled', 'confirmed'
+          filtered_query.order(evaluation_date: :asc)
+        when 'requested'
+          filtered_query.order(created_at: :desc)
+        when 'no_show', 'cancelled', nil, ''
+          # Fall through to default
+          nil
+        end
+
+      ordered_query ||= filtered_query.order(updated_at: :desc)
 
       # Include only constituent since that's all we use in the view
       ordered_query.includes(:constituent)

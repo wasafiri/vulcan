@@ -84,8 +84,8 @@ class AutosaveController extends Controller {
   }
 
   async saveField(element) {
-    // Skip if no element or it's a file input
-    if (!element || element.type === 'file') return
+    // Skip if no element, it's a file input, or has the 'data-no-autosave' attribute
+    if (!element || element.type === 'file' || element.dataset.noAutosave) return
 
     // Get field name and value
     const fieldName = element.name
@@ -132,6 +132,16 @@ class AutosaveController extends Controller {
             
             // Update the autosave URL as well
             this.urlValue = this.editAutosaveUrlValue.replace(':id', data.applicationId)
+            
+            // Add or update the _method hidden field to PATCH since we're now updating
+            let methodField = this.formTarget.querySelector('input[name="_method"]')
+            if (!methodField) {
+              methodField = document.createElement('input')
+              methodField.type = 'hidden'
+              methodField.name = '_method'
+              this.formTarget.appendChild(methodField)
+            }
+            methodField.value = 'patch'
           }
         } else {
           this.updateStatus("Error saving", "text-red-600")

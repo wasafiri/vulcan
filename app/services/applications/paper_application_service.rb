@@ -7,7 +7,7 @@ module Applications
     include Rails.application.routes.url_helpers
     attr_reader :params, :admin, :application, :constituent, :errors, :guardian_user_for_app
 
-    def initialize(params:, admin:)
+    def initialize(params:, admin:, skip_income_validation: false)
       super()
       @params = params.with_indifferent_access
       @admin = admin
@@ -16,6 +16,7 @@ module Applications
       @guardian_user_for_app = nil
       @errors = []
       @temp_passwords = {}
+      @skip_income_validation = skip_income_validation
     end
 
     def create
@@ -172,6 +173,9 @@ module Applications
     end
 
     def validate_income_threshold(application_attrs) # rubocop:disable Naming/PredicateMethod
+      # Skip validation if explicitly requested (e.g., for rejection cases)
+      return true if @skip_income_validation
+
       household_size = application_attrs[:household_size]
       annual_income = application_attrs[:annual_income]
 
@@ -309,12 +313,14 @@ module Applications
         NotificationService.create_and_deliver!(
           type: 'proof_rejected',
           recipient: @constituent,
-          actor: @admin,
-          notifiable: review,
-          metadata: {
-            template_variables: proof_rejection_template_variables(review)
-          },
-          channel: @constituent.communication_preference.to_sym
+          options: {
+            actor: @admin,
+            notifiable: review,
+            metadata: {
+              template_variables: proof_rejection_template_variables(review)
+            },
+            channel: @constituent.communication_preference.to_sym
+          }
         )
       end
     end
@@ -329,13 +335,15 @@ module Applications
         NotificationService.create_and_deliver!(
           type: 'account_created',
           recipient: user,
-          actor: @admin,
-          notifiable: @application,
-          metadata: {
-            temp_password: temp_password,
-            template_variables: account_creation_template_variables(user, temp_password)
-          },
-          channel: user.communication_preference.to_sym
+          options: {
+            actor: @admin,
+            notifiable: @application,
+            metadata: {
+              temp_password: temp_password,
+              template_variables: account_creation_template_variables(user, temp_password)
+            },
+            channel: user.communication_preference.to_sym
+          }
         )
       end
     end

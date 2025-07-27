@@ -41,9 +41,7 @@ module Applications
     end
 
     def find_existing_application
-      current_user.applications.find_or_initialize_by(id: params[:id]) do |app|
-        apply_default_attributes(app)
-      end
+      current_user.applications.find_by(id: params[:id]) || create_new_application
     end
 
     def create_new_application

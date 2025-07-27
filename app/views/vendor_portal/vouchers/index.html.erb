@@ -2,7 +2,7 @@
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-2xl font-bold text-gray-900">Vouchers</h1>
     <div>
-      <%= link_to vendor_dashboard_path,
+      <%= link_to vendor_portal_dashboard_path,
           class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
         Back to Dashboard
       <% end %>
@@ -63,7 +63,7 @@
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <% if voucher.can_redeem?(Policy.voucher_minimum_redemption_amount) %>
-                      <%= link_to "Redeem", redeem_vendor_voucher_path(voucher), class: "inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+                      <%= link_to "Redeem", redeem_vendor_portal_voucher_path(voucher), class: "inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
                     <% else %>
                       <span class="text-gray-500">Cannot redeem</span>
                     <% end %>
@@ -91,7 +91,7 @@
       const code = document.getElementById('voucher_code').value;
       if (!code) return;
       // Build the URL directly with the code
-      window.location.href = `/vendor/vouchers/${code}/redeem`;
+      window.location.href = `/vendor_portal/vouchers/${code}/redeem`;
     });
   });
 </script>

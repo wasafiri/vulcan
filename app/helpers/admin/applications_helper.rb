@@ -26,15 +26,30 @@ module Admin
           'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
         ].join(' ')
 
-        link_to 'View Certification', url,
+        link_to 'View Medical Certification Document', url,
                 target: '_blank',
                 class: button_classes,
                 rel: 'noopener'
       else
-        link_to 'View Certification', url,
+        link_to 'View Medical Certification Document', url,
                 target: '_blank',
                 class: 'text-blue-600 hover:text-blue-800 underline',
                 rel: 'noopener'
+      end
+    end
+
+    def medical_certification_label(application)
+      case application.medical_certification_status
+      when 'approved'
+        'Medical Certification Approved'
+      when 'rejected'
+        'Medical Certification Rejected'
+      when 'received'
+        'Medical Certification Received'
+      when 'requested'
+        'Medical Certification Requested'
+      else
+        'Medical Certification'
       end
     end
 

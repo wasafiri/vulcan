@@ -7,22 +7,31 @@ FactoryBot.define do
 
     # Create unique users to avoid email/phone conflicts
     constituent do
+      unique_id = SecureRandom.hex(6)
+      # Generate a valid 10-digit phone number: 555-XXX-XXXX format
+      phone_suffix = (unique_id.to_i(16) % 10_000_000).to_s.rjust(7, '0')
       create(:constituent,
-             email: "pqi_constituent_#{Time.current.to_f.to_s.gsub('.', '_')}@example.com",
-             phone: "555-#{Time.current.to_i.to_s.last(3)}-#{rand(1000..9999)}")
+             email: "pqi_constituent_#{unique_id}@example.com",
+             phone: "555#{phone_suffix}")
     end
 
     application do
+      unique_id = SecureRandom.hex(6)
+      # Generate a valid 10-digit phone number: 555-XXX-XXXX format
+      phone_suffix = (unique_id.to_i(16) % 10_000_000).to_s.rjust(7, '0')
       create(:application,
              user: create(:constituent,
-                          email: "pqi_app_user_#{Time.current.to_f.to_s.gsub('.', '_')}@example.com",
-                          phone: "555-#{Time.current.to_i.to_s.last(3)}-#{rand(1000..9999)}"))
+                          email: "pqi_app_user_#{unique_id}@example.com",
+                          phone: "555#{phone_suffix}"))
     end
 
     admin do
+      unique_id = SecureRandom.hex(6)
+      # Generate a valid 10-digit phone number: 555-XXX-XXXX format  
+      phone_suffix = (unique_id.to_i(16) % 10_000_000).to_s.rjust(7, '0')
       create(:admin,
-             email: "pqi_admin_#{Time.current.to_f.to_s.gsub('.', '_')}@example.com",
-             phone: "555-#{Time.current.to_i.to_s.last(3)}-#{rand(1000..9999)}")
+             email: "pqi_admin_#{unique_id}@example.com",
+             phone: "555#{phone_suffix}")
     end
 
     printed_at { Time.current }

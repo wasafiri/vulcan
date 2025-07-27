@@ -49,10 +49,12 @@ module Applications
       NotificationService.create_and_deliver!(
         type: 'training_requested',
         recipient: admin,
-        actor: current_user,
-        notifiable: application,
-        metadata: notification_metadata(admin),
-        channel: :email
+        options: {
+          actor: current_user,
+          notifiable: application,
+          metadata: notification_metadata(admin),
+          channel: :email
+        }
       )
     rescue StandardError => e
       Rails.logger.error("Failed to notify admin #{admin.id} of training request: #{e.message}")

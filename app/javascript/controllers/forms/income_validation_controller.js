@@ -1,5 +1,4 @@
 import { Controller } from "@hotwired/stimulus"
-import { railsRequest } from "../../services/rails_request"
 import { applyTargetSafety } from "../../mixins/target_safety"
 import { setVisible } from "../../utils/visibility"
 
@@ -17,29 +16,32 @@ class IncomeValidationController extends Controller {
 
   static outlets = ["flash"] // Declare flash outlet
   static values = {
-    fplUrl: String,  // Rails-Native: URL provided via data attribute
-    modifier: { type: Number, default: 200 } // Default to 200% of FPL
+    fplThresholds: String,  // JSON string of FPL thresholds
+    modifier: Number // FPL modifier percentage from policy
   }
 
   connect() {
-    this.fplThresholds = {}
-    
-    // Request key for tracking
-    this.requestKey = `income-validation-${this.identifier}-${Date.now()}`
+    // Parse FPL thresholds from server-rendered data
+    try {
+      this.fplThresholds = JSON.parse(this.fplThresholdsValue)
+    } catch (error) {
+      console.error("Failed to parse FPL thresholds:", error)
+      this.fplThresholds = {}
+    }
     
     // Bind method for event listener cleanup
     this._validate = this.validateIncomeThreshold.bind(this)
-    
+
     this.setupEventListeners()
-    
-    // Fetch FPL data and validate initial state
-    this.fetchFplThresholds()
+
+    // Mark as loaded and validate initial state
+    this.element.dataset.fplLoaded = "true"
+    this.element.classList.add("fpl-data-loaded")
+    this.dispatch("fpl-data-loaded")
+    this.validateIncomeThreshold()
   }
 
   disconnect() {
-    // Cancel any pending request
-    railsRequest.cancel(this.requestKey)
-    
     this.teardownEventListeners()
   }
 
@@ -48,7 +50,7 @@ class IncomeValidationController extends Controller {
       target.addEventListener("input", this._validate)
       target.addEventListener("change", this._validate)
     })
-    
+
     this.withTarget('annualIncome', (target) => {
       target.addEventListener("input", this._validate)
       target.addEventListener("change", this._validate)
@@ -60,55 +62,18 @@ class IncomeValidationController extends Controller {
       target.removeEventListener("input", this._validate)
       target.removeEventListener("change", this._validate)
     })
-    
+
     this.withTarget('annualIncome', (target) => {
       target.removeEventListener("input", this._validate)
       target.removeEventListener("change", this._validate)
     })
   }
 
-  // Rails 8 @rails/request.js FPL threshold loading
-  async fetchFplThresholds() {
-    // Rails-Native Pattern: Require URL to be provided via Stimulus values
-    if (!this.hasFplUrlValue) {
-      console.error("Income validation requires fplUrl value to be provided")
-      this.handleFetchError(new Error("FPL URL not configured"))
-      return
-    }
-
-    try {
-      // Use centralized rails request service
-      const result = await railsRequest.perform({
-        method: 'get',
-        url: this.fplUrlValue,
-        key: this.requestKey
-      })
-
-      if (result.success) {
-        const data = result.data
-        
-        if (process.env.NODE_ENV !== 'production') {
-          console.log("FPL thresholds loaded successfully", data)
-        }
-        
-        // Store the FPL data
-        this.fplThresholds = data.thresholds || {}
-        this.modifierValue = data.modifier || this.modifierValue
-        
-        // Re-run validation with new data
-        this.validateIncomeThreshold()
-      }
-
-    } catch (error) {
-      console.error("FPL thresholds loading failed", error)
-      this.handleFetchError(error)
-    }
-  }
 
   validateIncomeThreshold() {
     const size = this.getHouseholdSize()
     const income = this.getAnnualIncome()
-    
+
     // Skip validation if inputs are invalid
     if (size < 1 || income < 1) {
       this.clearValidationState()
@@ -117,17 +82,18 @@ class IncomeValidationController extends Controller {
 
     const threshold = this.calculateThreshold(size)
     const exceedsThreshold = income > threshold
-    
+
+
     this.updateValidationUI(exceedsThreshold, threshold)
-    
+
     // Dispatch custom event for other controllers to listen to
-    this.dispatch("validated", { 
-      detail: { 
-        exceedsThreshold, 
-        income, 
-        threshold, 
-        householdSize: size 
-      } 
+    this.dispatch("validated", {
+      detail: {
+        exceedsThreshold,
+        income,
+        threshold,
+        householdSize: size
+      }
     })
   }
 
@@ -142,18 +108,37 @@ class IncomeValidationController extends Controller {
       // Handle both formatted and raw input values
       const value = target.value
       const rawValue = target.dataset.rawValue
-      
+
       if (rawValue) {
         return parseFloat(rawValue) || 0
       }
-      
+
       return parseFloat(value.replace(/[^\d.-]/g, '')) || 0
     }, 0)
   }
 
   calculateThreshold(householdSize) {
-    const baseFpl = this.fplThresholds[Math.min(householdSize, 8)] || 0
-    return baseFpl * (this.modifierValue / 100)
+    const size = Math.min(householdSize, 8)
+    
+    // Use server-rendered data with fallback to prevent failures
+    let baseFpl = 0
+    if (this.fplThresholds && typeof this.fplThresholds === 'object') {
+      baseFpl = this.fplThresholds[size.toString()] || this.fplThresholds[size] || 0
+    }
+    
+    // Fallback to hardcoded values if server data parsing fails
+    if (!baseFpl) {
+      const fallbackFpl = {
+        1: 15650, 2: 21150, 3: 26650, 4: 32150,
+        5: 37650, 6: 43150, 7: 48650, 8: 54150
+      }
+      baseFpl = fallbackFpl[size] || 0
+    }
+    
+    // Use Stimulus value (automatically parsed from data-income-validation-modifier-value)
+    let modifier = this.modifierValue || 400 // Use Stimulus parsed value with fallback
+    
+    return baseFpl * (modifier / 100)
   }
 
   updateValidationUI(exceedsThreshold, threshold) {
@@ -201,8 +186,9 @@ class IncomeValidationController extends Controller {
 
   updateSubmitButton(exceedsThreshold) {
     this.withTarget('submitButton', (target) => {
+      console.log(`Income validation: Setting button disabled = ${exceedsThreshold}`)
       target.disabled = exceedsThreshold
-      
+
       if (exceedsThreshold) {
         target.classList.add("opacity-50", "cursor-not-allowed")
         target.setAttribute("disabled", "disabled")
@@ -211,6 +197,10 @@ class IncomeValidationController extends Controller {
         target.removeAttribute("disabled")
       }
     })
+    
+    // Debug: Check if target was found
+    const hasTarget = this.hasSubmitButtonTarget
+    console.log(`Income validation: hasSubmitButtonTarget = ${hasTarget}`)
   }
 
   clearValidationState() {
@@ -218,31 +208,12 @@ class IncomeValidationController extends Controller {
     this.updateSubmitButton(false)
   }
 
-  handleFetchError(error) {
-    console.error("FPL threshold fetch failed:", error)
-    
-    this.withTarget('warningContainer', (target) => {
-      target.innerHTML = `
-        <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 p-4 rounded">
-          <p>Unable to load income thresholds. Please refresh the page and try again.</p>
-        </div>
-      `
-      setVisible(target, true)
-    })
-
-    if (this.hasFlashOutlet) {
-      this.flashOutlet.showError("Failed to load income thresholds. Please refresh the page.")
-    }
-  }
 
   // Action methods for manual triggering
   validateAction() {
     this.validateIncomeThreshold()
   }
 
-  refreshThresholdsAction() {
-    this.fetchFplThresholds()
-  }
 }
 
 // Apply target safety mixin

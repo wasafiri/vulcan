@@ -7,6 +7,7 @@ Rails.application.routes.draw do
 
   # Test routes (only in test environment)
   get 'test/auth_status', to: 'test#auth_status' if Rails.env.test?
+  post 'test/set_session', to: 'test#set_session' if Rails.env.test?
 
   root to: 'home#index'
 
@@ -127,6 +128,7 @@ Rails.application.routes.draw do
     resources :paper_applications, only: %i[new create] do
       collection do
         post :send_rejection_notification
+        post :reject_for_income
         get :fpl_thresholds
       end
     end
@@ -138,6 +140,7 @@ Rails.application.routes.draw do
         get  :search
         get  :filter
         get  :dashboard
+        get  :refresh_pipeline_chart
       end
 
       member do
@@ -304,7 +307,7 @@ Rails.application.routes.draw do
   end
 
   # Vendor portal routes
-  namespace :vendor, module: 'vendor_portal' do
+  namespace :vendor_portal do
     resource :dashboard, only: [:show], controller: :dashboard
     resource :profile, only: %i[edit update], controller: :profiles
     resources :redemptions, only: %i[new create] do
@@ -331,7 +334,7 @@ Rails.application.routes.draw do
   namespace :constituent_portal do
     resource :dashboard, only: [:show]
     resources :dependents
-    resources :applications, path: 'applications' do
+    resources :applications, path: 'applications', except: [:destroy] do
       collection do
         get :fpl_thresholds
         patch :autosave_field
@@ -344,6 +347,7 @@ Rails.application.routes.draw do
         get :verify
         patch :submit
         post :resubmit_proof
+        post :update # Handle form submissions that POST to update path
         post :request_training
       end
 

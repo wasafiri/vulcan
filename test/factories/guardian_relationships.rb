@@ -17,15 +17,15 @@ FactoryBot.define do
 
     # Traits for different phone types on dependent
     trait :dependent_with_voice_phone do
-      dependent_user { create(:constituent, :with_voice_phone) }
+      dependent_user { association(:constituent, :with_voice_phone) }
     end
 
     trait :dependent_with_videophone do
-      dependent_user { create(:constituent, :with_videophone) }
+      dependent_user { association(:constituent, :with_videophone) }
     end
 
     trait :dependent_with_text_phone do
-      dependent_user { create(:constituent, :with_text_phone) }
+      dependent_user { association(:constituent, :with_text_phone) }
     end
 
     # Trait for dependent sharing guardian's contact info

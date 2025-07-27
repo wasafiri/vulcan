@@ -40,10 +40,13 @@ module Applications
     end
 
     test 'creates constituent with proper Users::Constituent type' do
-      # Mock the direct mailer call
-      mock_mailer = mock('ActionMailer::MessageDelivery')
-      mock_mailer.expects(:deliver_later).once
-      ApplicationNotificationsMailer.expects(:account_created).at_least_once.returns(mock_mailer)
+      # Mock the NotificationService call instead of the direct mailer
+      # The service now uses NotificationService.create_and_deliver! which handles mailer calls internally
+      NotificationService.expects(:create_and_deliver!).with(
+        type: 'account_created',
+        recipient: anything,
+        options: anything
+      ).at_least_once.returns(nil) # Returns nil when notification creation fails gracefully
 
       service = PaperApplicationService.new(
         params: @valid_params,

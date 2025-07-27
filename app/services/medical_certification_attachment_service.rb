@@ -183,10 +183,12 @@ class MedicalCertificationAttachmentService
         NotificationService.create_and_deliver!(
           type: notification_action,
           recipient: application.user,
-          actor: admin,
-          notifiable: application,
-          metadata: metadata,
-          channel: :email
+          options: {
+            actor: admin,
+            notifiable: application,
+            metadata: metadata,
+            channel: :email
+          }
         )
       end
     end
@@ -305,6 +307,7 @@ class MedicalCertificationAttachmentService
     Event.create!(
       user: admin,
       action: 'medical_certification_status_changed',
+      auditable: app, # Add auditable field to match test expectations and approval flow
       metadata: {
         application_id: app.id,
         old_status: app.medical_certification_status_was || 'requested',
@@ -320,13 +323,15 @@ class MedicalCertificationAttachmentService
     NotificationService.create_and_deliver!(
       type: 'medical_certification_rejected',
       recipient: params[:application].user,
-      actor: params[:admin],
-      notifiable: params[:application],
-      metadata: {
-        'reason' => params[:reason],
-        'notes' => params[:notes]
-      },
-      channel: :email
+      options: {
+        actor: params[:admin],
+        notifiable: params[:application],
+        metadata: {
+          'reason' => params[:reason],
+          'notes' => params[:notes]
+        },
+        channel: :email
+      }
     )
   end
 

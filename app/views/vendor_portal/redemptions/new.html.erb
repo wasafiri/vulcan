@@ -5,7 +5,7 @@
         <h1 class="text-3xl font-bold text-gray-900">Process Voucher</h1>
       </div>
       <div class="mt-4 flex md:mt-0 md:ml-4">
-        <%= link_to vendor_dashboard_path,
+        <%= link_to vendor_portal_dashboard_path,
             class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
           Back to Dashboard
         <% end %>
@@ -25,7 +25,7 @@
             <div class="mt-2 text-sm text-yellow-700">
               <p>Your account is not yet approved to process vouchers.</p>
               <% unless current_user.w9_form.attached? %>
-                <p class="mt-1">Please <%= link_to "upload your W9 form", edit_vendor_profile_path, class: "underline" %> to complete your registration.</p>
+                <p class="mt-1">Please <%= link_to "upload your W9 form", edit_vendor_portal_profile_path, class: "underline" %> to complete your registration.</p>
               <% end %>
             </div>
           </div>
@@ -33,7 +33,7 @@
       </div>
     <% end %>
 
-    <%= form_with url: verify_vendor_redemptions_path,
+    <%= form_with url: verify_vendor_portal_redemptions_path,
         method: :get,
         local: true,
         class: "space-y-8" do |f| %>

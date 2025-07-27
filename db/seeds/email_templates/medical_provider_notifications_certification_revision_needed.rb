@@ -39,6 +39,7 @@ EmailTemplate.create_or_find_by!(name: 'medical_provider_notifications_certifica
     For questions, please contact us at medical-cert@mdmat.org or call 410-767-6960.
     Maryland Accessible Telecommunications (MAT) - Improving lives through accessible communication.
   TEXT
+  template.variables = %w[constituent_full_name application_id rejection_reason remaining_attempts]
   template.version = 1
 end
 Rails.logger.debug 'Seeded medical_provider_notifications_certification_revision_needed (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

@@ -355,7 +355,7 @@ module Admin
       if @q.present?
         # Split search terms to handle multi-word searches like "Guardian Test"
         search_terms = @q.strip.split(/\s+/)
-        
+
         if search_terms.length == 1
           # Single term search - search in first_name, last_name, or email
           query_term = "%#{search_terms.first.downcase}%"
@@ -369,18 +369,18 @@ module Admin
           full_name_query = base_query.where(
             "LOWER(CONCAT(first_name, ' ', last_name)) ILIKE :q OR LOWER(email) ILIKE :q", q: full_name_term
           )
-          
+
           # If no results from full name search, try individual terms
           if full_name_query.empty?
             conditions = []
             params = {}
-            
+
             search_terms.each_with_index do |term, index|
-              term_key = "term_#{index}".to_sym
+              term_key = :"term_#{index}"
               params[term_key] = "%#{term.downcase}%"
               conditions << "LOWER(first_name) ILIKE :#{term_key} OR LOWER(last_name) ILIKE :#{term_key} OR LOWER(email) ILIKE :#{term_key}"
             end
-            
+
             base_query.where(conditions.join(' OR '), params)
           else
             full_name_query

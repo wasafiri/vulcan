@@ -21,7 +21,7 @@ class WelcomeController < ApplicationController
     if current_user.constituent?
       redirect_to constituent_portal_dashboard_path
     elsif current_user.vendor?
-      redirect_to vendor_dashboard_path
+      redirect_to vendor_portal_dashboard_path
     elsif current_user.evaluator?
       redirect_to evaluators_dashboard_path
     elsif current_user.trainer?

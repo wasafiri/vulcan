@@ -78,9 +78,12 @@
     <div class="mb-4">
       <h2 class="text-xl font-semibold mb-2">Medical Provider & Certification</h2>
       <% if @application.medical_provider_name.present? %>
-        <p><strong>Name:</strong> <%= @application.medical_provider_name %></p>
-        <p><strong>Phone:</strong> <%= @application.medical_provider_phone %></p>
-        <p><strong>Email:</strong> <%= @application.medical_provider_email %></p>
+        <div class="mb-3">
+          <h3 class="text-lg font-medium">Medical Provider Information</h3>
+          <p><strong>Name:</strong> <%= @application.medical_provider_name %></p>
+          <p><strong>Phone:</strong> <%= @application.medical_provider_phone %></p>
+          <p><strong>Email:</strong> <%= @application.medical_provider_email %></p>
+        </div>
       <% else %>
         <p>No medical provider information provided</p>
       <% end %>
@@ -93,7 +96,7 @@
         else "bg-gray-100 text-gray-800"
       end %>
       <p><strong>Certification Status:</strong>
-        <span class="px-2 py-1 text-sm rounded-full <%= status_class %>">
+        <span class="certification-status px-2 py-1 text-sm rounded-full <%= status_class %>">
           <%= status.titleize %>
         </span>
       </p>

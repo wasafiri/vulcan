@@ -63,14 +63,16 @@ module Admin
       NotificationService.create_and_deliver!(
         type: 'security_key_recovery_approved',
         recipient: @recovery_request.user,
-        actor: current_user,
-        notifiable: @recovery_request,
-        metadata: {
-          recovery_request_id: @recovery_request.id,
-          approved_at: Time.current.iso8601,
-          approved_by: current_user.full_name
-        },
-        channel: :email
+        options: {
+          actor: current_user,
+          notifiable: @recovery_request,
+          metadata: {
+            recovery_request_id: @recovery_request.id,
+            approved_at: Time.current.iso8601,
+            approved_by: current_user.full_name
+          },
+          channel: :email
+        }
       )
     rescue StandardError => e
       Rails.logger.error "Failed to notify user #{@recovery_request.user_id} of recovery approval: #{e.message}"

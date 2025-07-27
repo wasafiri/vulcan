@@ -1,17 +1,17 @@
 # Voucher fixtures for testing
 
-# Voucher processed by vendor_raz
-vendor_raz_voucher:
+# Voucher processed by vendor_ray
+vendor_ray_voucher:
   code: "ABC123XYZ789"
   application: approved
-  vendor_id: <%= ActiveRecord::FixtureSet.identify(:vendor_raz) %>
+  vendor_id: <%= ActiveRecord::FixtureSet.identify(:vendor_ray) %>
   initial_value: 500.00
   remaining_value: 250.00
   status: active
   issued_at: <%= Time.current %>
   last_used_at: <%= Time.current - 1.day %>
 
-# Voucher that shouldn't be visible to vendor_raz (not processed by them)
+# Voucher that shouldn't be visible to vendor_ray (not processed by them)
 kenneth_voucher:
   code: "UX6XE6BT9QEY"
   application: active
@@ -22,7 +22,7 @@ kenneth_voucher:
   issued_at: <%= Time.current %>
   last_used_at: null
 
-# Another voucher that shouldn't be visible to vendor_raz
+# Another voucher that shouldn't be visible to vendor_ray
 steven_voucher:
   code: "TW8SZQIMNBKT"
   application: approved
@@ -40,7 +40,7 @@ steven_voucher:
 one:
   code: "TESTCODE12345"
   application: complete
-  vendor_id: <%= ActiveRecord::FixtureSet.identify(:vendor_raz) %>
+  vendor_id: <%= ActiveRecord::FixtureSet.identify(:vendor_ray) %>
   initial_value: 500.00
   remaining_value: 300.00
   status: active
@@ -51,7 +51,7 @@ one:
 fully_redeemed:
   code: "REDEEMEDCODE99"
   application: in_review
-  vendor_id: <%= ActiveRecord::FixtureSet.identify(:vendor_raz) %>
+  vendor_id: <%= ActiveRecord::FixtureSet.identify(:vendor_ray) %>
   initial_value: 300.00
   remaining_value: 0.00
   status: redeemed
@@ -61,7 +61,7 @@ fully_redeemed:
 valid_voucher:
   code: "VALIDVOUCHER1"
   application: approved
-  vendor_id: <%= ActiveRecord::FixtureSet.identify(:vendor_raz) %>
+  vendor_id: <%= ActiveRecord::FixtureSet.identify(:vendor_ray) %>
   initial_value: 1000.00
   remaining_value: 500.00
   status: active

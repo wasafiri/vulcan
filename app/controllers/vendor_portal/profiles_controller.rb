@@ -12,7 +12,7 @@ module VendorPortal
 
       if @vendor.update(vendor_params)
         flash[:notice] = 'Profile updated successfully'
-        redirect_to vendor_dashboard_path
+        redirect_to vendor_portal_dashboard_path
       else
         flash.now[:alert] = 'There was an error updating your profile'
         render :edit

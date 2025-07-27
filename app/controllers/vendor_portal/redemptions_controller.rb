@@ -9,10 +9,10 @@ module VendorPortal
 
       @voucher = Voucher.active.find_by(code: params[:code])
       if @voucher
-        redirect_to verify_vendor_voucher_path(@voucher.code)
+        redirect_to verify_vendor_portal_voucher_path(@voucher.code)
       else
         flash[:alert] = I18n.t('alerts.invalid_voucher_code', default: 'Invalid voucher code')
-        redirect_to vendor_vouchers_path
+        redirect_to vendor_portal_vouchers_path
       end
     end
 
@@ -30,7 +30,7 @@ module VendorPortal
         render json: {
           valid: true,
           message: 'Valid voucher found',
-          redirect_url: verify_vendor_voucher_path(voucher.code)
+          redirect_url: verify_vendor_portal_voucher_path(voucher.code)
         }
       else
         render json: {
@@ -42,7 +42,7 @@ module VendorPortal
 
     def create
       # This action is typically handled by the VouchersController#process_redemption
-      redirect_to vendor_vouchers_path
+      redirect_to vendor_portal_vouchers_path
     end
   end
 end

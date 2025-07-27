@@ -21,9 +21,9 @@ module WebauthnTestHelper
     true
   end
 
-  def create_fake_credential(_user, client, options = {})
+  def create_fake_credential(user, client, options = {})
     # Get challenge using proper HTTP method call for integration tests
-    return create_webauthn_credential_directly(_user, client, options) unless respond_to?(:get)
+    return create_webauthn_credential_directly(user, client, options) unless respond_to?(:get)
 
     # Integration test context - use HTTP methods
     get webauthn_creation_options_two_factor_authentication_path, xhr: true
@@ -71,7 +71,7 @@ module WebauthnTestHelper
   # Helper method to create WebAuthn credential directly for system tests
   def create_webauthn_credential_directly(user, client, options = {})
     # Generate a fake credential response
-    attestation_response = client.create(
+    client.create(
       # WebAuthn challenges are base64-url strings without padding
       challenge: Base64.urlsafe_encode64(SecureRandom.random_bytes(32), padding: false),
       rp_id: URI.parse(client.origin).host,
@@ -113,11 +113,45 @@ module WebauthnTestHelper
     end
 
     # Return a fake client for the test environment
-    WebAuthn::FakeClient.new('https://example.com')
+    @fake_client = WebAuthn::FakeClient.new('https://example.com')
+  end
+
+  # Helper method to access the fake client (for tests that expect this method)
+  def fake_client
+    @fake_client ||= setup_webauthn_test_environment
   end
 
   # Backwards-compatibility alias used by some system tests
   def create_webauthn_credential_programmatically(user, client, nickname = 'Test Security Key')
     create_fake_credential(user, client, nickname: nickname)
+  end
+
+  # Helper method to retrieve WebAuthn challenge from session for system tests
+  # This method handles the complexity of accessing session data in different test contexts
+  def retrieve_session_webauthn_challenge(options = {})
+    # For system tests, we can't directly access the session like in integration tests
+    # Instead, we need to simulate the challenge generation process
+
+    if options[:fetch_options] && options[:user]
+      # This is for verification flow - generate verification options
+      user = options[:user]
+      return nil unless user&.webauthn_credentials&.any?
+
+      # Generate a challenge similar to what the controller would do
+      get_options = WebAuthn::Credential.options_for_get(
+        allow: user.webauthn_credentials.pluck(:external_id)
+      )
+
+      # In system tests, we can't store this in session, so we return the challenge directly
+      get_options.challenge
+    else
+      # This is for credential creation flow
+      # Generate a challenge similar to what the controller would do
+      create_options = WebAuthn::Credential.options_for_create(
+        user: { id: SecureRandom.uuid, name: 'test@example.com' }
+      )
+
+      create_options.challenge
+    end
   end
 end

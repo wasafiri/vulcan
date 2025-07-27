@@ -56,73 +56,127 @@ module Admin
     test 'admin can approve a medical certification during upload' do
       @application.update!(medical_certification_status: 'requested')
       visit admin_application_path(@application)
+      
+      # Wait for page to be fully loaded
+      wait_for_turbo
+      
+      # Ensure the form is present before interacting
+      assert_selector '[data-testid="medical-certification-upload-form"]', wait: 10
 
       within '[data-testid="medical-certification-upload-form"]' do
         choose 'Approve Certification and Upload'
-        attach_file 'medical_certification', Rails.root.join('test/fixtures/files/medical_certification_valid.pdf'), make_visible: true
+        attach_file 'medical_certification', Rails.root.join('test/fixtures/files/medical_certification_valid.pdf')
         click_button 'Process Certification'
       end
 
-      assert_text 'Medical certification successfully uploaded and approved'
+      # Wait for form submission to complete
+      wait_for_turbo
+      
+      assert_text 'Medical certification successfully uploaded and approved', wait: 10
       @application.reload
       assert @application.medical_certification.attached?, 'Medical certification file should be attached'
       assert_equal 'approved', @application.medical_certification_status
       assert_audit_event('medical_certification_status_changed', actor: @admin, auditable: @application)
+      
+      # Clear any pending network connections to prevent timeout during teardown
+      clear_pending_network_connections if respond_to?(:clear_pending_network_connections)
     end
 
     test 'admin can reject a medical certification without uploading' do
       @application.update!(medical_certification_status: 'requested')
       visit admin_application_path(@application)
+      
+      # Wait for page to be fully loaded
+      wait_for_turbo
+      
+      # Ensure the form is present before interacting
+      assert_selector '[data-testid="medical-certification-upload-form"]', wait: 10
 
       within '[data-testid="medical-certification-upload-form"]' do
         choose 'Reject Certification'
-        assert_selector 'select[name="medical_certification_rejection_reason"]', visible: true
+        assert_selector 'select[name="medical_certification_rejection_reason"]', visible: true, wait: 5
         select 'Missing Information', from: 'medical_certification_rejection_reason'
         fill_in 'medical_certification_rejection_notes', with: 'The certification form is missing required signatures.'
         click_button 'Process Certification'
       end
 
-      assert_text 'Medical certification rejected and provider notified'
+      # Wait for form submission to complete
+      wait_for_turbo
+      
+      assert_text 'Medical certification rejected and provider notified', wait: 10
       @application.reload
       assert_equal 'rejected', @application.medical_certification_status
-      assert_equal 'Missing Information', @application.medical_certification_rejection_reason
+      assert_equal 'missing_information', @application.medical_certification_rejection_reason
       assert_audit_event('medical_certification_status_changed', actor: @admin, auditable: @application)
+      
+      # Clear any pending network connections to prevent timeout during teardown
+      clear_pending_network_connections if respond_to?(:clear_pending_network_connections)
     end
 
     # --- Validation Tests ---
 
     test 'admin sees error when trying to approve without a file' do
+      @application.update!(medical_certification_status: 'requested')
       visit admin_application_path(@application)
+      
+      # Wait for page to be fully loaded
+      wait_for_turbo
+      
+      # Ensure the form is present before interacting
+      assert_selector '[data-testid="medical-certification-upload-form"]', wait: 10
 
-      # Select the "Approve" option
-      choose 'Approve Certification and Upload'
+      within '[data-testid="medical-certification-upload-form"]' do
+        # Select the "Approve" option
+        choose 'Approve Certification and Upload'
 
-      # Try to submit without attaching a file
-      click_button 'Process Certification'
+        # Try to submit without attaching a file
+        click_button 'Process Certification'
+      end
 
+      # Wait for any request processing to complete
+      wait_for_turbo
+      
       # Verify error message is displayed
-      assert_text 'Please select a file to upload'
+      assert_text 'Please select a file to upload', wait: 10
 
       # Verify status remained 'requested'
       @application.reload
       assert_equal 'requested', @application.medical_certification_status
+      
+      # Clear any pending network connections to prevent timeout during teardown
+      clear_pending_network_connections if respond_to?(:clear_pending_network_connections)
     end
 
     test 'admin sees error when trying to reject without a reason' do
+      @application.update!(medical_certification_status: 'requested')
       visit admin_application_path(@application)
+      
+      # Wait for page to be fully loaded
+      wait_for_turbo
+      
+      # Ensure the form is present before interacting
+      assert_selector '[data-testid="medical-certification-upload-form"]', wait: 10
 
-      # Select the "Reject" option
-      choose 'Reject Certification'
+      within '[data-testid="medical-certification-upload-form"]' do
+        # Select the "Reject" option
+        choose 'Reject Certification'
 
-      # Try to submit without selecting a rejection reason
-      click_button 'Process Certification'
+        # Try to submit without selecting a rejection reason
+        click_button 'Process Certification'
+      end
 
+      # Wait for any request processing to complete
+      wait_for_turbo
+      
       # Verify error message is displayed
-      assert_text 'Please select a rejection reason'
+      assert_text 'Please select a rejection reason', wait: 10
 
       # Verify status remained 'requested'
       @application.reload
       assert_equal 'requested', @application.medical_certification_status
+      
+      # Clear any pending network connections to prevent timeout during teardown
+      clear_pending_network_connections if respond_to?(:clear_pending_network_connections)
     end
 
     test 'upload form is not shown when medical certification is already attached' do

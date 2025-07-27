@@ -55,11 +55,14 @@ module Admin
         admin: current_user
       )
 
-      if service.create
+      service_result = service.create
+
+      if service_result
+        success_message = generate_success_message(service.application)
         handle_success_response(
           html_redirect_path: admin_application_path(service.application),
-          html_message: generate_success_message(service.application),
-          turbo_message: generate_success_message(service.application),
+          html_message: success_message,
+          turbo_message: success_message,
           turbo_redirect_path: admin_application_path(service.application)
         )
       else
@@ -92,44 +95,149 @@ module Admin
       end
     end
 
+    # Legacy AJAX endpoint for FPL thresholds - delegates to IncomeThresholdCalculationService
+    # TODO: Consider removing this endpoint in favor of server-rendered data
     def fpl_thresholds
       thresholds = {}
+      modifier = nil
+
       (1..8).each do |size|
-        thresholds[size] = Policy.get("fpl_#{size}_person").to_i
+        result = IncomeThresholdCalculationService.call(size)
+        if result.success?
+          thresholds[size] = result.data[:base_fpl]
+          modifier ||= result.data[:modifier] # Get modifier from first successful call
+        else
+          thresholds[size] = 0 # Fallback for failed calculations
+        end
       end
-      modifier = Policy.get('fpl_modifier_percentage').to_i
-      render json: { thresholds: thresholds, modifier: modifier }
+
+      render json: { thresholds: thresholds, modifier: modifier || 400 }
+    end
+
+    # Helper methods for FPL data - delegates to IncomeThresholdCalculationService
+    # See: app/services/income_threshold_calculation_service.rb for core FPL logic
+    helper_method :fpl_thresholds_json, :fpl_modifier_value
+
+    def fpl_thresholds_json
+      # Generate FPL threshold data for JavaScript using IncomeThresholdCalculationService
+      thresholds = (1..8).to_h do |size|
+        result = IncomeThresholdCalculationService.call(size)
+        if result.success?
+          [size.to_s, result.data[:base_fpl]]
+        else
+          [size.to_s, 0] # Fallback for failed calculations
+        end
+      end
+      thresholds.to_json
+    end
+
+    def fpl_modifier_value
+      # Get FPL modifier percentage via IncomeThresholdCalculationService (uses any household size)
+      result = IncomeThresholdCalculationService.call(1)
+      if result.success?
+        result.data[:modifier]
+      else
+        400 # Fallback default
+      end
+    end
+
+    def reject_for_income
+      service = initialize_rejection_service
+      return handle_service_failure(service) unless service.create
+
+      application = service.application
+      log_successful_rejection(application)
+      send_rejection_notification_for_application(application)
+      log_audit_event(application)
+
+      redirect_to admin_applications_path,
+                  notice: 'Application rejected due to income threshold. Rejection notification has been sent.'
     end
 
     def send_rejection_notification
-      constituent_params_for_notification = build_constituent_params_for_notification
+      # Build constituent params from form data
+      constituent_params = build_constituent_params_for_notification
       notification_params = build_notification_params
 
-      communication_preference = params[:notification_method] || params[:communication_preference]
-
-      if communication_preference == 'email'
-        ApplicationNotificationsMailer.income_threshold_exceeded(constituent_params_for_notification, notification_params)
-                                      .deliver_later
-        handle_success_response(
-          html_redirect_path: admin_applications_path,
-          html_message: 'Rejection notification has been sent.',
-          turbo_message: 'Rejection notification has been sent.'
-        )
-      elsif communication_preference == 'letter'
-        handle_success_response(
-          html_redirect_path: admin_applications_path,
-          html_message: 'Rejection letter has been queued for printing.',
-          turbo_message: 'Rejection letter has been queued for printing.'
-        ) # Assuming a letter service exists
+      notification_method = params[:notification_method]
+      
+      if notification_method == 'letter'
+        # For letter notifications, queue for printing
+        # This would integrate with a print queue system
+        redirect_to admin_applications_path,
+                    notice: 'Rejection letter has been queued for printing'
       else
-        handle_error_response(
-          html_redirect_path: admin_applications_path,
-          error_message: 'Invalid communication preference for rejection notification.'
-        )
+        # For email notifications, send immediately
+        ApplicationNotificationsMailer.income_threshold_exceeded(
+          constituent_params,
+          notification_params
+        ).deliver_later
+
+        redirect_to admin_applications_path,
+                    notice: 'Rejection notification has been sent'
       end
     end
 
     private
+
+    def initialize_rejection_service
+      service_params = paper_application_processing_params
+      service_params[:application] ||= {}
+      service_params[:application][:status] = 'rejected'
+
+      Applications::PaperApplicationService.new(
+        params: service_params,
+        admin: current_user,
+        skip_income_validation: true
+      )
+    end
+
+    def log_successful_rejection(application)
+      Rails.logger.debug { "Successfully rejected application #{application.id}" }
+    end
+
+    def send_rejection_notification_for_application(application)
+      ApplicationNotificationsMailer.income_threshold_exceeded(
+        user_contact_attributes(application.user),
+        rejection_notification_params(application)
+      ).deliver_later
+    end
+
+    def user_contact_attributes(user)
+      user.attributes.slice('first_name', 'last_name', 'email', 'phone')
+    end
+
+    def rejection_notification_params(application)
+      threshold_amount = calculate_income_threshold(application.household_size)
+
+      {
+        household_size: application.household_size,
+        annual_income: application.annual_income,
+        threshold_amount: threshold_amount
+      }
+    end
+
+    def calculate_income_threshold(household_size)
+      threshold_result = IncomeThresholdCalculationService.new(household_size).call
+      threshold_result.success? ? threshold_result.data[:threshold] : 0
+    end
+
+    def log_audit_event(application)
+      AuditEventService.log(
+        action: 'application_rejected_income_threshold',
+        actor: Current.user,
+        auditable: application,
+        metadata: audit_metadata(application)
+      )
+    end
+
+    def audit_metadata(application)
+      {
+        income: application.annual_income,
+        household_size: application.household_size,
+        threshold: calculate_income_threshold(application.household_size)
+      }
+    end
 
     def handle_service_failure(service, existing_application = nil)
       error_msg = if service.errors.any?

@@ -37,6 +37,9 @@ class ModalController extends Controller {
     
     // Safety timeout to restore scroll if needed
     this._setupScrollSafetyTimeout()
+
+    // Mark modal controller as connected for test synchronization
+    this.element.setAttribute('data-modal-controller-connected', 'true')
   }
 
   disconnect() {
@@ -78,7 +81,54 @@ class ModalController extends Controller {
       return
     }
 
+    // Transfer proof type data from the triggering button to rejection modals
+    const proofType = event?.currentTarget?.dataset?.proofType
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Modal: Opening modal', modalId, 'with proof type', proofType)
+    }
+    if (proofType && (modalId === 'proofRejectionModal' || modalId === 'medicalCertificationRejectionModal')) {
+      this._setProofTypeInModal(modalElement, proofType)
+    }
+
     this._showModal(modalElement)
+  }
+
+  _setProofTypeInModal(modalElement, proofType) {
+    // Find the hidden proof type field in the rejection modal
+    const proofTypeField = modalElement.querySelector('#rejection-proof-type')
+    if (proofTypeField) {
+      proofTypeField.value = proofType
+      
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Modal: Set proof type to', proofType, 'in field', proofTypeField)
+      }
+      
+      // Trigger change event for any listeners
+      proofTypeField.dispatchEvent(new Event('change', { bubbles: true }))
+      
+      // Try to find and notify the rejection form controller
+      // First check if the modal itself has the rejection-form controller
+      const formElement = modalElement.hasAttribute('data-controller') && modalElement.getAttribute('data-controller').includes('rejection-form')
+        ? modalElement
+        : modalElement.querySelector('[data-controller*="rejection-form"]')
+      if (formElement) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('Modal: Found rejection form element, dispatching proof-type-changed event with proofType:', proofType)
+        }
+        // Dispatch a custom event that the rejection form controller can listen for
+        formElement.dispatchEvent(new CustomEvent('proof-type-changed', { 
+          detail: { proofType },
+          bubbles: true 
+        }))
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('Modal: Event dispatched')
+        }
+      } else {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('Modal: No rejection form element found in modal')
+        }
+      }
+    }
   }
 
   _showModal(element) {
@@ -94,6 +144,9 @@ class ModalController extends Controller {
     // ✅ ACCEPTABLE: Scoped query within the modal element
     const firstInput = element.querySelector("input, textarea")
     firstInput?.focus()
+    
+    // Signal that modal is fully ready for tests
+    element.setAttribute('data-test-modal-ready', 'true')
   }
 
   _lockScroll() {
@@ -191,6 +244,8 @@ class ModalController extends Controller {
       modalElement.querySelectorAll('iframe[data-original-src]').forEach((iframe) => {
         iframe.removeAttribute("data-pdf-loaded")
       })
+      // Remove modal ready signal
+      modalElement.removeAttribute('data-test-modal-ready')
     }
 
     // Only remove overflow-hidden if no other modals are visible

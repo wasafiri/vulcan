@@ -39,16 +39,16 @@ module ApplicationFormHandling
   end
 
   # Common success message determination
-  def determine_success_message(application, is_submission = false)
+  def determine_success_message(application, is_submission: false)
     if is_submission || application.status_in_progress?
       'Application submitted successfully!'
     else
-      'Application saved successfully.'
+      'Application saved as draft.'
     end
   end
 
   # Handle transaction failures consistently
-  def handle_transaction_failure(exception, context)
+  def handle_transaction_failure?(exception, context)
     Rails.logger.error("Transaction failed during #{context}: #{exception.message}")
     Rails.logger.error(exception.backtrace.join("\n")) if exception.backtrace
     false

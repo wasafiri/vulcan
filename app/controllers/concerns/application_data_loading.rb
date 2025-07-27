@@ -3,10 +3,10 @@
 module ApplicationDataLoading
   extend ActiveSupport::Concern
 
-  # Wanted attachment names for preloading (can be overridden in including controllers)
+  # Preload attachment names
   DEFAULT_ATTACHMENT_NAMES = %w[income_proof residency_proof medical_certification].freeze
 
-  # Loads an application with optimized attachment preloading
+  # Load an application with optimized attachment preloading
   # @param application_id [Integer] The ID of the application to load
   # @return [Application] The loaded application
   def load_application_with_attachments(application_id)
@@ -19,7 +19,7 @@ module ApplicationDataLoading
     application
   end
 
-  # Preloads attachment metadata for a single application
+  # Preload attachment metadata for a single application
   # @param application [Application] The application to preload attachments for
   def preload_application_attachments(application)
     attachment_ids = ActiveStorage::Attachment
@@ -40,7 +40,7 @@ module ApplicationDataLoading
       .to_a
   end
 
-  # Loads associations specifically needed for application show views
+  # Load associations specifically needed for application show views
   # @param application [Application] The application to load associations for
   def load_application_show_associations(application)
     # Load status changes directly – they're always needed
@@ -61,7 +61,7 @@ module ApplicationDataLoading
     load_training_associations(application) if application.status_approved?
   end
 
-  # Loads training-related associations for approved applications
+  # Load training-related associations for approved applications
   # @param application [Application] The application to load training data for
   def load_training_associations(application)
     application.evaluations.preload(:evaluator) if application.respond_to?(:evaluations)
@@ -70,7 +70,7 @@ module ApplicationDataLoading
     application.training_sessions.preload(:trainer).order(created_at: :desc)
   end
 
-  # Preloads attachments for multiple applications efficiently
+  # Preload attachments for multiple applications efficiently
   # @param applications [Array<Application>] Applications to preload attachments for
   # @param attachment_names [Array<String>] Names of attachments to preload
   # @return [Hash] Hash mapping application_id to Set of attachment names
@@ -82,7 +82,7 @@ module ApplicationDataLoading
     fetch_and_process_attachments(ids, attachment_names)
   end
 
-  # Loads proof history data for income and residency proofs
+  # Load proof history data for income and residency proofs
   # @param application [Application] The application to load proof history for
   # @return [Hash] Hash with :income and :residency keys containing history data
   def load_proof_histories(application)
@@ -92,7 +92,7 @@ module ApplicationDataLoading
     }
   end
 
-  # Loads proof history for a specific proof type
+  # Load proof history for a specific proof type
   # @param application [Application] The application
   # @param type [Symbol] The proof type (:income or :residency)
   # @return [Hash] Hash containing reviews and audits
@@ -111,7 +111,7 @@ module ApplicationDataLoading
     { reviews: [], audits: [], error: true }
   end
 
-  # Reloads application and its associations (used for turbo stream updates)
+  # Reload application and its associations (used for turbo stream updates)
   # @param application [Application] The application to reload
   # @return [Application] The reloaded application
   def reload_application_and_associations(application)
@@ -130,24 +130,18 @@ module ApplicationDataLoading
     end
   end
 
-  # Builds a base scope for application queries with common includes
+  # Build a base scope for application queries with common includes
   # @param exclude_statuses [Array<Symbol>] Statuses to exclude (default: [:rejected, :archived])
-  # @param preload_proof_blobs [Boolean] Whether to eager-load proof blobs
   # @return [ActiveRecord::Relation] The base scope
-  def build_application_base_scope(exclude_statuses: %i[rejected archived], preload_proof_blobs: true)
+  def build_application_base_scope(exclude_statuses: %i[rejected archived])
     scope = Application.includes(:user, :managing_guardian).distinct
 
     scope = scope.where.not(status: exclude_statuses) if exclude_statuses.any?
 
-    # Only eager-load proof blobs when explicitly requested. This avoids loading
-    # large ActiveStorage associations for list views where we rely on
-    # `preload_attachments_for_applications` + `ApplicationStorageDecorator`.
-    scope = scope.with_proof_blobs if preload_proof_blobs
-
     scope
   end
 
-  # Loads notifications for an application with specific actions
+  # Load notifications for an application with specific actions
   # @param application [Application] The application
   # @param actions [Array<String>] Notification actions to load
   # @return [Array<NotificationDecorator>] Decorated notifications
@@ -167,7 +161,7 @@ module ApplicationDataLoading
       .map { |n| NotificationDecorator.new(n) }
   end
 
-  # Loads application events with specific actions
+  # Load application events with specific actions
   # @param application [Application] The application
   # @param actions [Array<String>] Event actions to load
   # @return [ActiveRecord::Relation] The events
@@ -189,7 +183,7 @@ module ApplicationDataLoading
 
   private
 
-  # Resolves attachment names from parameter or constant
+  # Resolve attachment names from parameter or constant
   # @param attachment_names [Array<String>, nil] Names to use or nil for default
   # @return [Array<String>] Resolved attachment names
   def resolve_attachment_names(attachment_names)
@@ -202,7 +196,7 @@ module ApplicationDataLoading
     end
   end
 
-  # Fetches and processes attachment data with error handling
+  # Fetch and process attachment data with error handling
   # @param ids [Array<Integer>] Application IDs
   # @param attachment_names [Array<String>] Attachment names to fetch
   # @return [Hash] Hash mapping application_id to Set of attachment names
@@ -218,7 +212,7 @@ module ApplicationDataLoading
     handle_attachments_error(e, ids)
   end
 
-  # Fetches raw attachment data from database
+  # Fetch raw attachment data from database
   # @param ids [Array<Integer>] Application IDs
   # @param attachment_names [Array<String>] Attachment names to fetch
   # @return [Array<Array>] Raw attachment data
@@ -228,7 +222,7 @@ module ApplicationDataLoading
       .pluck(:record_id, :name)
   end
 
-  # Logs attachment preloading information
+  # Log attachment preloading information
   # @param attachments_data [Array] The fetched attachment data
   # @param ids [Array<Integer>] Application IDs
   def log_attachments_preload(attachments_data, ids)
@@ -237,7 +231,7 @@ module ApplicationDataLoading
     Rails.logger.debug { "Preloaded #{attachments_data.length} attachments for #{ids.length} applications" }
   end
 
-  # Transforms raw attachment data into structured result
+  # Transform raw attachment data into structured result
   # @param attachments_data [Array<Array>] Raw attachment data
   # @return [Hash] Hash mapping application_id to Set of attachment names
   def transform_attachments_data(attachments_data)
@@ -245,7 +239,7 @@ module ApplicationDataLoading
                     .transform_values { |rows| rows.to_set(&:second) }
   end
 
-  # Logs applications with missing attachments
+  # Log applications with missing attachments
   # @param ids [Array<Integer>] All application IDs
   # @param result [Hash] Result hash with application IDs as keys
   def log_missing_attachments(ids, result)
@@ -257,7 +251,7 @@ module ApplicationDataLoading
     Rails.logger.debug { "Applications with no attachments: #{missing_attachments}" }
   end
 
-  # Handles errors during attachment processing
+  # Handle errors during attachment processing
   # @param error [StandardError] The error that occurred
   # @param ids [Array<Integer>] Application IDs being processed
   # @return [Hash] Empty hash as fallback
@@ -267,7 +261,7 @@ module ApplicationDataLoading
     {}
   end
 
-  # Filters and sorts a collection by proof type
+  # Filter and sorts a collection by proof type
   # @param collection [ActiveRecord::Relation] The collection to filter
   # @param type [Symbol] The proof type to filter by
   # @param sort_method [Symbol] The method to sort by

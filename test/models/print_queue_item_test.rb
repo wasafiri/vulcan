@@ -4,8 +4,6 @@ require 'test_helper'
 
 class PrintQueueItemTest < ActiveSupport::TestCase
   # Set up test helpers
-  include CupriteTestBridge if defined?(CupriteTestBridge)
-
   def setup
     @constituent = create(:constituent)
     @admin = create(:admin)
@@ -38,7 +36,7 @@ class PrintQueueItemTest < ActiveSupport::TestCase
   teardown do
     # Log test execution time for performance monitoring
     if defined?(measure_time) && @start_time
-      measure_time("PrintQueueItemTest #{name}") { true }
+      true 
     end
   end
 

@@ -33,7 +33,7 @@ module VendorPortal
       Policy.stubs(:voucher_validity_period).returns(6.months)
 
       # Set up session for verified vouchers - using rack_test_session for integration tests
-      get vendor_vouchers_path # This initializes the session
+      get vendor_portal_vouchers_path # This initializes the session
 
       # Instead of modifying the session directly, we'll stub the identity verification method
       VendorPortal::VouchersController.any_instance.stubs(:identity_verified?).with(anything).returns(true)
@@ -43,7 +43,7 @@ module VendorPortal
 
     # Simplified test focusing only on the index response
     def test_get_index
-      get vendor_vouchers_path
+      get vendor_portal_vouchers_path
       assert_response :success
       # Just a basic check for page content - we know the title has "Vendor" in it
       assert_match(/vendor/i, response.body)
@@ -96,11 +96,11 @@ module VendorPortal
 
       # Process redemption using the confirmed correct path helper
       # Include product_ids parameter since it's now required
-      post process_redemption_vendor_voucher_path(@voucher.code),
+      post process_redemption_vendor_portal_voucher_path(@voucher.code),
            params: { amount: 100.0, product_ids: [@product.id] }
 
       # Check for redirect to dashboard on success
-      assert_redirected_to vendor_dashboard_path
+      assert_redirected_to vendor_portal_dashboard_path
 
       # Verify success flash message
       assert_match(/successfully processed/, flash[:notice])

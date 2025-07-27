@@ -10,7 +10,7 @@ import { setVisible } from "../../utils/visibility"
 export default class extends Controller {
   static targets = [
     "dependentSection",
-    "dependentSelect", 
+    "dependentSelect",
     "formTitle",
     "applyDependentRadio",
     "applySelfRadio"
@@ -21,19 +21,30 @@ export default class extends Controller {
   }
 
   connect() {
+    console.log("DependentSelectorController connected - ALWAYS LOG THIS")
+    console.log("Available targets:", this.constructor.targets)
+    console.log("Form title target exists:", this.hasFormTitleTarget)
+    console.log("Apply self radio target exists:", this.hasApplySelfRadioTarget)
+    console.log("Apply dependent radio target exists:", this.hasApplyDependentRadioTarget)
+
     if (process.env.NODE_ENV !== 'production') {
       console.log("DependentSelectorController connected")
     }
-    
+
     // Guard against multiple connections
     if (this._initialized) return;
     this._initialized = true;
-    
-    // Track state - don't rely on DOM classes
-    this._isForSelf = true;
-    
-    // Initialize immediately to avoid Capybara visibility issues
-    this.initializeDependentSelection();
+
+    // Read initial state from DOM
+    this._isForSelf = this.hasApplySelfRadioTarget ? this.applySelfRadioTarget.checked : true;
+
+    // Initialize from URL parameters only if they exist
+    const urlParams = new URLSearchParams(window.location.search)
+    const hasUrlParams = urlParams.has('for_self') || urlParams.has('user_id')
+
+    if (hasUrlParams) {
+      this.initializeDependentSelection();
+    }
   }
 
   disconnect() {
@@ -46,23 +57,22 @@ export default class extends Controller {
     if (process.env.NODE_ENV !== 'production') {
       console.log("toggleDependentSelection:", event.target.value)
     }
-    
+
     if (!this.hasDependentSectionTarget) {
       return;
     }
 
     const isForSelf = event.target.value === "true";
     this._isForSelf = isForSelf;
-    
+
     if (isForSelf) {
       this.hideDependentSection();
       this.updateFormTitle("New Application");
     } else {
       this.showDependentSection();
       this.updateFormTitle("New Application");
-      this._ensureListener();
     }
-    
+
     // Dispatch event for other controllers to listen to
     this.dispatch("selectionChanged", {
       detail: { isForSelf, target: event.target }
@@ -76,17 +86,19 @@ export default class extends Controller {
 
   // Alias for updateDependentName to match the action name in the view
   selectDependentAction(event) {
-    this.updateDependentName(event);
+    console.log("selectDependentAction called");
+    this.updateDependentName();
   }
 
   // Update form title when dependent selection changes
   updateDependentName() {
+    console.log("updateDependentName called");
     this.updateFormTitleFromSelection();
-    
+
     // Dispatch event with selected dependent info
     if (this.hasDependentSelectTarget && this.dependentSelectTarget.value) {
       const selectedOption = this.dependentSelectTarget.options[this.dependentSelectTarget.selectedIndex];
-      
+
       this.dispatch("dependentSelected", {
         detail: {
           dependentId: this.dependentSelectTarget.value,
@@ -98,15 +110,11 @@ export default class extends Controller {
 
   showDependentSection() {
     setVisible(this.dependentSectionTarget, true, { required: true });
-    
-    if (this.hasDependentSelectTarget) {
-      this._ensureListener();
-    }
   }
 
   hideDependentSection() {
     setVisible(this.dependentSectionTarget, false);
-    
+
     if (this.hasDependentSelectTarget) {
       this.dependentSelectTarget.removeAttribute("required");
       this.dependentSelectTarget.value = "";
@@ -116,12 +124,12 @@ export default class extends Controller {
   // Helper to ensure listener is set up correctly without duplicates
   _ensureListener() {
     if (!this.hasDependentSelectTarget) return;
-    
+
     // Create bound method if it doesn't exist
     if (!this._boundUpdateDependentName) {
       this._boundUpdateDependentName = this.updateDependentName.bind(this);
     }
-    
+
     // Remove existing listener (if any) and add new one
     this.dependentSelectTarget.removeEventListener("change", this._boundUpdateDependentName);
     this.dependentSelectTarget.addEventListener("change", this._boundUpdateDependentName);
@@ -135,13 +143,16 @@ export default class extends Controller {
   }
 
   updateFormTitleFromSelection() {
+    console.log("updateFormTitleFromSelection called");
     if (!this.hasDependentSelectTarget) {
+      console.log("No dependentSelectTarget found");
       return;
     }
-    
+
     if (this.dependentSelectTarget.value) {
       const selectedOption = this.dependentSelectTarget.options[this.dependentSelectTarget.selectedIndex]
       const dependentName = selectedOption.text
+      console.log("Selected dependent name:", dependentName);
       this.updateFormTitle(`New Application for ${dependentName}`)
     } else {
       this.updateFormTitle("New Application")
@@ -153,6 +164,7 @@ export default class extends Controller {
       console.warn("Missing formTitle target - check HTML structure");
       return;
     }
+    console.log("Updating form title to:", title);
     this.formTitleTarget.textContent = title;
   }
 
@@ -161,26 +173,21 @@ export default class extends Controller {
     const urlParams = new URLSearchParams(window.location.search)
     const forSelfParam = urlParams.get('for_self')
     const userIdParam = urlParams.get('user_id')
-    
+
     // Determine if this should be a dependent application
     const isForDependent = this.shouldInitializeForDependent(forSelfParam, userIdParam)
-    
+
     if (isForDependent) {
       this.initializeDependentApplication(userIdParam)
     } else {
       this.initializeSelfApplication()
     }
-    
-    // After initialization, ensure listener is set if section is visible
-    if (this.hasDependentSelectTarget && !this._isForSelf) {
-      this._ensureListener();
-    }
+
+    // After initialization, the Stimulus action binding will handle events
   }
 
   shouldInitializeForDependent(forSelfParam, userIdParam) {
-    return forSelfParam === 'false' || 
-           userIdParam !== null || 
-           (this.hasDependentSectionTarget && !this.dependentSectionTarget.classList.contains('hidden'))
+    return forSelfParam === 'false' || userIdParam !== null
   }
 
   initializeDependentApplication(userIdParam) {
@@ -189,16 +196,16 @@ export default class extends Controller {
       console.warn("Missing applyDependentRadio target - check HTML structure");
       return;
     }
-    
+
     this.applyDependentRadioTarget.checked = true;
     this._isForSelf = false;
     this.showDependentSection();
-    
+
     // Set specific dependent if provided in URL
     if (userIdParam && this.hasDependentSelectTarget) {
       this.selectDependentById(userIdParam)
     }
-    
+
     this.updateFormTitleFromSelection();
   }
 
@@ -208,27 +215,27 @@ export default class extends Controller {
       console.warn("Missing applySelfRadio target - check HTML structure");
       return;
     }
-    
+
     this.applySelfRadioTarget.checked = true;
     this._isForSelf = true;
-    
+
     if (this.hasDependentSectionTarget) {
       this.hideDependentSection();
     }
-    
+
     this.updateFormTitle("New Application");
   }
 
   selectDependentById(userId) {
     if (!this.hasDependentSelectTarget) return
-    
+
     // Find and select the option with matching user ID
     Array.from(this.dependentSelectTarget.options).forEach(option => {
       if (option.value === userId) {
         this.dependentSelectTarget.value = userId
       }
     })
-    
+
     // Update title after selection
     this.updateFormTitleFromSelection()
   }
@@ -246,7 +253,7 @@ export default class extends Controller {
     if (!this.hasDependentSelectTarget || !this.dependentSelectTarget.value) {
       return null
     }
-    
+
     const selectedOption = this.dependentSelectTarget.options[this.dependentSelectTarget.selectedIndex]
     return selectedOption ? selectedOption.text : null
   }

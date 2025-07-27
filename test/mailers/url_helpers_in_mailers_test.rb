@@ -93,9 +93,9 @@ class UrlHelpersInMailersTest < ActionMailer::TestCase
 
       template_body = case name
                       when 'application_notifications_proof_rejected'
-                        "Subject: Your proof was rejected\n\n%<header_text>s\n\nYour proof has been rejected. Please visit http://%<host>s/dashboard to resubmit.\n\n%<footer_text>s"
+                        "Subject: Your proof was rejected\n\n%<header_text>s\n\nDear %<constituent_full_name>s,\n\nYour %<proof_type_formatted>s proof has been rejected by %<organization_name>s.\n\nRejection reason: %<rejection_reason>s\n\nPlease visit http://%<host>s/dashboard to resubmit.\n\n%<footer_text>s"
                       when 'evaluator_mailer_new_evaluation_assigned'
-                        "Subject: New Evaluation\n\n%<header_text>s\n\n%<status_box_text>s\n\nPlease visit http://%<host>s/evaluations to view.\n\n%<footer_text>s"
+                        "Subject: New Evaluation\n\n%<header_text>s\n\nDear %<evaluator_full_name>s,\n\nA new evaluation has been assigned for constituent %<constituent_full_name>s.\n\nConstituent Details:\nEmail: %<constituent_email>s\nPhone: %<constituent_phone_formatted>s\nAddress: %<constituent_address_formatted>s\nDisabilities: %<constituent_disabilities_text_list>s\n\n%<status_box_text>s\n\nPlease visit %<evaluators_evaluation_url>s to view.\n\n%<footer_text>s"
                       when 'email_header_text'
                         "=== %<title>s ===\n\n"
                       when 'email_footer_text'
@@ -106,7 +106,8 @@ class UrlHelpersInMailersTest < ActionMailer::TestCase
         name: name,
         format: :text,
         body: template_body,
-        subject: "Test Subject for #{name}"
+        subject: "Test Subject for #{name}",
+        description: "Test template for #{name}"
       )
     end
   end

@@ -40,7 +40,7 @@ module Admin
       load_dashboard_metrics
 
       # Skip heavy ActiveStorage eager-loading; we preload attachment existence separately
-      scoped = filtered_scope(build_application_base_scope(preload_proof_blobs: false))
+      scoped = filtered_scope(build_application_base_scope)
       @pagy, page_of_apps = paginate(scoped)
       # ApplicationDataLoading concern: Efficiently preloads attachments for multiple applications
       # Flow: preload_attachments_for_applications -> groups attachments by application_id to avoid N+1 queries
@@ -352,6 +352,20 @@ module Admin
       else
         redirect_to admin_application_path(@application),
                     alert: 'Failed to assign voucher. Please ensure all requirements are met.'
+      end
+    end
+
+    def refresh_pipeline_chart
+      # Load updated chart data
+      load_dashboard_metrics
+
+      respond_to do |format|
+        format.turbo_stream do
+          render turbo_stream: turbo_stream.update('pipeline_chart_frame',
+                                                   partial: 'pipeline_chart',
+                                                   locals: { data: @pipeline_chart_data }
+          )
+        end
       end
     end
 

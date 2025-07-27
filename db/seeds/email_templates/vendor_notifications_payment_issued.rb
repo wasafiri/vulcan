@@ -36,6 +36,8 @@ EmailTemplate.create_or_find_by!(name: 'vendor_notifications_invoice_payment_iss
 
     Thank you for your participation in our program!
   TEXT
+  template.variables = %w[vendor_business_name invoice_number total_amount_formatted gad_invoice_reference
+                          check_number]
   template.version = 1
 end
 Rails.logger.debug 'Seeded vendor_notifications_invoice_payment_processed (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

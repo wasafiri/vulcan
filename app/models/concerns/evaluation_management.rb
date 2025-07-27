@@ -15,7 +15,7 @@ module EvaluationManagement
         constituent: user,
         application: self,
         evaluation_type: determine_evaluation_type,
-        evaluation_datetime: nil, # Will be set when scheduling
+        evaluation_date: nil, # Will be set when scheduling
         needs: '',
         location: ''
         # Initialize other required fields as needed

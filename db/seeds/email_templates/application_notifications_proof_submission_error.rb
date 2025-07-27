@@ -25,6 +25,7 @@ EmailTemplate.create_or_find_by!(name: 'application_notifications_proof_submissi
 
     %<footer_text>s
   TEXT
+  template.variables = %w[header_text constituent_full_name message footer_text]
   template.version = 1
 end
 Rails.logger.debug 'Seeded application_notifications_proof_submission_error (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

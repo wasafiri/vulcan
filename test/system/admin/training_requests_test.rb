@@ -8,11 +8,12 @@ module AdminNamespace
     setup do
       @admin = users(:admin_david)
       @constituent = users(:constituent_john)
-      @application = applications(:one)
+      @application = create(:application, user: @constituent, status: :approved,
+                           household_size: 2, annual_income: 30000,
+                           maryland_resident: true, self_certify_disability: true)
 
       # Set Current.user to avoid validation errors in callbacks
       Current.user = @admin
-      @application.update!(status: :approved)
       Current.reset
 
       # Create a training request notification

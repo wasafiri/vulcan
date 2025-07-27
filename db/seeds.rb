@@ -14,7 +14,7 @@ require 'active_record/fixtures'
 
 # Helper method to conditionally output messages
 def seed_puts(message)
-  Rails.logger.debug message if ENV['VERBOSE_TESTS'] || Rails.env.development?
+  puts message if ENV['VERBOSE_TESTS'] || Rails.env.development?
 end
 
 # Helper method for error messages (always shown)
@@ -47,7 +47,7 @@ end
 def valid_proof_status?(proof_type, status_value)
   valid_statuses = case proof_type
                    when :income_proof, :residency_proof
-                     %w[approved rejected]
+                     %w[approved rejected not_reviewed]  # Include not_reviewed for test data
                    when :medical_certification
                      %w[received accepted]
                    else
@@ -220,7 +220,7 @@ def create_users_with_factories
   users_map['constituent_mark'] = create_user_with_factory(:constituent, email: 'mark.jones@example.com', first_name: 'Mark', last_name: 'Jones')
 
   # Create vendors
-  users_map['vendor_raz'] = create_user_with_factory(:vendor_user, email: 'raz@testemail.com', first_name: 'Raz', last_name: 'Vendor')
+  users_map['vendor_ray'] = create_user_with_factory(:vendor_user, email: 'ray@testemail.com', first_name: 'Ray', last_name: 'Vendor')
   users_map['vendor_teltex'] = create_user_with_factory(:vendor_user, email: 'teltex@testemail.com', first_name: 'Teltex', last_name: 'Vendor')
 
   users_map
@@ -438,31 +438,31 @@ end
 if Rails.env.production?
   Rails.logger.debug 'Production environment detected. Seeding skipped to prevent data override.'
 else
-  puts "🌱 SEEDING STARTED at #{Time.current}"
+  seed_puts "🌱 SEEDING STARTED at #{Time.current}"
   begin
     ActiveRecord::Base.transaction do
-      puts '🧹 Clearing existing data...'
+      seed_puts '🧹 Clearing existing data...'
       clear_existing_data
 
-      puts '📦 Creating products from fixtures...'
+      seed_puts '📦 Creating products from fixtures...'
       create_products_from_fixtures
 
-      puts '📋 Creating policies...'
+      seed_puts '📋 Creating policies...'
       create_policies
 
-      puts '👥 Loading fixture data (users, applications, invoices)...'
+      seed_puts '👥 Loading fixture data (users, applications, invoices)...'
       load_fixtures_data
 
-      puts '📧 Seeding email templates...'
+      seed_puts '📧 Seeding email templates...'
       seed_email_templates
 
-      puts '📁 Ensuring storage directory exists...'
+      seed_puts '📁 Ensuring storage directory exists...'
       ensure_storage_directory
 
-      puts '📎 Attaching files to applications...'
+      seed_puts '📎 Attaching files to applications...'
       attach_files_to_applications
 
-      puts '🔍 Verifying and fixing missing files...'
+      seed_puts '🔍 Verifying and fixing missing files...'
       verify_and_fix_missing_files
     end
   rescue StandardError => e
@@ -473,14 +473,14 @@ else
     exit 1
   else
     # Show summary of what was created
-    puts '📊 SEEDING SUMMARY:'
-    puts "   Users: #{User.count}"
-    puts "   Applications: #{Application.count}"
-    puts "   Products: #{Product.count}"
-    puts "   Policies: #{Policy.count}"
-    puts "   Email Templates: #{EmailTemplate.count}"
-    puts "   Invoices: #{Invoice.count}"
-    puts "✅ SEEDING COMPLETED SUCCESSFULLY at #{Time.current}!"
+    seed_puts '📊 SEEDING SUMMARY:'
+    seed_puts "   Users: #{User.count}"
+    seed_puts "   Applications: #{Application.count}"
+    seed_puts "   Products: #{Product.count}"
+    seed_puts "   Policies: #{Policy.count}"
+    seed_puts "   Email Templates: #{EmailTemplate.count}"
+    seed_puts "   Invoices: #{Invoice.count}"
+    seed_puts "✅ SEEDING COMPLETED SUCCESSFULLY at #{Time.current}!"
     Rails.logger.debug 'Seeding completed successfully!' unless Rails.env.production?
   end
 end

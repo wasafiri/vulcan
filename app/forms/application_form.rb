@@ -144,7 +144,8 @@ class ApplicationForm
 
   def assign_integer_attributes(app_params, fields)
     fields.each do |field|
-      send("#{field}=", app_params[field]&.to_i) if app_params.key?(field)
+      value = app_params[field]
+      send("#{field}=", value.present? ? value.to_i : nil) if app_params.key?(field)
     end
   end
 

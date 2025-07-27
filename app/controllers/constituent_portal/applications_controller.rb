@@ -30,17 +30,16 @@ module ConstituentPortal
     before_action :require_constituent!, except: [:fpl_thresholds]
     before_action :set_application, only: %i[show edit update verify submit]
     before_action :ensure_editable, only: %i[edit update]
-    before_action :setup_dependent_application, only: %i[new create], if: -> { for_dependent_application? }
     before_action :setup_address_for_form, only: %i[new edit]
     # ParamCasting concern: Automatically converts checkbox values to proper boolean types
-    # This prevents issues with Rails checkbox helpers that send ["0", "1"] arrays
     before_action :cast_boolean_params, only: %i[create update]
     before_action :set_paper_application_context, if: -> { Rails.env.test? }
 
     # Override current_user for tests
     def current_user
-      if Rails.env.test? && ENV['TEST_USER_ID'].present?
-        @current_user ||= User.find_by(id: ENV.fetch('TEST_USER_ID', nil))
+      if Rails.env.test? && (ENV['TEST_USER_ID'].present? || Current.test_user_id.present?)
+        test_user_id = ENV['TEST_USER_ID'] || Current.test_user_id
+        @current_user ||= User.find_by(id: test_user_id)
         return @current_user if @current_user
       end
       super
@@ -58,30 +57,50 @@ module ConstituentPortal
     end
 
     def new
-      @application = current_user.applications.new
-      @application.medical_provider_attributes ||= {}
-
-      setup_dependent_application
-      setup_address_for_form
+      initialize_new_application
+      setup_applicant_context
+      setup_form_dependencies
     end
 
-    def edit; end
+    def edit
+      # Initialize medical_provider_attributes with existing data for form fields
+      # Use Struct for fixed set of known attributes so Rails fields_for can properly bind
+      medical_provider_struct = Struct.new(:name, :phone, :fax, :email)
+      @application.medical_provider_attributes = medical_provider_struct.new(
+        @application.medical_provider_name,
+        @application.medical_provider_phone,
+        @application.medical_provider_fax,
+        @application.medical_provider_email
+      )
+    end
 
     def create
-      @form = ApplicationForm.new(
-        current_user: current_user,
-        params: params
-      )
+      @form = build_application_form
 
       return render_form_errors(@form) unless @form.valid?
 
       result = Applications::ApplicationCreator.call(@form)
 
       if result.success?
-        redirect_to_app(result.application)
+        # Create audit event for application creation
+        AuditEventService.log(
+          action: 'application_created',
+          actor: current_user,
+          auditable: result.application,
+          metadata: {
+            submission_method: 'online',
+            message: 'Application created via Online method'
+          }
+        )
+        handle_creation_success(result)
       else
         handle_creation_failure(result)
       end
+    rescue StandardError => e
+      Rails.logger.error "Error creating application: #{e.message}"
+      @application = result&.application || Application.new(filtered_application_params)
+      @application.errors.add(:base, e.message)
+      render_form_errors(nil, @application)
     end
 
     def update
@@ -99,7 +118,14 @@ module ConstituentPortal
 
       if result.success?
         notice = determine_update_notice(original_status, result.application)
-        redirect_to constituent_portal_application_path(result.application), notice: notice
+
+        respond_to do |format|
+          format.html { redirect_to constituent_portal_application_path(result.application), notice: notice }
+          format.turbo_stream do
+            flash[:notice] = notice
+            redirect_to constituent_portal_application_path(result.application, format: :html)
+          end
+        end
       else
         handle_update_failure(result)
       end
@@ -173,24 +199,118 @@ module ConstituentPortal
       render_autosave_error('An error occurred during autosave', :internal_server_error)
     end
 
+    # Legacy AJAX endpoint for FPL thresholds - delegates to IncomeThresholdCalculationService
+    # TODO: Consider removing this endpoint in favor of server-rendered data
     def fpl_thresholds
       thresholds = {}
+      modifier = nil
+
       (1..8).each do |size|
-        policy = Policy.find_by(key: "fpl_#{size}_person")
-        thresholds[size.to_s] = policy&.value.to_i
+        result = IncomeThresholdCalculationService.call(size)
+        if result.success?
+          thresholds[size.to_s] = result.data[:base_fpl]
+          modifier ||= result.data[:modifier] # Get modifier from first successful call
+        else
+          thresholds[size.to_s] = 0 # Fallback for failed calculations
+        end
       end
-      modifier = Policy.find_by(key: 'fpl_modifier_percentage')&.value&.to_i || 400
-      render json: { thresholds: thresholds, modifier: modifier }
+
+      render json: { thresholds: thresholds, modifier: modifier || 400 }
+    end
+
+    # Helper methods for FPL data - delegates to IncomeThresholdCalculationService
+    # See: app/services/income_threshold_calculation_service.rb for core FPL logic
+    helper_method :fpl_thresholds_json, :fpl_modifier_value
+
+    def fpl_thresholds_json
+      # Generate FPL threshold data for JavaScript using IncomeThresholdCalculationService
+      thresholds = (1..8).to_h do |size|
+        result = IncomeThresholdCalculationService.call(size)
+        if result.success?
+          [size.to_s, result.data[:base_fpl]]
+        else
+          [size.to_s, 0] # Fallback for failed calculations
+        end
+      end
+      thresholds.to_json
+    end
+
+    def fpl_modifier_value
+      # Get FPL modifier percentage via IncomeThresholdCalculationService (uses any household size)
+      result = IncomeThresholdCalculationService.call(1)
+      if result.success?
+        result.data[:modifier]
+      else
+        400 # Fallback default
+      end
     end
 
     private
 
-    def setup_dependent_application
-      if params[:user_id].present?
-        setup_specific_dependent_application
-      elsif for_dependent_application?
-        setup_guardian_application_context
+    def initialize_new_application
+      @application = current_user.applications.new
+      @application.medical_provider_attributes ||= {}
+    end
+
+    def setup_applicant_context
+      @applicant_type = determine_applicant_type
+      @selected_dependent_id = params[:user_id].presence
+      @selected_dependent_name = find_selected_dependent_name
+
+      # Setup dependent application if needed
+      setup_dependent_application if should_setup_dependent_application?
+    end
+
+    def setup_form_dependencies
+      setup_address_for_form
+      @dependents = current_user.dependents.order(:first_name, :last_name)
+    end
+
+    def determine_applicant_type
+      if params[:for_self] == 'false' || params[:user_id].present?
+        'dependent'
+      else
+        'self'
       end
+    end
+
+    def find_selected_dependent_name
+      return nil if @selected_dependent_id.blank?
+
+      dependent = current_user.dependents.find_by(id: @selected_dependent_id)
+      dependent&.full_name
+    end
+
+    def build_application_form
+      ApplicationForm.new(
+        current_user: current_user,
+        params: params
+      )
+    end
+
+    def handle_creation_success(result)
+      notice = determine_creation_notice
+      redirect_to_application_with_notice(result.application, notice)
+    end
+
+    def determine_creation_notice
+      params[:submit_application] ? 'Application submitted successfully!' : 'Application saved as draft.'
+    end
+
+    def redirect_to_application_with_notice(application, notice)
+      respond_to do |format|
+        format.html { redirect_to constituent_portal_application_path(application), notice: notice }
+        format.turbo_stream do
+          flash[:notice] = notice
+          redirect_to constituent_portal_application_path(application, format: :html)
+        end
+      end
+    end
+
+    def setup_dependent_application
+      return if params[:user_id].blank?
+
+      setup_specific_dependent_application
     end
 
     def setup_specific_dependent_application
@@ -202,14 +322,12 @@ module ConstituentPortal
       @application.managing_guardian_id = current_user.id
     end
 
-    def setup_guardian_application_context
-      return unless @application
-
-      @application.managing_guardian_id = current_user.id
-    end
-
     def for_dependent_application?
       ['false', false].include?(params[:for_self])
+    end
+
+    def should_setup_dependent_application?
+      params[:user_id].present? || for_dependent_application?
     end
 
     def setup_address_for_form
@@ -226,7 +344,6 @@ module ConstituentPortal
 
       # ApplicationFormHandling concern: Handles form validation errors consistently
       # Flow: render_form_errors -> adds errors to application + calls initialize_address_and_provider_for_form + renders with proper status
-      # This replaces manual error handling and form preparation logic
       render_form_errors(nil, @application)
     end
 
@@ -244,7 +361,7 @@ module ConstituentPortal
       # ApplicationFormHandling concern: Standardizes success message determination
       # Flow: determine_success_message(application, is_submission) -> returns appropriate message
       # is_submission = true when status changed to in_progress, false for draft saves
-      determine_success_message(application, application.status != original_status && application.status_in_progress?)
+      determine_success_message(application, is_submission: application.status != original_status && application.status_in_progress?)
     end
 
     def prepare_medical_provider_for_edit
@@ -265,9 +382,11 @@ module ConstituentPortal
         NotificationService.create_and_deliver!(
           type: 'review_requested',
           recipient: admin,
-          actor: current_user,
-          notifiable: @application,
-          channel: :email
+          options: {
+            actor: current_user,
+            notifiable: @application,
+            channel: :email
+          }
         )
       end
     end

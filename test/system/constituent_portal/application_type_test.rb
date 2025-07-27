@@ -1,15 +1,12 @@
 # frozen_string_literal: true
 
 require 'application_system_test_case'
-require_relative '../../support/cuprite_test_bridge'
 
 module ConstituentPortal
   class ApplicationTypeTest < ApplicationSystemTestCase
-    include CupriteTestBridge
-
     setup do
       @constituent = create(:constituent)
-      enhanced_sign_in(@constituent) # Use enhanced sign-in for more reliable authentication
+      system_test_sign_in(@constituent) # Use enhanced sign-in for more reliable authentication
 
       # Make sure we're starting on the dashboard
       visit constituent_portal_dashboard_path
@@ -19,38 +16,40 @@ module ConstituentPortal
     test 'application type is displayed correctly on show page' do
       # Visit the new application page
       visit new_constituent_portal_application_path
-      wait_for_page_load # Ensure the page is fully loaded before proceeding
+      wait_for_turbo # Ensure the page is fully loaded before proceeding
 
-      # Fill in required fields
+      # Ensure this is a self-application (not dependent) to avoid guardian validation issues
+      choose 'Myself' if page.has_css?('input[value="true"]', visible: false)
+
+      # Fill in required fields using our safe filling methods to prevent concatenation
       check 'I certify that I am a resident of Maryland'
-      fill_in 'Household Size', with: 3
-      fill_in 'Annual Income', with: 45_999
+      safe_fill_household_and_income(3, 45_999)
 
       # Fill in address information
-      fill_in 'Street Address', with: '123 Test St'
-      fill_in 'City', with: 'Baltimore'
+      find('input[name*="physical_address_1"]').set('').set('123 Test St')
+      find('input[name*="city"]').set('').set('Baltimore')
       select 'Maryland', from: 'State'
-      fill_in 'Zip Code', with: '21201'
+      find('input[name*="zip_code"]').set('').set('21201')
 
       # Fill in disability information
       check 'I certify that I have a disability that affects my ability to access telecommunications services'
       check 'Hearing'
 
-      # Fill in medical provider info - use the actual fieldset identifier
-      within(:xpath, "//section[contains(., 'Medical Provider Information') or contains(., 'Medical Professional Information')]") do
-        fill_in 'Name', with: 'Dr. Test Provider'
-        fill_in 'Phone', with: '2025551234'
-        fill_in 'Email', with: 'test@example.com'
+      # Fill in medical provider info using correct nested attribute field names
+      within "section[aria-labelledby='medical-info-heading']" do
+        find('input[name="application[medical_provider_attributes][name]"]').set('').set('Dr. Test Provider')
+        find('input[name="application[medical_provider_attributes][phone]"]').set('').set('2025551234')
+        find('input[name="application[medical_provider_attributes][email]"]').set('').set('test@example.com')
       end
 
       # Check the medical authorization checkbox
       check 'I authorize the release and sharing of my medical information as described above'
 
-      # Save the application
-      click_button 'Save Application'
+      # Save the application using more specific button targeting
+      find('input[type="submit"][name="save_draft"]').click
 
-      # Verify we're redirected to the show page
-      assert_text 'Application saved as draft.'
+      # Verify we're redirected to the show page with proper wait time
+      assert_application_saved_as_draft(wait: 10)
 
       # Get the application ID from the URL
       current_url =~ %r{/applications/(\d+)}
@@ -86,18 +85,20 @@ module ConstituentPortal
     test 'self_certify_disability is set correctly' do
       # Visit the new application page
       visit new_constituent_portal_application_path
-      wait_for_page_load # Ensure the page is fully loaded
+      wait_for_turbo # Ensure the page is fully loaded
 
-      # Fill in required fields
+      # Ensure this is a self-application (not dependent) to avoid guardian validation issues
+      choose 'Myself' if page.has_css?('input[value="true"]', visible: false)
+
+      # Fill in required fields using safe methods to prevent concatenation
       check 'I certify that I am a resident of Maryland'
-      fill_in 'Household Size', with: 3
-      fill_in 'Annual Income', with: 45_999
+      safe_fill_household_and_income(3, 45_999)
 
-      # Fill in address information
-      fill_in 'Street Address', with: '123 Test St'
-      fill_in 'City', with: 'Baltimore'
+      # Fill in address information with explicit field clearing
+      find('input[name*="physical_address_1"]').set('').set('123 Test St')
+      find('input[name*="city"]').set('').set('Baltimore')
       select 'Maryland', from: 'State'
-      fill_in 'Zip Code', with: '21201'
+      find('input[name*="zip_code"]').set('').set('21201')
 
       # Use a more reliable method to check the self-certify checkbox
       # Use find + check to ensure we're finding the right element
@@ -110,23 +111,21 @@ module ConstituentPortal
         find('label', text: 'Hearing').find(:xpath, '..//input[@type="checkbox"]').check
       end
 
-      # Fill in medical provider info - use the actual section identifier
-      within(:xpath, "//section[contains(., 'Medical Provider Information') or contains(., 'Medical Professional Information')]") do
-        fill_in 'Name', with: 'Dr. Test Provider'
-        fill_in 'Phone', with: '2025551234'
-        fill_in 'Email', with: 'test@example.com'
+      # Fill in medical provider info using correct nested attribute field names
+      within "section[aria-labelledby='medical-info-heading']" do
+        find('input[name="application[medical_provider_attributes][name]"]').set('').set('Dr. Test Provider')
+        find('input[name="application[medical_provider_attributes][phone]"]').set('').set('2025551234')
+        find('input[name="application[medical_provider_attributes][email]"]').set('').set('test@example.com')
       end
 
       # Check the medical authorization checkbox
       check 'I authorize the release and sharing of my medical information as described above'
 
-      # Take a screenshot to debug if needed
-
       # Save the application with explicit button identification
       find('input[type="submit"][name="save_draft"]').click
 
-      # Verify we're redirected to the show page
-      assert_text 'Application saved as draft.', wait: 5
+      # Verify we're redirected to the show page with longer wait time
+      assert_application_saved_as_draft(wait: 10)
 
       # Get the application ID from the URL
       current_url =~ %r{/applications/(\d+)}

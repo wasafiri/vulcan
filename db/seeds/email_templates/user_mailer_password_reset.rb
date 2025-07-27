@@ -19,6 +19,7 @@ EmailTemplate.create_or_find_by!(name: 'user_mailer_password_reset', format: :te
 
     Have questions or need help? Just reply to this email and our support team will help you sort it out.
   TEXT
+  template.variables = %w[user_email reset_url]
   template.version = 1
 end
 Rails.logger.debug 'Seeded user_mailer_password_reset (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

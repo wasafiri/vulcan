@@ -20,7 +20,7 @@ class ApplicationTest < ActiveSupport::TestCase
 
   def teardown
     # Clear Current attributes after tests
-    Current.reset
+    Current.reset if defined?(Current) && Current.respond_to?(:reset)
   end
 
   # Skip notifications tests for now as they're inconsistent with our new safeguards
@@ -49,7 +49,7 @@ class ApplicationTest < ActiveSupport::TestCase
       assert_not application.residency_proof.attached?
     ensure
       # Reset Current attributes
-      Current.reset
+      Current.reset if defined?(Current) && Current.respond_to?(:reset)
     end
   end
 
@@ -87,7 +87,7 @@ class ApplicationTest < ActiveSupport::TestCase
       assert_equal 'approved', application.residency_proof_status
     ensure
       # Reset Current attributes
-      Current.reset
+      Current.reset if defined?(Current) && Current.respond_to?(:reset)
     end
   end
 
@@ -124,7 +124,7 @@ class ApplicationTest < ActiveSupport::TestCase
       assert_equal 'in_progress', event.metadata['new_status']
     ensure
       # Reset Current attributes
-      Current.reset
+      Current.reset if defined?(Current) && Current.respond_to?(:reset)
     end
   end
 
@@ -159,7 +159,7 @@ class ApplicationTest < ActiveSupport::TestCase
       assert_equal 'in_progress', event.metadata['new_status']
     ensure
       # Reset Current attributes to avoid affecting other tests
-      Current.reset
+      Current.reset if defined?(Current) && Current.respond_to?(:reset)
     end
   end
 

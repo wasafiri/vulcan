@@ -5,7 +5,7 @@
         <h1 class="text-3xl font-bold text-gray-900">Verify Voucher Identity</h1>
       </div>
       <div class="mt-4 flex md:mt-0 md:ml-4">
-        <%= link_to vendor_dashboard_path,
+        <%= link_to vendor_portal_dashboard_path,
             class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
           Back to Dashboard
         <% end %>
@@ -28,7 +28,7 @@
     <h2 class="text-xl font-semibold mb-4">Identity Verification</h2>
     <p class="mb-4 text-gray-700">Please ask the constituent to provide their date of birth to verify their identity.</p>
     
-    <%= form_with(url: verify_dob_vendor_voucher_path(@voucher), method: :post, id: "verification-form", class: "space-y-6") do |f| %>
+    <%= form_with(url: verify_dob_vendor_portal_voucher_path(@voucher), method: :post, id: "verification-form", class: "space-y-6") do |f| %>
       <div class="mb-4">
         <%= f.label :date_of_birth, "Date of Birth", class: "block text-sm font-medium text-gray-700" %>
         <div class="mt-1">
@@ -43,7 +43,7 @@
         <%= f.submit "Verify Identity", 
                     class: "inline-flex items-center px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500", 
                     data: { disable_with: "Verifying..." } %>
-        <%= link_to "Cancel", vendor_vouchers_path, 
+        <%= link_to "Cancel", vendor_portal_vouchers_path, 
                   class: "inline-flex items-center px-6 py-3 border border-gray-300 rounded-md text-base font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
       </div>
     <% end %>

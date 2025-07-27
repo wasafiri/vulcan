@@ -11,7 +11,7 @@ module VendorPortal
     end
 
     test 'viewing dashboard' do
-      visit vendor_dashboard_path
+      visit vendor_portal_dashboard_path
       clear_pending_connections_fast
 
       assert_selector 'h1', text: 'Vendor Dashboard'
@@ -25,7 +25,7 @@ module VendorPortal
     end
 
     test 'uploading W9 form' do
-      visit edit_vendor_profile_path
+      visit edit_vendor_portal_profile_path
       clear_pending_connections_fast
 
       # The actual field name from the production UI
@@ -53,7 +53,7 @@ module VendorPortal
 
     test 'processing a valid voucher' do
       # The actual voucher processing flow starts at vouchers index
-      visit vendor_vouchers_path
+      visit vendor_portal_vouchers_path
       clear_pending_connections_fast
 
       # Fill in voucher code in the main form
@@ -75,7 +75,7 @@ module VendorPortal
     end
 
     test 'attempting to process an invalid voucher' do
-      visit vendor_vouchers_path
+      visit vendor_portal_vouchers_path
       clear_pending_connections_fast
 
       # Try to verify an invalid voucher code
@@ -93,7 +93,7 @@ module VendorPortal
                   vendor: @vendor,
                   status: 'transaction_completed')
 
-      visit vendor_transactions_path
+      visit vendor_portal_transactions_path
       clear_pending_connections_fast
 
       # Check for basic transaction page elements
@@ -110,7 +110,7 @@ module VendorPortal
                   status: 'transaction_completed')
 
       # Visit CSV export directly
-      visit vendor_transactions_path(format: :csv)
+      visit vendor_portal_transactions_path(format: :csv)
       clear_pending_connections_fast
 
       # Check response type if available
@@ -118,20 +118,21 @@ module VendorPortal
     end
 
     test 'viewing invoice details' do
-      invoice = create(:invoice, :paid, vendor: @vendor)
+      invoice = create(:invoice, :paid, :with_transactions, vendor: @vendor)
 
-      visit vendor_invoice_path(invoice)
+      visit vendor_portal_invoice_path(invoice)
       clear_pending_connections_fast
 
       # Check for invoice information
       assert_text "Invoice ##{invoice.id}"
       assert_text(/invoice paid|paid/i)
 
-      assert_text invoice.gad_invoice_reference if invoice.gad_invoice_reference.present?
+      # GAD invoice reference is not displayed in vendor portal (only in admin views)
+      # assert_text invoice.gad_invoice_reference if invoice.gad_invoice_reference.present?
     end
 
     test 'custom date range filtering' do
-      visit vendor_transactions_path
+      visit vendor_portal_transactions_path
       clear_pending_connections_fast
 
       # Look for date filtering - this might not exist or be different
@@ -156,7 +157,7 @@ module VendorPortal
       # Test with a pending vendor
       @vendor.update!(status: :pending)
 
-      visit vendor_dashboard_path
+      visit vendor_portal_dashboard_path
       clear_pending_connections_fast
 
       # Look for any warning or alert messages

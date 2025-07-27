@@ -7,6 +7,9 @@ class InboundEmailProcessingTest < ActionDispatch::IntegrationTest
   include ActionMailboxTestHelper
 
   setup do
+    # Ensure required email templates exist for mailbox processing
+    create_required_email_templates
+
     # Create test constituent with guaranteed unique email
     @test_email = "constituent-#{SecureRandom.hex(8)}@example.com"
     @constituent = create(:constituent, email: @test_email, status: :active, verified: true)
@@ -251,5 +254,41 @@ class InboundEmailProcessingTest < ActionDispatch::IntegrationTest
     # but we should at least have one proof attached after processing
     @application.reload
     assert @application.income_proof.attached? if @application.respond_to?(:income_proof)
+  end
+
+  private
+
+  def create_required_email_templates
+    # Create application_notifications_proof_submission_error template
+    unless EmailTemplate.exists?(name: 'application_notifications_proof_submission_error', format: :text)
+      EmailTemplate.create!(
+        name: 'application_notifications_proof_submission_error',
+        format: :text,
+        subject: 'Proof Submission Error',
+        body: "Dear %<constituent_full_name>s,\n\nThere was an error processing your proof submission.\n\nError: %<message>s\n\nPlease contact us for assistance.\n\n%<header_text>s\n%<footer_text>s",
+        description: 'Sent when proof submission fails processing.'
+      )
+    end
+
+    # Create header and footer templates if they don't exist
+    unless EmailTemplate.exists?(name: 'email_header_text', format: :text)
+      EmailTemplate.create!(
+        name: 'email_header_text',
+        format: :text,
+        subject: 'Header Template',
+        body: "=== %<title>s ===\n\n",
+        description: 'Standard email header partial.'
+      )
+    end
+
+    unless EmailTemplate.exists?(name: 'email_footer_text', format: :text)
+      EmailTemplate.create!(
+        name: 'email_footer_text',
+        format: :text,
+        subject: 'Footer Template',
+        body: "\n\nThank you,\nThe MAT Team\nContact: %<contact_email>s",
+        description: 'Standard email footer partial.'
+      )
+    end
   end
 end

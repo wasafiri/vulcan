@@ -9,17 +9,13 @@ module Applications
       @application = application
     end
 
-    # Build combined audit logs from multiple sources
+    # Build combined audit logs from multiple sources, including creation event
     def build_audit_logs
       return [] unless application
 
-      [
-        load_proof_reviews,
-        load_status_changes,
-        load_notifications,
-        load_application_events,
-        load_user_profile_changes
-      ].flatten.sort_by(&:created_at).reverse
+      # Combine creation event with other events
+      events = [build_creation_event] + combined_events
+      events.sort_by(&:created_at).reverse
     rescue StandardError => e
       Rails.logger.error "Failed to build audit logs: #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
@@ -45,6 +41,31 @@ module Applications
 
     private
 
+    # Construct the application creation event
+    def build_creation_event
+      Event.new(
+        user: application.user,
+        auditable: application,
+        action: 'application_created',
+        created_at: application.created_at,
+        metadata: {
+          'submission_method' => application.submission_method,
+          'initial_status' => application.status
+        }
+      )
+    end
+
+    # Aggregate events from all sources
+    def combined_events
+      [
+        load_proof_reviews,
+        load_status_changes,
+        load_notifications,
+        load_application_events,
+        load_user_profile_changes
+      ].flatten
+    end
+
     # Load proof reviews with minimal eager loading
     def load_proof_reviews
       ProofReview
@@ -67,8 +88,6 @@ module Applications
 
     # Load notifications with eager loading for actor association
     def load_notifications
-      # For notifications, use a more optimized query and apply the decorator pattern
-      # to prevent ActiveStorage eager loading on blob associations
       Notification
         .select('id, recipient_id, actor_id, notifiable_id, notifiable_type, action, read_at, created_at, message_id, delivery_status, metadata')
         .includes(:actor)
@@ -80,18 +99,13 @@ module Applications
                  medical_certification_rejected
                  review_requested
                  documents_requested
-                 proof_approved
-                 proof_rejected
                ])
         .order(created_at: :desc)
         .to_a
-
-      # Return raw notifications; decorator interferes with deduplication service type checking
     end
 
     # Load application events with minimal eager loading
     def load_application_events
-      # For events, use a plpgsql-optimized JSONB query with minimal includes
       Event
         .select('id, user_id, action, created_at, metadata, auditable_type, auditable_id')
         .includes(:user) # Include just the user without role_capabilities
@@ -100,8 +114,8 @@ module Applications
           %w[
             voucher_assigned voucher_redeemed voucher_expired voucher_cancelled
             application_created evaluator_assigned trainer_assigned application_auto_approved
-            medical_certification_requested medical_certification_status_changed # Added certification events
-            alternate_contact_updated # Added to include alternate contact change events
+            medical_certification_requested medical_certification_status_changed
+            alternate_contact_updated
           ],
           application.id.to_s,
           { application_id: application.id }.to_json,
@@ -113,7 +127,6 @@ module Applications
 
     # Load user profile changes with minimal eager loading
     def load_user_profile_changes
-      # Get profile changes for the application's user and any managing guardian
       user_ids = [application.user_id]
       user_ids << application.managing_guardian_id if application.managing_guardian_id.present?
 

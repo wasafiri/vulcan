@@ -129,7 +129,7 @@ module Admin
     end
 
     def teardown
-      Current.reset
+      Current.reset if defined?(Current) && Current.respond_to?(:reset)
     end
 
     private

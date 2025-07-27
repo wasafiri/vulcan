@@ -145,15 +145,23 @@ module ActiveSupport
     # Shortcut occasionally used in controller tests
     attr_reader :product
 
-    # Enable parallel testing for unit and integration tests
-    parallelize(workers: ENV.fetch('PARALLEL_WORKERS', :number_of_processors), with: :processes)
+    # Enable limited parallel testing for unit and integration tests
+    system_test_workers = ENV.fetch('SYSTEM_TEST_WORKERS', 4).to_i
+    parallel_workers = ENV.fetch('PARALLEL_WORKERS', :number_of_processors)
+
+    # Use reduced parallelism if we're running system tests
+    if ENV['RAILS_ENV'] == 'test' && (caller.any? { |line| line.include?('system') } || ARGV.any? { |arg| arg.include?('system') })
+      parallelize(workers: system_test_workers, with: :processes)
+    else
+      parallelize(workers: parallel_workers, with: :processes)
+    end
 
     # Optimized DatabaseCleaner strategy
     if defined?(DatabaseCleaner)
       # Per-worker truncation (expensive but thorough isolation)
       parallelize_setup do |_worker|
         DatabaseCleaner.clean_with(:truncation)
-        load Rails.root.join('db/seeds.rb')
+        # Seeds are already loaded once globally - no need to reload per worker
       end
 
       # Per-test transactions (fast and sufficient for most cases)

@@ -18,7 +18,7 @@ module PaperApplicationContextHelpers
   def teardown_paper_application_context
     # Clear paper application context
     Thread.current[:paper_application_context] = nil
-    Current.reset
+    Current.reset if defined?(Current) && Current.respond_to?(:reset)
   end
 
   # Simple helper to check if we're in paper context

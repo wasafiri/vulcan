@@ -400,9 +400,11 @@ class ProofAttachmentService
       NotificationService.create_and_deliver!(
         type: "#{context.proof_type}_proof_attached",
         recipient: context.application.user,
-        actor: context.admin || context.application.user,
-        notifiable: context.application,
-        metadata: event_metadata
+        options: {
+          actor: context.admin || context.application.user,
+          notifiable: context.application,
+          metadata: event_metadata
+        }
       )
     end
 
@@ -452,9 +454,11 @@ class ProofAttachmentService
       NotificationService.create_and_deliver!(
         type: "#{proof_type}_proof_rejected",
         recipient: application.user,
-        actor: admin,
-        notifiable: application,
-        metadata: audit_metadata
+        options: {
+          actor: admin,
+          notifiable: application,
+          metadata: audit_metadata
+        }
       )
     end
 

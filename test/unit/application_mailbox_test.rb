@@ -23,16 +23,23 @@ class ApplicationMailboxRoutingTest < ActionMailbox::TestCase
       residency_proof_status: :not_reviewed
     )
 
-    # Disable validation and processing to isolate routing tests
+    # Disable validation and processing to isolate routing tests - prevent before_processing callbacks
+    ProofSubmissionMailbox.any_instance.stubs(:ensure_constituent_can_submit).returns(true)
     ProofSubmissionMailbox.any_instance.stubs(:validate_attachments).returns(true)
     ProofSubmissionMailbox.any_instance.stubs(:bounce_with_notification).returns(nil)
     ProofSubmissionMailbox.any_instance.stubs(:process).returns(true)
     ProofSubmissionMailbox.any_instance.stubs(:attach_proof).returns(true)
 
-    # Medical certification mailbox stubs
+    # Medical certification mailbox stubs - prevent before_processing callbacks
+    MedicalCertificationMailbox.any_instance.stubs(:ensure_medical_provider).returns(true)
+    MedicalCertificationMailbox.any_instance.stubs(:ensure_valid_certification_request).returns(true)
+    MedicalCertificationMailbox.any_instance.stubs(:validate_attachments).returns(true)
     MedicalCertificationMailbox.any_instance.stubs(:bounce_with_notification).returns(nil)
     MedicalCertificationMailbox.any_instance.stubs(:process).returns(true)
     MedicalCertificationMailbox.any_instance.stubs(:constituent).returns(@constituent)
+
+    # DefaultMailbox stubs (in case the router tries to process it)
+    DefaultMailbox.any_instance.stubs(:process).returns(true)
 
     # Stub event creation
     Event.stubs(:create!).returns(true)

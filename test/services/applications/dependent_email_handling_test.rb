@@ -5,6 +5,9 @@ require 'test_helper'
 module Applications
   class DependentEmailHandlingTest < ActiveSupport::TestCase
     setup do
+      # Set up FPL policies for income validation
+      setup_fpl_policies
+      
       @admin = create(:admin)
       @guardian = create(:constituent, email: 'guardian@example.com')
     end
@@ -27,7 +30,7 @@ module Applications
           },
           application: {
             household_size: 2,
-            annual_income: 20_000,
+            annual_income: 18_000, # Safely under the threshold
             maryland_resident: true,
             medical_provider_name: 'Dr. Test',
             medical_provider_phone: '555-123-4567',
@@ -79,7 +82,7 @@ module Applications
           },
           application: {
             household_size: 2,
-            annual_income: 20_000,
+            annual_income: 18_000, # Safely under the threshold
             maryland_resident: true,
             medical_provider_name: 'Dr. Test',
             medical_provider_phone: '555-123-4567',

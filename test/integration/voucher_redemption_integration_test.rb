@@ -89,19 +89,19 @@ class VoucherRedemptionIntegrationTest < ActionDispatch::IntegrationTest
 
     # Manually set up voucher verification in the session after sign-in
     # This simulates the vendor having verified voucher identity
-    post verify_dob_vendor_voucher_path(@voucher.code), params: {
+    post verify_dob_vendor_portal_voucher_path(@voucher.code), params: {
       date_of_birth: @constituent.date_of_birth.strftime('%Y-%m-%d')
     }
   end
 
   test 'full voucher redemption flow with database integrity verification' do
     # First make sure identity is verified by hitting the verify DOB route
-    get verify_vendor_voucher_path(@voucher.code)
+    get verify_vendor_portal_voucher_path(@voucher.code)
     assert_response :success
 
     # Simulate DOB verification
-    post verify_dob_vendor_voucher_path(@voucher.code), params: { date_of_birth: @constituent.date_of_birth.strftime('%Y-%m-%d') }
-    assert_redirected_to redeem_vendor_voucher_path(@voucher.code)
+    post verify_dob_vendor_portal_voucher_path(@voucher.code), params: { date_of_birth: @constituent.date_of_birth.strftime('%Y-%m-%d') }
+    assert_redirected_to redeem_vendor_portal_voucher_path(@voucher.code)
     follow_redirect!
     assert_response :success # Verify the redeem page loads successfully
 
@@ -119,7 +119,7 @@ class VoucherRedemptionIntegrationTest < ActionDispatch::IntegrationTest
     application_products_before = @application.products.count
 
     # Process the redemption
-    post process_redemption_vendor_voucher_path(@voucher.code), params: {
+    post process_redemption_vendor_portal_voucher_path(@voucher.code), params: {
       amount: redemption_amount,
       product_ids: product_ids,
       product_quantities: product_quantities
@@ -216,7 +216,7 @@ class VoucherRedemptionIntegrationTest < ActionDispatch::IntegrationTest
     product_ids = [@product1.id]
     product_quantities = { @product1.id.to_s => '1' }
 
-    post process_redemption_vendor_voucher_path(@voucher.code), params: {
+    post process_redemption_vendor_portal_voucher_path(@voucher.code), params: {
       amount: redemption_amount,
       product_ids: product_ids,
       product_quantities: product_quantities
@@ -274,7 +274,7 @@ class VoucherRedemptionIntegrationTest < ActionDispatch::IntegrationTest
 
   test 'voucher verification handles invalid codes appropriately' do
     # Try with an invalid voucher code through the index page
-    get vendor_vouchers_path(code: 'INVALIDVOUCHERCODE')
+    get vendor_portal_vouchers_path(code: 'INVALIDVOUCHERCODE')
     assert_response :success # Should just render the index page
     assert_match(/Invalid voucher code/, flash[:alert])
   end
@@ -286,13 +286,13 @@ class VoucherRedemptionIntegrationTest < ActionDispatch::IntegrationTest
     session.delete(:verified_vouchers)
 
     # Try to redeem voucher without verification
-    post process_redemption_vendor_voucher_path(@voucher.code), params: {
+    post process_redemption_vendor_portal_voucher_path(@voucher.code), params: {
       amount: 150.0,
       product_ids: [@product1.id],
       product_quantities: { @product1.id.to_s => '1' }
     }
 
-    assert_redirected_to verify_vendor_voucher_path(@voucher.code)
+    assert_redirected_to verify_vendor_portal_voucher_path(@voucher.code)
     follow_redirect!
     assert_match(/Identity verification is required before redemption/,
                  flash[:alert])

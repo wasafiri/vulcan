@@ -91,7 +91,7 @@
             <% @upcoming_evaluations.each do |evaluation| %>
               <tr>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <%= evaluation.evaluation_datetime.strftime("%B %d, %Y at %I:%M %p") %>
+                  <%= evaluation.evaluation_date.strftime("%B %d, %Y at %I:%M %p") %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   <%= evaluation.constituent.full_name %>
@@ -139,8 +139,8 @@
               <% @filtered_evaluations.each do |evaluation| %>
                 <tr>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <% if @current_filter == 'scheduled' && evaluation.evaluation_datetime.present? %>
-                      <%= evaluation.evaluation_datetime.strftime("%B %d, %Y at %I:%M %p") %>
+                    <% if @current_filter == 'scheduled' && evaluation.evaluation_date.present? %>
+                      <%= evaluation.evaluation_date.strftime("%B %d, %Y at %I:%M %p") %>
                     <% elsif @current_filter == 'completed' && evaluation.evaluation_date.present? %>
                       <%= evaluation.evaluation_date.strftime("%B %d, %Y") %>
                     <% else %>

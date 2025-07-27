@@ -77,7 +77,7 @@ class ApplicationController < ActionController::Base
     when Users::Administrator then admin_applications_path
     when Users::Constituent then constituent_portal_dashboard_path
     when Users::Evaluator then evaluators_dashboard_path
-    when Users::Vendor then vendor_dashboard_path
+    when Users::Vendor then vendor_portal_dashboard_path
     else root_path
     end
   end
@@ -87,13 +87,15 @@ class ApplicationController < ActionController::Base
     # Get the return path BEFORE clearing the 2FA session data
     stored_location = TwoFactorAuth.get_return_path(session) || session.delete(:return_to)
 
-    # Complete the 2FA authentication process (this clears session data)
+    # Complete the 2FA authentication process (but preserve challenge until after sign-in)
     TwoFactorAuth.complete_authentication(session)
 
     # Create the session and redirect
     session_record = _create_and_set_session_cookie(user)
 
     if session_record
+      # Clear the challenge only after successful sign-in
+      TwoFactorAuth.clear_challenge(session)
       # Redirect to stored location or appropriate dashboard
       redirect_to stored_location || _dashboard_for(user), notice: 'Signed in successfully'
     else

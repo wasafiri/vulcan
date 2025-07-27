@@ -4,11 +4,11 @@
     <div class="flex justify-between items-center mb-8">
       <h1 class="text-3xl font-bold text-gray-900">Vendor Dashboard</h1>
       <div class="flex space-x-4">
-        <%= link_to vendor_dashboard_path,
+        <%= link_to vendor_portal_dashboard_path,
             class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
           Back to Dashboard
         <% end %>
-        <%= link_to vendor_vouchers_path,
+        <%= link_to vendor_portal_vouchers_path,
             class: "inline-flex items-center px-5 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
           Process Voucher
         <% end %>
@@ -20,7 +20,7 @@
       <div class="px-4 py-5 sm:p-6">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-lg font-medium text-gray-900">Business Information</h2>
-          <%= link_to "Edit Profile", edit_vendor_profile_path, class: "text-sm font-medium text-indigo-600 hover:text-indigo-500" %>
+          <%= link_to "Edit Profile", edit_vendor_portal_profile_path, class: "text-sm font-medium text-indigo-600 hover:text-indigo-500" %>
         </div>
         <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
           <div class="sm:col-span-3">
@@ -54,7 +54,7 @@
                 <h3 class="text-sm font-medium text-yellow-800">W9 Form Required</h3>
                 <div class="mt-2 text-sm text-yellow-700">
                   <p>Please upload your W9 form to process vouchers.</p>
-                  <%= link_to "Upload W9", edit_vendor_profile_path, class: "font-medium underline hover:text-yellow-600" %>
+                  <%= link_to "Upload W9", edit_vendor_portal_profile_path, class: "font-medium underline hover:text-yellow-600" %>
                 </div>
               </div>
             </div>
@@ -105,7 +105,7 @@
           </div>
         </div>
         <div class="bg-gray-50 px-5 py-3">
-          <%= link_to vendor_transactions_path, class: "text-sm font-medium text-indigo-700 hover:text-indigo-900" do %>
+          <%= link_to vendor_portal_transactions_path, class: "text-sm font-medium text-indigo-700 hover:text-indigo-900" do %>
             View transactions
           <% end %>
         </div>
@@ -133,7 +133,7 @@
           </div>
         </div>
         <div class="bg-gray-50 px-5 py-3">
-          <%= link_to vendor_transactions_path(period: "month"), class: "text-sm font-medium text-indigo-700 hover:text-indigo-900" do %>
+          <%= link_to vendor_portal_transactions_path(period: "month"), class: "text-sm font-medium text-indigo-700 hover:text-indigo-900" do %>
             View month details
           <% end %>
         </div>
@@ -144,7 +144,7 @@
     <div class="bg-white shadow rounded-lg mb-8">
       <div class="px-4 py-5 sm:px-6 flex justify-between items-center">
         <h2 class="text-lg font-medium text-gray-900">Recent Transactions</h2>
-        <%= link_to "View All", vendor_transactions_path, class: "text-sm font-medium text-indigo-600 hover:text-indigo-500" %>
+        <%= link_to "View All", vendor_portal_transactions_path, class: "text-sm font-medium text-indigo-600 hover:text-indigo-500" %>
       </div>
       <div class="border-t border-gray-200">
         <div class="overflow-x-auto">
@@ -213,7 +213,7 @@
                 <% if month_total > 0 %>
                   <tr>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <%= link_to month.strftime("%B %Y"), vendor_transactions_path(
+                      <%= link_to month.strftime("%B %Y"), vendor_portal_transactions_path(
                         period: "custom",
                         start_date: month.beginning_of_month.strftime("%Y-%m-%d"),
                         end_date: month.end_of_month.strftime("%Y-%m-%d")

@@ -128,34 +128,74 @@ module Applications
     end
 
     def save_application_with_audit
+      action_type = target_application.new_record? ? 'application_created' : 'application_updated'
       target_application.save!
+      actor = determine_audit_actor
 
-      # Use the managing guardian as the actor when the application is for a dependent
-      actor = if @form.for_dependent?
-                target_application.managing_guardian || @form.current_user
-              else
-                @form.current_user
-              end
+      if action_type == 'application_created'
+        log_application_created_event(actor)
+      elsif action_type == 'application_updated'
+        log_application_updated_event(actor)
+      end
 
-      # Log the application creation/update event
+      log_status_change_event(actor) if @form.is_submission
+    end
+
+    def determine_audit_actor
+      if @form.for_dependent?
+        target_application.managing_guardian || @form.current_user
+      else
+        @form.current_user
+      end
+    end
+
+    def log_application_created_event(actor)
+      Rails.logger.debug { "Logging application_created event for application #{target_application.id}" }
+      begin
+        event = AuditEventService.log(
+          action: 'application_created',
+          actor: actor,
+          auditable: target_application,
+          metadata: {
+            submission_method: @form.submission_method,
+            initial_status: target_application.status
+          }
+        )
+        if event
+          Rails.logger.debug { "Successfully logged application_created event: #{event.id}" }
+        else
+          Rails.logger.error 'AuditEventService returned nil for application_created event'
+        end
+      rescue StandardError => e
+        Rails.logger.error "Error logging application_created event: #{e.message}"
+        raise
+      end
+    end
+
+    def log_application_updated_event(actor)
+      Rails.logger.debug { "Logging application_updated event for application #{target_application.id}" }
       AuditEventService.log(
-        action: @form.application ? 'application_updated' : 'application_created',
+        action: 'application_updated',
         actor: actor,
         auditable: target_application,
         metadata: {
-          submission_method: @form.submission_method,
-          is_submission: @form.is_submission,
-          for_dependent: @form.for_dependent?
+          submission_method: @form.submission_method
         }
       )
+    end
 
-      # Ensure the audit record uses the correct actor in rare cases where
-      # earlier logic may have associated the dependent instead of the
-      # guardian.  We update any existing `application_created` events for
-      # this application within the current transaction to guarantee
-      # consistency and satisfy test expectations.
-      Event.where(action: 'application_created', auditable: target_application)
-           .update_all(user_id: actor.id)
+    def log_status_change_event(actor)
+      Rails.logger.debug { "Logging application_status_changed event for application #{target_application.id}" }
+      AuditEventService.log(
+        action: 'application_status_changed',
+        actor: actor,
+        auditable: target_application,
+        metadata: {
+          new_status: 'in_progress',
+          old_status: 'draft',
+          submission_method: @form.submission_method
+        }
+      )
     end
 
     def log_events
@@ -201,7 +241,7 @@ module Applications
     end
 
     def target_application
-      @form.target_application
+      @target_application ||= @form.target_application
     end
 
     def success_result

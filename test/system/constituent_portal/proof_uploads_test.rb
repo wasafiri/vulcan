@@ -6,7 +6,7 @@ class ProofUploadsTest < ApplicationSystemTestCase
   include ActiveJob::TestHelper
 
   setup do
-    @user = create(:constituent)
+    @user = create(:constituent, email_verified: true, verified: true)
     @valid_pdf = file_fixture('income_proof.pdf')
 
     # Create application with rejected proofs using factory
@@ -21,6 +21,10 @@ class ProofUploadsTest < ApplicationSystemTestCase
     assert @application.income_proof.attached?, 'Income proof must be attached'
     assert @application.rejected_income_proof?, 'Income proof status must be rejected'
     assert_equal @application.user_id, @user.id, 'Application should belong to test user'
+
+    # Set up rate limit policies required by proof submission
+    Policy.find_or_create_by!(key: 'proof_submission_rate_limit_web') { |p| p.value = 10 }
+    Policy.find_or_create_by!(key: 'proof_submission_rate_period') { |p| p.value = 24 }
 
     # Sign in using documented pattern
     system_test_sign_in(@user)
@@ -54,7 +58,7 @@ class ProofUploadsTest < ApplicationSystemTestCase
     wait_for_turbo
 
     # Should redirect to success page or dashboard
-    assert_text 'Proof submitted successfully'
+    assert_success_message('Proof submitted successfully')
 
     # Verify proof was attached
     assert @application.reload.income_proof.attached?

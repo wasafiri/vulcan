@@ -1,28 +1,35 @@
 <% if flash.any? %>
-  <%# Primary method: JSON data in script tag for new NotificationService %>
-  <script type="application/json" id="rails-flash-messages">
-    <%= raw [
-      flash.map do |type, message|
-        {
-          message: message,
-          type: case type.to_s
-                when 'notice' then 'success'
-                when 'alert' then 'warning'  
-                when 'info' then 'info'
-                else 'error'
-                end
-        }
-      end
-    ].flatten.to_json %>
-  </script>
+  <%# Configuration: Set flash_mode to control how flash messages are displayed %>
+  <%# Options: :toast (JavaScript notifications), :traditional (Rails HTML), :both %>
+  <% flash_mode = Rails.application.config.try(:flash_mode) || (Rails.env.test? ? :both : :toast) %>
+  
+  <% if flash_mode == :toast || flash_mode == :both %>
+    <%# JSON data for toast notifications %>
+    <script type="application/json" id="rails-flash-messages">
+      <%= raw [
+        flash.map do |type, message|
+          {
+            message: message,
+            type: case type.to_s
+                  when 'notice' then 'success'
+                  when 'alert' then 'warning'  
+                  when 'info' then 'info'
+                  else 'error'
+                  end
+          }
+        end
+      ].flatten.to_json %>
+    </script>
+  <% end %>
 
-  <%# Fallback: Render HTML elements for accessibility and testing %>
-  <%# These will be hidden by CSS but provide semantic structure %>
-  <div class="sr-only" aria-live="polite">
-    <% flash.each do |type, message| %>
-      <div role="alert" class="flash-message flash-<%= type %>">
-        <%= message %>
-      </div>
-    <% end %>
-  </div>
+  <% if flash_mode == :traditional || flash_mode == :both %>
+    <%# Traditional Rails flash messages (visible HTML) %>
+    <div class="flash-messages" aria-live="polite">
+      <% flash.each do |type, message| %>
+        <div role="alert" class="flash-message flash-<%= type %> <%= flash_mode == :both ? 'mb-2 p-3 rounded' : '' %>" data-testid="flash-<%= type %>">
+          <%= message %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
 <% end %>

@@ -60,12 +60,14 @@ module VoucherManagement
     NotificationService.create_and_deliver!(
       type: action,
       recipient: recipient,
-      actor: actor,
-      notifiable: self,
-      metadata: {
-        application_id: id
-      },
-      channel: :email
+      options: {
+        actor: actor,
+        notifiable: self,
+        metadata: {
+          application_id: id
+        },
+        channel: :email
+      }
     )
   end
 end

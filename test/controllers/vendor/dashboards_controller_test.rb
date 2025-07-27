@@ -32,14 +32,14 @@ module VendorPortal
       reset! # Explicitly reset the session
 
       # Access without logging in should redirect
-      get vendor_dashboard_path
+      get vendor_portal_dashboard_path
       assert_response :redirect
       # Could redirect to sign_in_path or root_path depending on authentication flow
     end
 
     test 'gets show when authenticated' do
       sign_in_with_headers(@vendor)
-      get vendor_dashboard_path
+      get vendor_portal_dashboard_path
       assert_response :success
     end
   end

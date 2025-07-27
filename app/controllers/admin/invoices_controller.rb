@@ -41,28 +41,17 @@ module Admin
     end
 
     def update
-      if @invoice.update(invoice_params)
-        notice = if @invoice.saved_change_to_status? && @invoice.status_invoice_approved?
-                   'Invoice approved successfully'
-                 elsif @invoice.saved_change_to_status? && @invoice.status_invoice_paid?
-                   'Payment details recorded successfully'
-                 else
-                   'Invoice updated successfully'
-                 end
+      handle_missing_gad_reference and return if missing_gad_reference?
 
+      if @invoice.update(invoice_params)
         log_event!('Updated invoice details', {
                      status_changed: @invoice.saved_change_to_status?,
                      new_status: @invoice.status,
                      gad_reference: @invoice.gad_invoice_reference
                    })
-
-        redirect_to [:admin, @invoice], notice: notice
+        redirect_to [:admin, @invoice], notice: invoice_update_notice
       else
-        # Set @transactions for the show template when rendering due to validation errors
-        @transactions = @invoice.voucher_transactions
-                                .includes(:voucher)
-                                .order(processed_at: :desc)
-        render :show, status: :unprocessable_entity
+        render_update_error
       end
     end
 
@@ -88,6 +77,38 @@ module Admin
                     payment_notes
                     gad_invoice_reference]
       )
+    end
+
+    # Helpers for update action refactoring
+    def missing_gad_reference?
+      invoice_params[:status] == 'invoice_paid' && params.dig(:invoice, :gad_invoice_reference).blank?
+    end
+
+    def handle_missing_gad_reference
+      flash[:alert] = "GAD reference can't be blank"
+      set_transactions
+      render :show, status: :unprocessable_entity
+    end
+
+    def render_update_error
+      set_transactions
+      render :show, status: :unprocessable_entity
+    end
+
+    def invoice_update_notice
+      if @invoice.saved_change_to_status? && @invoice.status_invoice_approved?
+        'Invoice approved successfully'
+      elsif @invoice.saved_change_to_status? && @invoice.status_invoice_paid?
+        'Payment details recorded successfully'
+      else
+        'Invoice updated successfully'
+      end
+    end
+
+    def set_transactions
+      @transactions = @invoice.voucher_transactions
+                              .includes(:voucher)
+                              .order(processed_at: :desc)
     end
 
     def apply_filters(scope)

@@ -1,32 +1,20 @@
 # frozen_string_literal: true
 
 require 'application_system_test_case'
-require_relative '../../support/cuprite_test_bridge' # For enhanced browser interactions if needed
 
 module Admin
   class PaperApplicationConditionalUiTest < ApplicationSystemTestCase
-    include CupriteTestBridge # If using methods from it
-
     setup do
-      @admin = create(:admin) # Use FactoryBot for creating admin user
-      enhanced_sign_in(@admin) # Use the enhanced sign-in method from CupriteTestBridge
+      @admin = create(:admin, email: "paper_app_ui_admin_#{Time.now.to_i}_#{rand(10_000)}@example.com") # Use unique email
+      system_test_sign_in(@admin)
       # Ensure sign-in is complete and we are on a page that requires authentication
       # For example, visit the admin dashboard first and assert something there.
-      visit admin_dashboard_path # Or whatever your admin root path is
-      # The failure message "Also found 'Applications'" suggests the H1 might be "Applications"
-      # Let's try asserting that, or a more generic selector for the dashboard.
-      # For now, let's assume the main heading on the dashboard is "Applications" or that
-      # the path itself is sufficient to ensure we are logged in and on an admin page.
-      # A more robust check would be to find a unique element on the dashboard.
-      # Given the error, let's try to assert 'Applications' as the h1.
-      assert_selector 'h1', text: 'Applications' # Or a selector unique to the admin dashboard
+      visit admin_applications_path
+      # Admin dashboard shows both "Dashboard" (hidden) and "Admin Dashboard" (visible)
+      assert_selector 'h1', text: 'Dashboard' # Hidden semantic landmark for tests
 
       visit new_admin_paper_application_path
-      wait_for_page_load # Ensure page and JS are ready
-    end
-
-    teardown do
-      enhanced_sign_out if defined?(page) && page.driver.respond_to?(:browser)
+      wait_for_turbo # Ensure page and JS are ready
     end
 
     test 'UI initial state before guardian selection' do
@@ -43,7 +31,7 @@ module Admin
 
       # "Guardian Information" section should be hidden
       assert_selector 'fieldset legend', text: 'Guardian Information', visible: :hidden
-      assert_selector '[data-applicant-type-target="guardianSection"]', visible: :hidden # This is the wrapper for the guardian picker
+      assert_selector '[data-applicant-type-target="guardianSection"]', visible: :hidden
 
       # "Selected Guardian" display should be hidden
       assert_selector '[data-guardian-picker-target="selectedPane"]', visible: :hidden
@@ -53,40 +41,54 @@ module Admin
       assert_selector '[data-applicant-type-target="sectionsForDependentWithGuardian"]', visible: :hidden
 
       # "Relationship Type" (within dependent info) should also be hidden as its parent is hidden
-      # This is data-dependent-fields-target="relationshipType"
       assert_selector '[data-dependent-fields-target="relationshipType"]', visible: :hidden
     end
 
     test 'UI state after guardian selection (guardian with no address)' do
       # Create a guardian without an address to test address field visibility
-      # Guardians are Users::Constituent, so create as such with the guardian trait.
-      guardian = create(:constituent, :guardian, physical_address_1: nil, city: nil, state: nil, zip_code: nil)
+      # Use the same pattern as the working paper_applications_test.rb
+      guardian = create(:constituent,
+                        first_name: 'Guardian',
+                        last_name: 'Test',
+                        email: "guardian.test.#{Time.now.to_i}@example.com",
+                        phone: '555-123-4567',
+                        physical_address_1: nil,
+                        city: nil,
+                        state: nil,
+                        zip_code: nil)
 
       # Select "A Dependent (must select existing guardian in system or enter guardian's information)" to reveal the guardian section
       choose 'A Dependent (must select existing guardian in system or enter guardian\'s information)'
-      wait_for_page_load # Wait for UI update after selecting applicant type
 
-      # Fill in search and select guardian
+      # Wait for Turbo and ensure Stimulus controllers are loaded
+      wait_for_turbo
+      wait_for_stimulus_controller('applicant-type')
+      wait_for_stimulus_controller('guardian-picker')
+      wait_for_stimulus_controller('admin-user-search')
+
+      # Ensure the guardian section is visible
+      assert_selector '[data-applicant-type-target="guardianSection"]', visible: true, wait: 5
+
+      # Fill in search and trigger the search
       within_fieldset_tagged('Guardian Information') do
-        fill_in 'guardian_search_q', with: guardian.email
-        # Trigger search by pressing Enter key to ensure Turbo request fires
-        find('#guardian_search_q').send_keys(:enter)
-        # Wait for Turbo response
-        sleep 1.0
-
-        # Use `within` with a CSS selector for the turbo-frame, not `within_frame`
-        within 'turbo-frame#guardian_search_results' do
-          # Wait for the specific list item to appear, indicating search results are loaded.
-          expect_result_item = find('li', text: guardian.full_name, wait: 10)
-          expect_result_item.click
-        end
+        fill_in 'guardian_search_q', with: guardian.full_name
       end
 
-      # Give extra time for the selection action to complete and JS to run
-      sleep 2
+      # Wait for search results to appear
+      assert_selector '#guardian_search_results li', text: /#{guardian.full_name}/i, wait: 5
+
+      # Select the guardian from search results
+      within('#guardian_search_results') do
+        find('li', text: /#{guardian.full_name}/i, wait: 5).click
+      end
+
+      # Wait for guardian selection to complete and ensure controllers are updated
+      wait_for_selector '[data-guardian-picker-target="selectedPane"]', visible: true, timeout: 10
+
+      # Additional wait for dependent section to become visible
+      wait_for_selector '[data-applicant-type-target="sectionsForDependentWithGuardian"]', visible: true, timeout: 5
 
       # "Selected Guardian" display should be visible
-      # This is data-guardian-picker-target="selectedPane"
       selected_display_selector = '[data-guardian-picker-target="selectedPane"]'
       assert_selector selected_display_selector, visible: true, wait: 10 # Increased wait time
       within(selected_display_selector) do
@@ -103,7 +105,7 @@ module Admin
 
       # Applicant Type section may be hidden or shown after guardian selection
       # The actual behavior depends on the applicant-type controller implementation
-      # Let's just check if the element exists in the DOM without requiring visibility
+      # Check if the element exists in the DOM without requiring visibility
       assert_selector 'fieldset[data-applicant-type-target="radioSection"]', visible: :all
 
       # Dependent Info section should be visible (as per applicant-type#updateApplicantTypeDisplay)
@@ -112,7 +114,7 @@ module Admin
       within('[data-applicant-type-target="sectionsForDependentWithGuardian"]') do
         assert_selector 'fieldset legend', text: 'Dependent Information'
         # Check for dependent search/create within the dependent info section
-        assert_selector 'input#dependent_attributes_first_name', visible: true # Check for a field within the dependent section
+        assert_selector 'input#constituent_first_name', visible: true # Check for a field within the dependent section
       end
 
       # Relationship Type (within dependent info) should be visible and required
@@ -126,7 +128,7 @@ module Admin
 
       # Address fields for the *dependent* should be visible if "Same as Guardian's" is unchecked.
       # The default is checked, so dependent address fields should be hidden initially.
-      assert_selector '#dependent-contact-fields', visible: :hidden
+      assert_selector '[data-dependent-fields-target="addressFields"]', visible: :hidden
     end
 
     test 'UI state for adult-only flow (no guardian selected)' do
@@ -144,7 +146,6 @@ module Admin
       assert_selector '[data-guardian-picker-target="selectedPane"]', visible: :hidden
 
       # "Applicant Type" section should be visible (as per new logic)
-      # This is data-applicant-type-target="radioSection"
       assert_selector 'fieldset[data-applicant-type-target="radioSection"]', visible: true
       within('fieldset[data-applicant-type-target="radioSection"]') do
         assert_selector 'input#applicant_is_adult', visible: true
@@ -152,11 +153,9 @@ module Admin
       end
 
       # "Dependent Info" section should be hidden
-      # This is data-applicant-type-target="sectionsForDependentWithGuardian"
       assert_selector '[data-applicant-type-target="sectionsForDependentWithGuardian"]', visible: :hidden
 
       # "Relationship Type" (within dependent info) should also be hidden as its parent is hidden
-      # This is data-dependent-fields-target="relationshipType"
       assert_selector '[data-dependent-fields-target="relationshipType"]', visible: :hidden
 
       # "Show Application Details, Disability, Provider, Proof sections."
@@ -168,7 +167,6 @@ module Admin
 
       # "If no applicant address on record, show address fields."
       # The adult applicant fields are in the fieldset with legend "Applicant's Information"
-      # This fieldset is data-applicant-type-target="adultSection"
       assert_selector 'fieldset[data-applicant-type-target="adultSection"]', visible: true
       within('fieldset[data-applicant-type-target="adultSection"]') do
         assert_selector 'legend', text: "Applicant's Information"

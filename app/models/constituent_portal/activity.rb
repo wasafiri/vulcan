@@ -25,7 +25,7 @@ module ConstituentPortal
 
       # Process each deduplicated submission audit
       deduplicated_submissions.each do |event|
-        is_initial = is_initial_submission?(application, event)
+        is_initial = initial_submission?(application, event)
         activities << from_submission_event(event, is_initial: is_initial)
       end
 
@@ -72,7 +72,7 @@ module ConstituentPortal
     end
 
     # Determine if a submission is the initial one for its proof type
-    def self.is_initial_submission?(application, event)
+    def self.initial_submission?(application, event)
       proof_type = event.metadata['proof_type']
       # Handle both submitted and attached events
       action_names = ["#{proof_type}_proof_submitted", "#{proof_type}_proof_attached"]
@@ -87,7 +87,7 @@ module ConstituentPortal
     end
 
     # Initialize a new activity
-    def initialize(source:, created_at:, activity_type:, proof_type:, description:, details: nil)
+    def initialize(source:, created_at:, activity_type:, proof_type:, description:, details: nil) # rubocop:disable Metrics/ParameterLists
       @source = source
       @created_at = created_at
       @activity_type = activity_type

@@ -17,17 +17,30 @@ module Admin
       # Create constituent
       constituent = create(:constituent)
 
-      # Create print queue items with attached PDFs (important: we need to create & attach in one step to avoid validation errors)
-      @pending_letter = build(:print_queue_item, status: :pending, constituent: constituent)
+      # Create print queue items with attached PDFs and use the created constituent
+      # Override the factory defaults to use our pre-created users
+      @pending_letter = build(:print_queue_item, 
+                             status: :pending, 
+                             constituent: constituent,
+                             application: create(:application, user: constituent),
+                             admin: nil)
       @pending_letter.pdf_letter.attach(io: test_pdf.open, filename: 'test_letter.pdf')
       @pending_letter.save!
 
-      @pending_letter2 = build(:print_queue_item, status: :pending, constituent: constituent)
+      @pending_letter2 = build(:print_queue_item, 
+                              status: :pending, 
+                              constituent: constituent,
+                              application: create(:application, user: constituent),
+                              admin: nil)
       @pending_letter2.pdf_letter.attach(io: test_pdf.open, filename: 'test_letter2.pdf')
       @pending_letter2.save!
 
-      @printed_letter = build(:print_queue_item, status: :printed, constituent: constituent,
-                                                 admin: @admin, printed_at: 1.day.ago)
+      @printed_letter = build(:print_queue_item, 
+                             status: :printed, 
+                             constituent: constituent,
+                             application: create(:application, user: constituent),
+                             admin: @admin, 
+                             printed_at: 1.day.ago)
       @printed_letter.pdf_letter.attach(io: test_pdf.open, filename: 'printed_letter.pdf')
       @printed_letter.save!
 

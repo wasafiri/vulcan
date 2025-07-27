@@ -31,12 +31,14 @@ module TrainingManagement
       NotificationService.create_and_deliver!(
         type: 'trainer_assigned',
         recipient: user,
-        actor: Current.user,
-        notifiable: self,
-        metadata: {
-          application_id: id
-        },
-        channel: :email
+        options: {
+          actor: Current.user,
+          notifiable: self,
+          metadata: {
+            application_id: id
+          },
+          channel: :email
+        }
       )
 
       # Send email notification to the trainer with constituent contact info
@@ -74,12 +76,14 @@ module TrainingManagement
     NotificationService.create_and_deliver!(
       type: action,
       recipient: recipient,
-      actor: actor,
-      notifiable: self,
-      metadata: {
-        application_id: id
-      },
-      channel: :email
+      options: {
+        actor: actor,
+        notifiable: self,
+        metadata: {
+          application_id: id
+        },
+        channel: :email
+      }
     )
   end
 end

@@ -11,41 +11,33 @@ module Admin
       @admin = create(:admin)
       @application = create(:application, :in_progress_with_pending_proofs)
 
-      # Sign in once for all tests; individual tests no longer need sign_in_as
-      system_test_sign_in(@admin)
-      wait_for_turbo
-
-      clear_pending_connections_fast
+      # Sign in with enhanced stability
+      with_browser_rescue do
+        system_test_sign_in(@admin)
+        wait_for_page_stable
+      end
     end
 
     test 'admin reviews application proofs' do
-      # Visit the specific application directly
-      visit admin_application_path(@application)
-      clear_pending_connections_fast
-
-      # Verify application details page loads
-      assert_text 'Application Details'
-
-      # Disambiguate first Review Proof button inside income proof row
-      within '#attachments-section' do
-        assert_selector '[data-proof-type="income"]', wait: 5
-        find('[data-proof-type="income"]').click
+      # Visit the specific application directly with enhanced browser rescue
+      with_browser_rescue(max_retries: 3) do
+        visit admin_application_path(@application)
+        wait_for_page_stable
+        
+        # Verify page loaded properly before proceeding
+        assert_selector 'h1#application-title', wait: 15
       end
+      
+      # Ensure attachments section is present and visible before interacting
+      assert_selector '#attachments-section', wait: 10
 
-      # Wait for modal or review interface
-      if has_selector?('#incomeProofReviewModal', wait: 3)
-        within('#incomeProofReviewModal') do
-          if has_button?('Approve', wait: 2)
-            click_button 'Approve'
-          end
-        end
-      elsif has_text?('Review Income Proof', wait: 3)
-        # Alternative review interface
-        if has_button?('Approve', wait: 2)
-          click_button 'Approve'
-        end
-      else
-        skip 'Income proof review modal not available'
+      # Use the proven stable modal helper from system_test_helpers.rb
+      click_review_proof_and_wait('income', timeout: 15)
+
+      # Approve the income proof within the modal using stable pattern
+      within '#incomeProofReviewModal' do
+        assert_selector 'button', text: 'Approve', wait: 10
+        click_button 'Approve'
       end
 
       # Verify success (flexible assertion)
@@ -53,12 +45,14 @@ module Admin
     end
 
     test 'admin receives notification for new proofs' do
-      # Visit the specific application directly
-      visit admin_application_path(@application)
-      clear_pending_connections_fast
+      # Visit the specific application directly with browser rescue
+      with_browser_rescue do
+        visit admin_application_path(@application)
+        wait_for_page_stable
+      end
 
-      # Verify basic application information loads
-      assert_text 'Application Details'
+      # Verify application details page loads with specific selector
+      assert_selector 'h1#application-title', wait: 15
       
       # Look for proof status information (flexible selectors)
       if has_text?('Income Proof', wait: 3)
@@ -79,10 +73,8 @@ module Admin
 
     private
 
-    def clear_pending_connections_fast
-      super if defined?(super)
-    rescue StandardError => e
-      debug_puts "Connection clear warning in proof reviews: #{e.message}"
+    def debug_puts(msg)
+      puts msg if ENV['VERBOSE_TESTS']
     end
   end
 end

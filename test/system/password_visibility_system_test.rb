@@ -21,7 +21,9 @@ class PasswordVisibilitySystemTest < ApplicationSystemTestCase
 
     # Password should now be visible
     assert_selector "input#user_password[type='text']"
-    password_toggle = find('input#user_password').sibling('button')
+    password_field = find('input#user_password')
+    container = password_field.ancestor('[data-controller="visibility"]')
+    password_toggle = container.find('button[data-action="visibility#togglePassword"]')
     assert_equal 'true', password_toggle['aria-pressed']
 
     # Toggle back
@@ -36,7 +38,9 @@ class PasswordVisibilitySystemTest < ApplicationSystemTestCase
 
     # Confirmation password should now be visible
     assert_selector "input#user_password_confirmation[type='text']"
-    confirmation_toggle = find('input#user_password_confirmation').sibling('button')
+    confirmation_field = find('input#user_password_confirmation')
+    confirmation_container = confirmation_field.ancestor('[data-controller="visibility"]')
+    confirmation_toggle = confirmation_container.find('button[data-action="visibility#togglePassword"]')
     assert_equal 'true', confirmation_toggle['aria-pressed']
 
     # Toggle back
@@ -61,7 +65,9 @@ class PasswordVisibilitySystemTest < ApplicationSystemTestCase
 
     # Password should be visible initially
     assert_selector "input#user_password[type='text']"
-    password_toggle = find('input#user_password').sibling('button')
+    password_field = find('input#user_password')
+    container = password_field.ancestor('[data-controller="visibility"]')
+    password_toggle = container.find('button[data-action="visibility#togglePassword"]')
     assert_equal 'true', password_toggle['aria-pressed']
 
     # Wait for the timeout
@@ -69,6 +75,8 @@ class PasswordVisibilitySystemTest < ApplicationSystemTestCase
 
     # Password should be hidden again
     assert_selector "input#user_password[type='password']"
+    # Reload the toggle element as it may have been updated
+    password_toggle = container.find('button[data-action="visibility#togglePassword"]')
     assert_equal 'false', password_toggle['aria-pressed']
   end
 

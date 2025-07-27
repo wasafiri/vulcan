@@ -35,6 +35,9 @@ module Applications
     # @param event [Object] The event to fingerprint.
     # @return [String] A unique fingerprint string.
     def event_fingerprint(event)
+      # Never deduplicate application_created events
+      return "application_created_#{event.id}" if event.respond_to?(:action) && event.action == 'application_created'
+
       action = generic_action(event)
       details = fingerprint_details(event)
       [action, details].compact.join('_').presence || "default_fingerprint_#{event.class.name.underscore}_#{event.id || event.created_at.to_i}"
@@ -104,6 +107,9 @@ module Applications
     #
     # @param event [Object] The event to score. @return [Integer] The priority score.
     def priority_score(event)
+      # Give highest priority to application_created events
+      return 4 if event.respond_to?(:action) && event.action == 'application_created'
+
       case event
       when ApplicationStatusChange
         3

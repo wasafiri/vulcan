@@ -20,10 +20,12 @@ class ApplicationStatus
     NotificationService.create_and_deliver!(
       type: 'application_sent_back',
       recipient: @application.user,
-      actor: actor,
-      notifiable: @application,
-      metadata: { reason: 'Additional information required.' },
-      channel: :email
+      options: {
+        actor: actor,
+        notifiable: @application,
+        metadata: { reason: 'Additional information required.' },
+        channel: :email
+      }
     )
   end
 end

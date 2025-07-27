@@ -3,10 +3,8 @@
 # app/services/audit_event_service.rb
 class AuditEventService < BaseService
   # Time window for preventing duplicate event creation.
-  # Reduced to 2 seconds to prevent only accidental duplicates (double-clicks)
-  # while allowing legitimate events. EventDeduplicationService handles
-  # sophisticated business-logic deduplication for display purposes.
-  DEDUP_WINDOW = 2.seconds
+  # EventDeduplicationService handles sophisticated deduplication for display purposes.
+  DEDUP_WINDOW = 5.seconds
 
   # Logs a distinct system event and prevents duplicates within the DEDUP_WINDOW.
   #
@@ -17,16 +15,15 @@ class AuditEventService < BaseService
   # @param created_at [Time] (Optional) The timestamp for the event, for testing purposes.
   # @return [Event, nil] The created Event record or nil if deduplicated.
   def self.log(action:, actor:, auditable:, metadata: {}, created_at: nil)
-    # This code-level deduplication can still have race conditions under high concurrency.
-    # A more robust solution would be a partial unique index in the database on
+    # TODO: for more robustness add a partial unique index in the database on
     # (action, auditable_type, auditable_id) for recent events.
-    if recent_duplicate_exists?(action: action, auditable: auditable, metadata: metadata)
+    # Skip deduplication for application_created events to ensure they always get logged
+    if action.to_s != 'application_created' && recent_duplicate_exists?(action: action, auditable: auditable, metadata: metadata)
       Rails.logger.info "AuditEventService: Duplicate event '#{action}' for #{auditable.class.name} ##{auditable.id} suppressed."
       return nil
     end
 
-    # Use reverse_merge to ensure caller-provided metadata is not overwritten.
-    # Namespace internal keys to avoid conflicts.
+    # Use reverse_merge to ensure caller-provided metadata is not overwritten; namespace internal keys to avoid conflicts.
     final_metadata = metadata.reverse_merge(
       __service_generated: true
     )
@@ -41,9 +38,23 @@ class AuditEventService < BaseService
     # Only set created_at if it's provided, primarily for testing
     event_attributes[:created_at] = created_at if created_at.present?
 
-    Event.create!(event_attributes)
+    # Debug log for application_created events
+    if action.to_s == 'application_created'
+      Rails.logger.debug { "AuditEventService: Creating application_created event for application #{auditable.id}" }
+      Rails.logger.debug { "Metadata: #{final_metadata.inspect}" }
+    end
+
+    event = Event.create!(event_attributes)
+
+    # Additional debug for created event
+    if action.to_s == 'application_created' && event.persisted?
+      Rails.logger.debug { "AuditEventService: Successfully created event #{event.id} for application #{auditable.id}" }
+    end
+
+    event
   rescue ActiveRecord::RecordInvalid => e
     Rails.logger.error "AuditEventService: Failed to log event: #{e.message}"
+    Rails.logger.error "Event attributes: #{event_attributes.inspect}"
     raise # Re-raise the exception to make it visible in tests
   end
 

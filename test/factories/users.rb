@@ -66,11 +66,19 @@ FactoryBot.define do
 
     factory :admin, class: 'Users::Administrator' do
       sequence(:email) { |n| "admin#{n}@example.com" }
+      password { 'password123' }
       type { 'Users::Administrator' }
       first_name { 'Admin' }
-      # Ensure admin users are verified for login
+      last_name { 'User' }
+      sequence(:phone) { |n| "888-#{format('%03d', ((n + Time.current.to_i) % 900) + 100)}-#{format('%04d', (((n * 17) + Time.current.to_i) % 9000) + 1000)}" }
+      phone_type { 'voice' }
+      date_of_birth { 30.years.ago }
+      timezone { 'Eastern Time (US & Canada)' }
+      locale { 'en' }
+      # Ensure admin users are verified and active for login
       email_verified { true }
       verified { true }
+      status { :active }
     end
 
     factory :evaluator, class: 'Users::Evaluator' do
@@ -260,13 +268,22 @@ FactoryBot.define do
     status { :approved } # Default to an approved vendor
     w9_status { :approved } # Default to W9 approved
 
-    after(:build) do |vendor|
+    after(:create) do |vendor|
       unless vendor.w9_form.attached?
+        # Temporarily skip the W9 callback during attachment
+        vendor.define_singleton_method(:update_w9_status_on_form_upload) { nil }
+
         vendor.w9_form.attach(
           io: Rails.root.join('test/fixtures/files/sample_w9.pdf').open,
           filename: 'sample_w9.pdf',
           content_type: 'application/pdf'
         )
+
+        # Set w9_status to approved after file attachment, bypassing callbacks
+        vendor.update_column(:w9_status, :approved)
+
+        # Re-enable the callback for normal operation
+        vendor.singleton_class.send(:remove_method, :update_w9_status_on_form_upload)
       end
     end
 

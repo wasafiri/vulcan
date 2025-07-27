@@ -20,11 +20,11 @@
         <% if current_user %>
           <div class="flex items-center space-x-4">
             <div><%= current_user.full_name %></div>
-            <div><%= link_to "Profile", edit_vendor_profile_path, class: "text-gray-200 hover:text-white" %></div>
-            <div><%= link_to "Dashboard", vendor_dashboard_path, class: "text-gray-200 hover:text-white" %></div>
-            <div><%= link_to "Vouchers", vendor_vouchers_path, class: "text-gray-200 hover:text-white" %></div>
-            <div><%= link_to "Transactions", vendor_transactions_path, class: "text-gray-200 hover:text-white" %></div>
-            <div><%= link_to "Invoices", vendor_invoices_path, class: "text-gray-200 hover:text-white" %></div>
+            <div><%= link_to "Profile", edit_vendor_portal_profile_path, class: "text-gray-200 hover:text-white" %></div>
+            <div><%= link_to "Dashboard", vendor_portal_dashboard_path, class: "text-gray-200 hover:text-white" %></div>
+            <div><%= link_to "Vouchers", vendor_portal_vouchers_path, class: "text-gray-200 hover:text-white" %></div>
+            <div><%= link_to "Transactions", vendor_portal_transactions_path, class: "text-gray-200 hover:text-white" %></div>
+            <div><%= link_to "Invoices", vendor_portal_invoices_path, class: "text-gray-200 hover:text-white" %></div>
             <div><%= button_to "Sign Out", sign_out_path, method: :delete, data: { turbo: false }, class: "text-gray-200 hover:text-white" %></div>
           </div>
         <% end %>

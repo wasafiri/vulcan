@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
-require 'application_system_test_case'
+require 'test_helper'
 
 module Admin
-  class EmailTemplatesTest < ApplicationSystemTestCase
+  class EmailTemplatesTest < ActiveSupport::TestCase
     MockViewContext = Struct.new(:sample_data_for_template) do
       def sample_data_for_template(_template_name)
         { 'name' => 'System Test User' }
@@ -14,7 +14,7 @@ module Admin
       # Ensure we start with clean database state
       DatabaseCleaner.clean if defined?(DatabaseCleaner)
 
-      @admin = users(:admin) || create(:admin)
+      @admin = create(:admin)
       unique_id = SecureRandom.hex(4)
       html_name  = "test_template_html_#{unique_id}"
       text_name  = "test_template_text_#{unique_id}"
@@ -51,8 +51,6 @@ module Admin
       Admin::EmailTemplatesController.any_instance.stubs(:view_context).returns(
         MockViewContext.new
       )
-
-      system_test_sign_in(@admin) # Use the correct authentication method
     end
 
     teardown do

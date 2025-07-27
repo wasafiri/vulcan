@@ -16,6 +16,7 @@ class Policy < ApplicationRecord
 
   after_update :log_change
 
+  RATE_LIMIT_ACTIONS = %i[proof_submission].freeze
   RATE_LIMIT_KEYS = %w[
     proof_submission_rate_limit_web
     proof_submission_rate_limit_email
@@ -33,6 +34,8 @@ class Policy < ApplicationRecord
   ].freeze
 
   def self.rate_limit_for(action, method)
+    return nil unless action.to_sym.in?(RATE_LIMIT_ACTIONS)
+
     max_value = get("#{action}_rate_limit_#{method}")
     period_value = get("#{action}_rate_period")
 

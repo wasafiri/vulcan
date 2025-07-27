@@ -13,7 +13,7 @@ class TwoFactorAuthenticationsController < ApplicationController
   include TwoFactorVerification
   include TurboStreamResponseHandling
 
-  before_action :ensure_two_factor_initiated, except: %i[setup]
+  before_action :ensure_two_factor_initiated_unless_skipped, except: %i[setup]
   before_action :authenticate_user!, only: %i[setup]
   skip_before_action :authenticate_user!, only: %i[verify verify_method process_verification verification_options setup]
 
@@ -298,25 +298,25 @@ class TwoFactorAuthenticationsController < ApplicationController
       # since complete_two_factor_authentication does a redirect
       stored_location = TwoFactorAuth.get_return_path(session) || session.delete(:return_to)
       TwoFactorAuth.complete_authentication(session)
-      _create_and_set_session_cookie(@user)
+      session_record = _create_and_set_session_cookie(@user)
 
-      return_to = stored_location || _dashboard_for(@user)
-      render json: { status: 'success', redirect_url: return_to }
+      if session_record
+        # Clear the challenge only after successful sign-in
+        TwoFactorAuth.clear_challenge(session)
+        return_to = stored_location || _dashboard_for(@user)
+        render json: { status: 'success', redirect_url: return_to }
+      else
+        render json: { error: 'Unable to create session' }, status: :unprocessable_entity
+      end
     end
   end
 
   # Handle failed verification response
   def handle_failed_verification(format, message)
-    # Determine appropriate status code based on error message
     status = determine_error_status(message)
 
     format.html do
-      # Set up instance variables needed by the verification templates
-      @user = find_user_for_two_factor
-      @webauthn_enabled = @user.webauthn_credentials.exists?
-      @totp_enabled = @user.totp_credentials.exists?
-      @sms_enabled = @user.sms_credentials.exists?
-
+      set_verification_context
       template = verification_template_for_type(@type)
       handle_error_response(
         html_render_action: template,
@@ -325,18 +325,20 @@ class TwoFactorAuthenticationsController < ApplicationController
       )
     end
     format.turbo_stream do
-      # Set up instance variables needed by the verification templates
-      @user = find_user_for_two_factor
-      @webauthn_enabled = @user.webauthn_credentials.exists?
-      @totp_enabled = @user.totp_credentials.exists?
-      @sms_enabled = @user.sms_credentials.exists?
-
+      set_verification_context
       handle_error_response(
         error_message: message,
         status: status
       )
     end
     format.json { render json: { error: message }, status: status }
+  end
+
+  def set_verification_context
+    @user = find_user_for_two_factor
+    @webauthn_enabled = @user.webauthn_credentials.exists?
+    @totp_enabled = @user.totp_credentials.exists?
+    @sms_enabled = @user.sms_credentials.exists?
   end
 
   # Determine appropriate HTTP status code based on error message
@@ -381,5 +383,11 @@ class TwoFactorAuthenticationsController < ApplicationController
     # Use the standardized session key from the TwoFactorAuth module
     user_id = session[TwoFactorAuth::SESSION_KEYS[:temp_user_id]]
     User.find_by(id: user_id) if user_id
+  end
+
+  def ensure_two_factor_initiated_unless_skipped
+    return if session[:skip_2fa]
+
+    ensure_two_factor_initiated
   end
 end

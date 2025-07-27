@@ -4,6 +4,7 @@ class Invoice < ApplicationRecord
   belongs_to :vendor, class_name: 'User'
   has_many :vouchers, dependent: :nullify
   has_many :voucher_transactions, dependent: :nullify
+  has_many :events, as: :auditable, dependent: :destroy
 
   validates :start_date, presence: true
   validates :end_date, presence: true

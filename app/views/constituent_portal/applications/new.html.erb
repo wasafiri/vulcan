@@ -5,7 +5,7 @@
       Skip to main content
     </a>
     <!-- Wrap the form container with an id for the skip link -->
-    <div id="main-content" tabindex="-1" class="bg-white p-4 sm:p-8 rounded shadow-md">
+    <div id="main-content" tabindex="-1" class="bg-white p-4 sm:p-8 rounded shadow-md" data-controller="dependent-selector">
       <h1 class="text-2xl font-semibold mb-6 text-center" id="form-title" data-dependent-selector-target="formTitle">
         <% if @applicant_type == 'dependent' && @selected_dependent_name.present? %>
           New Application for <%= @selected_dependent_name %>
@@ -25,13 +25,14 @@
           class: "space-y-6",
           "aria-labelledby": "form-title",
           data: { 
-            controller: "income-validation currency-formatter accessibility-announcer autosave dependent-selector", 
+            controller: "income-validation currency-formatter accessibility-announcer autosave", 
             autosave_target: "form",
             autosave_url_value: autosave_field_constituent_portal_applications_path,
             autosave_debounce_wait_value: 1000,
             autosave_edit_form_url_value: constituent_portal_application_path(':id'),
             autosave_edit_autosave_url_value: autosave_field_constituent_portal_application_path(':id'),
-            income_validation_fpl_url_value: fpl_thresholds_constituent_portal_applications_path
+            "income-validation-fpl-thresholds-value": fpl_thresholds_json,
+            "income-validation-modifier-value": fpl_modifier_value
           }) do |form| %>
           
         <!-- Autosave status indicator -->
@@ -90,7 +91,7 @@
                   class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-500 rounded-md",
                   "aria-describedby": "household_size_help",
                   data: { 
-                    income_validation_target: "householdSize"
+                    "income-validation-target": "householdSize"
                   } %>
             </div>
             <p class="mt-2 text-sm text-gray-700" id="household_size_help">
@@ -112,7 +113,7 @@
                   "aria-labelledby": "annual_income_label annual_income_help",
                   inputmode: "decimal",
                   data: { 
-                    income_validation_target: "annualIncome",
+                    "income-validation-target": "annualIncome",
                     currency_formatter_target: "input"
                   } %>
             </div>
@@ -136,14 +137,16 @@
               <%= form.text_field :physical_address_1, 
                   value: @address[:physical_address_1],
                   class: "mt-1 block w-full h-10 py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-                  required: true %>
+                  required: true,
+                  data: { no_autosave: true } %>
             </div>
             
             <div>
               <%= form.label :physical_address_2, "Apartment/Suite", class: "block text-sm font-medium text-gray-700" %>
               <%= form.text_field :physical_address_2, 
                   value: @address[:physical_address_2],
-                  class: "mt-1 block w-full h-10 py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" %>
+                  class: "mt-1 block w-full h-10 py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+                  data: { no_autosave: true } %>
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -152,7 +155,8 @@
                 <%= form.text_field :city, 
                     value: @address[:city],
                     class: "mt-1 block w-full h-10 py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-                    required: true %>
+                    required: true,
+                    data: { no_autosave: true } %>
               </div>
               
               <div>
@@ -175,7 +179,8 @@
                     ], (@address && @address.respond_to?(:[]) ? @address[:state] : nil) || params.dig(:application, :state) || current_user&.state || "MD"),
                     { include_blank: "Select State" },
                     { class: "mt-1 block w-full h-10 py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-                      required: true } %>
+                      required: true,
+                      data: { no_autosave: true } } %>
               </div>
               
               <div>
@@ -185,7 +190,8 @@
                     class: "mt-1 block w-full h-10 py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
                     required: true,
                     pattern: "\\d{5}(-\\d{4})?",
-                    title: "5-digit zip code (12345) or 9-digit zip code (12345-6789)" %>
+                    title: "5-digit zip code (12345) or 9-digit zip code (12345-6789)",
+                    data: { no_autosave: true } %>
               </div>
             </div>
           </div>
@@ -200,18 +206,18 @@
                      id: "apply_for_self",
                      class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
                      data: { 
-                       action: "change->dependent-selector#toggleAction",
+                       action: "click->dependent-selector#toggleAction",
                        "dependent-selector-target": "applySelfRadio"
                      } %>
               <%= label_tag "apply_for_self", "Myself", class: "ml-3 text-sm text-gray-700" %>
             </div>
-            <% if current_user&.dependents&.any? %>
+            <% if @dependents&.any? %>
               <div class="flex items-center">
                 <%= radio_button_tag "application[for_self]", "false", @applicant_type == 'dependent',
                        id: "apply_for_dependent",
                        class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
                        data: { 
-                         action: "change->dependent-selector#toggleAction",
+                         action: "click->dependent-selector#toggleAction",
                          "dependent-selector-target": "applyDependentRadio"
                        } %>
                 <%= label_tag "apply_for_dependent", "A dependent I manage", class: "ml-3 text-sm text-gray-700" %>
@@ -219,24 +225,26 @@
             <% end %>
           </div>
 
-          <% if current_user&.dependents&.any? %>
-            <div id="dependent-selection-fields" class="space-y-4" data-dependent-selector-target="dependentSection" style="<%= @applicant_type == 'dependent' ? 'display: block;' : 'display: none;' %>">
-              <div>
-                <%= form.label :user_id, "Select Dependent", class: "block text-sm font-medium text-gray-700" %>
-                <%= form.select :user_id,
-                    options_for_select(current_user.dependents.map { |d| [d.full_name, d.id] }, @application.user_id),
-                    { include_blank: "Select a Dependent" },
-                    { class: "mt-1 block w-full h-10 py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
-                      required: @application.for_dependent?,
-                      data: { 
-                        "dependent-selector-target": "dependentSelect",
-                        action: "change->dependent-selector#selectDependentAction"
-                      } } %>
+          <% if @dependents&.any? %>
+            <%= turbo_frame_tag :dependent_select_frame do %>
+              <div id="dependent-selection-fields" class="space-y-4" data-dependent-selector-target="dependentSection" style="<%= @applicant_type == 'dependent' ? 'display: block;' : 'display: none;' %>">
+                <div>
+                  <%= form.label :user_id, "Select Dependent", class: "block text-sm font-medium text-gray-700" %>
+                  <%= form.select :user_id,
+                      options_for_select(@dependents.map { |d| [d.full_name, d.id] }, @application.user_id),
+                      { include_blank: "Select a Dependent" },
+                      { class: "mt-1 block w-full h-10 py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
+                        required: @application.for_dependent?,
+                        data: { 
+                          "dependent-selector-target": "dependentSelect",
+                          action: "change->dependent-selector#selectDependentAction"
+                        } } %>
+                </div>
+                <p class="mt-2 text-sm text-gray-700">
+                  If you don't see the dependent you want to select in the dropdown box, create one first by going to your <%= link_to "dashboard", constituent_portal_dashboard_path, class: "text-indigo-600 hover:text-indigo-500" %> and click on "Add New Dependent".
+                </p>
               </div>
-              <p class="mt-2 text-sm text-gray-700">
-                If you don't see the dependent you want to select in the dropdown box, create one first by going to your <%= link_to "dashboard", constituent_portal_dashboard_path, class: "text-indigo-600 hover:text-indigo-500" %> and click on "Add New Dependent".
-              </p>
-            </div>
+            <% end %>
           <% end %>
         </section>
 
@@ -365,7 +373,7 @@
               name: "submit_application",
               class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500",
               "aria-label": "Submit final application",
-              data: { income_validation_target: "submitButton" } %>
+              data: { "income-validation-target": "submitButton" } %>
         </div>
       <% end %>
     </div>

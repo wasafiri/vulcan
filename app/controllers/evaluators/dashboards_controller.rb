@@ -58,7 +58,7 @@ module Evaluators
         @section_title = 'Requested Evaluations'
       when 'scheduled'
         @filtered_evaluations = current_user.admin? ? Evaluation.active : current_user.evaluations.active
-        @filtered_evaluations = @filtered_evaluations.order(evaluation_datetime: :asc)
+        @filtered_evaluations = @filtered_evaluations.order(evaluation_date: :asc)
         @section_title = 'Scheduled Evaluations'
       when 'completed'
         @filtered_evaluations = current_user.admin? ? Evaluation.completed_evaluations : current_user.evaluations.completed_evaluations
@@ -83,7 +83,7 @@ module Evaluators
       # Data for dashboard tables - limit to 5 items for each section
       @requested_evaluations_display = @requested_evaluations.order(created_at: :desc).limit(5)
       @upcoming_evaluations = (current_user.admin? ? Evaluation.active : current_user.evaluations.active)
-                              .order(evaluation_datetime: :asc).limit(5)
+                                 .order(evaluation_date: :asc).limit(5)
       @recent_evaluations = (current_user.admin? ? Evaluation.completed_evaluations : current_user.evaluations.completed_evaluations)
                             .order(evaluation_date: :desc).limit(5)
     end

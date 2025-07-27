@@ -6,6 +6,9 @@ class MedicalCertificationFlowTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
 
   def setup
+    # Ensure required email templates exist
+    create_medical_provider_email_templates
+
     # Use unique emails with a timestamp to avoid email duplication errors
     timestamp = Time.current.to_i
     @admin = create(:admin, email: "mcf_admin_#{timestamp}@example.com")
@@ -45,6 +48,7 @@ class MedicalCertificationFlowTest < ActionDispatch::IntegrationTest
 
     # 5. Verify notification was created
     notification = Notification.last
+    assert_not_nil notification, "Expected notification to be created but was nil"
     assert_equal 'medical_certification_requested', notification.action
     assert_equal @application.user.id, notification.recipient_id
     assert_equal @admin.id, notification.actor_id
@@ -128,5 +132,29 @@ class MedicalCertificationFlowTest < ActionDispatch::IntegrationTest
     clear_enqueued_jobs
     clear_performed_jobs
     Current.reset
+  end
+
+  private
+
+  def create_medical_provider_email_templates
+    # Create medical_provider_request_certification template
+    unless EmailTemplate.exists?(name: 'medical_provider_request_certification', format: :text)
+      EmailTemplate.create!(
+        name: 'medical_provider_request_certification',
+        format: :text,
+        subject: 'Medical Certification Request',
+        body: "Dear Medical Provider,\n\n" \
+              "We need medical certification for %<constituent_full_name>s.\n\n" \
+              "Application ID: %<application_id>s\n" \
+              "Date: %<timestamp_formatted>s\n" \
+              "DOB: %<constituent_dob_formatted>s\n" \
+              "Address: %<constituent_address_formatted>s\n\n" \
+              "%<request_count_message>s\n\n" \
+              "Download form: %<download_form_url>s\n\n" \
+              "Please provide the required certification.\n\n" \
+              "Thank you.",
+        description: 'Sent to medical providers requesting certification.'
+      )
+    end
   end
 end

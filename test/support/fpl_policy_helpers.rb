@@ -9,15 +9,35 @@ module FplPolicyHelpers
       end
     end
 
-    # Set up 2024 FPL values for testing purposes (matching db/seeds.rb)
-    Policy.find_or_create_by(key: 'fpl_1_person').update(value: 15_650)
-    Policy.find_or_create_by(key: 'fpl_2_person').update(value: 21_150)
-    Policy.find_or_create_by(key: 'fpl_3_person').update(value: 26_650)
-    Policy.find_or_create_by(key: 'fpl_4_person').update(value: 32_150)
-    Policy.find_or_create_by(key: 'fpl_5_person').update(value: 37_650)
-    Policy.find_or_create_by(key: 'fpl_6_person').update(value: 43_150)
-    Policy.find_or_create_by(key: 'fpl_7_person').update(value: 48_650)
-    Policy.find_or_create_by(key: 'fpl_8_person').update(value: 54_150)
-    Policy.find_or_create_by(key: 'fpl_modifier_percentage').update(value: 400)
+    # Use find_or_initialize_by with explicit update to avoid race conditions
+    policies = [
+      { key: 'fpl_1_person', value: 15_650 },
+      { key: 'fpl_2_person', value: 21_150 },
+      { key: 'fpl_3_person', value: 26_650 },
+      { key: 'fpl_4_person', value: 32_150 },
+      { key: 'fpl_5_person', value: 37_650 },
+      { key: 'fpl_6_person', value: 43_150 },
+      { key: 'fpl_7_person', value: 48_650 },
+      { key: 'fpl_8_person', value: 54_150 },
+      { key: 'fpl_modifier_percentage', value: 400 },
+      { key: 'proof_submission_rate_limit_web', value: 10 },
+      { key: 'proof_submission_rate_limit_email', value: 5 },
+      { key: 'proof_submission_rate_period', value: 24 },
+      { key: 'max_proof_rejections', value: 3 }
+    ]
+
+    policies.each do |policy_attrs|
+      # Use find_or_create_by to handle race conditions in parallel tests
+      Policy.find_or_create_by(key: policy_attrs[:key]) do |policy|
+        policy.value = policy_attrs[:value]
+      end
+    rescue ActiveRecord::RecordNotUnique
+      # Handle race condition where another thread created the policy
+      # Just update the existing one
+      existing_policy = Policy.find_by(key: policy_attrs[:key])
+      if existing_policy && existing_policy.value != policy_attrs[:value]
+        existing_policy.update!(value: policy_attrs[:value])
+      end
+    end
   end
 end

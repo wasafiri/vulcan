@@ -36,10 +36,12 @@ class TrainingSessionNotifier
     NotificationService.create_and_deliver!(
       type: notification_action,
       recipient: training_session.constituent,
-      actor: training_session.trainer,
-      notifiable: training_session,
-      metadata: notification_metadata,
-      channel: :email
+      options: {
+        actor: training_session.trainer,
+        notifiable: training_session,
+        metadata: notification_metadata,
+        channel: :email
+      }
     )
   rescue StandardError => e
     Rails.logger.error "Failed to send training session notification via NotificationService: #{e.message}"

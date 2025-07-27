@@ -19,7 +19,7 @@ module VendorPortal
     end
 
     def test_get_show
-      get vendor_dashboard_path
+      get vendor_portal_dashboard_path
       assert_response :success
       # Instead of checking assigns which is deprecated in newer Rails,
       # check for content in the response body that indicates the page loaded correctly

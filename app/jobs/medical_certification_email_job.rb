@@ -72,14 +72,16 @@ class MedicalCertificationEmailJob < ApplicationJob
     NotificationService.create_and_deliver!(
       type: 'medical_certification_requested',
       recipient: recipient,
-      actor: actor,
-      notifiable: application,
-      metadata: {
-        timestamp: timestamp,
-        provider: application.medical_provider_name,
-        provider_email: application.medical_provider_email
-      },
-      channel: :email
+      options: {
+        actor: actor,
+        notifiable: application,
+        metadata: {
+          timestamp: timestamp,
+          provider: application.medical_provider_name,
+          provider_email: application.medical_provider_email
+        },
+        channel: :email
+      }
     )
   end
 end

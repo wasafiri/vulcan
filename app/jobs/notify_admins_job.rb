@@ -20,9 +20,11 @@ class NotifyAdminsJob < ApplicationJob
       NotificationService.create_and_deliver!(
         type: 'proof_needs_review',
         recipient: admin,
-        actor: application.user,
-        notifiable: application,
-        channel: :email
+        options: {
+          actor: application.user,
+          notifiable: application,
+          channel: :email
+        }
       )
     end
   end

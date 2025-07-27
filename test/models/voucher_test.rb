@@ -9,6 +9,9 @@ class VoucherTest < ActiveSupport::TestCase
     # Clear email deliveries to prevent test pollution
     ActionMailer::Base.deliveries.clear
 
+    # Ensure required email templates exist for voucher notifications
+    create_voucher_email_templates
+
     Current.user = create(:admin)
     # Create a constituent with a unique email for each test to avoid email conflicts
     constituent = create(:constituent, email: "unique_setup_#{Time.now.to_i}_#{rand(1000)}@example.com")
@@ -250,5 +253,42 @@ class VoucherTest < ActiveSupport::TestCase
     end
 
     assert_equal 1, ActionMailer::Base.deliveries.size
+  end
+
+  private
+
+  def create_voucher_email_templates
+    # Create voucher_assigned template (no header/footer required)
+    unless EmailTemplate.exists?(name: 'voucher_notifications_voucher_assigned', format: :text)
+      EmailTemplate.create!(
+        name: 'voucher_notifications_voucher_assigned',
+        format: :text,
+        subject: 'Your Voucher Has Been Assigned',
+        body: "Dear %<user_first_name>s,\n\nYour voucher %<voucher_code>s with value %<initial_value_formatted>s has been assigned.\n\nExpires: %<expiration_date_formatted>s\n\nValid for %<validity_period_months>s months.\nMinimum redemption: %<minimum_redemption_amount_formatted>s",
+        description: 'Sent when a voucher is assigned to a constituent.'
+      )
+    end
+
+    # Create voucher_expired template (requires header/footer)
+    unless EmailTemplate.exists?(name: 'voucher_notifications_voucher_expired', format: :text)
+      EmailTemplate.create!(
+        name: 'voucher_notifications_voucher_expired',
+        format: :text,
+        subject: 'Your Voucher Has Expired',
+        body: "%<header_text>s\n\nDear %<user_first_name>s,\n\nYour voucher %<voucher_code>s has expired.\n\nInitial Value: %<initial_value_formatted>s\nUnused Value: %<unused_value_formatted>s\nExpiration Date: %<expiration_date_formatted>s\n\n%<footer_text>s",
+        description: 'Sent when a voucher expires.'
+      )
+    end
+
+    # Create voucher_redeemed template (no header/footer required)
+    unless EmailTemplate.exists?(name: 'voucher_notifications_voucher_redeemed', format: :text)
+      EmailTemplate.create!(
+        name: 'voucher_notifications_voucher_redeemed',
+        format: :text,
+        subject: 'Voucher Successfully Redeemed',
+        body: "Dear %<vendor_business_name>s,\n\nVoucher %<voucher_code>s has been redeemed by %<user_first_name>s.\n\nTransaction Date: %<transaction_date_formatted>s\nAmount: %<transaction_amount_formatted>s\nReference: %<transaction_reference_number>s\nExpiration Date: %<expiration_date_formatted>s\nRemaining Balance: %<remaining_balance_formatted>s\n\n%<remaining_value_message_text>s\n%<fully_redeemed_message_text>s",
+        description: 'Sent when a voucher is redeemed.'
+      )
+    end
   end
 end

@@ -9,11 +9,13 @@
 #   NotificationService.create_and_deliver!(
 #     type: :proof_approved,
 #     recipient: user,
-#     actor: admin,
-#     notifiable: application,
-#     audit: true,
-#     channel: :email,
-#     metadata: { custom_key: 'value' }
+#     options: {
+#       actor: admin,
+#       notifiable: application,
+#       audit: true,
+#       channel: :email,
+#       metadata: { custom_key: 'value' }
+#     }
 #   )
 #
 class NotificationService
@@ -22,14 +24,21 @@ class NotificationService
     #
     # @param type [Symbol] The action type of the notification (e.g., :proof_rejected).
     # @param recipient [User] The user who will receive the notification.
-    # @param actor [User, nil] The user who initiated the action.
-    # @param notifiable [ActiveRecord::Base, nil] The object associated with the notification.
-    # @param deliver [Boolean] Whether to enqueue the notification for delivery.
-    # @param audit [Boolean] Whether to create an Event record for the audit trail.
-    # @param channel [Symbol] The delivery channel (:email, :sms, etc.).
-    # @param options [Hash] Additional options, including :metadata.
+    # @param options [Hash] Additional options with the following keys:
+    #   :actor [User, nil] The user who initiated the action (default: nil)
+    #   :notifiable [ActiveRecord::Base, nil] The object associated with the notification (default: nil)
+    #   :deliver [Boolean] Whether to enqueue the notification for delivery (default: true)
+    #   :audit [Boolean] Whether to create an Event record for the audit trail (default: false)
+    #   :channel [Symbol] The delivery channel (:email, :sms, etc.) (default: :email)
+    #   :metadata [Hash] Additional metadata to include in the notification
     # @return [Notification, nil] The created Notification record, or nil on failure if errors are ignored.
-    def create_and_deliver!(type:, recipient:, actor: nil, notifiable: nil, deliver: true, audit: false, channel: :email, **options)
+    def create_and_deliver!(type:, recipient:, **options)
+      actor = options.fetch(:actor) { default_actor }
+      notifiable = options[:notifiable]
+      deliver = options.fetch(:deliver, true)
+      audit = options.fetch(:audit, false)
+      channel = options.fetch(:channel, :email)
+
       Rails.logger.info "Creating notification: #{type} for #{recipient.class.name}##{recipient.id} via #{channel}"
 
       notification = create_notification!(
@@ -151,6 +160,10 @@ class NotificationService
     rescue StandardError => e
       Rails.logger.error "NotificationService: Audit log creation failed for Notification ##{notification.id}: #{e.message}"
       # We do not re-raise here, as audit logging failure should not prevent notification delivery.
+    end
+
+    def default_actor
+      User.admins&.first || User.find_by(email: 'system@mat.maryland.gov')
     end
   end
 end

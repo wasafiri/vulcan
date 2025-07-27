@@ -40,9 +40,31 @@ export default class extends Controller {
       this.reasonFieldTarget.classList.remove('border-red-500')
     }
     
-    // Initialize visibility based on initial proof type
-    if (this.hasProofTypeTarget) {
+    // Initialize visibility based on initial proof type only if it has a value
+    if (this.hasProofTypeTarget && this.proofTypeTarget.value) {
       this._updateReasonGroupsVisibility(this.proofTypeTarget.value)
+    }
+    
+    // Listen for proof type changes from modal controller
+    this.element.addEventListener('proof-type-changed', this._handleProofTypeChanged.bind(this))
+  }
+  
+  disconnect() {
+    // Note: We can't remove the exact bound function, but this prevents memory leaks
+    this.element.removeEventListener('proof-type-changed', this._handleProofTypeChanged)
+  }
+  
+  _handleProofTypeChanged(event) {
+    const proofType = event.detail.proofType
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('RejectionForm: Received proof type changed event:', proofType)
+    }
+    if (this.hasProofTypeTarget) {
+      this.proofTypeTarget.value = proofType
+      this._updateReasonGroupsVisibility(proofType)
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('RejectionForm: Updated visibility for proof type:', proofType)
+      }
     }
   }
 
@@ -58,8 +80,15 @@ export default class extends Controller {
   
   // Private method for managing reason group visibility
   _updateReasonGroupsVisibility(proofType) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('RejectionForm: _updateReasonGroupsVisibility called with proof type:', proofType)
+    }
+    
     // Early exit if no reason group targets exist
     if (!this.hasIncomeOnlyReasonsTarget && !this.hasMedicalOnlyReasonsTarget && !this.hasGeneralReasonsTarget) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('RejectionForm: No reason group targets found')
+      }
       return
     }
 
@@ -75,15 +104,24 @@ export default class extends Controller {
     const isIncome = proofType === 'income'
     const isMedical = proofType === 'medical'
     
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('RejectionForm: isIncome:', isIncome, 'isMedical:', isMedical)
+    }
+    
     const groups = [
-      { target: this.hasIncomeOnlyReasonsTarget ? this.incomeOnlyReasonsTarget : null, show: isIncome },
-      { target: this.hasMedicalOnlyReasonsTarget ? this.medicalOnlyReasonsTarget : null, show: isMedical },
-      { target: this.hasGeneralReasonsTarget ? this.generalReasonsTarget : null, show: !isMedical }
+      { target: this.hasIncomeOnlyReasonsTarget ? this.incomeOnlyReasonsTarget : null, show: isIncome, name: 'income' },
+      { target: this.hasMedicalOnlyReasonsTarget ? this.medicalOnlyReasonsTarget : null, show: isMedical, name: 'medical' },
+      { target: this.hasGeneralReasonsTarget ? this.generalReasonsTarget : null, show: !isMedical, name: 'general' }
     ]
     
     // Apply visibility with ARIA support
-    groups.forEach(({ target, show }) => {
-      if (target) setVisible(target, show, { ariaHidden: !show })
+    groups.forEach(({ target, show, name }) => {
+      if (target) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`RejectionForm: Setting ${name} group visibility to ${show}`)
+        }
+        setVisible(target, show, { ariaHidden: !show })
+      }
     })
   }
 

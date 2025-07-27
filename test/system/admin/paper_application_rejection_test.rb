@@ -101,13 +101,20 @@ module Admin
 
       # Select a rejection reason
       select 'Missing Name', from: 'income_proof_rejection_reason'
+      
+      # Wait for any JavaScript-triggered field population to complete
+      # The controller may populate the field with default text first
+      sleep 0.1
 
-      # Modify the notes
+      # Clear and set the custom message explicitly
       custom_message = 'Please provide a document with your full legal name clearly visible.'
-      fill_in 'income_proof_rejection_notes', with: custom_message
-
-      # Check that the notes field contains the custom message
       notes_field = find("[name='income_proof_rejection_notes']")
+      
+      # Clear the field first, then set the new value
+      notes_field.set('')
+      notes_field.set(custom_message)
+
+      # Check that the notes field contains only the custom message
       assert_equal custom_message, notes_field.value
     end
   end

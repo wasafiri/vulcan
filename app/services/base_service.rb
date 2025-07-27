@@ -34,7 +34,7 @@ class BaseService
   protected
 
   # Add an error message to the errors array
-  def add_error(message)
+  def add_error?(message)
     @errors << message
     false
   end
@@ -52,6 +52,6 @@ class BaseService
     Rails.logger.error error_message
     Rails.logger.error exception.backtrace.join("\n") if exception.backtrace
 
-    add_error(exception.message)
+    add_error?(exception.message)
   end
 end

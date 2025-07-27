@@ -76,9 +76,11 @@ class RegistrationsMailerTest < ActiveSupport::TestCase
         # Ensure required variables are present for EmailTemplate validation
         body: "Subject: Welcome to the Maryland Accessible Telecommunications Program\n\n" \
               "%<header_text>s\n\n" \
-              "Dear %<user_first_name>s (%<user_full_name>s),\n\n" \
+              "Dear %<user_full_name>s,\n\n" \
               "Welcome to the program.\n\n" \
               "Access your dashboard here: %<dashboard_url>s\n\n" \
+              "Apply for services: %<new_application_url>s\n\n" \
+              "Active vendors: %<active_vendors_text_list>s\n\n" \
               '%<footer_text>s',
         subject: 'Welcome to the Maryland Accessible Telecommunications Program',
         # Add description to satisfy validation

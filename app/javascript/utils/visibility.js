@@ -31,8 +31,18 @@ export function setVisible(element, visible, options = {}) {
   
   const { required, hiddenClass = 'hidden', ariaHidden } = options;
   
-  // Toggle visibility
-  element.classList.toggle(hiddenClass, !visible);
+  // Toggle visibility - handle both CSS classes and inline styles properly
+  if (visible) {
+    element.classList.remove(hiddenClass);
+    // Remove inline display:none that might override CSS classes
+    if (element.style.display === 'none') {
+      element.style.display = '';
+    }
+  } else {
+    element.classList.add(hiddenClass);
+    // Set inline style for elements that start with inline display:none
+    element.style.display = 'none';
+  }
   
   // Handle required attribute if specified
   if (required !== undefined) {

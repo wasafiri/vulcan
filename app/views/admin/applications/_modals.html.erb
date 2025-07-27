@@ -226,7 +226,7 @@ end
         <h3 id="proofRejectionModal-heading" class="text-lg font-medium text-gray-900 mb-4">Enter Rejection Reason</h3>
         <div class="mb-4">
           <p class="text-sm font-medium text-gray-700 mb-1">Predefined Rejection Reasons:</p>
-          <div class="flex flex-wrap gap-2 mb-2 general-reasons">
+          <div class="flex flex-wrap gap-2 mb-2 general-reasons" data-rejection-form-target="generalReasons">
             <button type="button"
                     class="px-3 py-1 bg-gray-200 rounded"
                     data-action="click->rejection-form#selectPredefinedReason"
@@ -252,7 +252,7 @@ end
               Wrong Document Type
             </button>
           </div>
-          <div class="flex flex-wrap gap-2 income-only-reasons hidden">
+          <div class="flex flex-wrap gap-2 income-only-reasons" data-rejection-form-target="incomeOnlyReasons" style="display: none;">
             <button type="button"
                     class="px-3 py-1 bg-gray-200 rounded"
                     data-action="click->rejection-form#selectPredefinedReason"
@@ -289,6 +289,7 @@ end
             <%= f.label :rejection_reason, "Reason for Rejection", class: "block text-sm font-medium text-gray-700" %>
             <%= f.text_area :rejection_reason,
                 rows: 4,
+                id: "rejection_reason",
                 class: "mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
                 required: true,
                 placeholder: "Please provide a detailed explanation...",
@@ -337,7 +338,7 @@ end
         <h3 id="medicalCertificationRejectionModal-heading" class="text-lg font-medium text-gray-900 mb-4">Enter Medical Certification Rejection Reason</h3>
         <div class="mb-4">
           <p class="text-sm font-medium text-gray-700 mb-1">Predefined Rejection Reasons:</p>
-          <div class="flex flex-wrap gap-2 mb-2 medical-only-reasons">
+          <div class="flex flex-wrap gap-2 mb-2 medical-only-reasons" data-rejection-form-target="medicalOnlyReasons">
             <button type="button"
                     class="px-3 py-1 bg-gray-200 rounded"
                     data-action="click->rejection-form#selectPredefinedReason"
@@ -393,6 +394,7 @@ end
             <%= f.label :rejection_reason, "Reason for Rejection", class: "block text-sm font-medium text-gray-700" %>
             <%= f.text_area :rejection_reason,
                 rows: 4,
+                id: "rejection_reason",
                 class: "mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm",
                 required: true,
                 placeholder: "Please provide a detailed explanation...",

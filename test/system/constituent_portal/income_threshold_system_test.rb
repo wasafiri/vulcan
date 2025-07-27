@@ -8,14 +8,14 @@ module ConstituentPortal
       @user = users(:constituent_john)
 
       # Set up FPL policies for testing
-      Policy.find_or_create_by(key: 'fpl_1_person').update(value: 15_000)
-      Policy.find_or_create_by(key: 'fpl_2_person').update(value: 20_000)
-      Policy.find_or_create_by(key: 'fpl_3_person').update(value: 25_000)
-      Policy.find_or_create_by(key: 'fpl_4_person').update(value: 30_000)
-      Policy.find_or_create_by(key: 'fpl_5_person').update(value: 35_000)
-      Policy.find_or_create_by(key: 'fpl_6_person').update(value: 40_000)
-      Policy.find_or_create_by(key: 'fpl_7_person').update(value: 45_000)
-      Policy.find_or_create_by(key: 'fpl_8_person').update(value: 50_000)
+      Policy.find_or_create_by(key: 'fpl_1_person').update(value: 15_650)
+      Policy.find_or_create_by(key: 'fpl_2_person').update(value: 21_150)
+      Policy.find_or_create_by(key: 'fpl_3_person').update(value: 26_650)
+      Policy.find_or_create_by(key: 'fpl_4_person').update(value: 32_150)
+      Policy.find_or_create_by(key: 'fpl_5_person').update(value: 37_650)
+      Policy.find_or_create_by(key: 'fpl_6_person').update(value: 43_150)
+      Policy.find_or_create_by(key: 'fpl_7_person').update(value: 48_650)
+      Policy.find_or_create_by(key: 'fpl_8_person').update(value: 54_150)
       Policy.find_or_create_by(key: 'fpl_modifier_percentage').update(value: 400)
 
       # Reliable sign in via shared helper
@@ -29,45 +29,62 @@ module ConstituentPortal
       # Visit the new application form
       visit new_constituent_portal_application_path
 
+      # Wait for the income validation controller to load its FPL data.
+      wait_for_fpl_data_to_load
+
       # Test cases for different household sizes and incomes
       test_cases = [
-        { household_size: 1, income: 59_999, expected_disabled: false }, # Below threshold
-        { household_size: 1, income: 60_001, expected_disabled: true },  # Above threshold
-        { household_size: 3, income: 99_999, expected_disabled: false }, # Below threshold
-        { household_size: 3, income: 100_001, expected_disabled: true }, # Above threshold
-        { household_size: 8, income: 199_999, expected_disabled: false }, # Below threshold
-        { household_size: 8, income: 200_001, expected_disabled: true } # Above threshold
+        { household_size: 1, income: 59_999, expected_disabled: false }, # Below threshold (15650*4=62600)
+        { household_size: 1, income: 65_000, expected_disabled: true },  # Above threshold
+        { household_size: 3, income: 99_999, expected_disabled: false }, # Below threshold (26650*4=106600)
+        { household_size: 3, income: 110_000, expected_disabled: true }, # Above threshold
+        { household_size: 8, income: 199_999, expected_disabled: false }, # Below threshold (54150*4=216600)
+        { household_size: 8, income: 220_000, expected_disabled: true } # Above threshold
       ]
 
-      # Test each case
+      # Test each case with proper field clearing
       test_cases.each do |test_case|
         household_size = test_case[:household_size]
         income = test_case[:income]
         expected_disabled = test_case[:expected_disabled]
 
-        # Fill in the household size and income
-        fill_in 'Household Size', with: household_size
-        fill_in 'Annual Income', with: income
+        # Clear and set field values explicitly to avoid concatenation issues
+        household_size_field = find('input[name*="household_size"]')
+        household_size_field.set('')  # Clear first
+        household_size_field.set(household_size)
+        
+        income_field = find('input[name*="annual_income"]')
+        income_field.set('')  # Clear first  
+        income_field.set(income)
 
-        # Trigger the validation by blurring the income field
-        find('body').click # Click elsewhere to trigger blur event
+        # Trigger validation events
+        household_size_field.trigger('change')
+        income_field.trigger('change')
+        
+        # Wait for validation to complete by checking expected button state
+        using_wait_time(10) do
+          submit_button = find('input[name="submit_application"]')
+          
+          if expected_disabled
+            # Wait for button to become disabled
+            assert submit_button.disabled?, 
+                   "Expected submit button to be disabled for household size #{household_size} and income #{income}"
+          else
+            # Wait for button to remain enabled (or become enabled if it was initially disabled)
+            assert_not submit_button.disabled?, 
+                       "Expected submit button to be enabled for household size #{household_size} and income #{income}"
+          end
+        end
 
-        # Wait a moment for the JavaScript to process
-        sleep 0.5
-
-        # Check if the submit button is disabled as expected
-        submit_button = find('input[name="submit_application"]')
-        actual_disabled = submit_button.disabled?
-
-        assert_equal expected_disabled, actual_disabled,
-                     "Expected submit button to be #{expected_disabled ? 'disabled' : 'enabled'} for household size #{household_size} and income #{income}"
-
-        # Check if the warning is displayed as expected
-        warning = find_by_id('income-threshold-warning', visible: false)
-        actual_visible = warning.visible?
-
-        assert_equal expected_disabled, actual_visible,
-                     "Expected warning to be #{expected_disabled ? 'visible' : 'hidden'} for household size #{household_size} and income #{income}"
+        # Check if the warning is displayed as expected using proper Capybara matchers
+        if expected_disabled
+          # Wait for warning to become visible
+          assert_selector '#income-threshold-warning', visible: true, wait: 10,
+                          text: /Income Exceeds Threshold/
+        else
+          # Wait for warning to remain hidden
+          assert_no_selector '#income-threshold-warning', visible: true, wait: 10
+        end
       end
     end
 
@@ -75,51 +92,89 @@ module ConstituentPortal
       # Visit the new application form
       visit new_constituent_portal_application_path
 
-      # Edge case 1: Exactly at the threshold
-      fill_in 'Household Size', with: 3
-      fill_in 'Annual Income', with: 100_000 # Exactly at the threshold (25000 * 4)
-      find('body').click # Trigger blur event
-      sleep 0.5
+      # Wait for the income validation controller to load its FPL data.
+      wait_for_fpl_data_to_load
 
-      # The button should be enabled (not disabled) when exactly at the threshold
+      # Edge case 1: Exactly at the threshold
+      household_size_field = find('input[name*="household_size"]')
+      household_size_field.set('')
+      household_size_field.set(3)
+      
+      income_field = find('input[name*="annual_income"]')
+      income_field.set('')
+      income_field.set(106_600) # Exactly at the threshold (26650 * 4)
+      
+      # Trigger validation and wait for completion
+      household_size_field.trigger('change')
+      income_field.trigger('change')
+      
+      # Use proper Capybara waiting - button should be enabled at threshold
       submit_button = find('input[name="submit_application"]')
-      assert_equal false, submit_button.disabled?,
+      using_wait_time(5) do
+        assert_not submit_button.disabled?,
                    'Submit button should be enabled when income is exactly at the threshold'
+      end
+      assert_no_selector '#income-threshold-warning', visible: true, wait: 5
 
       # Edge case 2: Very large household size
-      fill_in 'Household Size', with: 20
-      fill_in 'Annual Income', with: 199_999 # Below the threshold for size 8 (50000 * 4)
-      find('body').click # Trigger blur event
-      sleep 0.5
-
-      # The button should be enabled for large household sizes that fall back to size 8
-      submit_button = find('input[name="submit_application"]')
-      assert_equal false, submit_button.disabled?,
+      household_size_field.set('')
+      household_size_field.set(20)
+      
+      income_field.set('')
+      income_field.set(199_999) # Below the threshold for size 8 (54150 * 4 = 216600)
+      
+      # Trigger validation and wait for completion
+      household_size_field.trigger('change')
+      income_field.trigger('change')
+      
+      # Button should be enabled for large household sizes below threshold
+      using_wait_time(5) do
+        assert_not submit_button.disabled?,
                    'Submit button should be enabled for large household sizes below the threshold'
+      end
+      assert_no_selector '#income-threshold-warning', visible: true, wait: 5
 
       # Edge case 3: Very large income
-      fill_in 'Household Size', with: 1
-      fill_in 'Annual Income', with: 1_000_000 # Well above the threshold
-      find('body').click # Trigger blur event
-      sleep 0.5
-
-      # The button should be disabled for very large incomes
-      submit_button = find('input[name="submit_application"]')
-      assert_equal true, submit_button.disabled?,
-                   'Submit button should be disabled for very large incomes'
+      household_size_field.set('')
+      household_size_field.set(1)
+      
+      income_field.set('')
+      income_field.set(1_000_000) # Well above the threshold
+      
+      # Trigger validation and wait for completion
+      household_size_field.trigger('change')
+      income_field.trigger('change')
+      
+      # Button should be disabled for very large incomes
+      using_wait_time(5) do
+        assert submit_button.disabled?,
+                'Submit button should be disabled for very large incomes'
+      end
+      assert_selector '#income-threshold-warning', visible: true, wait: 5,
+                      text: /Income Exceeds Threshold/
 
       # Edge case 4: Zero values - this test is skipped because the current implementation
       # doesn't hide the warning for zero values if it was previously shown
       # This is a known issue that should be fixed in a future update
 
       # Reset the form to a known state
-      visit new_constituent_portal_application_path
+      refresh
+      wait_for_fpl_data_to_load
 
-      # Start with zero values
-      fill_in 'Household Size', with: 0
-      fill_in 'Annual Income', with: 0
+      # Start with zero values  
+      household_size_field = find('input[name*="household_size"]')
+      income_field = find('input[name*="annual_income"]')
+      
+      household_size_field.set('')
+      household_size_field.set(0)
+      
+      income_field.set('')
+      income_field.set(0)
+      
+      # Trigger validation
+      household_size_field.trigger('change')
+      income_field.trigger('change')
       find('body').click # Trigger blur event
-      sleep 0.5
 
       # The warning should not be visible initially
       warning = find_by_id('income-threshold-warning', visible: false)

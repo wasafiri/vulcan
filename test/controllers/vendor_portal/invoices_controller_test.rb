@@ -19,8 +19,8 @@ module VendorPortal
     end
 
     test 'should show invoices index' do
-      # Assuming vendor_invoices_url route exists
-      get vendor_invoices_url
+      # Using vendor_portal_invoices_url route
+      get vendor_portal_invoices_url
       assert_response :success
       # Add assertions to check for specific content on the invoices index page
       assert_select 'h1', 'My Invoices' # Corrected assertion to match view
@@ -29,9 +29,9 @@ module VendorPortal
     end
 
     test 'should show individual invoice' do
-      # Assuming a vendor invoice exists and vendor_invoice_url route exists
+      # Using vendor_portal_invoice_url route
       invoice = create(:invoice, vendor: @vendor_user, total_amount: 123.45) # Create an invoice associated with the vendor user
-      get vendor_invoice_url(invoice)
+      get vendor_portal_invoice_url(invoice)
       assert_response :success
       # Add assertions to check for content on the invoice show page
       assert_select 'h1', "Invoice ##{invoice.id}"
@@ -43,9 +43,9 @@ module VendorPortal
       another_vendor_user = create(:vendor_user)
       invoice_from_another_vendor = create(:invoice, vendor: another_vendor_user)
 
-      get vendor_invoice_url(invoice_from_another_vendor)
+      get vendor_portal_invoice_url(invoice_from_another_vendor)
       # Assuming the application redirects or returns a 404 for unauthorized access
-      assert_redirected_to vendor_invoices_url # Updated assertion to expect redirect
+      assert_redirected_to vendor_portal_invoices_url # Updated assertion to expect redirect
     end
 
     # Add more tests as needed for filtering, sorting, or other invoice index/show page features.

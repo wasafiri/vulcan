@@ -359,20 +359,18 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
     Event.expects(:create!).with(has_entry(action: 'proof_submission_processed')).once
 
     # Track performance for optimization
-    measure_time('Process email with attachment') do
-      # No bounce expected here - email should process successfully
-      assert_nothing_raised do
-        result = safe_receive_email(
-          to: MatVulcan::InboundEmailConfig.inbound_email_address,
-          from: @constituent.email,
-          subject: 'Income Proof Submission',
-          body: 'Please find my proof attached.',
-          attachments: {
-            'proof.pdf' => @pdf_content # Attachment provided but might not be seen by mail.attachments.each
-          }
-        )
-        assert result, 'Email processing failed unexpectedly'
-      end
+        # No bounce expected here - email should process successfully
+    assert_nothing_raised do
+      result = safe_receive_email(
+        to: MatVulcan::InboundEmailConfig.inbound_email_address,
+        from: @constituent.email,
+        subject: 'Income Proof Submission',
+        body: 'Please find my proof attached.',
+        attachments: {
+          'proof.pdf' => @pdf_content # Attachment provided but might not be seen by mail.attachments.each
+        }
+      )
+      assert result, 'Email processing failed unexpectedly'
 
       # Verify expectations for Event creation were met
       Mocha::Mockery.instance.verify
@@ -390,34 +388,32 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
   # 4. Verify that :bounce is thrown (indicating proper bounce handling)
   # 5. Verify notification email is sent to inform sender
   test 'bounces email from unknown sender' do
-    measure_time('Process email from unknown sender') do
-      # We need to stub the Event creation completely to avoid FK violations and focus on the bounce behavior
-      Event.stubs(:create!).returns(true)
+        # We need to stub the Event creation completely to avoid FK violations and focus on the bounce behavior
+    Event.stubs(:create!).returns(true)
 
-      # In a bounce scenario, we need to verify that:
-      # 1. An email is sent (the proof_submission_error notification)
-      # 2. The bounce event is triggered
+    # In a bounce scenario, we need to verify that:
+    # 1. An email is sent (the proof_submission_error notification)
+    # 2. The bounce event is triggered
 
-      # First, ensure the mail object is correctly delivered before the bounce
-      mail_double = mock('Mail')
-      mail_double.expects(:deliver_now).returns(true)
-      ApplicationNotificationsMailer.expects(:proof_submission_error).returns(mail_double)
+    # First, ensure the mail object is correctly delivered before the bounce
+    mail_double = mock('Mail')
+    mail_double.expects(:deliver_now).returns(true)
+    ApplicationNotificationsMailer.expects(:proof_submission_error).returns(mail_double)
 
-      # Now, we can't combine assert_emails with assert_throws
-      # because the throw interrupts the block - separate the concerns:
+    # Now, we can't combine assert_emails with assert_throws
+    # because the throw interrupts the block - separate the concerns:
 
-      # Verify the bounce happens - this tests the before_processing callback logic
-      assert_throws(:bounce) do
-        safe_receive_email(
-          to: MatVulcan::InboundEmailConfig.inbound_email_address,
-          from: 'unknown@example.com',
-          subject: 'Income Proof',
-          body: 'Proof attached.',
-          attachments: {
-            'proof.pdf' => @pdf_content
-          }
-        )
-      end
+    # Verify the bounce happens - this tests the before_processing callback logic
+    assert_throws(:bounce) do
+      safe_receive_email(
+        to: MatVulcan::InboundEmailConfig.inbound_email_address,
+        from: 'unknown@example.com',
+        subject: 'Income Proof',
+        body: 'Proof attached.',
+        attachments: {
+          'proof.pdf' => @pdf_content
+        }
+      )
     end
   end
 
@@ -432,33 +428,31 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
   # 4. Send email from constituent without active application
   # 5. Verify bounce occurs and proper audit event is created
   test 'bounces email from constituent without active application' do
-    measure_time('Process email without active application') do
-      # Create a constituent without an active application using FactoryBot
-      # Use a unique email to prevent conflicts with other tests
-      unique_email = "mark.smith.#{SecureRandom.hex(4)}@example.com"
-      constituent_without_app = create(:constituent, email: unique_email)
+        # Create a constituent without an active application using FactoryBot
+    # Use a unique email to prevent conflicts with other tests
+    unique_email = "mark.smith.#{SecureRandom.hex(4)}@example.com"
+    constituent_without_app = create(:constituent, email: unique_email)
 
-      # Ensure any applications are not in an active state
-      # Create an application and immediately mark it rejected
-      create(:application, user: constituent_without_app, status: :rejected)
+    # Ensure any applications are not in an active state
+    # Create an application and immediately mark it rejected
+    create(:application, user: constituent_without_app, status: :rejected)
 
-      # First, ensure the mail object is correctly delivered before the bounce
-      mail_double = mock('Mail')
-      mail_double.expects(:deliver_now).returns(true)
-      ApplicationNotificationsMailer.expects(:proof_submission_error).returns(mail_double)
+    # First, ensure the mail object is correctly delivered before the bounce
+    mail_double = mock('Mail')
+    mail_double.expects(:deliver_now).returns(true)
+    ApplicationNotificationsMailer.expects(:proof_submission_error).returns(mail_double)
 
-      # Verify the bounce happens - this tests the active application check
-      assert_throws(:bounce) do
-        safe_receive_email(
-          to: MatVulcan::InboundEmailConfig.inbound_email_address,
-          from: constituent_without_app.email,
-          subject: 'Income Proof',
-          body: 'Proof attached.',
-          attachments: {
-            'proof.pdf' => @pdf_content
-          }
-        )
-      end
+    # Verify the bounce happens - this tests the active application check
+    assert_throws(:bounce) do
+      safe_receive_email(
+        to: MatVulcan::InboundEmailConfig.inbound_email_address,
+        from: constituent_without_app.email,
+        subject: 'Income Proof',
+        body: 'Proof attached.',
+        attachments: {
+          'proof.pdf' => @pdf_content
+        }
+      )
 
       # Verify the correct audit event was created
       latest_event = get_latest_event
@@ -476,21 +470,19 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
   # 3. Verify bounce occurs due to missing attachments
   # 4. Verify proper audit event is created
   test 'bounces email without attachments' do
-    measure_time('Process email without attachments') do
-      # First, ensure the mail object is correctly delivered before the bounce
-      mail_double = mock('Mail')
-      mail_double.expects(:deliver_now).returns(true)
-      ApplicationNotificationsMailer.expects(:proof_submission_error).returns(mail_double)
+        # First, ensure the mail object is correctly delivered before the bounce
+    mail_double = mock('Mail')
+    mail_double.expects(:deliver_now).returns(true)
+    ApplicationNotificationsMailer.expects(:proof_submission_error).returns(mail_double)
 
-      # Verify the bounce happens - this tests the attachment validation logic
-      assert_throws(:bounce) do
-        safe_receive_email(
-          to: MatVulcan::InboundEmailConfig.inbound_email_address,
-          from: @constituent.email,
-          subject: 'Income Proof',
-          body: 'I forgot to attach the proof!'
-        )
-      end
+    # Verify the bounce happens - this tests the attachment validation logic
+    assert_throws(:bounce) do
+      safe_receive_email(
+        to: MatVulcan::InboundEmailConfig.inbound_email_address,
+        from: @constituent.email,
+        subject: 'Income Proof',
+        body: 'I forgot to attach the proof!'
+      )
 
       # Verify the correct audit event was created
       latest_event = get_latest_event
@@ -509,31 +501,29 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
   # 4. Verify bounce occurs due to max rejections policy
   # 5. Verify proper audit event is created
   test 'bounces email when max rejections reached' do
-    measure_time('Process email with max rejections') do
-      # Update the application to have max rejections
-      max_rejections = 3 # Use the value we set up in the setup method
-      @application.update_columns(total_rejections: max_rejections) # Use update_columns to bypass callbacks
+        # Update the application to have max rejections
+    max_rejections = 3 # Use the value we set up in the setup method
+    @application.update_columns(total_rejections: max_rejections) # Use update_columns to bypass callbacks
 
-      # Debug: Verify the application state
-      @application.reload
-      # Check rejection count and policy settings
+    # Debug: Verify the application state
+    @application.reload
+    # Check rejection count and policy settings
 
-      # First, ensure the mail object is correctly delivered before the bounce
-      mail_double = mock('Mail')
-      mail_double.expects(:deliver_now).returns(true)
-      ApplicationNotificationsMailer.expects(:proof_submission_error).returns(mail_double)
+    # First, ensure the mail object is correctly delivered before the bounce
+    mail_double = mock('Mail')
+    mail_double.expects(:deliver_now).returns(true)
+    ApplicationNotificationsMailer.expects(:proof_submission_error).returns(mail_double)
 
-      # Use direct ActionMailbox testing instead of safe_receive_email for bounce testing
-      # This ensures we can properly capture the :bounce throw
-      assert_throws(:bounce) do
-        receive_inbound_email_from_mail(
-          to: MatVulcan::InboundEmailConfig.inbound_email_address,
-          from: @constituent.email,
-          subject: 'Income Proof',
-          body: 'Please find my proof attached.'
-        ) do |mail|
-          mail.attachments['proof.pdf'] = @pdf_content
-        end
+    # Use direct ActionMailbox testing instead of safe_receive_email for bounce testing
+    # This ensures we can properly capture the :bounce throw
+    assert_throws(:bounce) do
+      receive_inbound_email_from_mail(
+        to: MatVulcan::InboundEmailConfig.inbound_email_address,
+        from: @constituent.email,
+        subject: 'Income Proof',
+        body: 'Please find my proof attached.'
+      ) do |mail|
+        mail.attachments['proof.pdf'] = @pdf_content
       end
 
       # Verify the correct audit event was created
@@ -568,14 +558,15 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
     puts 'Using real test data instead of stubs for proper integration testing'
     puts 'Focus: Testing business outcomes, not ActionMailbox status internals'
 
-    measure_time('Determine proof type from subject') do
-      puts "\n🔄 TESTING INCOME PROOF EMAIL"
+    puts "\n🔄 TESTING INCOME PROOF EMAIL"
 
-      # Track initial state for better assertions
-      initial_events_count = Event.count
-      initial_inbound_emails_count = ActionMailbox::InboundEmail.count
+    # Track initial state for better assertions
+    initial_events_count = Event.count
+    initial_inbound_emails_count = ActionMailbox::InboundEmail.count
 
-      # Use ActionMailbox best practice: real test data, proper assertions
+    # Use ActionMailbox best practice: real test data, proper assertions
+    inbound_email = nil
+    assert_difference -> { Event.where(action: %w[proof_submission_received proof_submission_processed]).count }, 2 do
       inbound_email = receive_inbound_email_from_mail(
         to: MatVulcan::InboundEmailConfig.inbound_email_address,
         from: @constituent.email,
@@ -584,134 +575,90 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
       ) do |mail|
         mail.attachments['income_proof.pdf'] = @pdf_content
       end
-
-      puts '📊 DETAILED RESULTS:'
-      puts "Email ID: #{inbound_email.id}"
-      puts "Status: #{inbound_email.status}"
-
-      # Enhanced debugging using Rails assertions
-      assert_not_nil inbound_email, 'InboundEmail should be created'
-      assert_instance_of ActionMailbox::InboundEmail, inbound_email, 'Should be an InboundEmail instance'
-
-      # Check if the email was routed correctly - verifies ApplicationMailbox routing logic
-      begin
-        mailbox_class = ApplicationMailbox.mailbox_for(inbound_email)
-        puts "Routed to: #{mailbox_class}"
-        assert_equal ProofSubmissionMailbox, mailbox_class, 'Should route to ProofSubmissionMailbox'
-      rescue StandardError => e
-        puts "Routing error: #{e.message}"
-        flunk "Email routing failed: #{e.message}"
-      end
-
-      # Verify exactly one new email was created
-      final_inbound_emails_count = ActionMailbox::InboundEmail.count
-      assert_equal initial_inbound_emails_count + 1, final_inbound_emails_count,
-                   'Should create exactly one new InboundEmail record'
-
-      # Check for any processing errors or exceptions - comprehensive debugging
-      if inbound_email.status == 'delivered'
-        # Check email status
-
-        # Check for related events that might explain the issue
-        related_events = Event.where("metadata ->> 'inbound_email_id' = ?", inbound_email.id.to_s)
-        puts "Related events: #{related_events.count}"
-        related_events.each do |event|
-          puts "  - #{event.action}: #{event.metadata}"
-        end
-
-        # Check application state - verify business logic worked
-        @application.reload
-        puts "Application income_proof attached: #{@application.income_proof.attached?}"
-        puts "Application income_proof_status: #{@application.income_proof_status}"
-
-        # Check if any exceptions were logged
-        recent_events = Event.where(created_at: 1.minute.ago..Time.current).order(created_at: :desc)
-        error_events = recent_events.select { |e| e.metadata&.dig('error').present? }
-        if error_events.any?
-          puts 'Error events found:'
-          error_events.each { |e| puts "  - #{e.action}: #{e.metadata['error']}" }
-        end
-
-        puts '📝 ACTUAL BEHAVIOR ANALYSIS:'
-        puts '- Email was delivered to mailbox but not fully processed'
-        puts "- This suggests the process() method started but didn't complete"
-        puts '- All the processing actually worked (proof attached, events created)'
-        puts "- This means there's likely an exception being raised AFTER successful processing"
-        puts '- Most likely: ProofAttachmentService.attach_proof is returning success:false despite working'
-        puts '- This is a Rails/ActionMailbox testing quirk - the actual functionality works'
-
-        puts "\n🤔 ACTIONMAILBOX TESTING INSIGHT:"
-        puts "The 'delivered' status doesn't mean the test failed - it means ActionMailbox"
-        puts "couldn't mark it as 'processed' due to some exception, but the actual business"
-        puts 'logic (proof attachment, events, status updates) all worked correctly.'
-        puts 'This is likely a testing environment issue, not a production issue.'
-      end
-
-      # RAILS BEST PRACTICE: Test business outcomes, not ActionMailbox internals
-      # After 3 hours of debugging, we learned that 'delivered' status doesn't mean failure
-      # It means the business logic worked but ActionMailbox couldn't mark it as 'processed'
-      # So we test what actually matters: did the business logic work?
-
-      if inbound_email.status == 'processed'
-        puts "✅ Email marked as 'processed' - perfect!"
-      elsif inbound_email.status == 'delivered'
-        puts "⚠️  Email marked as 'delivered' - this is a test environment quirk"
-        puts '   The business logic still worked (see events and attachments above)'
-        puts '   This is acceptable for testing - we verify business outcomes below'
-      else
-        flunk "Email has unexpected status: #{inbound_email.status}. Expected 'processed' or 'delivered'"
-      end
-
-      # Use assert_predicate for better readability - verify business outcome
-      @application.reload
-      assert_predicate @application.income_proof, :attached?,
-                       'Income proof should be attached to application'
-
-      # Verify events were created properly - ensures audit trail works
-      final_events_count = Event.count
-      events_created = final_events_count - initial_events_count
-      assert_operator events_created, :>, 0, 'Should create at least one event'
-
-      # Check for specific event types - verifies proper event logging
-      recent_events = Event.where(user: @constituent, created_at: 1.minute.ago..Time.current)
-      event_actions = recent_events.pluck(:action)
-      assert_includes event_actions, 'proof_submission_received',
-                      "Should create proof_submission_received event. Created events: #{event_actions}"
-
-      puts '✅ Income proof email processed successfully'
-
-      puts "\n🔄 TESTING RESIDENCY PROOF EMAIL"
-
-      # Test residency proof processing with same comprehensive verification
-      inbound_email2 = receive_inbound_email_from_mail(
-        to: MatVulcan::InboundEmailConfig.inbound_email_address,
-        from: @constituent.email,
-        subject: 'Residency Proof Submission',
-        body: 'Please find my residency proof attached.'
-      ) do |mail|
-        mail.attachments['residency_proof.pdf'] = @pdf_content
-      end
-
-      puts "Status: #{inbound_email2.status}"
-
-      # Apply the same ActionMailbox testing best practice for second email
-      if inbound_email2.status == 'processed'
-        puts "✅ Residency email marked as 'processed' - perfect!"
-      elsif inbound_email2.status == 'delivered'
-        puts "⚠️  Residency email marked as 'delivered' - test environment quirk"
-        puts '   The business logic still worked - we verify outcomes below'
-      else
-        flunk "Residency email has unexpected status: #{inbound_email2.status}. Expected 'processed' or 'delivered'"
-      end
-
-      # Verify residency proof business outcome
-      @application.reload
-      assert_predicate @application.residency_proof, :attached?,
-                       'Residency proof should be attached to application'
-
-      puts '✅ Residency proof email processed successfully'
-      puts "\n✅ INTEGRATION TEST COMPLETED - BOTH PROOF TYPES WORK"
     end
+
+    puts '📊 DETAILED RESULTS:'
+    puts "Email ID: #{inbound_email.id}"
+    puts "Status: #{inbound_email.status}"
+
+    # Enhanced debugging using Rails assertions
+    assert_not_nil inbound_email, 'InboundEmail should be created'
+    assert_instance_of ActionMailbox::InboundEmail, inbound_email, 'Should be an InboundEmail instance'
+
+    # Check if the email was routed correctly - verifies ApplicationMailbox routing logic
+    begin
+      mailbox_class = ApplicationMailbox.mailbox_for(inbound_email)
+      puts "Routed to: #{mailbox_class}"
+      assert_equal ProofSubmissionMailbox, mailbox_class, 'Should route to ProofSubmissionMailbox'
+    rescue StandardError => e
+      puts "Routing error: #{e.message}"
+      flunk "Email routing failed: #{e.message}"
+    end
+
+    # Verify exactly one new email was created
+    final_inbound_emails_count = ActionMailbox::InboundEmail.count
+    assert_equal initial_inbound_emails_count + 1, final_inbound_emails_count,
+                 'Should create exactly one new InboundEmail record'
+
+    # RAILS BEST PRACTICE: Test business outcomes, not ActionMailbox internals
+    if inbound_email.status == 'processed'
+      puts "✅ Email marked as 'processed' - perfect!"
+    elsif inbound_email.status == 'delivered'
+      puts "⚠️  Email marked as 'delivered' - this is a test environment quirk"
+      puts '   The business logic still worked - we verify outcomes below'
+    else
+      flunk "Email has unexpected status: #{inbound_email.status}. Expected 'processed' or 'delivered'"
+    end
+
+    # Use assert_predicate for better readability - verify business outcome
+    @application.reload
+    assert_predicate @application.income_proof, :attached?,
+                     'Income proof should be attached to application'
+
+    # Verify events were created properly - ensures audit trail works
+    final_events_count = Event.count
+    events_created = final_events_count - initial_events_count
+    assert_operator events_created, :>, 0, 'Should create at least one event'
+
+    # Check for specific event types - verifies proper event logging
+    recent_events = Event.where(user: @constituent, created_at: 1.minute.ago..Time.current)
+    event_actions = recent_events.pluck(:action)
+    assert_includes event_actions, 'proof_submission_received',
+                    "Should create proof_submission_received event. Created events: #{event_actions}"
+
+    puts '✅ Income proof email processed successfully'
+
+    puts "\n🔄 TESTING RESIDENCY PROOF EMAIL"
+
+    # Test residency proof processing with same comprehensive verification
+    inbound_email2 = receive_inbound_email_from_mail(
+      to: MatVulcan::InboundEmailConfig.inbound_email_address,
+      from: @constituent.email,
+      subject: 'Residency Proof Submission',
+      body: 'Please find my residency proof attached.'
+    ) do |mail|
+      mail.attachments['residency_proof.pdf'] = @pdf_content
+    end
+
+    puts "Status: #{inbound_email2.status}"
+
+    # Apply the same ActionMailbox testing best practice for second email
+    if inbound_email2.status == 'processed'
+      puts "✅ Residency email marked as 'processed' - perfect!"
+    elsif inbound_email2.status == 'delivered'
+      puts "⚠️  Residency email marked as 'delivered' - test environment quirk"
+      puts '   The business logic still worked - we verify outcomes below'
+    else
+      flunk "Residency email has unexpected status: #{inbound_email2.status}. Expected 'processed' or 'delivered'"
+    end
+
+    # Verify residency proof business outcome
+    @application.reload
+    assert_predicate @application.residency_proof, :attached?,
+                     'Residency proof should be attached to application'
+
+    puts '✅ Residency proof email processed successfully'
+    puts "\n✅ INTEGRATION TEST COMPLETED - BOTH PROOF TYPES WORK"
   end
 
   # TEST: PROOF TYPE DETERMINATION FROM EMAIL BODY
@@ -726,36 +673,33 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
   # 5. Verify business outcomes using ActionMailbox best practices
   test 'determines proof type from body when subject is ambiguous' do
     # Test proof type determination from email body using ActionMailbox best practices
-    measure_time('Determine proof type from body') do
-      # Create a proper multipart email with text body and attachment
-      # This ensures the body content is properly parsed by the mailbox
-      constituent_email = @constituent.email
-      pdf_content = @pdf_content
+    # Create a proper multipart email with text body and attachment
+    # This ensures the body content is properly parsed by the mailbox
 
-      mail = Mail.new do
-        to MatVulcan::InboundEmailConfig.inbound_email_address
-        from constituent_email
-        subject 'Proof documents' # Ambiguous subject
-        text_part do
-          body "I'm sending my residency proof as requested." # Body indicates residency
-        end
-        attachments['proof.pdf'] = pdf_content
+    # 1. Create the mail object
+    mail = Mail.new do |m|
+      m.to MatVulcan::InboundEmailConfig.inbound_email_address
+      m.from @constituent.email
+      m.subject 'Proof documents' # Ambiguous subject
+      m.text_part do
+        m.body "I'm sending my residency proof as requested." # Body indicates residency
       end
-
-      # Use ActionMailbox to process the email
-      inbound_email = ActionMailbox::InboundEmail.create_and_extract_message_id!(mail.to_s)
-      inbound_email.route
-
-      # Check application state after processing
-      @application.reload
-
-      # Apply ActionMailbox testing best practice - focus on business outcomes
-      assert @application.residency_proof.attached?, 'Residency proof should be attached'
-
-      # Verify email was processed (accept both valid states)
-      assert_includes %w[processed delivered], inbound_email.status,
-                      "Email should be processed or delivered, got: #{inbound_email.status}"
+      m.attachments['proof.pdf'] = @pdf_content
     end
+
+    # 2. Use ActionMailbox to process the email
+    inbound_email = ActionMailbox::InboundEmail.create_and_extract_message_id!(mail.to_s)
+    inbound_email.route
+
+    # 3. Check application state after processing
+    @application.reload
+
+    # 4. Apply ActionMailbox testing best practice - focus on business outcomes
+    assert @application.residency_proof.attached?, 'Residency proof should be attached'
+
+    # 5. Verify email was processed (accept both valid states)
+    assert_includes %w[processed delivered], inbound_email.status,
+                    "Email should be processed or delivered, got: #{inbound_email.status}"
   end
 
   # TEST: DEFAULT PROOF TYPE DETERMINATION
@@ -769,25 +713,23 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
   # 4. Verify email processing completed successfully
   test 'defaults to income when proof type is not specified' do
     # Test default proof type determination using ActionMailbox best practices
-    measure_time('Default to income proof type') do
-      # Use real email processing instead of stubs for integration testing
-      inbound_email = receive_inbound_email_from_mail(
-        to: MatVulcan::InboundEmailConfig.inbound_email_address,
-        from: @constituent.email,
-        subject: 'Proof documents', # Generic subject
-        body: 'Here is my documentation.' # Generic body
-      ) do |mail|
-        mail.attachments['proof.pdf'] = @pdf_content
-      end
-
-      # Apply ActionMailbox testing best practice - focus on business outcomes
-      @application.reload
-      assert @application.income_proof.attached?, 'Income proof should be attached'
-
-      # Verify email was processed (accept both valid states)
-      assert_includes %w[processed delivered], inbound_email.status,
-                      "Email should be processed or delivered, got: #{inbound_email.status}"
+    # Use real email processing instead of stubs for integration testing
+    inbound_email = receive_inbound_email_from_mail(
+      to: MatVulcan::InboundEmailConfig.inbound_email_address,
+      from: @constituent.email,
+      subject: 'Proof documents', # Generic subject
+      body: 'Here is my documentation.' # Generic body
+    ) do |mail|
+      mail.attachments['proof.pdf'] = @pdf_content
     end
+
+    # Apply ActionMailbox testing best practice - focus on business outcomes
+    @application.reload
+    assert @application.income_proof.attached?, 'Income proof should be attached'
+
+    # Verify email was processed (accept both valid states)
+    assert_includes %w[processed delivered], inbound_email.status,
+                    "Email should be processed or delivered, got: #{inbound_email.status}"
   end
 
   # TEST: MULTIPLE ATTACHMENTS PROCESSING
@@ -806,24 +748,22 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
     ProofSubmissionMailbox.any_instance.stubs(:validate_attachments).returns(true)
     ProofSubmissionMailbox.any_instance.stubs(:attach_proof).returns(true)
 
-    measure_time('Process multiple attachments') do
-      # Expect proper audit event creation for multiple attachments
-      Event.expects(:create!).with(has_entry(action: 'proof_submission_received')).once
-      Event.expects(:create!).with(has_entry(action: 'proof_submission_processed')).once
+        # Expect proper audit event creation for multiple attachments
+    Event.expects(:create!).with(has_entry(action: 'proof_submission_received')).once
+    Event.expects(:create!).with(has_entry(action: 'proof_submission_processed')).once
 
-      # Verify no exceptions are raised when processing multiple attachments
-      assert_nothing_raised do
-        safe_receive_email(
-          to: MatVulcan::InboundEmailConfig.inbound_email_address,
-          from: @constituent.email,
-          subject: 'Income Proof Submission',
-          body: 'Please find my proofs attached.',
-          attachments: {
-            'proof1.pdf' => @pdf_content,
-            'proof2.pdf' => 'Additional proof content'
-          }
-        )
-      end
+    # Verify no exceptions are raised when processing multiple attachments
+    assert_nothing_raised do
+      safe_receive_email(
+        to: MatVulcan::InboundEmailConfig.inbound_email_address,
+        from: @constituent.email,
+        subject: 'Income Proof Submission',
+        body: 'Please find my proofs attached.',
+        attachments: {
+          'proof1.pdf' => @pdf_content,
+          'proof2.pdf' => 'Additional proof content'
+        }
+      )
     end
   end
 end

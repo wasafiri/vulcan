@@ -32,6 +32,7 @@ EmailTemplate.create_or_find_by!(name: 'application_notifications_account_create
 
     %<footer_text>s
   TEXT
+  template.variables = %w[header_text constituent_first_name constituent_email temp_password sign_in_url footer_text]
   template.version = 1
 end
 Rails.logger.debug 'Seeded application_notifications_account_created (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

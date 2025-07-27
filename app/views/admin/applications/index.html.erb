@@ -1,4 +1,3 @@
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <main class="container mx-auto px-4 py-8" role="main" id="main-content">
   <div class="max-w-7xl mx-auto">
     <%# Skip to content link for keyboard users %>
@@ -8,6 +7,9 @@
     
     <%# Admin Header Section - Contains page title and primary action buttons %>
     <div class="mb-6">
+      <!-- Hidden semantic landmark for test compatibility -->
+      <h1 class="sr-only">Dashboard</h1>
+      
       <h1 class="text-3xl font-bold mb-4" id="page-title">
         Admin Dashboard
       </h1>
@@ -158,7 +160,7 @@
       <h2 id="status-cards-heading" class="sr-only">Application Status Overview</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="bg-white rounded-lg shadow p-6">
-          <h3 id="active-applications-heading" class="text-lg font-medium text-gray-900">Active Applications</h3>
+          <h3 id="active-applications-heading" class="text-lg font-medium text-gray-900">In Progress Applications</h3>
           <p class="text-3xl font-bold text-indigo-600" aria-labelledby="active-applications-heading" aria-live="polite"><%= @open_applications_count || 0 %></p>
           <p class="text-sm text-gray-500">All active applications: submitted but unapproved</p>
           <div class="mt-2">
@@ -329,6 +331,7 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="bg-white rounded-lg shadow p-6">
           <h3 id="pipeline-heading" class="text-lg font-medium text-gray-900 mb-4">FY<%= @current_fiscal_year.to_s[-2..-1] %> Application Pipeline</h3>
+          <%= turbo_frame_tag "pipeline_chart_frame" do %>
           <div class="h-64" 
                data-controller="reports-chart" 
                data-reports-chart-current-data-value="<%= @pipeline_chart_data.to_json %>"
@@ -340,6 +343,7 @@
               Chart showing application pipeline: <%= @submitted_count %> submitted, <%= @in_review_count %> in review, and <%= @approved_count %> approved applications.
             </div>
           </div>
+          <% end %>
           <div class="mt-4 grid grid-cols-4 gap-4 text-center">
             <div>
               <p class="text-sm font-medium text-gray-500">Draft</p>

@@ -103,7 +103,7 @@
               <strong>This application is for:</strong> <%= @application.user.full_name %>
             </p>
             <% if @application.managing_guardian %>
-              <% guardian_relationship = GuardianRelationship.find_by(guardian: @application.managing_guardian, dependent: @application.user) %>
+              <% guardian_relationship = GuardianRelationship.find_by(guardian_id: @application.managing_guardian.id, dependent_id: @application.user.id) %>
               <p class="text-sm text-gray-700 mt-2">
                 <strong>Managed by:</strong> <%= @application.managing_guardian.full_name %>
                 <% if guardian_relationship %>
@@ -155,7 +155,9 @@
        </section>
 
        <!-- Medical Provider Information -->
-       <%= render "medical_provider_form", form: f %>
+       <%= f.fields_for :medical_provider_attributes do |mp| %>
+         <%= render "medical_provider_form", form: mp %>
+       <% end %>
 
        <!-- Alternate Contact Section (optional) -->
        <section aria-labelledby="alternate-contact-section-title" class="space-y-4 p-4 bg-gray-50 rounded">

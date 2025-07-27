@@ -34,12 +34,16 @@ if Rails.env.test?
 
   # Configuration for system tests
   Capybara.configure do |config|
-    # Network settings for CI environments
-    config.server_host = '0.0.0.0' # bind to all interfaces
-    config.app_host = "http://#{IPSocket.getaddress(Socket.gethostname)}" if ENV['CI']
+    # Network settings - use localhost for stability
+    config.server_host = '127.0.0.1' # Use localhost instead of 0.0.0.0 for stability
+    # Don't set app_host unless doing subdomain testing (Stack Overflow best practice)
+    # config.app_host = "http://#{IPSocket.getaddress(Socket.gethostname)}" if ENV['CI']
 
     # Configure server for system tests
     config.server = :puma, { Silent: true }
+
+    # Use dynamic port allocation for parallel testing (avoids port conflicts)
+    config.server_port = nil # Let Capybara choose available ports
 
     # Reasonable default wait time (seconds) - longer in CI
     config.default_max_wait_time = ENV['CI'] ? 15 : 10
@@ -47,9 +51,13 @@ if Rails.env.test?
     # Input and interaction settings
     config.default_set_options = { clear: :backspace }
     config.automatic_label_click = true
+    config.automatic_reload = true # Auto-refind stale nodes after DOM changes
 
     # Enable aria-label support
     config.enable_aria_label = true
+    
+    # Configure test_id for cleaner element finding (following writeup best practices)
+    config.test_id = "data-testid"
 
     # Save path for Capybara screenshots
     config.save_path = Rails.root.join('tmp/capybara')

@@ -16,10 +16,10 @@ module VendorPortal
     end
 
     test 'should show transactions index with pagination' do
-      # Assuming vendor_transactions_url route exists
+      # Using vendor_portal_transactions_url route
       # Create multiple transactions to test pagination
       create_list(:voucher_transaction, 30, vendor: @vendor_user)
-      get vendor_transactions_url
+      get vendor_portal_transactions_url
       assert_response :success
       # Assert presence of transaction data and pagination links
       assert_select 'h1', 'Transaction History' # Updated assertion
@@ -33,7 +33,7 @@ module VendorPortal
       another_vendor_user = create(:vendor_user)
       create_list(:voucher_transaction, 5, vendor: another_vendor_user)
 
-      get vendor_transactions_url
+      get vendor_portal_transactions_url
       assert_response :success
       # Assert that only the current vendor's transactions are displayed
       # Since no transactions are created for the current vendor in this test, expect 0 rows.

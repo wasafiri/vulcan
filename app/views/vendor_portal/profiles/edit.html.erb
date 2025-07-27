@@ -5,14 +5,14 @@
         <h1 class="text-3xl font-bold text-gray-900">Vendor Profile</h1>
       </div>
       <div class="mt-4 flex md:mt-0 md:ml-4">
-        <%= link_to vendor_dashboard_path,
+        <%= link_to vendor_portal_dashboard_path,
             class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
           Back to Dashboard
         <% end %>
       </div>
     </div>
 
-    <%= form_with model: @vendor, url: vendor_profile_path, local: true, class: "space-y-8" do |f| %>
+    <%= form_with model: @vendor, url: vendor_portal_profile_path, local: true, class: "space-y-8" do |f| %>
       <% if @vendor.errors.any? %>
         <div class="rounded-md bg-red-50 p-4">
           <div class="flex">

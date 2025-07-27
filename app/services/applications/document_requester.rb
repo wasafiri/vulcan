@@ -31,9 +31,11 @@ module Applications
         NotificationService.create_and_deliver!(
           type: 'documents_requested',
           recipient: application.user,
-          actor: actor,
-          notifiable: application,
-          channel: :email
+          options: {
+            actor: actor,
+            notifiable: application,
+            channel: :email
+          }
         )
         true # Indicate success
       end

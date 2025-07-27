@@ -88,14 +88,14 @@ vision2:
   documentation_url: https://vision-accessibility.com/v2
   device_types: ["Smartphone"]
 
-raz_memory:
-  name: RAZ Memory Phone
-  manufacturer: RAZ Mobility
-  model_number: RAZ-MP
+ray_memory:
+  name: RAY Memory Phone
+  manufacturer: RAY Mobility
+  model_number: RAY-MP
   description: Phone designed for users with memory loss
   features: Simplified interface, Emergency contacts, Picture-based dialing
   compatibility_notes: Designed for users with cognitive impairments
-  documentation_url: https://razmobility.com/memory-phone
+  documentation_url: https://raymobility.com/memory-phone
   device_types: ["Smartphone", "Memory Aid Device"]
 
 jitterbug_flip:

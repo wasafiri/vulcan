@@ -180,8 +180,31 @@ FactoryBot.define do
           filename: 'residency_proof.pdf',
           content_type: 'application/pdf'
         )
-      rescue StandardError => e
-        raise e
+
+        # Create audit events for proof submissions so needs_proof_type_review? returns true
+        Event.create!(
+          user: application.user,
+          action: 'income_proof_submitted',
+          auditable: application,
+          metadata: {
+            application_id: application.id,
+            proof_type: 'income',
+            submission_method: 'web'
+          },
+          created_at: 1.hour.ago
+        )
+
+        Event.create!(
+          user: application.user,
+          action: 'residency_proof_submitted',
+          auditable: application,
+          metadata: {
+            application_id: application.id,
+            proof_type: 'residency',
+            submission_method: 'web'
+          },
+          created_at: 1.hour.ago
+        )
       end
     end
 

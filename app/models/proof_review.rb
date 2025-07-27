@@ -116,7 +116,7 @@ class ProofReview < ApplicationRecord
   # Creates a notification record and sends the email using the new NotificationService
   # Notification failures don't interrupt the proof review process
   def send_notification(action_name, _mail_method, metadata)
-    # Log the audit event first
+    # Log the audit event - EventDeduplicationService will handle preventing duplicates in audit log display
     AuditEventService.log(
       action: action_name,
       actor: admin,
@@ -124,14 +124,16 @@ class ProofReview < ApplicationRecord
       metadata: metadata
     )
 
-    # Then, send the notification without the audit flag
+    # Send the notification
     NotificationService.create_and_deliver!(
       type: action_name,
       recipient: application.user,
-      actor: admin,
-      notifiable: application,
-      metadata: metadata,
-      channel: :email
+      options: {
+        actor: admin,
+        notifiable: application,
+        metadata: metadata,
+        channel: :email
+      }
     )
   rescue StandardError => e
     Rails.logger.error "Failed to send #{action_name} notification via NotificationService: #{e.message}"
@@ -160,7 +162,7 @@ class ProofReview < ApplicationRecord
   end
 
   def send_max_rejections_warning
-    # Log the audit event first
+    # Log the audit event - EventDeduplicationService will handle preventing duplicates in audit log display
     AuditEventService.log(
       action: 'max_rejections_warning',
       actor: admin,
@@ -168,13 +170,15 @@ class ProofReview < ApplicationRecord
       metadata: { recipient_id: User.admins.first.id }
     )
 
-    # Then, send the notification without the audit flag
+    # Send the notification
     NotificationService.create_and_deliver!(
       type: 'max_rejections_warning',
       recipient: User.admins.first,
-      actor: admin,
-      notifiable: application,
-      channel: :email
+      options: {
+        actor: admin,
+        notifiable: application,
+        channel: :email
+      }
     )
   end
 

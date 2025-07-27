@@ -125,7 +125,10 @@ module ApplicationStatusManagement
   # Updates the application status using the model's status update method
   # This ensures proper status change records are created
   def update_application_status_to_approved
-    update_status('approved', user: nil, notes: 'Auto-approved based on all requirements being met')
+    # Use Current.user (the admin who triggered the action) instead of nil
+    # This ensures proper audit trail with the actual user who caused the auto-approval
+    acting_user = Current.user
+    update_status('approved', user: acting_user, notes: 'Auto-approved based on all requirements being met')
   end
 
   # Creates an audit event for the auto-approval
@@ -133,15 +136,18 @@ module ApplicationStatusManagement
     return unless defined?(Event) && Event.respond_to?(:create)
 
     begin
+      # Use Current.user if available, otherwise fall back to a system user for automated processes
+      acting_user = Current.user || User.find_by(email: 'system@example.com') || User.first
       Event.create!(
-        user: nil, # nil user indicates system action
+        user: acting_user,
         action: 'application_auto_approved',
         metadata: {
           application_id: id,
           old_status: previous_status,
           new_status: status,
           timestamp: Time.current.iso8601,
-          auto_approval: true
+          auto_approval: true,
+          triggered_by_user_id: acting_user&.id
         }
       )
     rescue StandardError => e

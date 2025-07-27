@@ -50,22 +50,23 @@ class UserSearchController extends BaseFormController {
     if (!q) return
 
     try {
-      const result = await railsRequest.perform({
-        method: 'get',
-        url: `${this.searchUrlValue}?q=${encodeURIComponent(q)}&role=${this.defaultRoleValue}`,
-        key: 'user-search',
-        headers: { Accept: 'text/vnd.turbo-stream.html, text/html' }
-      })
+      // Directly handle Turbo Stream response without cloning
+      const response = await fetch(
+        `${this.searchUrlValue}?q=${encodeURIComponent(q)}&role=${this.defaultRoleValue}`,
+        {
+          method: 'GET',
+          headers: { Accept: 'text/vnd.turbo-stream.html, text/html' }
+        }
+      )
 
-      if (result.success) {
-        this.displaySearchResults(result.data)
+      if (response.ok) {
+        const html = await response.text()
+        this.displaySearchResults(html)
+      } else {
+        throw new Error(`Search failed: ${response.status} ${response.statusText}`)
       }
-
     } catch (error) {
-      if (error.name !== 'RequestError') {
-        console.error('Search error:', error)
-      }
-      // Use flash outlet for consistent error notifications
+      console.error('Search error:', error)
       this.showErrorNotification(error.message || 'Search failed')
     }
   }

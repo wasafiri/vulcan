@@ -37,7 +37,10 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
       date_of_birth: 30.years.ago,
       phone: '555-555-5555',
       hearing_disability: true,
-      type: 'Users::Constituent'
+      type: 'Users::Constituent',
+      status: :active,
+      verified: true,
+      email_verified: true
     )
   end
 
@@ -469,8 +472,8 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
     # Sign in - capture a screenshot of the page after sign-in
     # to help diagnose what options are actually visible
     visit sign_in_path
-    find_by_id('email-input').send_keys(@user.email)
-    find_by_id('password-input').send_keys('password123')
+    find('#email-input').send_keys(@user.email)
+    find('#password-input').send_keys('password123')
     click_button 'Sign In'
 
     # Wait for Turbo-driven redirect to complete
@@ -498,8 +501,8 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
 
     # Sign in to trigger 2FA flow
     visit sign_in_path
-    find_by_id('email-input').send_keys(@user.email)
-    find_by_id('password-input').send_keys('password123')
+    find('#email-input').send_keys(@user.email)
+    find('#password-input').send_keys('password123')
     click_button 'Sign In'
 
     # Wait for Turbo-driven redirect to complete

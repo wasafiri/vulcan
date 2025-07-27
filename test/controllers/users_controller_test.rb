@@ -113,7 +113,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
       }
     }
 
-    assert_redirected_to vendor_dashboard_path
+    assert_redirected_to vendor_portal_dashboard_path
   end
 
   test 'should not update when not authenticated' do

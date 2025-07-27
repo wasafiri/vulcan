@@ -376,3 +376,89 @@ The frontend has been modernized with:
 - **Responsive Design**: Tailwind CSS implementation for mobile optimization
 
 These architectural improvements represent significant evolution from the original system design and should be considered when planning future enhancements.
+
+## Chart.js Infrastructure Consolidation
+
+### Critical Issue: Conflicting Chart.js Loading Architecture
+**Priority: HIGH** - Causing system test instability and `Ferrum::PendingConnectionsError` in dashboard tests.
+
+**Current State Analysis (December 2025):**
+- **Triple Chart.js Configuration Conflict**: System has three different Chart.js handling approaches operating simultaneously:
+  1. **NPM Package**: `"chart.js": "^4.4.8"` in package.json (DISABLED via commented imports)
+  2. **CDN Loading**: `<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>` in admin dashboard (REMOVED as quick fix)
+  3. **JavaScript Stubs**: Multiple stub implementations in both production and test environments
+
+**Root Cause of Test Failures:**
+- CDN script loading creates race conditions during system tests
+- Network blocking configuration conflicts with Chart.js CDN requests
+- `PendingConnectionsError` occurs when tests run faster than CDN requests can be blocked
+- Browser stability issues from conflicting Chart.js instances
+
+**Immediate Fix Applied:**
+- ✅ Removed CDN script tag from `app/views/admin/applications/index.html.erb`
+- ✅ Enhanced network blocking rules in `test/application_system_test_case.rb` to include:
+  - `cdn.jsdelivr.net`, `unpkg.com`, `cdnjs.cloudflare.com` in host resolver rules
+  - Corresponding regex patterns in URL blacklist
+
+**Architecture Decision Required:**
+
+### Option A: Full Stub Architecture (Recommended for Stability)
+**Pros:** Maximum test reliability, no network dependencies, faster page loads
+**Cons:** No real charting functionality, placeholder content only
+**Implementation:**
+- Keep existing stub in `application.js`
+- Update `ChartBaseController` to show placeholder content instead of real charts
+- Remove Chart.js from package.json dependencies
+- Maintain test environment stubs
+
+### Option B: Full Chart.js Implementation (Feature-Rich but Complex)
+**Pros:** Complete charting functionality, rich data visualization
+**Cons:** Network dependencies, potential stability issues, larger bundle size
+**Implementation:**
+- Enable Chart.js import in `application.js`: `import { Chart, registerables } from "chart.js"`
+- Remove all stub implementations
+- Update network blocking to allow Chart.js in development/production
+- Maintain test environment blocking only
+
+### Option C: Environment-Based Conditional Loading (Best of Both Worlds)
+**Pros:** Real charts in production, stable tests, flexible deployment
+**Cons:** More complex configuration, requires environment detection
+**Implementation:**
+- Environment-specific Chart.js loading logic
+- Real Chart.js in development/production environments
+- Stubbed Chart.js in test environment only
+- Conditional network blocking based on Rails environment
+
+**Technical Debt Items:**
+
+- [ ] **Chart.js Architecture Consolidation**
+  - **Priority:** HIGH
+  - **Goal:** Choose and implement one of the three architectural approaches above
+  - **Current Blocker:** Multiple conflicting Chart.js loading mechanisms
+  - **Files Affected:**
+    - `app/javascript/application.js` (stub implementation)
+    - `test/application_system_test_case.rb` (test stub + network blocking)
+    - `app/javascript/controllers/charts/base_controller.js` (expects real Chart.js)
+    - `app/javascript/services/chart_config.js` (chart configuration service)
+    - `package.json` (Chart.js dependency)
+
+- [ ] **Chart Controller Infrastructure Audit**
+  - **Priority:** MEDIUM
+  - **Goal:** Audit all chart controllers to ensure they handle the chosen Chart.js architecture
+  - **Files to Review:**
+    - `app/javascript/controllers/charts/base_controller.js`
+    - `app/javascript/controllers/charts/reports_chart_controller.js`
+    - Any views using `data-controller="chart"` attributes
+
+- [ ] **Network Blocking Configuration Optimization**
+  - **Priority:** LOW
+  - **Goal:** Optimize CDN blocking rules based on final Chart.js architecture decision
+  - **Implementation:** May need to adjust blocking rules in `test/application_system_test_case.rb`
+
+**Recommendation:**
+Start with **Option A (Full Stub)** for immediate stability, then evaluate **Option C (Environment-Based)** if charting functionality becomes a business requirement. The current system has well-designed chart controllers that can be easily activated when needed.
+
+**Testing Impact:**
+- System test stability should improve significantly with CDN script removal
+- Dashboard tests should no longer experience `PendingConnectionsError`
+- Chart-related UI tests may need updates based on final architecture choice

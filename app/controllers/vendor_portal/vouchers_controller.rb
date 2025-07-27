@@ -5,7 +5,7 @@ module VendorPortal
   class VouchersController < BaseController
     include ActionView::Helpers::NumberHelper # For number_to_currency
 
-    before_action :set_voucher, only: %i[verify verify_dob redeem process_redemption]
+    before_action :set_voucher, only: %i[show verify verify_dob redeem process_redemption]
     before_action :check_voucher_active, only: %i[verify redeem]
     before_action :check_identity_verified, only: %i[redeem]
 
@@ -16,10 +16,15 @@ module VendorPortal
 
       voucher = Voucher.where(status: :active).find_by(code: params[:code])
       if voucher
-        redirect_to verify_vendor_voucher_path(voucher.code)
+        redirect_to verify_vendor_portal_voucher_path(voucher.code)
       else
         flash.now[:alert] = t('alerts.invalid_voucher_code', default: 'Invalid voucher code')
       end
+    end
+
+    def show
+      # @voucher is set by before_action :set_voucher
+      # Show voucher details for vendor
     end
 
     def verify
@@ -42,7 +47,7 @@ module VendorPortal
 
       if result.success?
         flash[:notice] = t("alerts.#{result.message_key}")
-        redirect_to redeem_vendor_voucher_path(@voucher.code)
+        redirect_to redeem_vendor_portal_voucher_path(@voucher.code)
       else
         flash[:alert] = if result.attempts_left&.positive?
                           t("alerts.#{result.message_key}", attempts_left: result.attempts_left)
@@ -51,9 +56,9 @@ module VendorPortal
                         end
 
         if result.attempts_left&.zero?
-          redirect_to vendor_vouchers_path
+          redirect_to vendor_portal_vouchers_path
         else
-          redirect_to verify_vendor_voucher_path(@voucher.code)
+          redirect_to verify_vendor_portal_voucher_path(@voucher.code)
         end
       end
     end
@@ -69,21 +74,21 @@ module VendorPortal
       # In test environment, skip the full can_process_vouchers check and just check vendor_approved
       unless Rails.env.test? ? current_user.vendor_approved? : current_user.can_process_vouchers?
         flash[:alert] = 'Your account is not approved for processing vouchers yet'
-        redirect_to redeem_vendor_voucher_path(@voucher.code)
+        redirect_to redeem_vendor_portal_voucher_path(@voucher.code)
         return
       end
 
       # Validate the voucher can be redeemed using the correct enum helper
       unless @voucher.voucher_active? # Use the prefixed helper method
         flash[:alert] = 'This voucher is not active or has already been processed'
-        redirect_to vendor_vouchers_path
+        redirect_to vendor_portal_vouchers_path
         return
       end
 
       # Validate identity has been verified
       unless identity_verified?(@voucher)
         flash[:alert] = 'Identity verification is required before redemption'
-        redirect_to verify_vendor_voucher_path(@voucher.code)
+        redirect_to verify_vendor_portal_voucher_path(@voucher.code)
         return
       end
 
@@ -93,20 +98,20 @@ module VendorPortal
 
       if redemption_amount <= 0
         flash[:alert] = 'Redemption amount must be greater than zero'
-        redirect_to redeem_vendor_voucher_path(@voucher.code)
+        redirect_to redeem_vendor_portal_voucher_path(@voucher.code)
         return
       end
 
       if redemption_amount > available_amount
         flash[:alert] = "Cannot redeem more than the available amount (#{number_to_currency(available_amount)})"
-        redirect_to redeem_vendor_voucher_path(@voucher.code)
+        redirect_to redeem_vendor_portal_voucher_path(@voucher.code)
         return
       end
 
       # Validate that at least one product is selected
       if params[:product_ids].blank?
         flash[:alert] = 'Please select at least one product for this voucher redemption'
-        redirect_to redeem_vendor_voucher_path(@voucher.code)
+        redirect_to redeem_vendor_portal_voucher_path(@voucher.code)
         return
       end
 
@@ -159,10 +164,10 @@ module VendorPortal
         @voucher.reload
 
         flash[:notice] = 'Voucher successfully processed'
-        redirect_to vendor_dashboard_path
+        redirect_to vendor_portal_dashboard_path
       else
         flash[:alert] = "Error processing voucher: #{transaction.errors.full_messages.join(', ')}"
-        redirect_to redeem_vendor_voucher_path(@voucher.code)
+        redirect_to redeem_vendor_portal_voucher_path(@voucher.code)
       end
     end
 
@@ -175,21 +180,21 @@ module VendorPortal
       return if @voucher
 
       flash[:alert] = 'Invalid voucher code'
-      redirect_to vendor_vouchers_path
+      redirect_to vendor_portal_vouchers_path
     end
 
     def check_voucher_active
       return if @voucher.voucher_active?
 
       flash[:alert] = 'This voucher is not active or has already been processed'
-      redirect_to vendor_vouchers_path
+      redirect_to vendor_portal_vouchers_path
     end
 
     def check_identity_verified
       return if identity_verified?(@voucher)
 
       flash[:alert] = 'Identity verification is required before redemption'
-      redirect_to verify_vendor_voucher_path(@voucher.code)
+      redirect_to verify_vendor_portal_voucher_path(@voucher.code)
     end
 
     def identity_verified?(voucher)

@@ -5,7 +5,7 @@
         <h1 class="text-3xl font-bold text-gray-900">Transaction History</h1>
       </div>
       <div class="mt-4 flex md:mt-0 md:ml-4 space-x-4">
-        <%= link_to vendor_transactions_path(format: :csv, **request.query_parameters),
+        <%= link_to vendor_portal_transactions_path(format: :csv, **request.query_parameters),
             class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
           <svg class="-ml-1 mr-2 h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -13,7 +13,7 @@
           Export CSV
         <% end %>
 
-        <%= link_to vendor_dashboard_path,
+        <%= link_to vendor_portal_dashboard_path,
             class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
           Back to Dashboard
         <% end %>
@@ -23,7 +23,7 @@
     <!-- Filters -->
     <div class="bg-white shadow rounded-lg mb-8">
       <div class="px-4 py-5 sm:p-6">
-        <%= form_with url: vendor_transactions_path, method: :get, class: "space-y-6" do |f| %>
+        <%= form_with url: vendor_portal_transactions_path, method: :get, class: "space-y-6" do |f| %>
           <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
             <div class="sm:col-span-2">
               <%= f.label :period, "Time Period", class: "block text-sm font-medium text-gray-700" %>
@@ -104,7 +104,7 @@
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   <% if transaction.invoice %>
                     <%= link_to "##{transaction.invoice.id}",
-                        vendor_invoice_path(transaction.invoice),
+                        vendor_portal_invoice_path(transaction.invoice),
                         class: "text-indigo-600 hover:text-indigo-900" %>
                   <% else %>
                     <span class="text-gray-400">Pending</span>
@@ -122,7 +122,7 @@
           <nav class="flex items-center justify-between">
             <div class="flex-1 flex justify-between">
               <% if @pagy.prev %>
-                <%= link_to vendor_transactions_path(page: @pagy.prev, **request.query_parameters.except(:page)), 
+                <%= link_to vendor_portal_transactions_path(page: @pagy.prev, **request.query_parameters.except(:page)), 
                     class: "relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50" do %>
                   Previous
                 <% end %>
@@ -135,7 +135,7 @@
               <div class="hidden md:flex">
                 <% @pagy.series.each do |item| %>
                   <% if item.is_a?(Integer) %>
-                    <%= link_to item, vendor_transactions_path(page: item, **request.query_parameters.except(:page)), 
+                    <%= link_to item, vendor_portal_transactions_path(page: item, **request.query_parameters.except(:page)), 
                         class: "relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md #{item == @pagy.page ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}" %>
                   <% elsif item.is_a?(String) && item == @pagy.page.to_s %>
                     <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md bg-indigo-600 text-white">
@@ -150,7 +150,7 @@
               </div>
               
               <% if @pagy.next %>
-                <%= link_to vendor_transactions_path(page: @pagy.next, **request.query_parameters.except(:page)), 
+                <%= link_to vendor_portal_transactions_path(page: @pagy.next, **request.query_parameters.except(:page)), 
                     class: "relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50" do %>
                   Next
                 <% end %>

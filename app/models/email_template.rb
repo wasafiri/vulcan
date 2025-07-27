@@ -53,12 +53,12 @@ class EmailTemplate < ApplicationRecord
     },
     'application_notifications_proof_needs_review_reminder' => {
       description: 'Sent to admins as a reminder about applications awaiting proof review.',
-      required_vars: %w[admin_full_name stale_reviews_count stale_reviews_text_list admin_dashboard_url header_text footer_text], # Assuming admin_full_name based on template
+      required_vars: %w[admin_full_name stale_reviews_count stale_reviews_text_list admin_dashboard_url header_text footer_text],
       optional_vars: %w[title logo subtitle show_automated_message]
     },
     'application_notifications_proof_rejected' => {
       description: 'Sent when a submitted proof document is rejected.',
-      required_vars: %w[constituent_full_name organization_name proof_type_formatted rejection_reason header_text footer_text], # Assuming constituent_full_name based on template
+      required_vars: %w[constituent_full_name organization_name proof_type_formatted rejection_reason header_text footer_text],
       optional_vars: %w[remaining_attempts_message_text title logo subtitle show_automated_message] # Removed HTML/unused vars
     },
     'application_notifications_proof_submission_error' => {
@@ -68,7 +68,7 @@ class EmailTemplate < ApplicationRecord
     },
     'application_notifications_registration_confirmation' => {
       description: 'Sent to a user upon successful account registration confirmation.',
-      required_vars: %w[user_full_name dashboard_url new_application_url header_text footer_text active_vendors_text_list], # Assuming user_full_name based on template
+      required_vars: %w[user_full_name dashboard_url new_application_url header_text footer_text active_vendors_text_list],
       optional_vars: %w[title logo subtitle show_automated_message]
     },
 

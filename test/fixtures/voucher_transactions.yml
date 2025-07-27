@@ -1,6 +1,6 @@
 one:
   voucher: one
-  vendor: vendor_raz
+  vendor: vendor_ray
   amount: 200.00
   transaction_type: redemption
   status: transaction_completed
@@ -9,7 +9,7 @@ one:
 
 two:
   voucher: fully_redeemed
-  vendor: vendor_raz
+  vendor: vendor_ray
   amount: 300.00
   transaction_type: redemption
   status: transaction_completed
@@ -20,7 +20,7 @@ two:
 # Transactions for test_pending_99 invoice that total exactly 99.99
 test_transaction_1:
   voucher: one
-  vendor: vendor_raz
+  vendor: vendor_ray
   amount: 49.99
   transaction_type: redemption
   status: transaction_completed
@@ -30,7 +30,7 @@ test_transaction_1:
 
 test_transaction_2:
   voucher: fully_redeemed
-  vendor: vendor_raz
+  vendor: vendor_ray
   amount: 50.00
   transaction_type: redemption
   status: transaction_completed

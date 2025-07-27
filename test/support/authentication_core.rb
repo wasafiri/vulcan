@@ -77,11 +77,17 @@ module AuthenticationCore
 
   # Clears Current.user and test identity
   def clear_test_identity
-    # Clear Current context
-    Current.reset if defined?(Current)
+    # Clear specific Current attributes first
+    if defined?(Current)
+      Current.user = nil
+      Current.test_user_id = nil
+    end
 
-    # Use Thread-local variable for test user ID - standardize on this approach
-    Current.test_user_id = nil
+    # Then reset the entire Current context
+    Current.reset if defined?(Current) && Current.respond_to?(:reset)
+
+    # Explicitly set test_user_id to nil again after reset
+    Current.test_user_id = nil if defined?(Current) && Current.respond_to?(:test_user_id=)
 
     # For backward compatibility, also clear ENV variable
     ENV['TEST_USER_ID'] = nil if ENV['TEST_USER_ID'].present?
@@ -102,7 +108,7 @@ module AuthenticationCore
 
   # Print debug information when DEBUG_AUTH env var is set to 'true'
   def debug_auth(msg)
-    return unless ENV['DEBUG_AUTH'] == 'true'
+    return unless ENV['DEBUG_AUTH'] == 'true' || ENV['VERBOSE_TESTS'] == 'true'
 
     if defined?(Rails) && Rails.respond_to?(:logger) && Rails.logger
       Rails.logger.debug { "[AuthTest] #{msg}" }

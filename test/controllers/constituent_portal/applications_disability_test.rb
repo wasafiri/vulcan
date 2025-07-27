@@ -6,13 +6,16 @@ module ConstituentPortal
   class ApplicationsDisabilityTest < ActionDispatch::IntegrationTest
     include AuthenticationTestHelper
     setup do
+      # Set up FPL policies for income validation
+      setup_fpl_policies
+      
       @constituent = create(:constituent)
       sign_in_for_integration_test(@constituent)
 
       @application_params = {
         application: {
           household_size: 2,
-          annual_income: '50000',
+          annual_income: '18000', # Safely under the $20,000 threshold for household of 2
           maryland_resident: '1',
           self_certify_disability: '1',
           medical_provider_attributes: {

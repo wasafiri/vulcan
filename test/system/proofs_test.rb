@@ -31,12 +31,15 @@ class ProofsTest < ApplicationSystemTestCase
     fill_in 'Password', with: 'password123'
     fill_in 'Confirm Password', with: 'password123'
     fill_in 'Phone Number', with: '202-555-1234'
-    fill_in 'Date of Birth', with: '1990-01-01'
+    fill_in 'visible_date_of_birth', with: '01/01/1990'
     select 'English', from: 'Language Preference'
     click_button 'Create Account'
 
-    # Should redirect to home page
-    assert_current_path root_path
+    # Should redirect to welcome page
+    assert_current_path welcome_path
+
+    # Navigate to dashboard where Apply Now button is available
+    click_on 'Skip and Continue to Dashboard'
 
     # Start application process
     click_on 'Apply Now'
@@ -45,6 +48,13 @@ class ProofsTest < ApplicationSystemTestCase
     check 'I certify that I am a resident of Maryland'
     fill_in 'Household Size', with: '5'
     fill_in 'Annual Income', with: '100000'
+    
+    # Fill in address information
+    fill_in 'Street Address', with: '123 Main St'
+    fill_in 'City', with: 'Baltimore'
+    select 'Maryland', from: 'State'
+    fill_in 'Zip Code', with: '21201'
+    
     check 'I certify that I have a disability that affects my ability to access telecommunications services'
     check 'Hearing'
 
@@ -55,6 +65,9 @@ class ProofsTest < ApplicationSystemTestCase
       fill_in 'Fax (Optional)', with: '202-555-5556'
       fill_in 'Email', with: 'drfel@gmail.net'
     end
+    
+    # Medical authorization (required)
+    check 'I authorize the release and sharing of my medical information as described above'
 
     # Attach proofs
     attach_file 'Proof of Residency', @valid_residency_proof.path
@@ -67,30 +80,24 @@ class ProofsTest < ApplicationSystemTestCase
     assert_text 'Application Details'
 
     # Verify application details
-    assert_text 'Application Type: Not specified'
+    assert_text 'Application Type: New'
     assert_text 'Submission Method: Online'
     assert_text 'Status: In Progress'
     assert_text 'Household Size: 5'
     assert_text 'Annual Income: $100,000.00'
-    assert_text 'Income Verification Status: Not Reviewed'
-    assert_text 'Income Verified At: Not verified'
-    assert_text 'Income Verified By: Not verified'
-    assert_text 'Income Details: None provided'
-    assert_text 'Residency Details: None provided'
-    assert_text 'Review Count: 0'
+    # Check proof statuses in the Uploaded Documents section
+    assert_text 'Uploaded Documents'
+    assert_text 'Income Proof'
+    assert_text 'Residency Proof'
+    assert_text 'Not Reviewed'
 
     # Verify medical provider information
-    assert_text 'Medical Provider Information'
+    assert_text 'Medical Provider & Certification'
     assert_text 'Name: Dr. Feelgood'
     assert_text 'Phone: 202-555-5555'
     assert_text 'Email: drfel@gmail.net'
 
-    # Verify proof sections exist
-    assert_text 'Income Proof'
-    assert_text 'Residency Proof'
-
     # Verify action buttons
-    assert_link 'Edit Application'
-    assert_link 'Back to Dashboard'
+    assert_link 'See your MAT Dashboard'
   end
 end

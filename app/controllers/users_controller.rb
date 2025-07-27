@@ -34,7 +34,7 @@ class UsersController < ApplicationController
     when Users::Administrator then admin_applications_path
     when Users::Constituent then constituent_portal_dashboard_path
     when Users::Evaluator then evaluators_dashboard_path
-    when Users::Vendor then vendor_dashboard_path
+    when Users::Vendor then vendor_portal_dashboard_path
     else root_path
     end
   end

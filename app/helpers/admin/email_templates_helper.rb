@@ -4,8 +4,15 @@ module Admin
   module EmailTemplatesHelper
     # Provides sample data for rendering email template previews or tests.
     # Returns a hash with string keys matching the %{variable_name} placeholders.
-    def sample_data_for_template(template_name) # rubocop:disable Metrics/MethodLength
-      base_data = {
+    def sample_data_for_template(template_name)
+      base_sample_data.merge(template_specific_data(template_name))
+    end
+
+    private
+
+    # Base sample data shared across all templates
+    def base_sample_data
+      {
         'header_text' => render(partial: 'shared/mailers/header', formats: [:text], locals: { title: 'Sample Email Title' }),
         'footer_text' => render(partial: 'shared/mailers/footer', formats: [:text], locals: { show_automated_message: true }),
         'header_logo_url' => asset_url('TAM_color.png'),
@@ -83,146 +90,73 @@ module Admin
         'proof_type_formatted' => 'Income Verification',
         'additional_notes' => 'These are some additional notes.'
       }
+    end
 
-      # Add template-specific overrides or additions here if needed
+    # Template-specific data overrides
+    def template_specific_data(template_name)
       case template_name.to_sym
       when :vendor_notifications_invoice_generated
-        base_data.merge({
-                          'header_title' => 'Vendor Notification: Invoice Generated',
-                          'vendor_business_name' => 'Baltimore Accessible Tech Solutions',
-                          'vendor_contact_name' => 'Morgan Johnson',
-                          'vendor_contact_email' => 'morgan@baltimoreats.com',
-                          'invoice_number' => 'INV-2025-042',
-                          'period_start_formatted' => (Date.current - 1.month).beginning_of_month.strftime('%B %d, %Y'),
-                          'period_end_formatted' => (Date.current - 1.month).end_of_month.strftime('%B %d, %Y'),
-                          'total_amount_formatted' => '$1,875.50',
-                          'transactions_text_list' => "- Voucher #V0012345: $550.00\n- Voucher #V0012346: $725.50\n- Voucher #V0012347: $600.00"
-                        })
+        vendor_invoice_data
       when :vendor_notifications_payment_issued
-        base_data.merge({
-                          'header_title' => 'Vendor Notification: Payment Issued',
-                          'vendor_business_name' => 'Baltimore Accessible Tech Solutions',
-                          'vendor_contact_name' => 'Morgan Johnson',
-                          'vendor_contact_email' => 'morgan@baltimoreats.com',
-                          'invoice_number' => 'INV-2025-042',
-                          'total_amount_formatted' => '$1,875.50',
-                          'gad_invoice_reference' => 'GAD-2025-X9874',
-                          'check_number' => 'CHK-58742'
-                        })
-      when :vendor_notifications_w9_approved, :vendor_notifications_w9_rejected, :vendor_notifications_w9_expired, :vendor_notifications_w9_expiring_soon
-        base_data.merge({
-                          'header_title' => "Vendor Notification: #{template_name.to_s.gsub('vendor_notifications_', '').humanize}",
-                          'vendor_business_name' => 'Baltimore Accessible Tech Solutions',
-                          'vendor_contact_name' => 'Morgan Johnson',
-                          'vendor_contact_email' => 'morgan@baltimoreats.com'
-                        })
+        vendor_payment_data
+      when :vendor_notifications_w9_approved, :vendor_notifications_w9_rejected,
+            :vendor_notifications_w9_expired, :vendor_notifications_w9_expiring_soon
+        vendor_w9_data(template_name)
       when :email_header_text
-        base_data.merge({
-                          'title' => 'Maryland Accessible Telecommunications',
-                          'subtitle' => 'Important Notification',
-                          'logo_url' => asset_url('TAM_color.png')
-                        })
+        email_header_data
       when :email_footer_text
-        base_data.merge({
-                          'organization_name' => 'Maryland Accessible Telecommunications',
-                          'contact_email' => 'support@mdmat.org',
-                          'website_url' => 'https://mdmat.org',
-                          'show_automated_message' => true
-                        })
+        email_footer_data
       when :application_notifications_account_created
-        base_data.merge({
-                          'header_title' => 'Your MAT Application Account',
-                          'header_text' => 'Maryland Accessible Telecommunications',
-                          'footer_text' => "Contact us at support@mdmat.org\nMaryland Accessible Telecommunications",
-                          'user_full_name' => 'Jamie Doe',
-                          'constituent_first_name' => 'Jamie',
-                          'constituent_email' => 'jamie.doe@example.com',
-                          'temp_password' => 'Temp123!',
-                          'sign_in_url' => 'http://example.com/sign_in',
-                          'title' => 'Account Created',
-                          'show_automated_message' => true
-                        })
+        application_account_created_data
       when :application_notifications_income_threshold_exceeded
-        base_data.merge({
-                          'header_title' => 'Application Update: Income Threshold',
-                          'header_text' => 'Maryland Accessible Telecommunications',
-                          'footer_text' => "Contact us at support@mdmat.org\nMaryland Accessible Telecommunications",
-                          'constituent_first_name' => 'Jamie',
-                          'household_size' => 4,
-                          'annual_income_formatted' => '$45,000.00',
-                          'threshold_formatted' => '$35,000.00',
-                          'status_box_text' => 'ERROR: Income Exceeds Limit',
-                          'title' => 'Income Threshold Exceeded',
-                          'show_automated_message' => true
-                        })
+        income_threshold_data
       when :application_notifications_registration_confirmation
-        base_data.merge({
-                          'header_title' => 'Registration Confirmation',
-                          'header_text' => 'Maryland Accessible Telecommunications',
-                          'footer_text' => "Contact us at support@mdmat.org\nMaryland Accessible Telecommunications",
-                          'user_full_name' => 'Jamie Doe',
-                          'dashboard_url' => 'http://example.com/dashboard',
-                          'new_application_url' => 'http://example.com/applications/new',
-                          'active_vendors_text_list' => "- ABC Telecommunications\n- XYZ Assistive Devices\n- Maryland Tech Solutions",
-                          'title' => 'Registration Confirmation',
-                          'show_automated_message' => true
-                        })
+        registration_confirmation_data
       when :application_notifications_proof_submission_error
-        base_data.merge({
-                          'header_title' => 'Proof Submission Error',
-                          'message' => 'There was an error processing your submission. The file format is not supported.'
-                        })
+        proof_submission_error_data
       when :medical_provider_certification_submission_error
-        base_data.merge({
-                          'header_title' => 'Certification Submission Error',
-                          'medical_provider_email' => 'doctor@example.com'
-                        })
+        certification_submission_error_data
       when :training_session_notifications_training_scheduled
-        base_data.merge({
-                          'header_title' => 'Training Session Scheduled',
-                          'scheduled_date_formatted' => (Date.current + 2.weeks).strftime('%B %d, %Y'),
-                          'scheduled_time_formatted' => '10:00 AM - 11:30 AM',
-                          'scheduled_date_time_formatted' => "#{(Date.current + 2.weeks).strftime('%B %d, %Y')} at 10:00 AM - 11:30 AM",
-                          'trainer_email' => 'trainer@example.com',
-                          'trainer_phone_formatted' => '555-987-6543',
-                          'support_email' => 'training@example.com'
-                        })
+        training_scheduled_data
       when :training_session_notifications_training_cancelled
-        base_data.merge({
-                          'header_title' => 'Training Session Cancelled',
-                          'scheduled_date_time_formatted' => "#{(Date.current + 2.weeks).strftime('%B %d, %Y')} at 10:00 AM - 11:30 AM",
-                          'support_email' => 'training@example.com'
-                        })
+        training_cancelled_data
       when :training_session_notifications_training_completed
-        base_data.merge({
-                          'header_title' => 'Training Session Completed',
-                          'completed_date_formatted' => Date.current.strftime('%B %d, %Y'),
-                          'trainer_email' => 'trainer@example.com',
-                          'trainer_phone_formatted' => '555-987-6543'
-                        })
+        training_completed_data
       when :training_session_notifications_training_no_show
-        base_data.merge({
-                          'header_title' => 'Training Session Missed',
-                          'scheduled_date_time_formatted' => "#{(Date.current - 1.day).strftime('%B %d, %Y')} at 10:00 AM - 11:30 AM",
-                          'support_email' => 'training@example.com'
-                        })
-      # Removed duplicate case condition for :vendor_notifications_w9_expired
+        training_no_show_data
       when :voucher_notifications_voucher_redeemed
-        base_data.merge({
-                          'header_title' => 'Voucher Successfully Redeemed',
-                          'redeemed_value_formatted' => '$350.00',
-                          'transaction_amount_formatted' => '$150.00',
-                          'remaining_balance_formatted' => '$350.00'
-                        })
+        voucher_redeemed_data
       when :admin_notifications_stale_reviews_summary
-        base_data.merge({
-                          'header_title' => 'Stale Reviews Summary',
-                          'admin_full_name' => 'Admin User'
-                        })
-      # Add cases for all other template names...
+        stale_reviews_data
       else
-        base_data # Return base data if no specific overrides
+        {} # Return empty hash for no overrides
       end
+    end
+
+    # Vendor-specific data methods
+    def vendor_invoice_data
+      {
+        'header_title' => 'Vendor Notification: Invoice Generated',
+        'vendor_business_name' => 'Baltimore Accessible Tech Solutions',
+        'vendor_contact_name' => 'Morgan Johnson',
+        'vendor_contact_email' => 'morgan@baltimoreats.com',
+        'invoice_number' => 'INV-2025-042',
+        'period_start_formatted' => (Date.current - 1.month).beginning_of_month.strftime('%B %d, %Y'),
+        'period_end_formatted' => (Date.current - 1.month).end_of_month.strftime('%B %d, %Y'),
+        'total_amount_formatted' => '$1,875.50',
+        'transactions_text_list' => "- Voucher #V0012345: $550.00\n- Voucher #V0012346: $725.50\n- Voucher #V0012347: $600.00"
+      }
+    end
+
+    def vendor_payment_data
+      {
+        'header_title' => 'Vendor Notification: Payment Issued',
+        'vendor_business_name' => 'Baltimore Accessible Tech Solutions',
+        'vendor_contact_name' => 'Morgan Johnson',
+        'vendor_contact_email' => 'morgan@baltimoreats.com',
+        'invoice_number' => 'INV-2025-042',
+        'total_amount_formatted' => '$1,875.50'
+      }
     end
   end
 end

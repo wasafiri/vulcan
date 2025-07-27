@@ -117,10 +117,12 @@ class W9Review < ApplicationRecord
     NotificationService.create_and_deliver!(
       type: action,
       recipient: vendor,
-      actor: admin,
-      notifiable: vendor, # W9 review is about the vendor
-      metadata: metadata,
-      channel: :email
+      options: {
+        actor: admin,
+        notifiable: vendor, # W9 review is about the vendor
+        metadata: metadata,
+        channel: :email
+      }
     )
   rescue StandardError => e
     Rails.logger.error "Failed to send #{action} notification via NotificationService: #{e.message}"
@@ -151,9 +153,11 @@ class W9Review < ApplicationRecord
         NotificationService.create_and_deliver!(
           type: 'vendor_max_w9_rejections_warning',
           recipient: User.admins.first,
-          actor: admin,
-          notifiable: vendor,
-          channel: :email
+          options: {
+            actor: admin,
+            notifiable: vendor,
+            channel: :email
+          }
         )
       end
     end

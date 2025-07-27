@@ -272,10 +272,12 @@ class MedicalProviderNotifier
     NotificationService.create_and_deliver!(
       type: 'medical_certification_rejected',
       recipient: application.user,
-      actor: admin,
-      notifiable: application,
-      metadata: default_metadata.merge(metadata),
-      channel: :email
+      options: {
+        actor: admin,
+        notifiable: application,
+        metadata: default_metadata.merge(metadata),
+        channel: :email
+      }
     )
   end
 

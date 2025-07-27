@@ -24,6 +24,9 @@ module Applications
           increment_request_count(current_time)
         end
 
+        # Ensure application is reloaded before creating notification
+        application.reload
+        
         # Create notification for tracking
         notification = create_notification(current_time)
 
@@ -104,19 +107,42 @@ module Applications
         return existing_notification
       end
 
-      # Use NotificationService for centralized notification creation
-      NotificationService.create_and_deliver!(
+      # Use NotificationService for centralized notification creation, with fallback
+      result = NotificationService.create_and_deliver!(
         type: 'medical_certification_requested',
         recipient: application.user,
-        actor: actor,
-        notifiable: application,
-        metadata: {
-          request_count: request_count,
-          provider: application.medical_provider_name,
-          provider_email: application.medical_provider_email
-        },
-        channel: :email
+        options: {
+          actor: actor,
+          notifiable: application,
+          metadata: {
+            request_count: request_count,
+            provider: application.medical_provider_name,
+            provider_email: application.medical_provider_email
+          },
+          channel: :email
+        }
       )
+      
+      # If NotificationService failed (returned nil), create notification directly as fallback
+      if result.nil?
+        Rails.logger.warn "NotificationService failed, creating notification directly as fallback"
+        result = Notification.create!(
+          recipient: application.user,
+          actor: actor,
+          action: 'medical_certification_requested',
+          notifiable: application,
+          metadata: {
+            request_count: request_count,
+            provider: application.medical_provider_name,
+            provider_email: application.medical_provider_email,
+            created_by_service: true,
+            timestamp: Time.current.iso8601,
+            channel: 'email'
+          }
+        )
+      end
+      
+      result
     rescue StandardError => e
       # Log but don't fail the process
       log_error(e, 'Failed to create notification')

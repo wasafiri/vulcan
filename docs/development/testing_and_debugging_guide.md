@@ -347,21 +347,34 @@ Uses `Current.paper_context` to bypass validations:
 ## Test Helpers Reference
 
 ### Authentication
-- `system_test_sign_in(user)` - Standard system test authentication
-- `enhanced_sign_in(user)` - Cuprite-optimized authentication
+- `system_test_sign_in(user, verify_path: nil)` - Robust UI-based authentication with Turbo/navigation waits and 2FA handling
+- `skip_2fa_and_sign_in(user)` - Bypass 2FA for RackTest driver
 - `assert_authenticated_as(user)` - Verify authentication state
-- `system_test_sign_out` - Clean session cleanup
+- `system_test_sign_out` - Clean session cleanup with browser reset
 
-### Interaction Helpers
-- `safe_click(selector)` - Click with scrolling and error handling
-- `safe_fill_in(selector, with: value)` - Fill with scrolling
-- `wait_for_turbo` - Wait for Turbo navigation completion
-- `scroll_to_element(selector)` - Scroll element into view
+### Synchronization & UI Helpers
+- `wait_for_network_idle(timeout: 10)` - Waits for Turbo and all browser network activity to settle
+- `wait_for_turbo(timeout: 5)` - Waits specifically for Turbo navigation completion
+- `ensure_stimulus_loaded(timeout: 5)` - Ensures Stimulus is loaded and ready
+- `wait_for_stimulus_controller(controller_name, timeout: 10)` - Waits for specific Stimulus controller initialization
+- `wait_for_complete_page_load` - Compatibility method for legacy tests
+- `wait_for_content(text, timeout: 10)` - Enhanced content waiting
+- `wait_for_selector(selector, timeout: 10, visible: true)` - Enhanced selector waiting
 
-### Debugging Tools
+### Debugging & Assertions
+- `assert_notification(text, type: nil, wait: 10)` - Flexible notification helper for flash/toast messages
+- `assert_success_message(text, wait: 10)` - Helper for success messages
+- `assert_error_message(text, wait: 10)` - Helper for error messages
+- `assert_application_saved_as_draft(wait: 10)` - Specialized helper for draft application messages
+- `assert_audit_event(event_type, actor: nil, auditable: nil, metadata: nil)` - Verify audit event creation
 - `take_screenshot(name)` - Visual debugging screenshots
-- `debug_page` - Output current page state and URL
-- `clear_pending_connections` - Clear browser connection issues
+
+### Browser Utilities
+- `clear_pending_network_connections` - Clear pending network requests
+- `safe_browser_action` - Safe interaction handling with browser restart
+- `safe_accept_alert` - Safe alert acceptance for medical certification tests
+- `assert_body_scrollable` / `assert_body_not_scrollable` - For modal tests
+- `restart_browser!` - Manually restart browser when tests detect issues
 
 ## Best Practices
 

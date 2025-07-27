@@ -87,7 +87,7 @@ module TurboStreamResponseHandling
       format.turbo_stream do
         if turbo_redirect_path.present?
           # Standard HTTP redirect – Turbo will convert this into a visit
-          redirect_to turbo_redirect_path, status: :see_other
+          redirect_to turbo_redirect_path, status: :see_other, notice: turbo_message
         else
           handle_turbo_stream_success(
             message: turbo_message,
