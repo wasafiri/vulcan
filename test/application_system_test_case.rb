@@ -27,6 +27,11 @@ Capybara.register_driver :cuprite do |app|
   # Format host resolver rules correctly - each rule needs its own MAP entry
   block_rules = blocked_hosts.map { |h| "MAP #{h} 0.0.0.0" }.join(', ')
 
+  # Debug: Check CI environment variables
+  is_ci = ENV['CI'] || ENV['HEROKU_TEST_RUN_ID']
+  timeout_value = is_ci ? 120 : 60
+  puts "🔧 Cuprite CI Detection: CI=#{ENV['CI']}, HEROKU_TEST_RUN_ID=#{ENV['HEROKU_TEST_RUN_ID']}, using timeout=#{timeout_value}s" if ENV['VERBOSE_TESTS']
+
   Capybara::Cuprite::Driver.new(
     app,
     # General options
@@ -35,10 +40,12 @@ Capybara.register_driver :cuprite do |app|
     inspector: true, # Allow `page.driver.debug` to open a browser inspector
 
     # Performance & Stability
-    # Extra long timeouts for CI environments where Chrome takes longer to start
-    process_timeout: ENV['CI'] ? 120 : 60, # Increased time to wait for Chrome to start (especially in CI/Docker)
-    timeout: ENV['CI'] ? 120 : 60,         # Increased time to wait for a command to finish (especially in CI/Docker)
-    ws_timeout: ENV['CI'] ? 120 : 60,      # Override 10-second Ferrum websocket limit to prevent Heroku CI timeouts
+    # Force long timeouts for CI environments - use 120s always in CI, fallback to 60s locally
+    process_timeout: timeout_value, # Chrome process startup timeout
+    timeout: timeout_value,         # General command timeout
+    # Try multiple Ferrum timeout parameters to override the 10-second limit
+    ws_timeout: timeout_value,      # Websocket connection timeout
+    browser_timeout: timeout_value, # Browser initialization timeout
     url_blacklist: [ # Backup blocking for any missed external requests (using regexps)
       /google-analytics\.com/,
       /googletagmanager\.com/,
@@ -414,7 +421,9 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   include ModalHelpers
 
   # Reduced parallelism for system tests to improve browser stability
-  parallelize(workers: ENV.fetch('SYSTEM_TEST_WORKERS', 4).to_i, with: :processes)
+  # Use fewer workers in CI environments to reduce resource contention
+  default_workers = (ENV['CI'] || ENV['HEROKU_TEST_RUN_ID']) ? 2 : 4
+  parallelize(workers: ENV.fetch('SYSTEM_TEST_WORKERS', default_workers).to_i, with: :processes)
 
   # Database cleaning strategy for system tests
   if defined?(DatabaseCleaner)
