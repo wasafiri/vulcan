@@ -110,8 +110,14 @@ module Admin
       end
 
       # Verify the audit log shows the application creation
+      # Wait for the audit log section to be present and populated
+      assert_selector '#audit-logs'
+      
+      # Use Capybara's intelligent waiting to wait for the specific audit log text to appear
+      # This handles the timing between application submission and audit log updates
       within '#audit-logs' do
-        assert_text 'Application created via Online method with status: In Progress'
+        # Wait for the audit log to show the in_progress status - Capybara will retry until timeout
+        assert_text 'Application created via Online method with status: In Progress', wait: 10
         assert_text 'Application created via Online method'
       end
     end

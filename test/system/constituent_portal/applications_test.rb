@@ -4,6 +4,9 @@ require 'application_system_test_case'
 
 class ApplicationsSystemTest < ApplicationSystemTestCase
   setup do
+    # Force a clean browser session for each test
+    Capybara.reset_sessions!
+    
     @user = create(:constituent, first_name: 'Test', last_name: 'Guardian')
     @dependent = create(:constituent, first_name: 'Jane', last_name: 'Dependent', email: 'jane.dependent@example.com', phone: '5555551212')
 
@@ -18,13 +21,14 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
     @valid_pdf = file_fixture('income_proof.pdf').to_s
     @valid_image = file_fixture('residency_proof.pdf').to_s
 
-    # Use enhanced sign in for better stability
-    system_test_sign_in(@user)
-    assert_text 'Dashboard', wait: 10 # Verify we're signed in
+    # Don't sign in during setup - let each test handle its own authentication
+    # This ensures each test starts with a clean authentication state
   end
 
   teardown do
     # Extra cleanup to ensure browser stability
+    # Always ensure clean session state between tests
+    Capybara.reset_sessions!
   end
 
   test 'can view new application form' do
@@ -95,6 +99,10 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
   end
 
   test 'can save a draft application' do
+    # Always sign in fresh for each test
+    system_test_sign_in(@user)
+    assert_text 'Dashboard', wait: 10 # Verify we're signed in
+    
     visit new_constituent_portal_application_path
     wait_for_page_stable # Use comprehensive wait strategy
 
@@ -146,6 +154,10 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
   end
 
   test 'preserves form data when validation fails' do
+    # Always sign in fresh for each test
+    system_test_sign_in(@user)
+    assert_text 'Dashboard', wait: 10 # Verify we're signed in
+    
     visit new_constituent_portal_application_path
 
     # Fill in required fields
@@ -190,6 +202,10 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
   end
 
   test 'saves all form fields when clicking Save Application' do
+    # Always sign in fresh for each test
+    system_test_sign_in(@user)
+    assert_text 'Dashboard', wait: 10 # Verify we're signed in
+    
     visit new_constituent_portal_application_path
     wait_for_turbo # Ensure page is fully loaded
 

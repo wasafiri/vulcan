@@ -95,9 +95,21 @@ module AdminTests
       # Always sign in fresh for each test
       system_test_sign_in(@admin)
       
-      # Create a regular application (not from a guardian)
-      regular_constituent = create(:constituent, email: "regular_test_#{Time.now.to_i}_#{rand(10_000)}@example.com")
-      regular_application = create(:application, :in_progress_with_pending_proofs, :old_enough_for_new_application, user: regular_constituent)
+      # Create a regular application (not from a guardian) with all required fields
+      regular_constituent = create(:constituent, 
+        email: "regular_test_#{Time.now.to_i}_#{rand(10_000)}@example.com",
+        first_name: 'Regular',
+        last_name: 'User'
+      )
+      regular_application = create(:application, 
+        :in_progress_with_pending_proofs, 
+        :old_enough_for_new_application, 
+        user: regular_constituent,
+        household_size: 2,
+        annual_income: 30_000,
+        maryland_resident: true,
+        self_certify_disability: true
+      )
 
       # Manually attach proofs since the factory trait isn't working
       regular_application.income_proof.attach(
@@ -111,10 +123,20 @@ module AdminTests
         content_type: 'application/pdf'
       )
 
+      # Ensure proofs are properly saved and processed
+      regular_application.reload
+      
       visit admin_application_path(regular_application)
 
+      # Wait for basic page structure first
+      assert_selector 'body', wait: 5
+      
+      # Wait for page to load completely with intelligent waiting
+      # Use a more specific selector that indicates the page has fully loaded
+      assert_selector 'h1', text: /Application.*Details/, wait: 15
+      
       # Use intelligent waiting - assert_selector will wait automatically  
-      assert_selector '#attachments-section'
+      assert_selector '#attachments-section', wait: 10
       assert_selector '#attachments-section', text: 'Income Proof'
       assert_selector '#attachments-section', text: 'Residency Proof'
 

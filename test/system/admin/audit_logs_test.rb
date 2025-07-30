@@ -5,6 +5,9 @@ require 'application_system_test_case'
 module Admin
   class AuditLogsTest < ApplicationSystemTestCase
     setup do
+      # Force a clean browser session for each test
+      Capybara.reset_sessions!
+      
       @admin = users(:admin_david)
 
       # Create application with explicit attributes to ensure it exists
@@ -31,22 +34,47 @@ module Admin
       # Set the MAILER_HOST environment variable for the test
       ENV['MAILER_HOST'] = 'example.com'
 
-      # Sign in as admin using system test authentication
-      system_test_sign_in(@admin)
+      # Don't sign in during setup - let each test handle its own authentication
+      # This ensures each test starts with a clean authentication state
     end
 
     teardown do
+      # Ensure any open modals are closed
+      begin
+        if has_selector?('#incomeProofReviewModal', visible: true, wait: 1)
+          within('#incomeProofReviewModal') do
+            click_button 'Close' if has_button?('Close', wait: 1)
+          end
+        end
+        
+        if has_selector?('#residencyProofReviewModal', visible: true, wait: 1)
+          within('#residencyProofReviewModal') do
+            click_button 'Close' if has_button?('Close', wait: 1)
+          end
+        end
+      rescue Ferrum::NodeNotFoundError, Ferrum::DeadBrowserError
+        # Browser might be in a bad state, reset it
+        Capybara.reset_sessions!
+      end
+      
       # Restore original environment variables
       ENV['MAILER_HOST'] = @original_mailer_host
+      
+      # Always ensure clean session state between tests
+      Capybara.reset_sessions!
     end
 
     test 'audit logs correctly show proof review actions without duplicates' do
+      # Always sign in fresh for each test
+      system_test_sign_in(@admin)
       visit admin_application_path(@application)
 
-      # Since we signed in during setup, we should be able to access the page directly
+      # Wait for page to load completely with intelligent waiting
+      # Use a more specific selector that indicates the page has fully loaded
+      assert_selector 'h1', text: /Application.*Details/, wait: 10
+
       # Use intelligent waiting - assert_selector will wait automatically
-      assert_selector 'h1#application-title'
-      assert_selector '#attachments-section'
+      assert_selector '#attachments-section', wait: 10
 
       # Open the income proof review modal
       within '#attachments-section' do
