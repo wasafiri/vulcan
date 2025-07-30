@@ -18,6 +18,7 @@ namespace :test do
   end
 end
 
-# Hook into the test task to ensure assets are compiled
+# Hook into the test tasks that actually need compiled assets
 task 'test:system' => 'test:compile_assets'
 task 'test:all' => 'test:compile_assets'
+# Don't hook into regular 'test' task as unit tests don't need compiled assets

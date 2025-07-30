@@ -373,16 +373,23 @@ module Admin
 
           # If no results from full name search, try individual terms
           if full_name_query.empty?
-            conditions = []
-            params = {}
+            # Build search conditions using Arel to avoid SQL injection warnings
+            table = User.arel_table
+            search_condition = nil
 
-            search_terms.each_with_index do |term, index|
-              term_key = :"term_#{index}"
-              params[term_key] = "%#{term.downcase}%"
-              conditions << "LOWER(first_name) ILIKE :#{term_key} OR LOWER(last_name) ILIKE :#{term_key} OR LOWER(email) ILIKE :#{term_key}"
+            search_terms.each do |term|
+              term_pattern = "%#{term.downcase}%"
+
+              # Create condition for this term across all searchable fields
+              term_condition = table[:first_name].lower.matches(term_pattern)
+                                                 .or(table[:last_name].lower.matches(term_pattern))
+                                                 .or(table[:email].lower.matches(term_pattern))
+
+              # Combine with previous conditions using OR
+              search_condition = search_condition ? search_condition.or(term_condition) : term_condition
             end
 
-            base_query.where(conditions.join(' OR '), params)
+            base_query.where(search_condition)
           else
             full_name_query
           end
