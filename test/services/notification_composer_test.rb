@@ -38,7 +38,7 @@ class NotificationComposerTest < ActiveSupport::TestCase
       @application,
       trainer
     )
-    assert_equal 'Jane Trainer assigned to train John Doe for Application #123 (Scheduled).', message
+    assert_equal "Jane Trainer assigned to train John Doe for Application ##{@application.id} (Scheduled).", message
   end
 
   test 'generate message for medical_certification_rejected with reason' do
@@ -48,7 +48,7 @@ class NotificationComposerTest < ActiveSupport::TestCase
       @admin,
       { 'reason' => 'Missing signature' }
     )
-    assert_equal 'Medical certification rejected for application #123 - Missing signature.', message
+    assert_equal "Medical certification rejected for application ##{@application.id} - Missing signature.", message
   end
 
   test 'generate default message for unknown action' do
@@ -57,7 +57,7 @@ class NotificationComposerTest < ActiveSupport::TestCase
       @application,
       @admin
     )
-    assert_equal 'Some new action notification regarding Application #123.', message
+    assert_equal "Some new action notification regarding Application ##{@application.id}.", message
   end
 
   test 'handles nil notifiable object gracefully' do
