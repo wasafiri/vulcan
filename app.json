@@ -11,6 +11,11 @@
         { "url": "heroku/ruby" },
         { "url": "heroku-community/google-chrome" }
       ],
+      "env": {
+        "RAILS_ENV": "test",
+        "HEADLESS": "true",
+        "CHROME_NO_SANDBOX": "true"
+      },
       "scripts": {
         "test-setup": "bin/rails db:prepare",
         "test": "bin/rails test && bin/rails test:system"
