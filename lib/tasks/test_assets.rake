@@ -5,21 +5,23 @@ namespace :test do
   task compile_assets: :environment do
     puts 'Compiling CSS assets for tests...'
     
-    # Try multiple approaches to find and run yarn/tailwindcss
-    css_success = false
-    
-    # Method 1: Try yarn build:css
-    if system('which yarn > /dev/null 2>&1') && system('yarn build:css')
-      css_success = true
-    # Method 2: Try npx tailwindcss directly
-    elsif system('which npx > /dev/null 2>&1') && 
-          system('npx tailwindcss -i ./app/assets/stylesheets/application.tailwind.css -o ./app/assets/builds/application.css --minify')
-      css_success = true
-    # Method 3: Try running tailwindcss from node_modules/.bin
-    elsif File.exist?('./node_modules/.bin/tailwindcss') &&
-          system('./node_modules/.bin/tailwindcss -i ./app/assets/stylesheets/application.tailwind.css -o ./app/assets/builds/application.css --minify')
-      css_success = true
+    # Ensure dependencies are installed first
+    unless Dir.exist?('./node_modules') && File.exist?('./node_modules/.bin/tailwindcss')
+      puts 'Installing Node.js dependencies...'
+      if system('which yarn > /dev/null 2>&1')
+        system('yarn install') || raise('Failed to install dependencies with yarn')
+      elsif system('which npm > /dev/null 2>&1')
+        system('npm install') || raise('Failed to install dependencies with npm')
+      else
+        raise('Neither yarn nor npm found')
+      end
     end
+    
+    # Now try to compile CSS
+    css_success = system('yarn build:css') ||
+                  system('npx tailwindcss -i ./app/assets/stylesheets/application.tailwind.css -o ./app/assets/builds/application.css --minify') ||
+                  system('./node_modules/.bin/tailwindcss -i ./app/assets/stylesheets/application.tailwind.css -o ./app/assets/builds/application.css --minify') ||
+                  system('node ./node_modules/tailwindcss/lib/cli.js -i ./app/assets/stylesheets/application.tailwind.css -o ./app/assets/builds/application.css --minify')
     
     raise('Failed to compile CSS assets <=== please investigate.') unless css_success
     puts 'CSS assets compiled successfully!'

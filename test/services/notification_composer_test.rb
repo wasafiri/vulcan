@@ -6,7 +6,7 @@ class NotificationComposerTest < ActiveSupport::TestCase
   setup do
     @admin = create(:admin, first_name: 'Admin', last_name: 'User')
     @constituent = create(:constituent, first_name: 'John', last_name: 'Doe')
-    @application = create(:application, id: 123, user: @constituent)
+    @application = create(:application, user: @constituent)
   end
 
   test 'generate message for proof_approved' do
@@ -16,7 +16,7 @@ class NotificationComposerTest < ActiveSupport::TestCase
       @admin,
       { 'proof_type' => 'income' }
     )
-    assert_equal 'Income approved for application #123.', message
+    assert_equal "Income approved for application ##{@application.id}.", message
   end
 
   test 'generate message for proof_rejected with reason' do
@@ -26,7 +26,7 @@ class NotificationComposerTest < ActiveSupport::TestCase
       @admin,
       { 'proof_type' => 'residency', 'rejection_reason' => 'Illegible document' }
     )
-    assert_equal 'Residency rejected for application #123 - Illegible document.', message
+    assert_equal "Residency rejected for application ##{@application.id} - Illegible document.", message
   end
 
   test 'generate message for trainer_assigned' do
