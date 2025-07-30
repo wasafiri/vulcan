@@ -35,8 +35,9 @@ Capybara.register_driver :cuprite do |app|
     inspector: true, # Allow `page.driver.debug` to open a browser inspector
 
     # Performance & Stability
-    process_timeout: 60, # Increased time to wait for Chrome to start (especially in CI/Docker)
-    timeout: 60,         # Increased time to wait for a command to finish (especially in CI/Docker)
+    # Extra long timeouts for CI environments where Chrome takes longer to start
+    process_timeout: ENV['CI'] ? 120 : 60, # Increased time to wait for Chrome to start (especially in CI/Docker)
+    timeout: ENV['CI'] ? 120 : 60,         # Increased time to wait for a command to finish (especially in CI/Docker)
     url_blacklist: [     # Backup blocking for any missed external requests (using regexps)
       /google-analytics\.com/,
       /googletagmanager\.com/,
