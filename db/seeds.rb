@@ -47,7 +47,7 @@ end
 def valid_proof_status?(proof_type, status_value)
   valid_statuses = case proof_type
                    when :income_proof, :residency_proof
-                     %w[approved rejected not_reviewed]  # Include not_reviewed for test data
+                     %w[approved rejected not_reviewed] # Include not_reviewed for test data
                    when :medical_certification
                      %w[received accepted]
                    else

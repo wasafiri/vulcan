@@ -204,9 +204,17 @@ module Admin
           end
 
           # Debug: Check what page we're actually on
-          current_url_value = current_url rescue 'ERROR_GETTING_URL'
+          current_url_value = begin
+                                current_url
+                              rescue
+                                'ERROR_GETTING_URL'
+                              end
           puts "=== DEBUG: Current URL after visit: #{current_url_value}"
-          puts "=== DEBUG: Page title: #{page.title rescue 'ERROR GETTING TITLE'}"
+          puts "=== DEBUG: Page title: #{begin
+                                           page.title
+                                         rescue
+                                           'ERROR GETTING TITLE'
+                                         end}"
           puts "=== DEBUG: Has sign-in form?: #{has_selector?('form[action="/sign_in"]', wait: 1)}"
 
           # If browser is completely corrupted (about:blank), force full restart

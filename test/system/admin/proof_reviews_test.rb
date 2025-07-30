@@ -95,18 +95,12 @@ module Admin
       assert_text(@application.user.full_name)
 
       # Look for proof status information (using intelligent waiting)
-      if has_text?('Income Proof')
-        assert_text(/Income Proof|income.*proof/i)
-      end
+      assert_text(/Income Proof|income.*proof/i) if has_text?('Income Proof')
 
-      if has_text?('Residency Proof')
-        assert_text(/Residency Proof|residency.*proof/i)
-      end
+      assert_text(/Residency Proof|residency.*proof/i) if has_text?('Residency Proof')
 
       # Check for any audit or activity information
-      if has_text?(/audit|activity|log/i)
-        assert_text(/audit|activity|log/i)
-      end
+      assert_text(/audit|activity|log/i) if has_text?(/audit|activity|log/i)
     end
 
     private

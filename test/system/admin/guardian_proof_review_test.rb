@@ -97,18 +97,18 @@ module AdminTests
 
       # Create a regular application (not from a guardian) with all required fields
       regular_constituent = create(:constituent,
-        email: "regular_test_#{Time.now.to_i}_#{rand(10_000)}@example.com",
-        first_name: 'Regular',
-        last_name: 'User'
+                                   email: "regular_test_#{Time.now.to_i}_#{rand(10_000)}@example.com",
+                                   first_name: 'Regular',
+                                   last_name: 'User'
       )
       regular_application = create(:application,
-        :in_progress_with_pending_proofs,
-        :old_enough_for_new_application,
-        user: regular_constituent,
-        household_size: 2,
-        annual_income: 30_000,
-        maryland_resident: true,
-        self_certify_disability: true
+                                   :in_progress_with_pending_proofs,
+                                   :old_enough_for_new_application,
+                                   user: regular_constituent,
+                                   household_size: 2,
+                                   annual_income: 30_000,
+                                   maryland_resident: true,
+                                   self_certify_disability: true
       )
 
       # Manually attach proofs since the factory trait isn't working

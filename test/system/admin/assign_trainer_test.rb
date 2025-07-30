@@ -5,7 +5,7 @@ require 'application_system_test_case'
 class AssignTrainerTest < ApplicationSystemTestCase
   setup do
     @admin = create(:admin)
-    @application = create(:application, :completed)  # Use :completed instead of :approved
+    @application = create(:application, :completed) # Use :completed instead of :approved
     @trainer = create(:user, :trainer, first_name: 'Jane', last_name: 'Trainer')
 
     # Set up policy to allow training sessions

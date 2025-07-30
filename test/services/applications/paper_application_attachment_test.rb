@@ -5,6 +5,7 @@ require 'test_helper'
 module Applications
   class PaperApplicationAttachmentTest < ActiveSupport::TestCase
     include ActionDispatch::TestProcess::FixtureFile
+
     setup do
       @admin = create(:admin)
       @timestamp = Time.current.to_f.to_s.gsub('.', '')

@@ -6,7 +6,7 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
   setup do
     # Force a clean browser session for each test
     Capybara.reset_sessions!
-    
+
     @user = create(:constituent, first_name: 'Test', last_name: 'Guardian')
     @dependent = create(:constituent, first_name: 'Jane', last_name: 'Dependent', email: 'jane.dependent@example.com', phone: '5555551212')
 
@@ -102,7 +102,7 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
     # Always sign in fresh for each test
     system_test_sign_in(@user)
     assert_text 'Dashboard', wait: 10 # Verify we're signed in
-    
+
     visit new_constituent_portal_application_path
     wait_for_page_stable # Use comprehensive wait strategy
 
@@ -157,7 +157,7 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
     # Always sign in fresh for each test
     system_test_sign_in(@user)
     assert_text 'Dashboard', wait: 10 # Verify we're signed in
-    
+
     visit new_constituent_portal_application_path
 
     # Fill in required fields
@@ -205,7 +205,7 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
     # Always sign in fresh for each test
     system_test_sign_in(@user)
     assert_text 'Dashboard', wait: 10 # Verify we're signed in
-    
+
     visit new_constituent_portal_application_path
     wait_for_turbo # Ensure page is fully loaded
 

@@ -4,6 +4,7 @@ require 'test_helper'
 
 class RegistrationsControllerTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
+
   setup do
     # Clear emails before each test
     ActionMailer::Base.deliveries.clear

@@ -6,6 +6,7 @@ require 'action_dispatch/testing/test_process'
 module Applications
   class PaperApplicationServiceTest < ActiveSupport::TestCase
     include ActionDispatch::TestProcess::FixtureFile
+
     # Disable parallelization for this test to avoid Active Storage conflicts
     self.use_transactional_tests = true
 

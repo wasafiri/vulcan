@@ -41,9 +41,7 @@ class ProofAttachmentMetricsJob < ApplicationJob
                       "Success Rate: #{success_rate}%"
 
     # Alert administrators if failure rate is too high
-    if success_rate < SUCCESS_RATE_THRESHOLD && failed_submissions >= MINIMUM_FAILURES_THRESHOLD
-      alert_administrators(success_rate, total_submissions, failed_submissions)
-    end
+    alert_administrators(success_rate, total_submissions, failed_submissions) if success_rate < SUCCESS_RATE_THRESHOLD && failed_submissions >= MINIMUM_FAILURES_THRESHOLD
 
     Rails.logger.info 'Proof submission failure rate analysis completed'
   end

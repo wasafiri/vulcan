@@ -5,6 +5,7 @@ require 'test_helper'
 module ConstituentPortal
   class ApplicationsDisabilityTest < ActionDispatch::IntegrationTest
     include AuthenticationTestHelper
+
     setup do
       # Set up FPL policies for income validation
       setup_fpl_policies

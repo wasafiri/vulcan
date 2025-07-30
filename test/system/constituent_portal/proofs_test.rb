@@ -6,7 +6,7 @@ class ProofsSystemTest < ApplicationSystemTestCase
   include ActiveJob::TestHelper
 
   setup do
-    setup_fpl_policies          # Creates FPL and rate limit policies
+    setup_fpl_policies # Creates FPL and rate limit policies
 
     @user = create(:constituent)
     @application = create(:application, :in_progress_with_rejected_proofs, :old_enough_for_new_application, user: @user)

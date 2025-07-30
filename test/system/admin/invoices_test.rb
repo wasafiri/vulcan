@@ -13,11 +13,11 @@ module Admin
 
       # Create invoices with dates far in the past to avoid overlap with existing data
       @invoice = create(:invoice, :pending, :with_transactions,
-                       vendor: @vendor,
-                       start_date: 1.year.ago.beginning_of_day,
-                       end_date: 50.weeks.ago.end_of_day,
-                       transaction_count: 1,
-                       amount_per_transaction: 99.99)
+                        vendor: @vendor,
+                        start_date: 1.year.ago.beginning_of_day,
+                        end_date: 50.weeks.ago.end_of_day,
+                        transaction_count: 1,
+                        amount_per_transaction: 99.99)
       @pending_invoice = create(:invoice, :pending, vendor: @vendor2,
                                start_date: 48.weeks.ago.beginning_of_day,
                                end_date: 46.weeks.ago.end_of_day)

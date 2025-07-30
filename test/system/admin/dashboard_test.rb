@@ -14,9 +14,9 @@ module Admin
 
       # Create applications with proofs needing review
       @app_with_pending_proof = create(:application,
-        status: 'in_progress',
-        income_proof_status: 'not_reviewed',
-        residency_proof_status: 'not_reviewed'
+                                       status: 'in_progress',
+                                       income_proof_status: 'not_reviewed',
+                                       residency_proof_status: 'not_reviewed'
       )
 
       # Create application with medical certification received
@@ -168,7 +168,7 @@ module Admin
       visit admin_applications_path
 
       # Test that users can access key administrative functions
-      assert_selector "a[aria-label*='paper application']"  # Can upload papers
+      assert_selector "a[aria-label*='paper application']" # Can upload papers
       assert_selector "a[aria-label*='policies']"          # Can edit policies
       assert_selector "a[aria-label*='products']"          # Can manage products
       assert_selector "a[aria-label*='reports']"           # Can view reports

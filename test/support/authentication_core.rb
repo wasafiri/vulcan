@@ -97,9 +97,7 @@ module AuthenticationCore
   def verify_authentication_state(user)
     assert_equal user.id, Current.user&.id, 'Current.user wrong' if defined?(Current)
 
-    if defined?(@controller) && @controller.respond_to?(:current_user, true)
-      assert_equal user.id, @controller.send(:current_user)&.id, 'controller current_user wrong'
-    end
+    assert_equal user.id, @controller.send(:current_user)&.id, 'controller current_user wrong' if defined?(@controller) && @controller.respond_to?(:current_user, true)
 
     session = Session.find_by(user_id: user.id)
     assert session.present?, 'No Session row'

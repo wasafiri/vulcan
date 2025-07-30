@@ -5,6 +5,7 @@ require 'test_helper'
 module ConstituentPortal
   class ApplicationsControllerAutosaveTest < ActionDispatch::IntegrationTest
     include AuthenticationTestHelper
+
     setup do
       # Set up test data using factories
       @user = create(:constituent, :with_disabilities)

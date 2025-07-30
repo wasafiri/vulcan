@@ -4,6 +4,7 @@ module Trainers
   # Base controller for the trainers portal.
   class BaseController < ApplicationController
     include Pagy::Backend
+
     before_action :require_trainer
 
     private
