@@ -11,6 +11,9 @@
         { "url": "heroku/ruby" },
         { "url": "heroku-community/google-chrome" }
       ],
+      "addons": [
+        "bucketeer"
+      ],
       "env": {
         "RAILS_ENV": "test",
         "HEADLESS": "true",
