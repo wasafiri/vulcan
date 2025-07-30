@@ -7,7 +7,7 @@ import { setVisible } from "../../utils/visibility"
 class AutosaveController extends Controller {
   static targets = ["form", "autosaveStatus", "fieldError"]
   static outlets = ["flash"] // Declare flash outlet
-  static values = { 
+  static values = {
     url: String,
     debounceWait: { type: Number, default: 1000 },
     editFormUrl: String,
@@ -17,20 +17,20 @@ class AutosaveController extends Controller {
   connect() {
     // Use our tested debounce utility
     this.debouncedSave = createFormChangeDebounce(() => this.executeFieldSave())
-    
+
     // Request key for tracking
     this.requestKey = `autosave-${this.identifier}-${Date.now()}`
-    
+
     this.setupFieldListeners()
   }
 
   disconnect() {
     // Cancel any pending autosave requests
     railsRequest.cancel(this.requestKey)
-    
+
     // Clean up event listeners
     this.cleanupEventListeners()
-    
+
     // Clear timers
     if (this._statusTimeout) {
       clearTimeout(this._statusTimeout)
@@ -40,16 +40,16 @@ class AutosaveController extends Controller {
 
   setupFieldListeners() {
     if (!this.safeTarget('form', false)) return
-    
+
     // Get all form inputs except file inputs, buttons, and submit inputs
     const formInputs = this.formTarget.querySelectorAll(
       'input:not([type="file"]):not([type="button"]):not([type="submit"]), select, textarea'
     )
-    
+
     // Store bound handler for cleanup
     this._boundHandleBlur = this.handleBlur.bind(this)
     this._fieldElements = []
-    
+
     formInputs.forEach(input => {
       // Store reference for cleanup
       this._fieldElements.push(input)
@@ -119,21 +119,21 @@ class AutosaveController extends Controller {
 
       if (result.success) {
         const data = result.data
-        
+
         if (data.success) {
           this.updateStatus("Saved", "text-green-600")
-          
+
           // If this is a new application, update the form action URL 
           // to include the new application ID
           if (data.applicationId && !this.formTarget.action.includes(`/${data.applicationId}`) && this.hasEditFormUrlValue && this.hasEditAutosaveUrlValue) {
-            // Use Rails-generated URLs instead of manual construction
+            // Use Rails-generated URLs
             const newFormAction = this.editFormUrlValue.replace(':id', data.applicationId)
             this.formTarget.action = newFormAction
-            
+
             // Update the autosave URL as well
             this.urlValue = this.editAutosaveUrlValue.replace(':id', data.applicationId)
-            
-            // Add or update the _method hidden field to PATCH since we're now updating
+
+            // Add or update the _method hidden field to PATCH
             let methodField = this.formTarget.querySelector('input[name="_method"]')
             if (!methodField) {
               methodField = document.createElement('input')
@@ -145,7 +145,7 @@ class AutosaveController extends Controller {
           }
         } else {
           this.updateStatus("Error saving", "text-red-600")
-          
+
           // Display field-specific errors
           if (data.errors) {
             Object.entries(data.errors).forEach(([field, messages]) => {
@@ -163,7 +163,7 @@ class AutosaveController extends Controller {
       if (error.name !== "AbortError") {
         console.error('Autosave error:', error)
         this.updateStatus("Failed to save", "text-red-600")
-        
+
         // Also show as a global flash message
         if (this.hasFlashOutlet) {
           this.flashOutlet.showError("Autosave failed: " + (error.message || "An unknown error occurred."))
@@ -184,7 +184,7 @@ class AutosaveController extends Controller {
     if (this._statusTimeout) {
       clearTimeout(this._statusTimeout)
     }
-    
+
     // Clear status message after a delay
     this._statusTimeout = setTimeout(() => {
       this.updateStatus("", "")
@@ -195,15 +195,15 @@ class AutosaveController extends Controller {
   updateStatus(message, cssClass) {
     this.withTarget('autosaveStatus', (target) => {
       target.textContent = message
-      
+
       // Reset classes
       target.className = "text-sm mt-2"
-      
+
       // Add new class if provided
       if (cssClass) {
         target.classList.add(cssClass)
       }
-      
+
       // Use setVisible utility for consistent visibility management
       setVisible(target, !!message)
     })
@@ -212,7 +212,7 @@ class AutosaveController extends Controller {
   displayFieldError(element, message) {
     // Find or create error element near the field
     const errorContainer = this.findOrCreateFieldErrorElement(element)
-    
+
     if (errorContainer) {
       errorContainer.textContent = message
       errorContainer.classList.add('text-red-600', 'text-sm', 'mt-1')
@@ -235,20 +235,20 @@ class AutosaveController extends Controller {
   findFieldErrorElement(element) {
     // First look for an existing field error element with a data-field attribute
     const fieldName = element.name
-    
+
     // Look for error elements that are siblings of the input
     const parent = element.parentElement
     if (parent) {
       const errorElem = parent.querySelector(`.field-error-message[data-field="${fieldName}"]`)
       if (errorElem) return errorElem
-      
+
       // Also look for any field error elements without a specific data field that are siblings
       const genericErrorElem = parent.querySelector('.field-error-message:not([data-field])')
       if (genericErrorElem) return genericErrorElem
     }
-    
+
     // Look more broadly for any target
-    return this.fieldErrorTargets.find(target => 
+    return this.fieldErrorTargets.find(target =>
       target.dataset.field === fieldName || !target.dataset.field
     )
   }
@@ -257,19 +257,19 @@ class AutosaveController extends Controller {
     // First try to find an existing error element
     const existing = this.findFieldErrorElement(element)
     if (existing) return existing
-    
+
     // If not found, create a new one
     const errorElem = document.createElement('p')
     errorElem.className = 'field-error-message text-red-600 text-sm mt-1'
     errorElem.dataset.field = element.name
-    
+
     // Insert after the input element
     const parent = element.parentElement
     if (parent) {
       parent.insertBefore(errorElem, element.nextSibling)
       return errorElem
     }
-    
+
     return null
   }
 }

@@ -4,6 +4,7 @@ module Admin
   class PaperApplicationsController < Admin::BaseController
     include ParamCasting
     include TurboStreamResponseHandling
+
     before_action :cast_complex_boolean_params, only: %i[create update]
 
     USER_BASE_FIELDS = %i[
@@ -137,7 +138,7 @@ module Admin
       if result.success?
         result.data[:modifier]
       else
-        400 # Fallback default
+        400 # Default
       end
     end
 
@@ -160,7 +161,7 @@ module Admin
       notification_params = build_notification_params
 
       notification_method = params[:notification_method]
-      
+
       if notification_method == 'letter'
         # For letter notifications, queue for printing
         # This would integrate with a print queue system
@@ -245,7 +246,8 @@ module Admin
                   else
                     'An unexpected error occurred.'
                   end
-      Rails.logger.error "Paper application operation failed: #{error_msg}"
+      operation_context = Rails.env.test? ? '[TEST_BUSINESS_LOGIC] ' : '[ADMIN_OPERATION] '
+      Rails.logger.error "#{operation_context}Paper application operation failed: #{error_msg}"
 
       repopulate_form_data(service, existing_application)
 
@@ -476,7 +478,7 @@ module Admin
       params.permit(:household_size, :annual_income, :communication_preference, :additional_notes).to_h
     end
 
-    # NOTE: cast_boolean_params and cast_boolean_for are now provided by the ParamCasting concern
+    # NOTE: cast_boolean_params and cast_boolean_for are provided by the ParamCasting concern
     # The complex parameter casting is handled by cast_complex_boolean_params
   end
 end

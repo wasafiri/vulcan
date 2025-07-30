@@ -23,7 +23,7 @@ module Admin
       # Part 1: Test Guardian Validation First (KNOWN WORKING from test 1)
       assert_selector 'label', text: 'A Dependent (must select existing guardian in system or enter guardian\'s information)'
       choose 'applicant_is_minor'
-      
+
       assert_selector '#guardian-info-section', visible: true
       assert_text 'Guardian Information'
       assert_selector '#dependent-info-section', visible: false
@@ -38,7 +38,7 @@ module Admin
         fill_in 'guardian_attributes[email]', with: 'invalid-email'
         click_button 'Save Guardian'
         assert_selector '.border-red-500', count: 2, wait: 3
-        
+
         # Now fill with valid data (KNOWN WORKING from test 2)
         fill_in 'guardian_attributes[first_name]', with: 'Guardian'
         fill_in 'guardian_attributes[last_name]', with: 'TestParent'
@@ -60,7 +60,7 @@ module Admin
       # Instead of testing CSS selectors, verify the guardian was actually selected by checking dependent section visibility
       assert_selector '#dependent-info-section', visible: true, wait: 5
       assert_text 'Dependent Information'
-      
+
       # Verify guardian info is displayed (working assertion from test 4)
       assert_text 'Guardian TestParent'
 
@@ -69,7 +69,7 @@ module Admin
         fill_in 'constituent[first_name]', with: 'Dependent'
         fill_in 'constituent[last_name]', with: 'TestChild'
         fill_in 'constituent[date_of_birth]', with: 10.years.ago.strftime('%Y-%m-%d')
-        
+
         uncheck 'use_guardian_email'
         assert_selector 'input[name="constituent[dependent_email]"]', visible: true, wait: 3
         fill_in 'constituent[dependent_email]', with: "dependent-test-#{Time.now.to_i}@example.com"
@@ -78,7 +78,7 @@ module Admin
 
       # Part 4: Complete Application and Submit (KNOWN WORKING)
       complete_application_form
-      
+
       # Part 5: Verify Full Workflow (flexible approach)
       verify_complete_workflow
     end
@@ -86,23 +86,23 @@ module Admin
     def perform_existing_guardian_selection_workflow
       # Setup with existing guardian
       existing_guardian = create(:constituent,
-                                first_name: 'Existing',
-                                last_name: 'Guardian',
-                                email: 'existing.guardian@example.com')
-      
+                                 first_name: 'Existing',
+                                 last_name: 'Guardian',
+                                 email: 'existing.guardian@example.com')
+
       admin = create(:admin, verified: true)
       system_test_sign_in(admin)
       visit new_admin_paper_application_path
 
       choose 'applicant_is_minor'
       assert_selector '#guardian-info-section', visible: true
-      
+
       # Part 1: Test Guardian Search (using working assertions instead of failing "Select Guardian" button)
       within '#guardian-info-section' do
         # Try to search for existing guardian
         if page.has_field?('Search by Name or Email')
           fill_in 'Search by Name or Email', with: 'Existing'
-          
+
           # Instead of clicking missing "Select Guardian" button, verify search worked by checking if guardian appears
           if page.has_text?('Existing Guardian', wait: 3)
             # Try to find any clickable element that would select the guardian
@@ -114,19 +114,18 @@ module Admin
             else
               # If no select button found, we'll test the core functionality by creating a guardian
               # This still tests the guardian workflow even if the search/select UI is broken
-              puts "INFO: Guardian search worked but select button missing. Testing core functionality..."
               click_link 'Or Create New Guardian'
               fill_existing_guardian_form
             end
           else
             # Search didn't work, fall back to creating new guardian to test workflow
-            puts "INFO: Guardian search not working, falling back to creation workflow..."
+            puts 'INFO: Guardian search not working, falling back to creation workflow...'
             click_link 'Or Create New Guardian'
             fill_existing_guardian_form
           end
         else
           # Search field missing, fall back to creation
-          puts "INFO: Guardian search field missing, falling back to creation workflow..."
+          puts 'INFO: Guardian search field missing, falling back to creation workflow...'
           click_link 'Or Create New Guardian'
           fill_existing_guardian_form
         end
@@ -136,13 +135,13 @@ module Admin
       # Instead of checking CSS selectors, verify dependent section becomes visible
       assert_selector '#dependent-info-section', visible: true, wait: 5
       assert_text 'Dependent Information'
-      
+
       # Part 3: Complete Dependent Form (KNOWN WORKING)
       within '#dependent-info-section' do
         fill_in 'constituent[first_name]', with: 'TestDependent'
         fill_in 'constituent[last_name]', with: 'ForExisting'
         fill_in 'constituent[date_of_birth]', with: 8.years.ago.strftime('%Y-%m-%d')
-        
+
         # Test using guardian's email (different from test 1)
         # leave 'use_guardian_email' checked (default)
         select 'Parent', from: 'relationship_type'
@@ -150,7 +149,7 @@ module Admin
 
       # Part 4: Complete Application (KNOWN WORKING)
       complete_application_form
-      
+
       # Part 5: Verify Workflow with Existing Guardian
       verify_existing_guardian_workflow(existing_guardian)
     end
@@ -168,7 +167,7 @@ module Admin
       fill_in 'guardian_attributes[zip_code]', with: '21203'
       choose 'guardian_phone_type_voice'
       choose 'guardian_communication_preference_email'
-      
+
       click_button 'Save Guardian'
       assert_text 'Existing Guardian', wait: 5
     end
@@ -177,7 +176,7 @@ module Admin
       # Disability information
       check 'applicant_attributes[self_certify_disability]'
       check 'applicant_attributes[hearing_disability]'
-      
+
       # Application details
       fill_in 'application_household_size', with: '3'
       fill_in 'application_annual_income', with: '25000'
@@ -213,7 +212,7 @@ module Admin
       end
     end
 
-    def verify_existing_guardian_workflow(existing_guardian)
+    def verify_existing_guardian_workflow(_existing_guardian)
       before_count = Application.count
       before_relationship_count = GuardianRelationship.count
 
@@ -225,38 +224,35 @@ module Admin
       if current_path_check.match?(%r{/admin/applications/\d+})
         # Verify application was created
         assert_equal before_count + 1, Application.count, 'Application count should have increased by 1'
-        
+
         # Verify guardian relationship was created
         assert_equal before_relationship_count + 1, GuardianRelationship.count, 'Guardian relationship count should have increased by 1'
-        
+
         # Verify the dependent user was created
-        dependent_user = User.where("created_at > ?", Time.current - 1.minute)
-                            .find_by(first_name: 'TestDependent', last_name: 'ForExisting')
+        dependent_user = User.where('created_at > ?', 1.minute.ago)
+                             .find_by(first_name: 'TestDependent', last_name: 'ForExisting')
         assert dependent_user.present?, 'Dependent user should have been created'
-        
+
         # Verify application structure
         newest_app = Application.order(created_at: :desc).first
         assert_equal 'Users::Constituent', newest_app.user.type, 'Application user should be a Constituent'
         assert newest_app.user.first_name.include?('TestDependent'), 'Application should belong to the dependent user'
-        
-        puts "INFO: Existing guardian workflow completed successfully"
       else
-        puts "INFO: Form did not redirect (current path: #{current_path_check}), but testing core functionality..."
         # Even if form doesn't redirect, verify dependent user was created
-        dependent_user = User.where("created_at > ?", Time.current - 1.minute)
-                            .find_by(first_name: 'TestDependent', last_name: 'ForExisting')
+        dependent_user = User.where('created_at > ?', 1.minute.ago)
+                             .find_by(first_name: 'TestDependent', last_name: 'ForExisting')
         assert dependent_user.present?, 'Dependent user should have been created even if form validation failed'
       end
     end
 
-    def verify_successful_application_creation(before_count, before_user_count, before_relationship_count, guardian_first_name, dependent_first_name)
+    def verify_successful_application_creation(before_count, _before_user_count, before_relationship_count, guardian_first_name, dependent_first_name)
       assert_equal before_count + 1, Application.count, 'Application count should have increased by 1'
-      
-      guardian_user = User.where("created_at > ?", Time.current - 1.minute)
-                         .find_by("first_name LIKE ?", "#{guardian_first_name}%")
-      dependent_user = User.where("created_at > ?", Time.current - 1.minute)
-                          .find_by("first_name LIKE ?", "#{dependent_first_name}%")
-      
+
+      guardian_user = User.where('created_at > ?', 1.minute.ago)
+                          .find_by('first_name LIKE ?', "#{guardian_first_name}%")
+      dependent_user = User.where('created_at > ?', 1.minute.ago)
+                           .find_by('first_name LIKE ?', "#{dependent_first_name}%")
+
       assert guardian_user.present?, 'Guardian user should have been created'
       assert dependent_user.present?, 'Dependent user should have been created'
       assert guardian_user != dependent_user, 'Guardian and dependent should be different users'
@@ -272,13 +268,12 @@ module Admin
       assert_equal 'Parent', guardian_relationship.relationship_type, 'Relationship type should be set correctly'
     end
 
-    def verify_guardian_creation_without_redirect(before_user_count, before_relationship_count, guardian_first_name)
+    def verify_guardian_creation_without_redirect(_before_user_count, _before_relationship_count, guardian_first_name)
       # Even if form doesn't redirect, guardian creation should work
-      guardian_user = User.where("created_at > ?", Time.current - 1.minute)
-                         .find_by("first_name LIKE ?", "#{guardian_first_name}%")
-      
+      guardian_user = User.where('created_at > ?', 1.minute.ago)
+                          .find_by('first_name LIKE ?', "#{guardian_first_name}%")
+
       assert guardian_user.present?, 'Guardian user should have been created even if form validation failed'
-      puts "INFO: Guardian creation worked: #{guardian_user.first_name} #{guardian_user.last_name} (#{guardian_user.email})"
     end
 
     def attach_pdf_proof(type)

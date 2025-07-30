@@ -62,7 +62,7 @@ module UserRolesAndCapabilities
     role_capabilities.exists?(capability: capability)
   end
 
-  def prevent_self_role_update(current_user, new_role)
+  def prevent_self_role_update?(current_user, new_role)
     !(self == current_user && type != new_role)
   end
 

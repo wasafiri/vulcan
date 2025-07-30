@@ -100,7 +100,7 @@ module CupriteRescue
     hard_restart
     retry
   ensure
-    Thread.current[:capybara_retries] = 0 if Thread.current[:capybara_retries] && Thread.current[:capybara_retries] > 0
+    Thread.current[:capybara_retries] = 0 if Thread.current[:capybara_retries]&.positive?
   end
 end
 
@@ -137,49 +137,53 @@ Capybara::Session.prepend(CupriteRescue)
 # Include CupriteSessionExtensions for hard restart capability
 Capybara::Session.include CupriteSessionExtensions
 
-# Patch fill_in method to avoid Node#set warnings and flakiness under Cuprite
+# Improved fill_in patch to eliminate ALL Cuprite Node#set warnings
 module FillInCupritePatch
   def fill_in(locator, **options)
-    return super unless driver.is_a?(Capybara::Cuprite::Driver) && options.key?(:with)
+    # Only patch for Cuprite driver
+    return super unless driver.is_a?(Capybara::Cuprite::Driver)
 
-    value = options[:with].to_s
-    el = find_field(locator, disabled: :all)
-    
-    # First clear the field completely using JavaScript to ensure it's empty
+    # Extract the value from either :with key or assume second positional argument pattern
+    value = options.delete(:with)&.to_s
+
+    # Find the field with remaining options (filtering out problematic ones)
+    safe_options = options.except(:clear, :fill_options, :currently_with, :exact_text, :normalize_ws)
+    el = find_field(locator, **safe_options)
+
+    # Clear the field using the most reliable method for Cuprite
     begin
-      execute_script("arguments[0].value = '';", el)
+      # Method 1: JavaScript clearing (most reliable)
+      execute_script("arguments[0].value = ''; arguments[0].dispatchEvent(new Event('input', {bubbles: true}));", el)
     rescue StandardError
-      # Fall back to manual clearing if JS fails
+      # Method 2: Fallback to native clearing
+      begin
+        el.native.clear if el.native.respond_to?(:clear)
+      rescue StandardError
+        # Method 3: Last resort - select all and replace
+        el.send_keys([:control, 'a']) if value.present?
+      end
     end
-    
-    # Click and focus the field
-    el.click
-    
-    # Set the new value
-    if value.present?
-      el.send_keys(value)
-    end
-    
-    # Trigger input and change events for JavaScript controllers
-    # This is necessary because send_keys doesn't automatically trigger these events
+
+    # Set the new value if provided
+    return if value.blank?
+
+    el.send_keys(value)
+    # Trigger change events for JavaScript controllers (Stimulus, etc.)
     begin
       execute_script(<<~JS, el)
         const element = arguments[0];
         if (element) {
-          element.dispatchEvent(new Event('input', { bubbles: true }));
           element.dispatchEvent(new Event('change', { bubbles: true }));
-          console.log('Triggered input/change events for:', element.name || element.id, 'value:', element.value);
+          element.dispatchEvent(new Event('blur', { bubbles: true }));
         }
       JS
     rescue StandardError => e
-      # Silently handle JS execution errors to prevent test failures
-      warn "Warning: Could not trigger input/change events: #{e.message}" if ENV['VERBOSE_TESTS']
+      warn "Warning: Could not trigger change events: #{e.message}" if ENV['VERBOSE_TESTS']
     end
   end
 end
 
 Capybara::Session.prepend(FillInCupritePatch)
-
 
 # Helper Modules – defined before use
 
@@ -205,67 +209,68 @@ module SeedLookupHelpers
 
   def users(sym)
     email = EMAILS.fetch(sym) { raise ArgumentError, "Unknown user #{sym}" }
-    
+
     # Determine the correct class and attributes based on the symbol
     user_class, attributes = case sym
-    when :admin, :admin_david
-      [Users::Administrator, {
-        password: 'password123',
-        first_name: sym.to_s.titleize.split('_').first,
-        last_name: 'User',
-        status: :active,
-        verified: true,
-        email_verified: true
-      }]
-    when :evaluator
-      [Users::Evaluator, {
-        password: 'password123',
-        first_name: sym.to_s.titleize.split('_').first,
-        last_name: 'User',
-        status: :active  # Evaluators have active status
-      }]
-    when :trainer
-      [Users::Trainer, {
-        password: 'password123',
-        first_name: sym.to_s.titleize.split('_').first,
-        last_name: 'User',
-        status: :active  # Trainers have active status
-      }]
-    when :medical_provider
-      [Users::MedicalProvider, {
-        password: 'password123',
-        first_name: sym.to_s.titleize.split('_').first,
-        last_name: 'User',
-        status: :active  # Medical providers inherit from base User
-      }]
-    when :vendor_ray, :vendor_teltex
-      [Users::Vendor, {
-        password: 'password123',
-        first_name: sym.to_s.titleize.split('_').first,
-        last_name: 'Vendor',  # Match the factory pattern
-        status: :approved,  # Vendors use :approved instead of :active
-        business_name: "#{sym.to_s.titleize.split('_').first} Business",
-        business_tax_id: "#{sym.to_s.upcase.gsub('_', '')}123456",
-        terms_accepted_at: Time.current,
-        # w9_status is handled by the factory's after(:create) callback
-        verified: true,
-        email_verified: true
-      }]
-    else
-      [Users::Constituent, {
-        password: 'password123',
-        first_name: sym.to_s.titleize.split('_').first,
-        last_name: 'User',
-        status: (sym == :unconfirmed_user ? :inactive : :active),
-        hearing_disability: true  # Set default disability to pass validation
-      }]
-    end
-    
+                             when :admin, :admin_david
+                               [Users::Administrator, {
+                                 password: 'password123',
+                                 first_name: sym.to_s.titleize.split('_').first,
+                                 last_name: 'User',
+                                 status: :active,
+                                 verified: true,
+                                 email_verified: true
+                               }]
+                             when :evaluator
+                               [Users::Evaluator, {
+                                 password: 'password123',
+                                 first_name: sym.to_s.titleize.split('_').first,
+                                 last_name: 'User',
+                                 status: :active  # Evaluators have active status
+                               }]
+                             when :trainer
+                               [Users::Trainer, {
+                                 password: 'password123',
+                                 first_name: sym.to_s.titleize.split('_').first,
+                                 last_name: 'User',
+                                 status: :active  # Trainers have active status
+                               }]
+                             when :medical_provider
+                               [Users::MedicalProvider, {
+                                 password: 'password123',
+                                 first_name: sym.to_s.titleize.split('_').first,
+                                 last_name: 'User',
+                                 status: :active  # Medical providers inherit from base User
+                               }]
+                             when :vendor_ray, :vendor_teltex
+                               [Users::Vendor, {
+                                 password: 'password123',
+                                 first_name: sym.to_s.titleize.split('_').first,
+                                 last_name: 'Vendor', # Match the factory pattern
+                                 status: :active, # Ensure vendor can authenticate
+                                 vendor_authorization_status: :approved, # vendor_authorization_status for vendor authorization to participate in voucher program
+                                 business_name: "#{sym.to_s.titleize.split('_').first} Business",
+                                 business_tax_id: "#{sym.to_s.upcase.gsub('_', '')}123456",
+                                 terms_accepted_at: Time.current,
+                                 # w9_status is handled by the factory's after(:create) callback
+                                 verified: true,
+                                 email_verified: true
+                               }]
+                             else
+                               [Users::Constituent, {
+                                 password: 'password123',
+                                 first_name: sym.to_s.titleize.split('_').first,
+                                 last_name: 'User',
+                                 status: (sym == :unconfirmed_user ? :inactive : :active),
+                                 hearing_disability: true # Set default disability to pass validation
+                               }]
+                             end
+
     # Use the specific class to find or create the user
     user = user_class.find_or_create_by!(email: email) do |u|
       attributes.each { |key, value| u.send("#{key}=", value) }
     end
-    
+
     # If we found an existing user (not just created), update its attributes to match what tests expect
     # This ensures test users have the correct attributes even if they were seeded differently
     # Skip this for vendor users since the factory handles all the complex w9_status logic correctly
@@ -277,7 +282,6 @@ module SeedLookupHelpers
         user.save! if user.changed?
       end
     end
-    
     user
   end
 
@@ -388,7 +392,7 @@ end
 # SECTION 3: THE BASE TEST CASE CLASS
 # --------------------------------------------------------------------------
 # All system tests will inherit from this class. It includes all necessary
-# helpers and defines a robust setup/teardown lifecycle.
+# helpers and defines a setup/teardown lifecycle.
 # --------------------------------------------------------------------------
 class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # Use the driver we registered above.
@@ -400,6 +404,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   include FplPolicyHelpers
   include SeedLookupHelpers            # users(:admin) etc. (defined above)
   include MemorySafeTestHelpers        # create() wrapper that uses FactoryBot (defined above)
+
   # SeedLookupHelper is in test_helper.rb for global access.
 
   # Load modal helpers
@@ -500,7 +505,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   end
 
   # Override Rails' take_screenshot to provide logging and handle optional name parameter
-  def take_screenshot(name = nil)
+  def take_screenshot(_name = nil)
     return nil unless page&.driver
 
     # Use Rails' built-in screenshot functionality (ignores name parameter)
@@ -621,7 +626,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     end
   end
 
-  # Emergency Chrome process cleanup - last resort
+  # Emergency Chrome process cleanup
   def emergency_chrome_cleanup
     # Get all Chrome processes
     chrome_processes = `ps aux | grep -i chrome | grep -v grep`.split("\n")

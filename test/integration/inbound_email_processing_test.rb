@@ -54,7 +54,7 @@ class InboundEmailProcessingTest < ActionDispatch::IntegrationTest
     # This prevents foreign key constraint violations when creating events for unknown senders
     # TROUBLESHOOTING: If you see "Key (user_id)=(X) is not present in table users" errors:
     # 1. Ensure User.system_user is called in test setup (done here)
-    # 2. Check that bounce_with_notification has robust user creation logic
+    # 2. Check that bounce_with_notification has user creation logic
     # 3. Verify no transaction isolation issues between user creation and event creation
     @system_user = User.system_user
 

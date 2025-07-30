@@ -33,24 +33,37 @@ class ProofSubmissionMailbox < ApplicationMailbox
 
   def process
     # NOTE: This method only runs if ALL before_processing callbacks pass
-    Rails.logger.info "PROOF SUBMISSION MAILBOX PROCESSING: Email from #{mail.from&.first} with subject '#{mail.subject}'"
+    log_processing_start
+    create_processing_event
+    process_attachments
+    complete_processing
+  end
 
+  private
+
+  def log_processing_start
+    Rails.logger.info "PROOF SUBMISSION MAILBOX PROCESSING: Email from #{mail.from&.first} with subject '#{mail.subject}'"
+  end
+
+  def create_processing_event
     # Create initial event to track that the email was received
     # Only create event if we have both constituent and application
-    if constituent && application
-      Event.create!(
-        user: constituent,
-        action: 'proof_submission_received',
-        metadata: {
-          application_id: application.id,
-          inbound_email_id: inbound_email.id,
-          email_subject: mail.subject,
-          email_from: mail.from&.first,
-          attachments_count: mail.attachments.count
-        }
-      )
-    end
+    return unless constituent && application
 
+    Event.create!(
+      user: constituent,
+      action: 'proof_submission_received',
+      metadata: {
+        application_id: application.id,
+        inbound_email_id: inbound_email.id,
+        email_subject: mail.subject,
+        email_from: mail.from&.first,
+        attachments_count: mail.attachments.count
+      }
+    )
+  end
+
+  def process_attachments
     # Process each attachment
     mail.attachments.each do |attachment|
       # Determine proof type based on email subject or content
@@ -60,14 +73,14 @@ class ProofSubmissionMailbox < ApplicationMailbox
       # ProofAttachmentService will create the correct audit event with submission_method: 'email'
       attach_proof(attachment, proof_type)
     end
+  end
 
+  def complete_processing
     # Notify admin of new proof submission
     notify_admin
 
     Rails.logger.info 'PROOF SUBMISSION MAILBOX COMPLETE: Successfully processed email'
   end
-
-  private
 
   def determine_proof_type(subject, body)
     text = [subject, body].join(' ').to_s.downcase
@@ -86,40 +99,50 @@ class ProofSubmissionMailbox < ApplicationMailbox
   end
 
   def attach_proof(attachment, proof_type)
-    # Safety check: ensure we have an application before proceeding
-    unless application
-      Rails.logger.error "MAILBOX ERROR: No application found for email from #{mail.from&.first}"
-      raise 'No application found for email processing'
-    end
+    validate_application_presence
+    blob = create_blob_from_attachment(attachment)
+    result = attach_proof_via_service(blob, proof_type)
+    handle_attachment_result(result)
+  end
 
-    # Create a blob from the attachment
-    blob = ActiveStorage::Blob.create_and_upload!(
+  def validate_application_presence
+    return if application
+
+    Rails.logger.error "MAILBOX ERROR: No application found for email from #{mail.from&.first}"
+    raise 'No application found for email processing'
+  end
+
+  def create_blob_from_attachment(attachment)
+    ActiveStorage::Blob.create_and_upload!(
       io: StringIO.new(attachment.body.decoded),
       filename: attachment.filename,
       content_type: attachment.content_type
     )
+  end
 
-    # Use the ProofAttachmentService to consistently handle attachments
-    result = ProofAttachmentService.attach_proof({
-                                                   application: application,
-                                                   proof_type: proof_type,
-                                                   blob_or_file: blob,
-                                                   status: :not_reviewed,
-                                                   admin: nil,
-                                                   submission_method: :email,
-                                                   metadata: {
-                                                     ip_address: '0.0.0.0',
-                                                     email_subject: mail.subject,
-                                                     email_from: mail.from&.first,
-                                                     inbound_email_id: inbound_email.id
-                                                   }
-                                                 })
+  def attach_proof_via_service(blob, proof_type)
+    ProofAttachmentService.attach_proof({
+                                          application: application,
+                                          proof_type: proof_type,
+                                          blob_or_file: blob,
+                                          status: :not_reviewed,
+                                          admin: nil,
+                                          submission_method: :email,
+                                          metadata: build_attachment_metadata
+                                        })
+  end
 
-    if result[:success]
-      # ProofAttachmentService already handled the attachment, audit events, and notifications
-      # No need to attach again - just return successfully
-      return
-    end
+  def build_attachment_metadata
+    {
+      ip_address: '0.0.0.0',
+      email_subject: mail.subject,
+      email_from: mail.from&.first,
+      inbound_email_id: inbound_email.id
+    }
+  end
+
+  def handle_attachment_result(result)
+    return if result[:success]
 
     Rails.logger.error "Failed to attach proof via email: #{result[:error]&.message}"
     raise "Failed to attach proof: #{result[:error]&.message}"
@@ -210,40 +233,55 @@ class ProofSubmissionMailbox < ApplicationMailbox
     # BOUNCE PROCESSING: This method halts all email processing
     Rails.logger.info "MAILBOX BOUNCE: #{error_type} - #{message} (from: #{mail.from&.first}, inbound_email: #{inbound_email.id})"
 
-    # Record the bounce event with detailed context
-    # IMPORTANT: Handle transaction/race condition issues with system_user creation
-    # In test environments, User.system_user might be created in a different transaction
-    # context, leading to foreign key constraint violations when creating Events
-    # This robust approach ensures we always have a valid user for event creation
-    event_user = constituent
-    if event_user.nil?
-      begin
-        event_user = User.system_user
-        # Double-check the user exists and is persisted
-        event_user.reload if event_user.persisted?
-      rescue ActiveRecord::RecordNotFound => e
-        Rails.logger.warn "System user not found during bounce: #{e.message}. Creating new system user."
-        # Clear the memoized value and try again
-        User.instance_variable_set(:@system_user, nil)
-        event_user = User.system_user
-      end
-    end
+    event_user = find_event_user_for_bounce
+    create_bounce_event(event_user, error_type, message)
+    send_bounce_notification(error_type, message)
+    mark_email_as_bounced
 
+    Rails.logger.info "MAILBOX BOUNCE COMPLETE: Email #{inbound_email.id} marked as bounced, notification sent"
+
+    # Halt all further processing - this prevents process() from running
+    throw :bounce
+  end
+
+  def find_event_user_for_bounce
+    return constituent if constituent
+
+    # Handle system user creation with transaction safety
+    begin
+      event_user = User.system_user
+      # Double-check the user exists and is persisted
+      event_user.reload if event_user.persisted?
+      event_user
+    rescue ActiveRecord::RecordNotFound => e
+      Rails.logger.warn "System user not found during bounce: #{e.message}. Creating new system user."
+      # Clear the memoized value and try again
+      User.instance_variable_set(:@system_user, nil)
+      User.system_user
+    end
+  end
+
+  def create_bounce_event(event_user, error_type, message)
     Event.create!(
       user: event_user,
       action: "proof_submission_#{error_type}",
-      metadata: {
-        application_id: application&.id,
-        error: message,
-        error_type: error_type,
-        inbound_email_id: inbound_email.id,
-        sender_email: mail.from&.first,
-        email_subject: mail.subject,
-        bounce_timestamp: Time.current.iso8601
-      }
+      metadata: build_bounce_event_metadata(error_type, message)
     )
+  end
 
-    # Send error notification to sender with clear explanation
+  def build_bounce_event_metadata(error_type, message)
+    {
+      application_id: application&.id,
+      error: message,
+      error_type: error_type,
+      inbound_email_id: inbound_email.id,
+      sender_email: mail.from&.first,
+      email_subject: mail.subject,
+      bounce_timestamp: Time.current.iso8601
+    }
+  end
+
+  def send_bounce_notification(error_type, message)
     bounce_mail = ApplicationNotificationsMailer.proof_submission_error(
       constituent,
       application,
@@ -251,14 +289,10 @@ class ProofSubmissionMailbox < ApplicationMailbox
       "Email processing failed: #{message}"
     )
     bounce_mail.deliver_now
+  end
 
-    # Mark inbound email as bounced for tracking
+  def mark_email_as_bounced
     inbound_email.update!(status: 'bounced')
-
-    Rails.logger.info "MAILBOX BOUNCE COMPLETE: Email #{inbound_email.id} marked as bounced, notification sent"
-
-    # Halt all further processing - this prevents process() from running
-    throw :bounce
   end
 
   def constituent
@@ -281,7 +315,7 @@ class ProofSubmissionMailbox < ApplicationMailbox
     return @application if defined?(@application)
 
     # If we found a constituent, use their most recent application
-    @application = constituent&.applications&.order(created_at: :desc)&.first
+    @application = constituent.applications.order(created_at: :desc).first if constituent
 
     # If we still don't have an application but have a provider email, use the app found by that
     @application ||= app_from_provider_email

@@ -59,7 +59,7 @@ module Admin
 
       # Wait for redirect to complete
       assert_selector 'h1', text: 'Application #'
-      
+
       # Verify success message is displayed
       assert_text 'Paper application successfully submitted.'
       new_application = Application.last
@@ -79,59 +79,59 @@ module Admin
       fill_in_applicant_information(first_name: 'High', last_name: 'Income')
       # Fill in income that exceeds the threshold
       fill_in_application_details(household_size: 1, annual_income: 100_000)
-      
+
       # Add required address information
       within_applicant_fieldset do
         fill_in 'constituent[physical_address_1]', with: '123 Main St'
         fill_in 'constituent[city]', with: 'Baltimore'
         fill_in 'constituent[zip_code]', with: '21201'
       end
-      
+
       # Add disability and medical provider information (required fields)
       fill_in_disability_information
       fill_in_medical_provider_information
 
       # Trigger validation by clicking outside the input field
       find('h1').click
-      
+
       # Wait for JavaScript validation to complete
       wait_for_network_idle
       wait_for_stimulus_controller('income-validation') if respond_to?(:wait_for_stimulus_controller)
 
       # Assert that the warning appears and the form state changes
       assert_text 'Income Exceeds Threshold'
-      
+
       # Wait for the rejection button to become visible (JavaScript-controlled)
       assert_selector '#rejection-button', visible: :visible, wait: 10
       assert_selector 'input[type=submit][disabled]'
 
       # Debug: Check button attributes and controller connection
-      button = find('#rejection-button', wait: 10)
+      button = find_by_id('rejection-button', wait: 10)
       puts "Button found: #{button.inspect}"
       puts "Button data-action: #{button['data-action']}"
       puts "Button data-paper-application-target: #{button['data-paper-application-target']}"
-      
+
       # Check if paper-application controller is connected
       form_element = find('form[data-controller*="paper-application"]', wait: 5)
       puts "Form with paper-application controller found: #{form_element.present?}"
-      
+
       # Admin can reject the application directly
       # First ensure the button is present and enabled
       assert_button 'Reject Application (Income)', disabled: false, wait: 10
-      
+
       # Test without confirmation dialog first to see if basic flow works
       # Remove data-confirm from button in test or handle differently
       # Test the complete rejection flow
-      puts "About to click reject button..."
-      
+      puts 'About to click reject button...'
+
       assert_difference 'Application.count', 1 do
         click_button 'Reject Application (Income)'
-        
+
         # Wait for the form submission and page redirect
         wait_for_network_idle
       end
-      
-      puts "SUCCESS: Application created and rejection flow completed!"
+
+      puts 'SUCCESS: Application created and rejection flow completed!'
 
       # Verify rejection was successful with success message (not error)
       assert_success_message('Application rejected due to income threshold. Rejection notification has been sent.')
@@ -289,11 +289,11 @@ module Admin
         find('li', text: /Alex Collins/i, wait: 5).click
       end
 
-      # 5. ASSERTION: Verify the guardian section is still visible and now shows the
+      # 5. ASSERTION: Verify the guardian section is still visible and shows the
       #    selected guardian's name, confirming the UI updated correctly without a page reload.
       within 'fieldset', text: 'Guardian Information' do
         assert_text 'Alex Collins'
-        assert_no_selector 'input#guardian_search_q'  # Search input should be hidden after selection
+        assert_no_selector 'input#guardian_search_q' # Search input should be hidden after selection
         assert_selector "input[type='hidden'][name='guardian_id'][value='#{guardian.id}']",
                         visible: :hidden
       end
@@ -319,7 +319,7 @@ module Admin
       choose "A Dependent (must select existing guardian in system or enter guardian's information)"
       wait_for_network_idle
 
-      # Now the guardian section should be visible
+      # Guardian section should be visible
       assert_selector 'fieldset legend', text: 'Guardian Information', visible: true
 
       # Ensure admin-user-search controller is visible within the guardian section
@@ -409,7 +409,7 @@ module Admin
           };
         JS
 
-        # Now click the button
+        # Click the button
         user_button.click
       end
 
@@ -565,15 +565,11 @@ module Admin
           });
         }
       JS
-      sleep 0.5
 
       # Wait for all JavaScript controllers to fully settle before filling fields
       wait_for_stimulus_controller('applicant-type', timeout: 10)
       wait_for_stimulus_controller('paper-application', timeout: 10)
       wait_for_network_idle(timeout: 3)
-      
-      # Additional wait to ensure all async operations are complete
-      sleep 1
 
       # Fill in dependent information - use direct fieldset finder
       dependent_fieldset = page.find('fieldset', text: 'Dependent Information', visible: true)
@@ -581,14 +577,11 @@ module Admin
         # Wait for fields to be enabled and stable
         assert_selector 'input[name="constituent[first_name]"]:not([disabled])', wait: 5
         assert_selector 'input[name="constituent[date_of_birth]"]:not([disabled])', wait: 3
-        
+
         # Fill fields one by one with small delays to prevent race conditions
         fill_in 'constituent[first_name]', with: 'Xavier'
-        sleep 0.1
         fill_in 'constituent[last_name]', with: 'Collins'
-        sleep 0.1
         fill_in 'constituent[date_of_birth]', with: '09/09/1999'
-        sleep 0.1
 
         # Check boxes for using guardian's email and address
         check 'use_guardian_email'
@@ -610,9 +603,8 @@ module Admin
           });
         }
       JS
-      sleep 0.5
 
-      # Now find the disability fieldset - it has the legend "Disability Information (for the Applicant)"
+      # Find the disability fieldset - it has the legend "Disability Information (for the Applicant)"
       disability_fieldset = page.find('fieldset', text: /Disability Information.*for the Applicant/i, visible: true)
       within disability_fieldset do
         check 'applicant_attributes[hearing_disability]'
@@ -656,7 +648,7 @@ module Admin
       # Wait for all fields to be populated by JavaScript
       wait_for_stimulus_controller('paper-application', timeout: 10)
       wait_for_network_idle(timeout: 5)
-      
+
       # Verification of key field values (with explicit waiting)
       assert_field 'constituent[first_name]', with: 'Xavier', wait: 5
       assert_field 'constituent[last_name]', with: 'Collins', wait: 5
@@ -739,14 +731,30 @@ module Admin
       assert_equal 'approved', application.residency_proof_status.to_s
       assert_equal 'approved', application.medical_certification_status.to_s
 
-      # Now visit the page to verify UI reflects the approved status
-      visit admin_application_path(application)
-      wait_for_network_idle
+      # Visit the page to verify UI reflects the approved status
+      begin
+        visit admin_application_path(application)
+        wait_for_network_idle
 
-      # Verify page loads correctly with better error handling
-      # Wait for turbo and ensure page is stable before assertions
-      wait_for_turbo
-      assert_text "Application ##{application.id} Details", wait: 10
+        # Verify page loads correctly with better error handling
+        # Wait for turbo and ensure page is stable before assertions
+        wait_for_turbo
+        assert_text "Application ##{application.id} Details", wait: 10
+      rescue Ferrum::NodeNotFoundError, Ferrum::DeadBrowserError => e
+        puts "Browser corruption detected during page visit: #{e.message}"
+        if respond_to?(:force_browser_restart, true)
+          force_browser_restart('paper_applications_recovery')
+        else
+          Capybara.reset_sessions!
+        end
+        # Re-authenticate after browser restart since sessions are lost
+        system_test_sign_in(@admin)
+        # Retry the visit after restart and re-authentication
+        visit admin_application_path(application)
+        wait_for_network_idle
+        wait_for_turbo
+        assert_text "Application ##{application.id} Details", wait: 10
+      end
 
       # Verify all proofs show as approved in the UI
       # Use more flexible text matching to handle various UI formats
@@ -855,7 +863,7 @@ module Admin
       # Temporarily enable waiting period validation for this test
       original_skip_flag = Application.skip_wait_period_validation
       Application.skip_wait_period_validation = false
-      
+
       begin
         # Setup: Create constituent with a recent application
         waiting_period_years = 3 # Assume policy
@@ -894,7 +902,6 @@ module Admin
             adultSection.style.display = 'block';
           }
         JS
-        sleep 0.5
         wait_for_turbo
         # Find the applicant info fieldset directly
         applicant_fieldset = find('fieldset', text: "Applicant's Information", visible: true)
@@ -973,7 +980,7 @@ module Admin
       choose 'An Adult (applying for themselves)'
       assert_selector 'fieldset', text: "Applicant's Information", wait: 5
 
-      # Fill in all required fields properly
+      # Fill in all required fields
       within 'fieldset', text: "Applicant's Information" do
         fill_in 'constituent[first_name]', with: 'John'
         fill_in 'constituent[last_name]', with: 'Doe'

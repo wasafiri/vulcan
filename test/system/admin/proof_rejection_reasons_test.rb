@@ -6,7 +6,7 @@ module Admin
   class ProofRejectionReasonsTest < ApplicationSystemTestCase
     setup do
       setup_fpl_policies
-      
+
       @admin = create(:admin)
       @user = create(:constituent, hearing_disability: true)
       @application = create(:application, :old_enough_for_new_application, user: @user)
@@ -37,8 +37,8 @@ module Admin
       # Use a more defensive approach to handle potential browser corruption
       begin
         assert_text(/Application Details|Application #/i, wait: 15)
-      rescue Ferrum::NodeNotFoundError => e
-        puts "Browser corruption detected during assert_text, restarting browser..."
+      rescue Ferrum::NodeNotFoundError
+        puts 'Browser corruption detected during assert_text, restarting browser...'
         if respond_to?(:force_browser_restart, true)
           force_browser_restart('assert_text_recovery')
         else
@@ -62,10 +62,10 @@ module Admin
         click_button 'Reject'
       end
 
-      # Wait for the rejection modal to open and be fully initialized
+      # Wait for the rejection modal to open and be initialized
       wait_for_modal_open('proofRejectionModal', timeout: 15)
 
-      # Wait for Stimulus controllers to initialize properly
+      # Wait for Stimulus controllers to initialize
       wait_for_stimulus_controller('rejection-form', timeout: 10)
 
       within_modal('#proofRejectionModal') do
@@ -97,12 +97,12 @@ module Admin
       visit admin_application_path(@application)
       wait_for_turbo
       wait_for_page_stable
-      
+
       # Look for the specific heading text expected by the page with defensive error handling
       begin
         assert_text(/Application #\d+ Details/i, wait: 15)
-      rescue Ferrum::NodeNotFoundError => e
-        puts "Browser corruption detected during assert_text, restarting browser..."
+      rescue Ferrum::NodeNotFoundError
+        puts 'Browser corruption detected during assert_text, restarting browser...'
         if respond_to?(:force_browser_restart, true)
           force_browser_restart('assert_text_recovery')
         else
@@ -193,23 +193,9 @@ module Admin
     test 'admin can modify the rejection reason text' do
       visit admin_application_path(@application)
       wait_for_turbo
-      wait_for_page_stable
-      
-      # Use Capybara's native waiting for page load with defensive error handling
-      begin
-        assert_text(/Application Details|Application #/i, wait: 15)
-      rescue Ferrum::NodeNotFoundError => e
-        puts "Browser corruption detected during assert_text, restarting browser..."
-        if respond_to?(:force_browser_restart, true)
-          force_browser_restart('assert_text_recovery')
-        else
-          Capybara.reset_sessions!
-        end
-        # Re-visit the page and try again
-        visit admin_application_path(@application)
-        wait_for_page_stable
-        assert_text(/Application Details|Application #/i, wait: 15)
-      end
+
+      # Use native Capybara waiting - let it retry automatically
+      assert_text(/Application Details|Application #/i, wait: 15)
       assert_selector('#attachments-section', wait: 10)
 
       # Use stable element finding with Capybara's native waiting
@@ -241,12 +227,12 @@ module Admin
 
         # Clear and modify the reason text
         custom_message = 'Please provide a document with your full legal name clearly visible.'
-        
+
         # Use a single find call with proper waiting to avoid stale node references
         using_wait_time(10) do
           reason_field = page.find("textarea[name='rejection_reason']", wait: 5)
           reason_field.set(custom_message)
-          
+
           # Verify the custom message was set correctly using the same element reference
           assert_equal custom_message, reason_field.value
         end

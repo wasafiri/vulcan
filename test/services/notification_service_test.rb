@@ -72,7 +72,7 @@ class NotificationServiceTest < ActiveSupport::TestCase
       notifiable: @application
     )
 
-    # Now, call the delivery part which should fail and handle the error
+    # Call the delivery part which should fail and handle the error
     NotificationService.send(:deliver_notification!, notification, channel: :email)
 
     notification.reload

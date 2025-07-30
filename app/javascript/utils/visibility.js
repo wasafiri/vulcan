@@ -22,16 +22,16 @@ export function setVisible(element, visible, options = {}) {
     console.warn('setVisible: element is null/undefined');
     return null;
   }
-  
+
   // Type check for HTMLElement
   if (!(element instanceof HTMLElement)) {
     console.warn('setVisible: expected HTMLElement, got', element);
     return element;
   }
-  
+
   const { required, hiddenClass = 'hidden', ariaHidden } = options;
-  
-  // Toggle visibility - handle both CSS classes and inline styles properly
+
+  // Toggle visibility - handle both CSS classes and inline styles
   if (visible) {
     element.classList.remove(hiddenClass);
     // Remove inline display:none that might override CSS classes
@@ -43,7 +43,7 @@ export function setVisible(element, visible, options = {}) {
     // Set inline style for elements that start with inline display:none
     element.style.display = 'none';
   }
-  
+
   // Handle required attribute if specified
   if (required !== undefined) {
     if (required && visible) {
@@ -52,12 +52,12 @@ export function setVisible(element, visible, options = {}) {
       element.removeAttribute('required');
     }
   }
-  
+
   // Handle aria-hidden attribute if specified
   if (ariaHidden !== undefined) {
     element.setAttribute('aria-hidden', ariaHidden.toString());
   }
-  
+
   return element;
 }
 
@@ -78,7 +78,7 @@ export function legacyToggleHidden(element, shouldHide, options = {}) {
     );
     _legacyWarned = true;
   }
-  
+
   return setVisible(element, !shouldHide, options);
 }
 
@@ -113,10 +113,10 @@ export function toggle(element, options = {}) {
     console.warn('toggle: element is null/undefined');
     return null;
   }
-  
+
   const { hiddenClass = 'hidden' } = options;
   const isCurrentlyHidden = element.classList.contains(hiddenClass);
-  
+
   return setVisible(element, isCurrentlyHidden, options);
 }
 

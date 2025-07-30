@@ -51,24 +51,44 @@ module Evaluators
     end
 
     def apply_filter
-      case @current_filter
+      evaluations = evaluations_for_filter(@current_filter)
+      @filtered_evaluations = order_evaluations(evaluations, @current_filter)
+      @section_title = section_title_for_filter(@current_filter)
+    end
+
+    def evaluations_for_filter(filter_type)
+      case filter_type
       when 'requested'
-        @filtered_evaluations = current_user.admin? ? Evaluation.requested_evaluations : current_user.evaluations.requested_evaluations
-        @filtered_evaluations = @filtered_evaluations.order(created_at: :desc)
-        @section_title = 'Requested Evaluations'
+        current_user.admin? ? Evaluation.requested_evaluations : current_user.evaluations.requested_evaluations
       when 'scheduled'
-        @filtered_evaluations = current_user.admin? ? Evaluation.active : current_user.evaluations.active
-        @filtered_evaluations = @filtered_evaluations.order(evaluation_date: :asc)
-        @section_title = 'Scheduled Evaluations'
+        current_user.admin? ? Evaluation.active : current_user.evaluations.active
       when 'completed'
-        @filtered_evaluations = current_user.admin? ? Evaluation.completed_evaluations : current_user.evaluations.completed_evaluations
-        @filtered_evaluations = @filtered_evaluations.order(evaluation_date: :desc)
-        @section_title = 'Completed Evaluations'
+        current_user.admin? ? Evaluation.completed_evaluations : current_user.evaluations.completed_evaluations
       when 'needs_followup'
-        @filtered_evaluations = current_user.admin? ? Evaluation.needing_followup : current_user.evaluations.needing_followup
-        @filtered_evaluations = @filtered_evaluations.order(updated_at: :desc)
-        @section_title = 'Evaluations Needing Follow-up'
+        current_user.admin? ? Evaluation.needing_followup : current_user.evaluations.needing_followup
       end
+    end
+
+    def order_evaluations(evaluations, filter_type)
+      case filter_type
+      when 'requested'
+        evaluations.order(created_at: :desc)
+      when 'scheduled'
+        evaluations.order(evaluation_date: :asc)
+      when 'completed'
+        evaluations.order(evaluation_date: :desc)
+      when 'needs_followup'
+        evaluations.order(updated_at: :desc)
+      end
+    end
+
+    def section_title_for_filter(filter_type)
+      {
+        'requested' => 'Requested Evaluations',
+        'scheduled' => 'Scheduled Evaluations',
+        'completed' => 'Completed Evaluations',
+        'needs_followup' => 'Evaluations Needing Follow-up'
+      }[filter_type]
     end
 
     def load_display_data
@@ -83,7 +103,7 @@ module Evaluators
       # Data for dashboard tables - limit to 5 items for each section
       @requested_evaluations_display = @requested_evaluations.order(created_at: :desc).limit(5)
       @upcoming_evaluations = (current_user.admin? ? Evaluation.active : current_user.evaluations.active)
-                                 .order(evaluation_date: :asc).limit(5)
+                              .order(evaluation_date: :asc).limit(5)
       @recent_evaluations = (current_user.admin? ? Evaluation.completed_evaluations : current_user.evaluations.completed_evaluations)
                             .order(evaluation_date: :desc).limit(5)
     end

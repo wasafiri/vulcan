@@ -1,19 +1,20 @@
 # frozen_string_literal: true
 
 FactoryBot.define do
-  factory :vendor, class: 'Users::Vendor' do
+  factory :vendor, parent: :user, class: 'Users::Vendor' do
     type { 'Users::Vendor' }
     sequence(:email) { |n| "vendor#{n}@example.com" }
-    password { 'password123' }
+    sequence(:phone) { |n| "444-#{format('%03d', (n % 900) + 100)}-#{format('%04d', (n % 9000) + 1000)}" }
     first_name { 'Test' }
     last_name { 'Vendor' }
     sequence(:business_name) { |n| "Test Business #{n}" }
     sequence(:business_tax_id) { |n| "12345#{n.to_s.rjust(4, '0')}" }
-    status { :pending }
-    verified { true }
+    vendor_authorization_status { :pending }
+    status { :active } # Ensure vendors can authenticate by default
 
     trait :approved do
-      status { :approved }
+      vendor_authorization_status { :approved }
+      status { :active } # Ensure vendor can authenticate
       sequence(:business_name) { |n| "Approved Vendor #{n}" }
       sequence(:business_tax_id) { |n| "99-#{n.to_s.rjust(7, '0')}" }
       terms_accepted_at { 1.day.ago }
@@ -29,11 +30,11 @@ FactoryBot.define do
     end
 
     trait :pending do
-      status { :pending }
+      vendor_authorization_status { :pending }
     end
 
     trait :suspended do
-      status { :suspended }
+      vendor_authorization_status { :suspended }
     end
 
     trait :with_w9 do

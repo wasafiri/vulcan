@@ -179,7 +179,7 @@ module Admin
 
     private
 
-    # Helper to find fieldset by legend text, more robustly
+    # Helper to find fieldset by legend text
     def within_fieldset_tagged(legend_text, &)
       fieldset_element = find('fieldset', text: legend_text, match: :prefer_exact)
       within(fieldset_element, &)

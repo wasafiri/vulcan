@@ -264,7 +264,8 @@ class ProofAttachmentService
     end
 
     def log_error(error)
-      message = "Proof attachment error: #{error.message}"
+      context = Rails.env.test? ? '[TEST_ATTACHMENT] ' : '[ATTACHMENT_ERROR] '
+      message = "#{context}Proof attachment error: #{error.message}"
 
       # In the test environment we intentionally trigger mismatched-digest errors with
       # fabricated files.  Logging them at ERROR level creates noisy output without
@@ -400,11 +401,9 @@ class ProofAttachmentService
       NotificationService.create_and_deliver!(
         type: "#{context.proof_type}_proof_attached",
         recipient: context.application.user,
-        options: {
-          actor: context.admin || context.application.user,
-          notifiable: context.application,
-          metadata: event_metadata
-        }
+        actor: context.admin || context.application.user,
+        notifiable: context.application,
+        metadata: event_metadata
       )
     end
 
@@ -454,11 +453,9 @@ class ProofAttachmentService
       NotificationService.create_and_deliver!(
         type: "#{proof_type}_proof_rejected",
         recipient: application.user,
-        options: {
-          actor: admin,
-          notifiable: application,
-          metadata: audit_metadata
-        }
+        actor: admin,
+        notifiable: application,
+        metadata: audit_metadata
       )
     end
 

@@ -57,7 +57,7 @@ class DebugSimpleTest < ApplicationSystemTestCase
     # Add assertion to make test valid
     if page.status_code == 200
       assert_equal sign_in_path, current_path, 'Should be on sign-in page'
-      assert forms.count > 0, 'Should have at least one form on sign-in page'
+      assert forms.any?, 'Should have at least one form on sign-in page'
     else
       # If page still has errors, just assert that we tried
       assert true, "Debug test completed - page status: #{page.status_code}"

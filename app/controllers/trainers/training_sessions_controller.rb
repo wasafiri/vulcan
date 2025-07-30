@@ -119,7 +119,7 @@ module Trainers
       @application = @training_session.application
       @constituent = @application&.user
 
-      result = TrainingSessions::CompleteService.new(@training_session, current_user, params).call
+      result = TrainingSessions::CompleteService.new(@training_session, current_user, complete_params).call
 
       if result.success?
         redirect_to trainers_training_session_path(@training_session), notice: result.message
@@ -133,7 +133,7 @@ module Trainers
       @application = @training_session.application
       @constituent = @application&.user
 
-      result = TrainingSessions::ScheduleService.new(@training_session, current_user, params).call
+      result = TrainingSessions::ScheduleService.new(@training_session, current_user, schedule_params).call
 
       if result.success?
         redirect_to trainers_training_session_path(@training_session),
@@ -148,7 +148,7 @@ module Trainers
       @application = @training_session.application
       @constituent = @application&.user
 
-      result = TrainingSessions::RescheduleService.new(@training_session, current_user, params).call
+      result = TrainingSessions::RescheduleService.new(@training_session, current_user, reschedule_params).call
 
       if result.success?
         redirect_to trainers_training_session_path(@training_session),
@@ -164,7 +164,7 @@ module Trainers
       @application = @training_session.application
       @constituent = @application&.user
 
-      result = TrainingSessions::CancelService.new(@training_session, current_user, params).call
+      result = TrainingSessions::CancelService.new(@training_session, current_user, cancel_params).call
 
       if result.success?
         redirect_to trainers_training_session_path(@training_session), notice: result.message
@@ -213,6 +213,22 @@ module Trainers
 
     def training_session_params
       params.expect(training_session: %i[status notes scheduled_for reschedule_reason cancellation_reason product_trained_on_id]) # Added new permitted parameters
+    end
+
+    def schedule_params
+      params.permit(:scheduled_for, :notes)
+    end
+
+    def reschedule_params
+      params.permit(:scheduled_for, :reschedule_reason)
+    end
+
+    def complete_params
+      params.permit(:notes, :product_trained_on_id)
+    end
+
+    def cancel_params
+      params.permit(:cancellation_reason)
     end
 
     def create_status_change_event(old_status)

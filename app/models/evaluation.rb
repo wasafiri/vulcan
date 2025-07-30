@@ -54,12 +54,10 @@ class Evaluation < ApplicationRecord
     NotificationService.create_and_deliver!(
       type: 'requested_additional_info',
       recipient: constituent,
-      options: {
-        actor: evaluator,
-        notifiable: self,
-        metadata: { evaluation_id: id },
-        channel: :email
-      }
+      actor: evaluator,
+      notifiable: self,
+      metadata: { evaluation_id: id },
+      channel: :email
     )
   end
 

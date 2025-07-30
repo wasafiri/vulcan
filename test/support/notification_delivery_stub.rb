@@ -4,7 +4,7 @@
 
 # Stub NotificationJob and NotificationRetryJob
 class NotificationJob
-  def self.set(retry:)
+  def self.set(*)
     self
   end
 
@@ -14,7 +14,7 @@ class NotificationJob
 end
 
 class NotificationRetryJob
-  def self.set(wait:)
+  def self.set(*)
     self
   end
 

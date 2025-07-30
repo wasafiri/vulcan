@@ -127,7 +127,7 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
   # 8. Set up performance tracking for test optimization
   setup do
     # Configure ActionMailbox for testing - this is critical!
-    # Without this, emails won't be routed properly and tests will fail mysteriously
+    # Without this, emails won't be routed and tests will fail mysteriously
     Rails.application.config.action_mailbox.ingress = :test
 
     # Create test data with unique identifiers to prevent cross-test contamination
@@ -250,7 +250,7 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
     # Extract attachments from email_params since receive_inbound_email_from_mail doesn't accept them directly
     attachments = email_params.delete(:attachments)
 
-    # Handle attachments properly using block syntax for receive_inbound_email_from_mail
+    # Handle attachments using block syntax for receive_inbound_email_from_mail
     inbound_email = if attachments.present?
                       receive_inbound_email_from_mail(**email_params) do |mail|
                         attachments.each do |filename, content|
@@ -515,7 +515,7 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
     ApplicationNotificationsMailer.expects(:proof_submission_error).returns(mail_double)
 
     # Use direct ActionMailbox testing instead of safe_receive_email for bounce testing
-    # This ensures we can properly capture the :bounce throw
+    # This ensures we can capture the :bounce throw
     assert_throws(:bounce) do
       receive_inbound_email_from_mail(
         to: MatVulcan::InboundEmailConfig.inbound_email_address,
@@ -615,7 +615,7 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
     assert_predicate @application.income_proof, :attached?,
                      'Income proof should be attached to application'
 
-    # Verify events were created properly - ensures audit trail works
+    # Verify events were created - ensures audit trail works
     final_events_count = Event.count
     events_created = final_events_count - initial_events_count
     assert_operator events_created, :>, 0, 'Should create at least one event'

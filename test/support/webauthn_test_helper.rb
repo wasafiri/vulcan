@@ -5,8 +5,7 @@ require 'webauthn/fake_client'
 module WebauthnTestHelper
   # Helper to properly setup two-factor authentication session state in integration tests
   def setup_two_factor_session(user, type = :webauthn)
-    # In integration tests, we need to POST to a route that sets up the session
-    # First sign in to initiate the flow
+    # In integration tests, we need to POST to a route that sets up the session. First sign in to initiate the flow:
     post sign_in_path, params: {
       email: user.email,
       password: 'password123'

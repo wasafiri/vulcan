@@ -3,6 +3,7 @@
 module Admin
   class VendorsController < ApplicationController
     include TurboStreamResponseHandling
+
     before_action :authenticate_user!
     before_action :require_admin!
     before_action :set_vendor, only: %i[show edit update]
@@ -52,7 +53,7 @@ module Admin
     end
 
     def vendor_params
-      params.expect(vendor: %i[business_name business_tax_id status])
+      params.expect(vendor: %i[business_name business_tax_id vendor_authorization_status])
     end
 
     def require_admin!

@@ -11,23 +11,60 @@ module Admin
       @admin = create(:admin)
       @application = create(:application, :in_progress_with_pending_proofs)
 
-      # Sign in with enhanced stability
-      with_browser_rescue do
+      # Sign in with proper error handling and verification
+      begin
         system_test_sign_in(@admin)
         wait_for_page_stable
+
+        # Verify we're actually signed in by checking for admin dashboard
+        visit admin_applications_path
+        assert_text 'Admin Dashboard', wait: 10
+      rescue Ferrum::NodeNotFoundError, Ferrum::DeadBrowserError => e
+        puts "Browser corruption during setup: #{e.message}"
+        if respond_to?(:force_browser_restart, true)
+          force_browser_restart('proof_reviews_setup_recovery')
+        else
+          Capybara.reset_sessions!
+        end
+        system_test_sign_in(@admin)
+        wait_for_page_stable
+        # Verify authentication after recovery
+        visit admin_applications_path
+        assert_text 'Admin Dashboard', wait: 10
       end
     end
 
     test 'admin reviews application proofs' do
-      # Visit the specific application directly with enhanced browser rescue
-      with_browser_rescue(max_retries: 3) do
+      # Visit the specific application directly with proper error handling
+      begin
         visit admin_application_path(@application)
         wait_for_page_stable
-        
-        # Verify page loaded properly before proceeding
-        assert_selector 'h1#application-title', wait: 15
+
+        # Check if we need to authenticate first
+        if has_text?('Sign In', wait: 5)
+          # We got redirected to sign-in, need to authenticate
+          system_test_sign_in(@admin)
+          visit admin_application_path(@application)
+          wait_for_page_stable
+        end
+
+        # Verify page loaded before proceeding
+        assert_selector 'h1', text: /Application.*Details/, wait: 15
+      rescue Ferrum::NodeNotFoundError, Ferrum::DeadBrowserError => e
+        puts "Browser corruption detected during page visit: #{e.message}"
+        if respond_to?(:force_browser_restart, true)
+          force_browser_restart('proof_reviews_page_visit_recovery')
+        else
+          Capybara.reset_sessions!
+        end
+        # Re-authenticate after browser restart since sessions are lost
+        system_test_sign_in(@admin)
+        # Retry the visit after restart and re-authentication
+        visit admin_application_path(@application)
+        wait_for_page_stable
+        assert_selector 'h1', text: /Application.*Details/, wait: 15
       end
-      
+
       # Ensure attachments section is present and visible before interacting
       assert_selector '#attachments-section', wait: 10
 
@@ -45,28 +82,29 @@ module Admin
     end
 
     test 'admin receives notification for new proofs' do
-      # Visit the specific application directly with browser rescue
-      with_browser_rescue do
+      visit admin_application_path(@application)
+
+      # Check if we need to authenticate
+      if has_selector?('form[action="/sign_in"]')
+        system_test_sign_in(@admin)
         visit admin_application_path(@application)
-        wait_for_page_stable
       end
 
-      # Verify application details page loads with specific selector
-      assert_selector 'h1#application-title', wait: 15
-      
-      # Look for proof status information (flexible selectors)
-      if has_text?('Income Proof', wait: 3)
-        # Verify some kind of proof status is shown
+      # Use intelligent waiting
+      assert_selector 'h1', text: /Application.*Details/
+      assert_text(@application.user.full_name)
+
+      # Look for proof status information (using intelligent waiting)
+      if has_text?('Income Proof')
         assert_text(/Income Proof|income.*proof/i)
       end
 
-      if has_text?('Residency Proof', wait: 3)
+      if has_text?('Residency Proof')
         assert_text(/Residency Proof|residency.*proof/i)
       end
 
       # Check for any audit or activity information
-      if has_text?(/audit|activity|log/i, wait: 2)
-        # Some kind of audit trail exists
+      if has_text?(/audit|activity|log/i)
         assert_text(/audit|activity|log/i)
       end
     end

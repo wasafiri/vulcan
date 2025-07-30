@@ -5,6 +5,7 @@ module Applications
   # It follows the same patterns as ConstituentPortal for file uploads
   class PaperApplicationService < BaseService
     include Rails.application.routes.url_helpers
+
     attr_reader :params, :admin, :application, :constituent, :errors, :guardian_user_for_app
 
     def initialize(params:, admin:, skip_income_validation: false)
@@ -21,14 +22,28 @@ module Applications
 
     def create
       Current.paper_context = true
-      ActiveRecord::Base.transaction do
+
+      # First, create the application and attachments in a transaction
+      application_created = ActiveRecord::Base.transaction do
         return failure('Constituent processing failed') unless process_constituent
         return failure('Application creation failed') unless create_application
         return failure('Proof upload failed') unless process_proof_uploads
 
-        handle_successful_application if @application.persisted?
-        return @application.persisted?
+        @application.persisted?
       end
+
+      # If application was successfully created, send notifications outside the transaction
+      if application_created && @application.persisted?
+        begin
+          handle_successful_application
+        rescue StandardError => e
+          # Log notification errors but don't fail the entire operation
+          log_error(e, 'Failed to send notifications after successful application creation')
+          # Application creation was successful, notifications failed but that's not critical
+        end
+      end
+
+      application_created
     rescue StandardError => e
       log_error(e, 'Failed to create paper application')
       @errors << e.message
@@ -313,14 +328,12 @@ module Applications
         NotificationService.create_and_deliver!(
           type: 'proof_rejected',
           recipient: @constituent,
-          options: {
-            actor: @admin,
-            notifiable: review,
-            metadata: {
-              template_variables: proof_rejection_template_variables(review)
-            },
-            channel: @constituent.communication_preference.to_sym
-          }
+          actor: @admin,
+          notifiable: review,
+          metadata: {
+            template_variables: proof_rejection_template_variables(review)
+          },
+          channel: @constituent.communication_preference.to_sym
         )
       end
     end
@@ -335,15 +348,13 @@ module Applications
         NotificationService.create_and_deliver!(
           type: 'account_created',
           recipient: user,
-          options: {
-            actor: @admin,
-            notifiable: @application,
-            metadata: {
-              temp_password: temp_password,
-              template_variables: account_creation_template_variables(user, temp_password)
-            },
-            channel: user.communication_preference.to_sym
-          }
+          actor: @admin,
+          notifiable: @application,
+          metadata: {
+            temp_password: temp_password,
+            template_variables: account_creation_template_variables(user, temp_password)
+          },
+          channel: user.communication_preference.to_sym
         )
       end
     end

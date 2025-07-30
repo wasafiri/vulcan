@@ -60,18 +60,20 @@ class ProofAttachmentMetricsJob < ApplicationJob
 
     current_admins.find_each do |admin|
       Rails.logger.debug { "ProofAttachmentMetricsJob: Attempting to create notification for admin #{admin.id}." }
-      Notification.create!(
+      NotificationService.create_and_deliver!(
+        type: 'attachment_failure_warning',
         recipient: admin,
         actor: current_system_user,
         notifiable: current_system_user,
-        action: 'attachment_failure_warning',
         metadata: {
           success_rate: success_rate,
           total: total,
           failed: failed,
           threshold: SUCCESS_RATE_THRESHOLD,
           analysis_period: '24_hours'
-        }
+        },
+        audit: true,    # Admin alerts should be audited
+        deliver: false  # Don't attempt email delivery until mailer is configured
       )
     rescue StandardError => e
       Rails.logger.error "Failed to create failure warning notification for admin #{admin.id}: #{e.message}"

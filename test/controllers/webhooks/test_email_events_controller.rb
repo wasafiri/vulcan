@@ -9,7 +9,7 @@ module Webhooks
     # Inherit all functionality from the real controller, but use our test base controller
     # This allows us to bypass authentication and signature verification in tests
 
-    # Override valid_payload? to handle our test cases with more robust validation
+    # Override valid_payload? to handle our test cases with validation
     def valid_payload?
       # Check if the payload is missing required fields
       return false if params[:email].blank?

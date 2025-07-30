@@ -13,7 +13,7 @@ module Admin
         p.value = 3
       end
 
-      # Set up FPL policies for the policies page to display properly
+      # Set up FPL policies for the policies page to display
       setup_fpl_policies
 
       # Use proper system test authentication

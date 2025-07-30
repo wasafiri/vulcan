@@ -45,7 +45,10 @@ module Applications
       NotificationService.expects(:create_and_deliver!).with(
         type: 'account_created',
         recipient: anything,
-        options: anything
+        actor: anything,
+        notifiable: anything,
+        metadata: anything,
+        channel: anything
       ).at_least_once.returns(nil) # Returns nil when notification creation fails gracefully
 
       service = PaperApplicationService.new(

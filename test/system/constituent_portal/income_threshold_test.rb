@@ -5,16 +5,15 @@ require 'application_system_test_case'
 module ConstituentPortal
   class IncomeThresholdTest < ApplicationSystemTestCase
     setup do
-      @constituent = create(:constituent, 
-        first_name: 'Sophia', 
-        last_name: 'Martinez',
-        email: 'sophia.martinez@example.com',
-        phone: '4105551234',
-        physical_address_1: '789 Elm Avenue',
-        city: 'Frederick', 
-        state: 'Maryland',
-        zip_code: '21702'
-      )
+      @constituent = create(:constituent,
+                            first_name: 'Sophia',
+                            last_name: 'Martinez',
+                            email: 'sophia.martinez@example.com',
+                            phone: '4105551234',
+                            physical_address_1: '789 Elm Avenue',
+                            city: 'Frederick',
+                            state: 'Maryland',
+                            zip_code: '21702')
       system_test_sign_in(@constituent)
 
       # Set up FPL policies for testing
@@ -80,7 +79,7 @@ module ConstituentPortal
         fill_in 'Phone', with: '5551234567'
         fill_in 'Email', with: 'dr.smith@example.com'
       end
-      
+
       # Medical authorization (required)
       check 'I authorize the release and sharing of my medical information as described above'
 

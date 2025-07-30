@@ -15,15 +15,15 @@ class AddCredentialController extends Controller {
     if (process.env.NODE_ENV !== 'production') {
       console.log("AddCredentialController connected")
     }
-    
+
     if (!this.hasCallbackUrlValue) {
       console.error("AddCredentialController requires a callback-url value.")
     }
-    
+
     // Request key for tracking
     this.requestKey = `add-credential-${this.identifier}-${Date.now()}`
-    
-    // Get the form element but don't attach a submit handler (using button click instead)
+
+    // Get the form element but don't attach a submit handler (using button click)
     this.form = this.element;
   }
 
@@ -32,7 +32,7 @@ class AddCredentialController extends Controller {
     railsRequest.cancel(this.requestKey)
   }
 
-  // Handle button click instead of form submission
+  // Handle button click  (not form submission)
   async register(event) {
     event.preventDefault(); // Prevent default button click / form submission
 
@@ -88,16 +88,16 @@ class AddCredentialController extends Controller {
         if (process.env.NODE_ENV !== 'production') {
           console.log("Using callback URL:", callbackUrl)
         }
-        
+
         // Step 3: Call the WebAuthn API using the Auth module, passing nickname explicitly
         // Pass null for the feedback element as we're using the flash outlet now
         const webauthnResult = await registerWebAuthn(callbackUrl, credentialOptions, nickname, null);
-        
+
         // Step 4: Handle non-redirect result (errors)
         if (!webauthnResult.success) {
           this.showFlashMessage(webauthnResult.message || "Security key registration failed", "error");
           console.error("Error details:", webauthnResult.details);
-          
+
           this.withTarget('submitButton', (target) => {
             target.disabled = false;
           })
@@ -108,7 +108,7 @@ class AddCredentialController extends Controller {
     } catch (error) {
       console.error("Error in WebAuthn flow:", error);
       this.showFlashMessage(`Error: ${error.message || "Something went wrong. Please try again."}`, "error");
-      
+
       this.withTarget('submitButton', (target) => {
         target.disabled = false;
       })

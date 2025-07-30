@@ -135,7 +135,7 @@ module Admin
         # Check for validation error (flexible text matching)
         assert_error_message(/GAD.*reference.*blank|required/i)
 
-        # Now add GAD reference and try again
+        # Add GAD reference and try again
         fill_in 'GAD Invoice Reference', with: 'GAD-123456'
         click_on 'Record Payment'
 

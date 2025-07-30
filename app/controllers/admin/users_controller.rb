@@ -4,6 +4,7 @@ module Admin
   class UsersController < ApplicationController
     include ParamCasting
     include UserServiceIntegration
+
     before_action :authenticate_user!
     before_action :require_admin!
 
@@ -478,7 +479,7 @@ module Admin
     end
 
     def can_update_user_role?(user, namespaced_role)
-      user.prevent_self_role_update(current_user, namespaced_role)
+      user.prevent_self_role_update?(current_user, namespaced_role)
     end
 
     def render_self_update_error

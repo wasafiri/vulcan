@@ -49,9 +49,9 @@ module MedicalProviderHelper
   # @return [Array<String>] Array of error messages (empty if valid)
   def validate_medical_provider(provider)
     errors = []
-    errors << 'Medical provider name is required' unless provider.name.present?
-    errors << 'Medical provider phone is required' unless provider.phone.present?
-    errors << 'Medical provider email is required' unless provider.email.present?
+    errors << 'Medical provider name is required' if provider.name.blank?
+    errors << 'Medical provider phone is required' if provider.phone.blank?
+    errors << 'Medical provider email is required' if provider.email.blank?
     errors << 'Invalid phone number format' if provider.phone.present? && !provider.valid_phone?
     errors << 'Invalid email format' if provider.email.present? && !provider.valid_email?
     errors

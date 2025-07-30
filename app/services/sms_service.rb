@@ -3,7 +3,7 @@
 class SmsService
   def self.send_message(phone_number, message)
     # In production, this would use a real SMS provider like Twilio
-    # For now, we'll log the message and simulate delivery
+    # Here, let's log the message and simulate delivery
 
     # Example Twilio implementation (commented out):
     # client = Twilio::REST::Client.new(

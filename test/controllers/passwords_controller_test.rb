@@ -7,6 +7,9 @@ class PasswordsControllerTest < ActionDispatch::IntegrationTest
     # Track performance for monitoring
     @start_time = Time.current
 
+    # Create basic email templates needed for mailer functionality
+    create_basic_email_templates
+
     @user = create(:constituent, password: 'password123', password_confirmation: 'password123')
     @original_password_digest = @user.password_digest
 
@@ -89,5 +92,30 @@ class PasswordsControllerTest < ActionDispatch::IntegrationTest
     # Verify password was not changed
     @user.reload
     assert_equal @original_password_digest, @user.password_digest
+  end
+
+  private
+
+  def create_basic_email_templates
+    # Create header and footer templates if they don't exist
+    unless EmailTemplate.exists?(name: 'email_header_text', format: :text)
+      EmailTemplate.create!(
+        name: 'email_header_text',
+        format: :text,
+        subject: 'Header Template',
+        description: 'Email header template for testing',
+        body: 'Maryland Accessible Telecommunications Program'
+      )
+    end
+
+    return if EmailTemplate.exists?(name: 'email_footer_text', format: :text)
+
+    EmailTemplate.create!(
+      name: 'email_footer_text',
+      format: :text,
+      subject: 'Footer Template',
+      description: 'Email footer template for testing',
+      body: 'Contact us at support@mat.maryland.gov'
+    )
   end
 end

@@ -60,7 +60,7 @@ module Admin
       # Approve the proof using the modal flow with stable element finding
       find('button[data-modal-id="incomeProofReviewModal"]', text: /Review Proof/i).click
       wait_for_modal_open('incomeProofReviewModal', timeout: 15)
-      
+
       within_modal('#incomeProofReviewModal') do
         click_button 'Approve'
       end
@@ -167,14 +167,68 @@ module Admin
         residency_email.route
 
         # Re-authenticate since using_truncation may have cleared session data
-        system_test_sign_in(@admin)
-        wait_for_turbo
+        # Use retry pattern for all operations after truncation
+        3.times do |attempt|
+          begin
+            system_test_sign_in(@admin)
+            wait_for_turbo
+            break
+          rescue Ferrum::NodeNotFoundError, Ferrum::DeadBrowserError => e
+            puts "Authentication attempt #{attempt + 1} failed: #{e.message}"
+            Capybara.reset_sessions! if attempt < 2
+            raise if attempt >= 2
+          end
+        end
 
         # Visit the application page and wait for content to load after email processing
-        with_browser_rescue do
-          visit admin_application_path(@application)
+        with_browser_rescue(max_retries: 3) do
+          # Use visit with retry to handle pending connections
+          visit_with_retry(admin_application_path(@application), max_retries: 3)
           wait_for_turbo
+
+          # Debug: Check if we need to authenticate again
+          if has_selector?('form[action="/sign_in"]', wait: 2)
+            puts "=== DEBUG: Need to re-authenticate after truncation"
+            3.times do |auth_attempt|
+              begin
+                system_test_sign_in(@admin)
+                visit_with_retry(admin_application_path(@application), max_retries: 3)
+                wait_for_turbo
+                break
+              rescue Ferrum::NodeNotFoundError, Ferrum::DeadBrowserError => e
+                puts "Re-auth attempt #{auth_attempt + 1} failed: #{e.message}"
+                Capybara.reset_sessions! if auth_attempt < 2
+                raise if auth_attempt >= 2
+              end
+            end
+          end
+
+          # Debug: Check what page we're actually on
+          current_url_value = current_url rescue 'ERROR_GETTING_URL'
+          puts "=== DEBUG: Current URL after visit: #{current_url_value}"
+          puts "=== DEBUG: Page title: #{page.title rescue 'ERROR GETTING TITLE'}"
+          puts "=== DEBUG: Has sign-in form?: #{has_selector?('form[action="/sign_in"]', wait: 1)}"
           
+          # If browser is completely corrupted (about:blank), force full restart
+          if current_url_value == 'about:blank' || current_url_value == 'ERROR_GETTING_URL'
+            puts "=== DEBUG: Browser completely corrupted, forcing restart"
+            Capybara.reset_sessions!
+            system_test_sign_in(@admin)
+            visit_with_retry(admin_application_path(@application), max_retries: 3)
+            wait_for_turbo
+          elsif has_selector?('form[action="/sign_in"]', wait: 1)
+            puts "=== DEBUG: Still on sign-in page, authenticating again"
+            system_test_sign_in(@admin)
+            visit_with_retry(admin_application_path(@application), max_retries: 2)
+            wait_for_turbo
+          end
+          
+          # Ensure we're on the right page 
+          assert_selector 'h1#application-title', wait: 15
+
+          # Wait for attachments section to be present
+          assert_selector '#attachments-section', wait: 15
+
           # Wait for email processing to complete and page to be updated
           # The attachments should appear after processing
           using_wait_time(10) do
@@ -184,7 +238,7 @@ module Admin
         end
 
         # Should see email submission indicator for both
-        with_browser_rescue do
+        with_browser_rescue(max_retries: 3) do
           wait_for_page_stable
           assert_text '(via email)', count: 2
           assert_text 'income_proof.pdf'

@@ -62,7 +62,7 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
       # Try accessing a protected page
       get constituent_portal_applications_path
 
-      # In a proper authentication system, we should now be redirected to sign in
+      # In a proper authentication system, we should be redirected to sign in
       # or get some kind of error response
       assert_not_equal 200, response.status, 'Should not get success response on protected page after failed login'
 
@@ -133,7 +133,6 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
     # original_token = cookies[:session_token]
     # assert original_token.present?, 'Should have a session token cookie after sign in' # This assertion is unreliable here
 
-    # Now sign out
     delete sign_out_path
     assert_response :redirect
 
@@ -242,7 +241,7 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
       remember_me: '1'
     }
 
-    # Application now redirects to dashboard after successful sign-in
+    # Application redirects to dashboard after successful sign-in
     assert_redirected_to constituent_portal_dashboard_path
     follow_redirect!
     assert_response :success
@@ -276,7 +275,7 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
       raise Minitest::Skip, 'Authentication not working properly'
     end
 
-    # Now call our test method and see if it skips as expected
+    # Call our test method and see if it skips as expected
     begin
       skip_unless_authentication_working_test
       flunk 'Expected test to be skipped'

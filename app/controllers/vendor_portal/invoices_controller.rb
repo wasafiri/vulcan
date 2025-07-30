@@ -8,7 +8,6 @@ module VendorPortal
     def index
       @invoices = current_user.invoices.order(created_at: :desc)
       # Basic pagination, can be enhanced with a gem like Kaminari or Pagy
-      # For now, let's assume we might want to paginate later.
       # @invoices = @invoices.page(params[:page]).per(10)
     end
 

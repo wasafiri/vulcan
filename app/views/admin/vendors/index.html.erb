@@ -50,7 +50,7 @@
                 <%= vendor.vendor_approved? ? 'bg-green-100 text-green-800' :
                     vendor.vendor_pending? ? 'bg-yellow-100 text-yellow-800' :
                     'bg-red-100 text-red-800' %>">
-                <%= vendor.status.titleize %>
+                <%= vendor.vendor_authorization_status.titleize %>
               </span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">

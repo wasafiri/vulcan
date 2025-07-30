@@ -31,7 +31,7 @@ module Admin
         notify_user_of_approval
       end
 
-      redirect_to admin_recovery_requests_path, notice: 'Security key recovery request approved successfully. The user can now register a new security key.'
+      redirect_to admin_recovery_requests_path, notice: 'Security key recovery request approved successfully. The user can register a new security key.'
     end
 
     private
@@ -63,16 +63,14 @@ module Admin
       NotificationService.create_and_deliver!(
         type: 'security_key_recovery_approved',
         recipient: @recovery_request.user,
-        options: {
-          actor: current_user,
-          notifiable: @recovery_request,
-          metadata: {
-            recovery_request_id: @recovery_request.id,
-            approved_at: Time.current.iso8601,
-            approved_by: current_user.full_name
-          },
-          channel: :email
-        }
+        actor: current_user,
+        notifiable: @recovery_request,
+        metadata: {
+          recovery_request_id: @recovery_request.id,
+          approved_at: Time.current.iso8601,
+          approved_by: current_user.full_name
+        },
+        channel: :email
       )
     rescue StandardError => e
       Rails.logger.error "Failed to notify user #{@recovery_request.user_id} of recovery approval: #{e.message}"

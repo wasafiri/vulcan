@@ -6,17 +6,15 @@ module VendorPortal
   class InvoicesTest < ApplicationSystemTestCase
     setup do
       @vendor_user = create(:vendor_user)
-      
+
       # Authentication verification is tested elsewhere - proceed directly to test functionality
       begin
         system_test_sign_in(@vendor_user)
       rescue RuntimeError => e
         # If authentication check fails but we're actually signed in, continue
-        if e.message.include?("Sign-in failed") && current_path != sign_in_path
-          debug_puts "Authentication check failed but user is signed in - continuing test"
-        else
-          raise
-        end
+        raise unless e.message.include?('Sign-in failed') && current_path != sign_in_path
+
+        debug_puts 'Authentication check failed but user is signed in - continuing test'
       end
     end
 
@@ -79,7 +77,7 @@ module VendorPortal
 
     def number_to_currency(amount)
       # Simple currency formatting for test assertions
-      "$#{'%.2f' % amount}"
+      "$#{format('%.2f', amount)}"
     end
 
     def visit_with_retry(url, max_retries: 3)
@@ -102,11 +100,9 @@ module VendorPortal
             system_test_sign_in(@vendor_user)
           rescue RuntimeError => auth_error
             # Handle auth verification issue but continue if actually signed in
-            if auth_error.message.include?("Sign-in failed") && current_path != sign_in_path
-              debug_puts "Re-authentication check failed but user is signed in - continuing"
-            else
-              raise
-            end
+            raise unless auth_error.message.include?('Sign-in failed') && current_path != sign_in_path
+
+            debug_puts 'Re-authentication check failed but user is signed in - continuing'
           end
           sleep 1
           retry

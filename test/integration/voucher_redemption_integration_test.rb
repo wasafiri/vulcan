@@ -14,7 +14,7 @@ class VoucherRedemptionIntegrationTest < ActionDispatch::IntegrationTest
       email: "integration_vendor.#{SecureRandom.hex(4)}@example.com",
       password: 'password',
       password_confirmation: 'password',
-      status: 'approved',
+      vendor_authorization_status: 'approved',
       business_name: 'Integration Test Business',
       business_tax_id: '123123123',
       terms_accepted_at: Time.current,

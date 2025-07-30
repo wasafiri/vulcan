@@ -67,7 +67,7 @@ export default class extends Controller {
     if (process.env.NODE_ENV !== 'production') {
       console.warn('validateIncomeThreshold called on paper-application controller - this should be handled by income-validation controller');
     }
-    // For now, just prevent the error - the income validation should be handled elsewhere
+    // For now, prevent the error - the income validation should be handled elsewhere
   }
 
   /* Modal helpers */
@@ -87,19 +87,19 @@ export default class extends Controller {
   // Main rejection method - implement form submission
   rejectForIncome() {
     console.log('rejectForIncome called');
-    
+
     // Get the main form element (the form this controller is attached to)
     const form = this.element.querySelector('form') || this.element;
     console.log('Form found:', form);
-    
+
     if (form) {
       // Set the rejection endpoint
       form.action = '/admin/paper_applications/reject_for_income';
       form.method = 'POST';
-      
+
       console.log('New action:', form.action);
       console.log('Form method:', form.method);
-      
+
       // Submit the form
       form.submit();
     } else {

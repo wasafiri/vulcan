@@ -5,7 +5,6 @@ module ModalHelpers
     within(css, &)
   end
 
-  # Defensive modal trigger clicking that avoids stale node references
   def click_modal_trigger(selector, wait: 10)
     assert_selector selector, wait: wait
     # Re-query each time to avoid stale references
@@ -37,14 +36,14 @@ module ModalHelpers
     modal_element = page.find(css, visible: true)
     if modal_element.has_selector?('[data-controller]', wait: 2)
       # Wait a brief moment for controller initialization
-      sleep(0.2)
+      sleep(0.1)
     end
 
     # Wait for scroll lock to be applied by the modal controller
     # The modal controller should add overflow-hidden to the body
     using_wait_time(5) do
       # Give the modal controller time to apply scroll lock
-      sleep(0.3)
+      sleep(0.1)
       true # Always succeed, let individual tests assert scroll state if needed
     end
   end

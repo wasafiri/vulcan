@@ -137,7 +137,7 @@ def create_products_from_fixtures
         product.assign_attributes(clean_attributes.transform_keys(&:to_sym))
       end
     end
-    raise 'No products created' if Product.count.zero?
+    raise 'No products created' if Product.none?
   else
     seed_error "Products fixture not found at #{product_fixture_path}"
   end

@@ -13,7 +13,6 @@ import { applyTargetSafety } from "../../mixins/target_safety"
  * - Consistent ARIA labeling
  * - Centralized chart defaults via chart config service
  * - Data validation
- * - Fixed sizing to prevent getComputedStyle loops
  */
 class ChartBaseController extends Controller {
   static outlets = ["flash"] // Declare flash outlet
@@ -23,8 +22,6 @@ class ChartBaseController extends Controller {
 
   connect() {
     this.cleanupExistingChart()
-
-    // Remove fixed container sizing to enable responsive behavior
     this.element.style.width = '100%'
     this.element.style.height = this.chartHeightValue + 'px'
   }
@@ -39,12 +36,6 @@ class ChartBaseController extends Controller {
       this.chartInstance = null
     }
   }
-
-  // Set fixed container dimensions to prevent CSS layout loops
-  // Removed setFixedContainerSize to enable responsive behavior
-
-  // Handle resize by updating container size and recreating chart
-  // Removed handleResize method - Chart.js handles responsive resizing automatically
 
   // Defensive data validation
   validateData(data, context = "chart data") {

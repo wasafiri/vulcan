@@ -35,9 +35,7 @@ module FplPolicyHelpers
       # Handle race condition where another thread created the policy
       # Just update the existing one
       existing_policy = Policy.find_by(key: policy_attrs[:key])
-      if existing_policy && existing_policy.value != policy_attrs[:value]
-        existing_policy.update!(value: policy_attrs[:value])
-      end
+      existing_policy.update!(value: policy_attrs[:value]) if existing_policy && existing_policy.value != policy_attrs[:value]
     end
   end
 end

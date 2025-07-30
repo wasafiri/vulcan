@@ -1,8 +1,7 @@
 // app/javascript/services/notification_service.js
 
 /**
- * Centralized client-side notification service.
- * Provides a robust way to display toast notifications, integrating with Turbo
+ * Centralized client-side notification service to display toast notifications, integrating with Turbo
  * and replacing the legacy flash system.
  */
 class NotificationService {
@@ -39,7 +38,7 @@ class NotificationService {
       container.setAttribute('data-turbo-permanent', ''); // Persist across Turbo navigations
       document.body.appendChild(container);
     }
-    
+
     // Cache the container
     this.container = container;
     return container;
@@ -116,7 +115,7 @@ class NotificationService {
       console.warn('[NotificationService] Container not available, cannot show notification:', message);
       return;
     }
-    
+
     this.cleanupOldNotifications();
 
     const notificationElement = this.createNotificationElement(message, type);
@@ -254,7 +253,7 @@ class NotificationService {
   processQueuedMessages() {
     // Check for messages embedded in a script tag (e.g., from Rails flash)
     const flashDataElement = document.getElementById('rails-flash-messages');
-    
+
     if (flashDataElement && flashDataElement.textContent) {
       try {
         const messages = JSON.parse(flashDataElement.textContent);
@@ -284,7 +283,7 @@ class NotificationService {
     if (!container) {
       return; // Nothing to clean up if container doesn't exist
     }
-    
+
     const existingNotifications = Array.from(container.children);
     if (existingNotifications.length >= this.maxNotifications) {
       const toRemoveCount = existingNotifications.length - this.maxNotifications + 1;

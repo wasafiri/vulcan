@@ -281,14 +281,14 @@ class VoucherTest < ActiveSupport::TestCase
     end
 
     # Create voucher_redeemed template (no header/footer required)
-    unless EmailTemplate.exists?(name: 'voucher_notifications_voucher_redeemed', format: :text)
-      EmailTemplate.create!(
-        name: 'voucher_notifications_voucher_redeemed',
-        format: :text,
-        subject: 'Voucher Successfully Redeemed',
-        body: "Dear %<vendor_business_name>s,\n\nVoucher %<voucher_code>s has been redeemed by %<user_first_name>s.\n\nTransaction Date: %<transaction_date_formatted>s\nAmount: %<transaction_amount_formatted>s\nReference: %<transaction_reference_number>s\nExpiration Date: %<expiration_date_formatted>s\nRemaining Balance: %<remaining_balance_formatted>s\n\n%<remaining_value_message_text>s\n%<fully_redeemed_message_text>s",
-        description: 'Sent when a voucher is redeemed.'
-      )
-    end
+    return if EmailTemplate.exists?(name: 'voucher_notifications_voucher_redeemed', format: :text)
+
+    EmailTemplate.create!(
+      name: 'voucher_notifications_voucher_redeemed',
+      format: :text,
+      subject: 'Voucher Successfully Redeemed',
+      body: "Dear %<vendor_business_name>s,\n\nVoucher %<voucher_code>s has been redeemed by %<user_first_name>s.\n\nTransaction Date: %<transaction_date_formatted>s\nAmount: %<transaction_amount_formatted>s\nReference: %<transaction_reference_number>s\nExpiration Date: %<expiration_date_formatted>s\nRemaining Balance: %<remaining_balance_formatted>s\n\n%<remaining_value_message_text>s\n%<fully_redeemed_message_text>s",
+      description: 'Sent when a voucher is redeemed.'
+    )
   end
 end

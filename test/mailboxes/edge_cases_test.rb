@@ -52,7 +52,7 @@ class EdgeCasesTest < ActionMailbox::TestCase
   end
 
   test 'handles emails with no attachments' do
-    # We need to use assert_throws to properly catch the bounce
+    # We need to use assert_throws to catch the bounce
     assert_throws(:bounce) do
       inbound_email = create_inbound_email_from_mail(
         to: 'proof@example.com',
@@ -197,29 +197,46 @@ class EdgeCasesTest < ActionMailbox::TestCase
   test 'handles emails with special characters in subject and body' do
     # Create a temporary file for testing
     file_path = Rails.root.join('tmp/income_proof.pdf')
-    File.write(file_path, 'This is a test PDF file')
 
-    # We need to stub ProofAttachmentValidator to pass validation
-    ProofAttachmentValidator.stubs(:validate!).returns(true)
+    begin
+      # Ensure the tmp directory exists
+      FileUtils.mkdir_p(File.dirname(file_path))
 
-    # Stub the attach_proof method to prevent actual attachment but still track calls
-    ProofSubmissionMailbox.any_instance.expects(:attach_proof).at_least_once.returns(true)
+      # Create the file with some content
+      File.write(file_path, 'This is a test PDF file')
 
-    inbound_email = create_inbound_email_with_attachment(
-      to: 'proof@example.com',
-      from: @constituent.email,
-      subject: 'Income Proof Submission - 特殊文字 - üñîçødé',
-      body: 'Please find my income proof attached. 特殊文字 üñîçødé',
-      attachment_path: file_path,
-      content_type: 'application/pdf'
-    )
+      # Verify file creation with simple retry logic
+      retries = 0
+      while !File.exist?(file_path) && retries < 5
+        sleep(0.1)
+        retries += 1
+      end
 
-    # Process without expecting a bounce
-    assert_nothing_raised do
-      inbound_email.route
+      assert File.exist?(file_path), "Test file was not created at #{file_path}"
+      assert File.size(file_path).positive?, "Test file is empty at #{file_path}"
+
+      # We need to stub ProofAttachmentValidator to pass validation
+      ProofAttachmentValidator.stubs(:validate!).returns(true)
+
+      # Stub the attach_proof method to prevent actual attachment but still track calls
+      ProofSubmissionMailbox.any_instance.expects(:attach_proof).at_least_once.returns(true)
+
+      inbound_email = create_inbound_email_with_attachment(
+        to: 'proof@example.com',
+        from: @constituent.email,
+        subject: 'Income Proof Submission - 特殊文字 - üñîçødé',
+        body: 'Please find my income proof attached. 特殊文字 üñîçødé',
+        attachment_path: file_path,
+        content_type: 'application/pdf'
+      )
+
+      # Process without expecting a bounce
+      assert_nothing_raised do
+        inbound_email.route
+      end
+    ensure
+      # Ensure cleanup happens even if test fails
+      FileUtils.rm_f(file_path) if file_path
     end
-
-    # Clean up
-    FileUtils.rm_f(file_path)
   end
 end

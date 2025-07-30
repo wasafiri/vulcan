@@ -80,13 +80,6 @@ class AuthenticationVerificationTest < ActionDispatch::IntegrationTest
     assert_response :success, 'Third request failed'
   end
 
-  # Test authentication with direct cookie manipulation (no longer used in integration tests)
-  test 'direct cookie manipulation is now deprecated for integration tests' do
-    # Skip this test as direct cookie manipulation doesn't work reliably in integration tests
-    # We should use sign_in_with_headers instead
-    skip "Direct cookie manipulation doesn't work reliably in integration tests - use sign_in_with_headers instead"
-  end
-
   # Test the checkbox_test approach
   test 'checkbox_test approach works for authentication' do
     # Use the same approach as the checkbox test

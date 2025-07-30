@@ -136,7 +136,7 @@ class ProofsSystemTest < ApplicationSystemTestCase
     # Should see success message
     assert_success_message('Proof submitted successfully')
 
-    # Now try to upload again - should hit rate limit
+    # Try to upload again - should hit rate limit
     # Go back to application page and try to resubmit again
     visit "/constituent_portal/applications/#{@application.id}"
 
@@ -145,7 +145,7 @@ class ProofsSystemTest < ApplicationSystemTestCase
       click_on 'Resubmit Income Proof'
       attach_valid_proof
 
-      # This should trigger rate limiting - click and wait for response
+      # Should trigger rate limiting - click and wait for response
       click_button 'Submit Document'
 
       # Check for rate limit message or error (could be inline error or modal)

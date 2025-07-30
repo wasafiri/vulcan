@@ -150,16 +150,17 @@ module TwoFactorVerification
   # SMS specific verification helpers
   def resolve_sms_credential_id(credential_id)
     # SMS login flow stores credential_id in challenge metadata during code generation
-    # When no challenge data exists (e.g., in tests), the system falls back to the user's first SMS credential
+    # When no challenge data exists (e.g., in tests), fall back to the user's first SMS credential
     return credential_id if credential_id.present?
 
     challenge_data = retrieve_challenge
     credential_id_from_challenge = challenge_data[:metadata]&.dig(:credential_id)
     return credential_id_from_challenge if credential_id_from_challenge.present?
 
-    # Fallback: if no challenge data (e.g., in tests), use the user's first SMS credential
+    # If no challenge data (e.g., in tests), use the user's first SMS credential
     user_for_2fa = find_user_for_two_factor
-    user_for_2fa&.sms_credentials&.first&.id
+    sms_credentials = user_for_2fa&.sms_credentials
+    sms_credentials&.first&.id
   end
 
   def find_sms_credential(credential_id)

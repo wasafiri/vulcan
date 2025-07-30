@@ -120,22 +120,8 @@ module Evaluators
     end
 
     def update
-      # Process attendees from the attendees_field
-      if params[:evaluation][:attendees_field].present?
-        attendees = params[:evaluation][:attendees_field].split(',').map do |attendee_str|
-          name, relationship = attendee_str.strip.split('-').map(&:strip)
-          { 'name' => name, 'relationship' => relationship }
-        end
-        params[:evaluation][:attendees] = attendees
-      end
-
-      # Process products tried from multi-select
-      if params[:evaluation][:products_tried_field].present?
-        products_tried = params[:evaluation][:products_tried_field].map do |product_id|
-          { 'product_id' => product_id, 'reaction' => 'Recorded during evaluation' }
-        end
-        params[:evaluation][:products_tried] = products_tried
-      end
+      process_attendees_param
+      process_products_tried_param
 
       if @evaluation.update(evaluation_params)
         redirect_to evaluators_evaluation_path(@evaluation), notice: 'Evaluation updated successfully.'
@@ -260,6 +246,25 @@ module Evaluators
 
       # Include only constituent since that's all we use in the view
       ordered_query.includes(:constituent)
+    end
+
+    def process_attendees_param
+      return if params[:evaluation][:attendees_field].blank?
+
+      attendees = params[:evaluation][:attendees_field].split(',').map do |attendee_str|
+        name, relationship = attendee_str.strip.split('-').map(&:strip)
+        { 'name' => name, 'relationship' => relationship }
+      end
+      params[:evaluation][:attendees] = attendees
+    end
+
+    def process_products_tried_param
+      return if params[:evaluation][:products_tried_field].blank?
+
+      products_tried = params[:evaluation][:products_tried_field].map do |product_id|
+        { 'product_id' => product_id, 'reaction' => 'Recorded during evaluation' }
+      end
+      params[:evaluation][:products_tried] = products_tried
     end
   end
 end

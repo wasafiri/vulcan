@@ -287,6 +287,16 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
 
     assert @user.reload.webauthn_credentials.exists?(nickname: 'KeyToDelete')
 
+    # Debug: Check user state before sign-in
+    puts "=== DEBUG: User email: #{@user.email}"
+    puts "=== DEBUG: User status: #{@user.status}"
+    puts "=== DEBUG: User verified: #{@user.verified}"
+    puts "=== DEBUG: User valid?: #{@user.valid?}"
+    puts "=== DEBUG: User errors: #{@user.errors.full_messages}" unless @user.valid?
+    
+    # Ensure user is properly saved and reloaded
+    @user.reload
+    
     system_test_sign_in(@user)
 
     # Complete 2FA authentication to get to profile page

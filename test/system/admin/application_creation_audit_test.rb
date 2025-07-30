@@ -101,7 +101,13 @@ module Admin
       puts "All links on admin applications page: #{all_links}"
 
       # Find the "View Application" link for the application
-      find('tr', text: @constituent.full_name).click_link('View Application')
+      # Use the constituent email to uniquely identify the row, but be more specific about the table
+      within 'table' do
+        row = find('tr', text: @constituent.email, match: :first)
+        within row do
+          click_link('View Application')
+        end
+      end
 
       # Verify the audit log shows the application creation
       within '#audit-logs' do

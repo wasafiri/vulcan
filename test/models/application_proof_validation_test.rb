@@ -190,7 +190,7 @@ class ApplicationProofValidationTest < ActiveSupport::TestCase
 
   test 'validates residency proof shows address' do
     # This is a business rule that would need custom validation
-    # For now, we're just testing that the file can be attached
+    # Here, testing that the file can be attached
     @application.residency_proof.attach(@valid_pdf)
     assert @application.valid?, 'Valid residency proof should be accepted'
   end
@@ -227,13 +227,13 @@ class ApplicationProofValidationTest < ActiveSupport::TestCase
 
   test 'validates SSA award letter is current year' do
     # This would require custom validation logic in the model
-    # For now, we're just documenting the requirement
+    # Document the requirement
     skip 'Implement custom validation for SSA award letter date'
   end
 
   test 'validates SSA award letter is less than 2 months old' do
     # This would require custom validation logic in the model
-    # For now, we're just documenting the requirement
+    # Document the requirement
     skip 'Implement custom validation for SSA award letter age'
   end
 end

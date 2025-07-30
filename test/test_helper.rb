@@ -48,6 +48,44 @@ unless defined?(SEEDS_LOADED)
   SEEDS_LOADED = true
 end
 
+# Loads only the critical email templates needed by all mailers
+# Used after database truncation in parallel tests
+def load_critical_email_templates
+  # Header template
+  EmailTemplate.find_or_create_by!(name: 'email_header_text', format: :text) do |template|
+    template.subject = 'Email Header Text'
+    template.description = 'Standard text header used in all email templates'
+    template.body = <<~TEXT
+      <%= title %>
+
+      <% if defined?(subtitle) && subtitle.present? %>
+      <%= subtitle %>
+      <% end %>
+    TEXT
+    template.version = 1
+  end
+
+  # Footer template
+  EmailTemplate.find_or_create_by!(name: 'email_footer_text', format: :text) do |template|
+    template.subject = 'Email Footer Text'
+    template.description = 'Standard text footer used in all email templates'
+    template.body = <<~TEXT
+      --
+      <%= organization_name %>
+      Email: <%= contact_email %>
+      Website: <%= website_url %>
+
+      <% if defined?(show_automated_message) && show_automated_message %>
+      This is an automated message. Please do not reply directly to this email.
+      <% end %>
+    TEXT
+    template.version = 1
+  end
+rescue StandardError => e
+  # In parallel tests, log but don't fail if template creation fails
+  Rails.logger.warn "Failed to create critical email templates: #{e.message}"
+end
+
 # Core test libraries
 require 'minitest/mock'
 require 'ostruct'
@@ -161,7 +199,8 @@ module ActiveSupport
       # Per-worker truncation (expensive but thorough isolation)
       parallelize_setup do |_worker|
         DatabaseCleaner.clean_with(:truncation)
-        # Seeds are already loaded once globally - no need to reload per worker
+        # After truncation, we need to re-seed critical templates that mailers depend on
+        load_critical_email_templates
       end
 
       # Per-test transactions (fast and sufficient for most cases)

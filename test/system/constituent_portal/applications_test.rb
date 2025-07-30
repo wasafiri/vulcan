@@ -9,12 +9,12 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
 
     # Use the factory to create the relationship
     create(:guardian_relationship, guardian_user: @user, dependent_user: @dependent)
-    
-    # Reload the user to ensure the dependents association is properly loaded
+
+    # Reload the user to ensure the dependents association is loaded
     @user.reload
-    
-    # Verify the relationship was created properly
-    assert @user.dependents.exists?(@dependent.id), "Dependent relationship not properly established"
+
+    # Verify the relationship was created
+    assert @user.dependents.exists?(@dependent.id), 'Dependent relationship not properly established'
     @valid_pdf = file_fixture('income_proof.pdf').to_s
     @valid_image = file_fixture('residency_proof.pdf').to_s
 
@@ -103,20 +103,20 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
 
     # Fill in required fields using direct Capybara DSL with existing infrastructure
     check 'I certify that I am a resident of Maryland'
-    
+
     # Use direct fill_in - FillInCupritePatch handles clearing and events automatically
     fill_in 'Household Size', with: 2
     fill_in 'Annual Income', with: 50_000
-    
+
     # Wait for form validation and any JavaScript to complete
     wait_for_page_stable
-    
+
     # Fill in address information - use name attributes since labels may vary
     find('input[name*="physical_address_1"]').set('456 Oak Ave')
     find('input[name*="city"]').set('Annapolis')
     select 'Maryland', from: 'State'
     find('input[name*="zip_code"]').set('21401')
-    
+
     check 'I certify that I have a disability that affects my ability to access telecommunications services'
     check 'Vision'
 
@@ -210,7 +210,7 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
     # Wait for the dependent radio button to be visible
     assert_selector 'input#apply_for_dependent', visible: true, wait: 10
     # Click the radio button directly using its ID
-    find('#apply_for_dependent').click
+    find_by_id('apply_for_dependent').click
 
     # Wait for the dependent section to become visible
     assert_selector '#dependent-selection-fields', visible: true, wait: 10
@@ -248,8 +248,7 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
 
     # Get the most recently created draft application for the specific dependent
     application = Application.where(user_id: @dependent.id, status: 'draft').order(created_at: :desc).first
-    assert_not_nil application, "Should have created a draft application for the dependent"
-
+    assert_not_nil application, 'Should have created a draft application for the dependent'
 
     # Verify application fields were saved in the database
     assert_equal 'draft', application.status
@@ -282,7 +281,7 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
     # Navigate to edit page to verify all fields were saved in the UI
     visit edit_constituent_portal_application_path(application)
     wait_for_turbo
-    
+
     # Add extra wait for form to fully populate
     wait_for_network_idle(timeout: 5)
 
@@ -303,24 +302,24 @@ class ApplicationsSystemTest < ApplicationSystemTestCase
     within "section[aria-labelledby='medical-info-heading']" do
       # Wait for the form section to be fully rendered
       assert_selector 'input[name="application[medical_provider_attributes][name]"]', wait: 10
-      
+
       name_field = find('input[name="application[medical_provider_attributes][name]"]')
       puts "DEBUG: Name field value: '#{name_field.value}'" if ENV['VERBOSE_TESTS']
-      
+
       # If the field is empty, this indicates the Struct binding issue persists
       # Skip the field value assertions but verify the core functionality worked
       if name_field.value.blank?
-        puts "WARNING: Medical provider fields are empty in edit form - this is a form binding issue, not a data persistence issue"
-        puts "The medical provider data was verified to be correctly saved in the database above"
+        puts 'WARNING: Medical provider fields are empty in edit form - this is a form binding issue, not a data persistence issue'
+        puts 'The medical provider data was verified to be correctly saved in the database above'
       else
         assert_equal 'Dr. Robert Johnson', name_field.value
-        
-        phone_field = find('input[name="application[medical_provider_attributes][phone]"]')  
+
+        phone_field = find('input[name="application[medical_provider_attributes][phone]"]')
         assert_equal '4105551234', phone_field.value
-        
+
         email_field = find('input[name="application[medical_provider_attributes][email]"]')
         assert_equal 'dr.johnson@example.com', email_field.value
-        
+
         # Fax field is optional, check if present
         if page.has_css?('input[name="application[medical_provider_attributes][fax]"]', wait: 1)
           fax_field = find('input[name="application[medical_provider_attributes][fax]"]')

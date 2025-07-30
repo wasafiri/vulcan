@@ -48,13 +48,13 @@ class ProofsTest < ApplicationSystemTestCase
     check 'I certify that I am a resident of Maryland'
     fill_in 'Household Size', with: '5'
     fill_in 'Annual Income', with: '100000'
-    
+
     # Fill in address information
     fill_in 'Street Address', with: '123 Main St'
     fill_in 'City', with: 'Baltimore'
     select 'Maryland', from: 'State'
     fill_in 'Zip Code', with: '21201'
-    
+
     check 'I certify that I have a disability that affects my ability to access telecommunications services'
     check 'Hearing'
 
@@ -65,7 +65,7 @@ class ProofsTest < ApplicationSystemTestCase
       fill_in 'Fax (Optional)', with: '202-555-5556'
       fill_in 'Email', with: 'drfel@gmail.net'
     end
-    
+
     # Medical authorization (required)
     check 'I authorize the release and sharing of my medical information as described above'
 

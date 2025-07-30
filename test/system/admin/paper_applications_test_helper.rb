@@ -24,13 +24,13 @@ module PaperApplicationsTestHelper
     within_application_details_fieldset do
       # Clear and set field values explicitly to avoid concatenation issues
       household_size_field = find('input[name="application[household_size]"]')
-      household_size_field.set('')  # Clear first
+      household_size_field.set('') # Clear first
       household_size_field.set(household_size.to_s)
-      
+
       income_field = find('input[name="application[annual_income]"]')
-      income_field.set('')  # Clear first
+      income_field.set('') # Clear first
       income_field.set(annual_income.to_s)
-      
+
       check 'application[maryland_resident]'
     end
   end
@@ -108,21 +108,19 @@ module PaperApplicationsTestHelper
   # Simple field filling that tries multiple approaches with proper clearing
   def paper_fill_in(field_label, value)
     # Try standard approach with explicit clearing first
-    begin
-      field = find_field(field_label)
+    field = find_field(field_label)
+    field.set('').set(value)
+  rescue Capybara::ElementNotFound
+    # Try by name attribute as fallback
+    case field_label
+    when 'Household Size'
+      find('input[name="application[household_size]"]').set('').set(value)
+    when 'Annual Income'
+      find('input[name="application[annual_income]"]').set('').set(value)
+    else
+      # Try find by partial text match and clear first
+      field = find_field(field_label, match: :first)
       field.set('').set(value)
-    rescue Capybara::ElementNotFound
-      # Try by name attribute as fallback
-      case field_label
-      when 'Household Size'
-        find('input[name="application[household_size]"]').set('').set(value)
-      when 'Annual Income'
-        find('input[name="application[annual_income]"]').set('').set(value)
-      else
-        # Last resort - find by partial text match and clear first
-        field = find_field(field_label, match: :first)
-        field.set('').set(value)
-      end
     end
   end
 end

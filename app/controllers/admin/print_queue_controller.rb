@@ -20,10 +20,15 @@ module Admin
         format.html
         format.pdf do
           if @letter.pdf_letter.attached?
-            send_data @letter.pdf_letter.download,
-                      filename: "#{@letter.letter_type}_#{@letter.constituent.id}.pdf",
-                      type: 'application/pdf',
-                      disposition: 'inline'
+            begin
+              send_data @letter.pdf_letter.download,
+                        filename: "#{@letter.letter_type}_#{@letter.constituent.id}.pdf",
+                        type: 'application/pdf',
+                        disposition: 'inline'
+            rescue ActiveStorage::FileNotFoundError => e
+              Rails.logger.error "[STORAGE_ERROR] PDF file missing for PrintQueueItem ##{@letter.id}: #{e.message}"
+              redirect_to admin_print_queue_index_path, alert: 'PDF file is missing from storage'
+            end
           else
             redirect_to admin_print_queue_index_path, alert: 'PDF not available for this letter'
           end

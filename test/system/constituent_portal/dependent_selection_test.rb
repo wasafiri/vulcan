@@ -141,7 +141,7 @@ module ConstituentPortal
 
       # Verify the dependent dropdown is visible and has the correct selection
       assert_selector '#dependent_select_frame', visible: true
-      
+
       # Change to the second dependent by selecting from dropdown
       select @dependent2.full_name, from: 'Select Dependent'
 

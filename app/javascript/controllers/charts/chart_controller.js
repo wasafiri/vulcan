@@ -5,8 +5,7 @@ import ChartBaseController from "./base_controller"
 /**
  * Chart Controller (v3)
  *
- * Builds on ChartBaseController's safeguards (fixed‐sizing to prevent CSS/layout loops,
- * debounced resize handling, cleanup logic) but restores full "responsive" behavior
+ * Builds on ChartBaseController's safeguards and restores full "responsive" behavior
  * and basic animations for visual interest.
  */
 export default class extends ChartBaseController {

@@ -128,12 +128,10 @@ class ProofReview < ApplicationRecord
     NotificationService.create_and_deliver!(
       type: action_name,
       recipient: application.user,
-      options: {
-        actor: admin,
-        notifiable: application,
-        metadata: metadata,
-        channel: :email
-      }
+      actor: admin,
+      notifiable: application,
+      metadata: metadata,
+      channel: :email
     )
   rescue StandardError => e
     Rails.logger.error "Failed to send #{action_name} notification via NotificationService: #{e.message}"
@@ -174,11 +172,9 @@ class ProofReview < ApplicationRecord
     NotificationService.create_and_deliver!(
       type: 'max_rejections_warning',
       recipient: User.admins.first,
-      options: {
-        actor: admin,
-        notifiable: application,
-        channel: :email
-      }
+      actor: admin,
+      notifiable: application,
+      channel: :email
     )
   end
 

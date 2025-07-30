@@ -8,11 +8,11 @@ require_relative '../support/webauthn_test_helper' # Include the helper
 # Renamed class for clarity
 class WebauthnSignInTest < ApplicationSystemTestCase
   include SystemTestAuthentication
-  include WebauthnTestHelper # Include the helper methods
+  include WebauthnTestHelper
+
   # Add teardown to handle any browser cleanup issues gracefully
   def teardown
     # Rescue any browser-related errors during teardown
-    # This is needed because WebAuthn can sometimes cause the browser to behave unpredictably
     super
   # we might need to change this to work with Cuprite gem
   rescue Selenium::WebDriver::Error::NoSuchWindowError,
@@ -25,7 +25,6 @@ class WebauthnSignInTest < ApplicationSystemTestCase
     user = create(:user, :confirmed)
 
     # Configure WebAuthn
-    # Use a fixed origin for testing since we won't navigate to a page
     setup_webauthn_test_environment
 
     # Create WebAuthn credential options
@@ -100,23 +99,23 @@ class WebauthnSignInTest < ApplicationSystemTestCase
     # Test the sign-in flow up to WebAuthn verification
     visit sign_in_path
     wait_for_network_idle
-    
+
     within('form[action="/sign_in"]') do
       fill_in 'email-input', with: user.email
       fill_in 'password-input', with: 'password123'
       click_button 'Sign In'
     end
-    
+
     wait_for_network_idle
-    
+
     # Should be redirected to WebAuthn verification page
     expected_path = verify_method_two_factor_authentication_path(type: 'webauthn')
     assert_current_path expected_path
-    
+
     # Verify the WebAuthn verification page displays correctly
     assert_text 'Security Key Verification'
     assert_text 'Use your registered security key to complete sign-in'
-    
+
     # Test stops here - we don't try to complete actual WebAuthn verification
     # That would require real hardware tokens or platform authenticators
   end
@@ -204,7 +203,7 @@ class WebauthnSignInTest < ApplicationSystemTestCase
 
     # Navigate to the success page to verify the UI flow
     visit credential_success_two_factor_authentication_path(type: 'webauthn')
-    
+
     # Check for the success page content directly
     assert_text 'Setup Complete!', wait: 10
     assert_text 'Your Security Key has been successfully set up', wait: 10
@@ -235,28 +234,24 @@ class WebauthnSignInTest < ApplicationSystemTestCase
     # Test UI elements are present and functional
     assert_selector 'button', text: 'Verify with Security Key'
     assert_text 'Use your registered security key to verify your identity'
-    
+
     # Test instructions are displayed
     assert_text 'Make sure your security key is ready'
     assert_text 'Click the button below to start the verification'
-    
+
     # Test that the verification button is clickable (but don't complete verification)
     verification_button = find('button', text: 'Verify with Security Key')
     assert verification_button.visible?
     assert_not verification_button.disabled?
-    
+
     # Test alternative method links if available
-    if user.totp_credentials.exists?
-      assert_selector 'a', text: 'Use Authenticator App Instead'
-    end
-    
-    if user.sms_credentials.exists?
-      assert_selector 'a', text: 'Use Text Message Instead'
-    end
-    
+    assert_selector 'a', text: 'Use Authenticator App Instead' if user.totp_credentials.exists?
+
+    assert_selector 'a', text: 'Use Text Message Instead' if user.sms_credentials.exists?
+
     # Test "lost security key" link
     assert_selector 'a', text: "I've lost my security key"
-    
+
     # This test verifies the UI is correctly displayed and functional
     # Actual WebAuthn verification requires real hardware and is tested elsewhere
   end
@@ -296,7 +291,7 @@ class WebauthnSignInTest < ApplicationSystemTestCase
     take_screenshot('webauthn-login-ui-failure')
 
     # NOTE: The actual verification failure logic should be tested in integration tests
-    # where we can properly mock the WebAuthn verification process
+    # where we can mock the WebAuthn verification process
   end
 
   private

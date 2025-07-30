@@ -15,7 +15,7 @@ module Users
     # Callbacks
     after_commit :update_w9_status_on_form_upload, on: :update
 
-    validates :status, presence: true
+    validates :vendor_authorization_status, presence: true
     validates :business_name, presence: true
     validates :business_tax_id, presence: true
     validates :w9_form, presence: true, if: -> { vendor_approved? && !new_record? }
@@ -29,13 +29,14 @@ module Users
                         message: 'must be a valid URL starting with http:// or https://' },
               allow_blank: true
 
-    enum :status, { pending: 0, approved: 1, suspended: 2 }, prefix: :vendor
+    attribute :vendor_authorization_status, :integer, default: 0
+    enum :vendor_authorization_status, { pending: 0, approved: 1, suspended: 2 }, prefix: :vendor
 
     # Explicitly declare the attribute type for w9_status
     attribute :w9_status, :integer, default: 0
     enum :w9_status, { not_submitted: 0, pending_review: 1, approved: 2, rejected: 3 }, prefix: :w9_status
 
-    scope :active, -> { where(status: :approved) }
+    scope :active, -> { where(vendor_authorization_status: :approved) }
     scope :with_pending_invoices, lambda {
       joins(:voucher_transactions)
         .where(voucher_transactions: { invoice_id: nil, status: :completed })

@@ -41,10 +41,10 @@ module ConstituentPortal
 
       def resubmit
         # The before_action has already run authorize_proof_access!
-        # We need to return if it failed to prevent a double render error
+        # Return if it fails to prevent a double render error
         return if performed?
 
-        # ProofAttachmentService manages its own transactions, so we don't need an outer transaction
+        # ProofAttachmentService manages its own transactions (we don't need an outer transaction)
         # This prevents nested transaction issues that can cause attachment rollbacks
         attach_and_update_proof
         track_submission
@@ -133,7 +133,7 @@ module ConstituentPortal
 
         redirect_to constituent_portal_application_path(@application),
                     alert: 'Cannot submit proof at this time'
-        nil # Add explicit return to prevent code execution after redirect
+        nil # Explicit return to prevent code execution after redirect
       end
 
       def authorize_proof_access!
@@ -141,7 +141,7 @@ module ConstituentPortal
 
         redirect_to constituent_portal_application_path(@application),
                     alert: 'Invalid proof type or status'
-        false # Add explicit return to halt execution
+        false # Explicit return to halt execution
       end
 
       def check_rate_limit

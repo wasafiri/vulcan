@@ -147,17 +147,11 @@ module ConstituentPortal
       # Debug: Check current values before updating
       household_field = find('#application_household_size')
       income_field = find('#application_annual_income')
-      puts "DEBUG: Current household size: #{household_field.value}"
-      puts "DEBUG: Current income: #{income_field.value}"
-      
+
       # Set values directly to bypass autosave interference
       household_field.set('4')
       income_field.set('55000')
-      
-      # Verify the values were set
-      puts "DEBUG: New household size: #{household_field.value}"
-      puts "DEBUG: New income: #{income_field.value}"
-      
+
       # Explicitly ensure Vision and Mobility are checked
       # First uncheck them in case they're already checked, then check them
       uncheck 'Vision' if page.has_checked_field?('Vision')
@@ -172,7 +166,6 @@ module ConstituentPortal
         fill_in 'Email', with: 'bfranklin@example.com'
         check 'I authorize the release and sharing of my medical information as described above'
       end
-
 
       # Save the updated application with safe interaction
       click_button 'Save Application'
@@ -191,7 +184,7 @@ module ConstituentPortal
           flash_content = find('.flash-messages').text
           puts "DEBUG: Flash content found: '#{flash_content}'"
         else
-          puts "DEBUG: No flash messages container found"
+          puts 'DEBUG: No flash messages container found'
         end
       end
 
@@ -200,17 +193,6 @@ module ConstituentPortal
         visit constituent_portal_application_path(application_id)
         wait_for_turbo
       end
-
-      # Debug: Print the application attributes after update
-      application = Application.find(application_id)
-      puts 'DEBUG: Application attributes after update:'
-      puts application.attributes.inspect
-
-      # Debug: Print the medical provider attributes
-      puts 'DEBUG: Medical provider attributes:'
-      puts "Name: #{application.medical_provider_name}"
-      puts "Phone: #{application.medical_provider_phone}"
-      puts "Email: #{application.medical_provider_email}"
 
       # Verify updated information is displayed correctly
       assert_text 'Household Size: 4', wait: 5

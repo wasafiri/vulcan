@@ -93,13 +93,13 @@ class EmailTemplate < ApplicationRecord
     # EvaluatorMailer Templates
     'evaluator_mailer_evaluation_submission_confirmation' => {
       description: 'Sent to a constituent confirming their evaluation was submitted.',
-      required_vars: %w[constituent_first_name application_id evaluator_full_name submission_date_formatted header_text footer_text status_box_text], # Added status_box_text based on template
+      required_vars: %w[constituent_first_name application_id evaluator_full_name submission_date_formatted header_text footer_text status_box_text],
       optional_vars: %w[title logo subtitle show_automated_message]
     },
     'evaluator_mailer_new_evaluation_assigned' => {
       description: 'Sent to an evaluator when a new evaluation is assigned to them.',
       required_vars: %w[evaluator_full_name constituent_full_name constituent_address_formatted constituent_phone_formatted
-                        constituent_email evaluators_evaluation_url header_text footer_text status_box_text constituent_disabilities_text_list], # Added status_box_text based on template
+                        constituent_email evaluators_evaluation_url header_text footer_text status_box_text constituent_disabilities_text_list],
       optional_vars: %w[title logo subtitle show_automated_message]
     },
 
@@ -175,7 +175,7 @@ class EmailTemplate < ApplicationRecord
     'training_session_notifications_trainer_assigned' => {
       description: 'Sent to a trainer when a new training session is assigned to them.',
       required_vars: %w[trainer_full_name constituent_full_name constituent_address_formatted constituent_phone_formatted
-                        constituent_email training_session_schedule_text header_text footer_text constituent_disabilities_text_list status_box_text], # Added status_box_text based on template
+                        constituent_email training_session_schedule_text header_text footer_text constituent_disabilities_text_list status_box_text],
       optional_vars: %w[title logo subtitle show_automated_message]
     },
     'training_session_notifications_training_scheduled' => {
@@ -192,12 +192,12 @@ class EmailTemplate < ApplicationRecord
     },
     'training_session_notifications_training_cancelled' => {
       description: 'Sent to a constituent when their scheduled training session is cancelled.',
-      required_vars: %w[constituent_full_name scheduled_date_time_formatted support_email header_text footer_text], # Removed application_id as it wasn't in the text template
+      required_vars: %w[constituent_full_name scheduled_date_time_formatted support_email header_text footer_text],
       optional_vars: %w[title logo subtitle show_automated_message]
     },
     'training_session_notifications_training_no_show' => { # NOTE: Mailer uses 'training_no_show' in find_by, but we use full name here
       description: 'Sent to a constituent if they are marked as a no-show for their training session.',
-      required_vars: %w[constituent_full_name scheduled_date_time_formatted support_email header_text footer_text], # Removed application_id as it wasn't in the text template
+      required_vars: %w[constituent_full_name scheduled_date_time_formatted support_email header_text footer_text],
       optional_vars: %w[title logo subtitle show_automated_message]
     }
   }.freeze

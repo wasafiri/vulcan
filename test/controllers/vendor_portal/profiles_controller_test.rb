@@ -10,7 +10,7 @@ module VendorPortal
     include AuthenticationTestHelper
 
     setup do
-      @vendor_user = create(:vendor_user, status: :pending) # Use FactoryBot to create a vendor user with pending status
+      @vendor_user = create(:vendor_user, vendor_authorization_status: :pending) # Use FactoryBot to create a vendor user with pending status
       sign_in_for_integration_test(@vendor_user) # Sign in the vendor user
       assert_authenticated(@vendor_user) # Verify authentication
     end

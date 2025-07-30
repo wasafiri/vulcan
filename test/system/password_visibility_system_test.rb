@@ -121,7 +121,7 @@ class PasswordVisibilitySystemTest < ApplicationSystemTestCase
     JAVASCRIPT
 
     # Wait for the toggle to take effect
-    sleep 0.5
+    sleep 0.1
 
     # Reload the elements to get updated attributes
     password_field = find('input#user_password')

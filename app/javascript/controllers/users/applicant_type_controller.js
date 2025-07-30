@@ -10,35 +10,33 @@ export default class extends Controller {
     // Guard against multiple connections
     if (this._connected) return;
     this._connected = true;
-    
+
     this._lastState = null; // Track last state to prevent unnecessary dispatches
     this.debouncedRefresh = createVeryShortDebounce(() => this.executeRefresh());
-    
+
     // Store bound method reference for cleanup
     this._boundGuardianPickerSelectionChange = this.guardianPickerSelectionChange.bind(this);
-    
+
     // Listen for guardian picker selection changes
     this.element.addEventListener('guardian-picker:selectionChange', this._boundGuardianPickerSelectionChange);
-    
+
     this.refresh();
     // If the guardian picker outlet is available, observe it for changes.
-    // This is an alternative to custom events if direct observation is preferred for future Stimulus versions.
-    // For now, relying on guardianPickerOutlet.selectedValue in refresh() called by other actions.
+    // Relying on guardianPickerOutlet.selectedValue in refresh() called by other actions is an alternative to custom events if direct observation is preferred for future Stimulus versions.
   }
 
   disconnect() {
     this._connected = false;
     this.debouncedRefresh?.cancel();
     this._lastState = null;
-    
+
     // Clean up event listener
     if (this._boundGuardianPickerSelectionChange) {
       this.element.removeEventListener('guardian-picker:selectionChange', this._boundGuardianPickerSelectionChange);
     }
   }
 
-  // This can be called by an action on the guardian-picker if its selection changes,
-  // or if this controller needs to react to external changes.
+  // This can be called by an action on the guardian-picker if its selection changes, or if this controller needs to react to external changes.
   guardianPickerOutletConnected(outlet, element) {
     if (process.env.NODE_ENV !== 'production') {
       console.log("ApplicantTypeController: Guardian Picker Outlet Connected");
@@ -167,7 +165,7 @@ export default class extends Controller {
 
       // Only dispatch event if the meaningful state has changed
       const currentIsDependentSelected = this.isDependentRadioChecked(); // Re-check after potential selectRadio call
-      const stateChanged = !this._lastState || 
+      const stateChanged = !this._lastState ||
         this._lastState.isDependentSelected !== currentIsDependentSelected ||
         this._lastState.guardianChosen !== guardianChosen;
 
@@ -176,7 +174,7 @@ export default class extends Controller {
           console.log("ApplicantTypeController: Dispatching applicantTypeChanged. isDependentSelected:", currentIsDependentSelected);
         }
         this.dispatch("applicantTypeChanged", { detail: { isDependentSelected: currentIsDependentSelected } });
-        
+
         // Update last state
         this._lastState = { isDependentSelected: currentIsDependentSelected, guardianChosen };
       }
@@ -209,10 +207,10 @@ export default class extends Controller {
    */
   _toggleFormFieldsDisabled(section, disabled) {
     if (!section) return;
-    
+
     // Find all form fields within the section
     const formFields = section.querySelectorAll('input, select, textarea');
-    
+
     formFields.forEach(field => {
       if (disabled) {
         field.disabled = true;

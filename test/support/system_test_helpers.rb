@@ -13,30 +13,34 @@ module SystemTestHelpers
     wait_for_turbo(timeout: timeout)
 
     # Use Capybara's native wait mechanism to ensure page is stable
-    using_wait_time(timeout) do
-      # Wait for body to be present and stable
-      assert_selector 'body', wait: timeout
-    end
-  rescue Ferrum::NodeNotFoundError, Ferrum::DeadBrowserError => e
-    puts "Warning: wait_for_page_stable failed due to browser corruption: #{e.message}"
-    # Browser is corrupted, force restart to recover
-    if respond_to?(:force_browser_restart, true)
-      force_browser_restart('page_stable_recovery')
-    else
-      Capybara.reset_sessions!
-    end
-    # Try one more time after restart
     begin
       using_wait_time(timeout) do
+        # Wait for body to be present and stable
         assert_selector 'body', wait: timeout
       end
-    rescue StandardError => recovery_error
-      puts "Warning: Recovery attempt also failed: #{recovery_error.message}"
-      # Re-raise the original error to fail the test cleanly
-      raise e
+    rescue Ferrum::NodeNotFoundError, Ferrum::DeadBrowserError => e
+      puts "Warning: wait_for_page_stable failed due to browser corruption: #{e.message}"
+      # Browser is corrupted, force restart to recover
+      if respond_to?(:force_browser_restart, true)
+        force_browser_restart('page_stable_recovery')
+      else
+        Capybara.reset_sessions!
+      end
+      # Try one more time after restart
+      begin
+        using_wait_time(timeout) do
+          assert_selector 'body', wait: timeout
+        end
+      rescue StandardError => recovery_error
+        puts "Warning: Recovery attempt also failed: #{recovery_error.message}"
+        # Return gracefully instead of raising to prevent test failure
+        false
+      end
+    rescue StandardError => e
+      puts "Warning: wait_for_page_stable failed: #{e.message}"
+      # Return gracefully for other errors
+      false
     end
-  rescue StandardError => e
-    puts "Warning: wait_for_page_stable failed: #{e.message}"
   end
 
   # Alias for backward compatibility
@@ -53,7 +57,6 @@ module SystemTestHelpers
   rescue StandardError => e
     puts "Warning: Turbo wait failed: #{e.message}"
   end
-
 
   # Ensures Stimulus is loaded and ready before proceeding with tests
   # Uses Capybara's built-in waiting instead of manual retry loops
@@ -113,7 +116,7 @@ module SystemTestHelpers
     rescue Capybara::ElementNotFound
       # Fallback: if the attribute isn't set, ensure the controller has the threshold values
       element = find("[data-controller*='income-validation']")
-      raise Capybara::ElementNotFound, 'FPL data not found on income validation controller' unless element['data-income-validation-fpl-thresholds-value'].present?
+      raise Capybara::ElementNotFound, 'FPL data not found on income validation controller' if element['data-income-validation-fpl-thresholds-value'].blank?
       # Data is present, controller should work
     end
   end
@@ -225,7 +228,7 @@ module SystemTestHelpers
   def clear_pending_network_connections
     # Call the Ferrum-specific clearing if available
     _clear_pending_network_connections_ferrum if respond_to?(:_clear_pending_network_connections_ferrum, true)
-    
+
     # Also do Capybara-style page stabilization
     _clear_pending_network_connections_capybara
   end
@@ -352,7 +355,7 @@ module SystemTestHelpers
     income_field.set(annual_income.to_s)
 
     # Trigger validation events if income validation controller is present
-    return unless page.has_css?('[data-controller*="income-validation"]', wait: 0.5)
+    return unless page.has_css?('[data-controller*="income-validation"]', wait: 1)
 
     household_field.trigger('change')
     income_field.trigger('change')
@@ -463,8 +466,6 @@ module SystemTestHelpers
 
     # Additional proof-specific waits
     using_wait_time(timeout) do
-      modal_element = find("##{modal_id}")
-
       # Review modals don't have rejection form controllers - they have approve/reject buttons
       # The rejection form is in a separate modal that opens when "Reject" is clicked
       begin

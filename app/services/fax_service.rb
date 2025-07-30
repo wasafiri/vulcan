@@ -53,7 +53,7 @@ class FaxService
     # 3. Send the fax using that URL
 
     # In production, implement S3 upload or another storage solution
-    # For now, we'll assume the PDF is already at a URL
+    # Assume the PDF is already at a URL
     media_url = options[:media_url] || "file://#{pdf_path}"
 
     # Call the regular send_fax method

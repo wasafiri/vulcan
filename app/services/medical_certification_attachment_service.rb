@@ -183,12 +183,10 @@ class MedicalCertificationAttachmentService
         NotificationService.create_and_deliver!(
           type: notification_action,
           recipient: application.user,
-          options: {
-            actor: admin,
-            notifiable: application,
-            metadata: metadata,
-            channel: :email
-          }
+          actor: admin,
+          notifiable: application,
+          metadata: metadata,
+          channel: :email
         )
       end
     end
@@ -215,7 +213,7 @@ class MedicalCertificationAttachmentService
       Rails.logger.error "Failed to record audit for failure: #{e.message}"
     end
   rescue StandardError => e
-    # Last resort logging if even the failure tracking fails
+    # Try logging if even the failure tracking fails
     Rails.logger.error "Failed to record medical certification failure: #{e.message}"
   end
 
@@ -323,15 +321,13 @@ class MedicalCertificationAttachmentService
     NotificationService.create_and_deliver!(
       type: 'medical_certification_rejected',
       recipient: params[:application].user,
-      options: {
-        actor: params[:admin],
-        notifiable: params[:application],
-        metadata: {
-          'reason' => params[:reason],
-          'notes' => params[:notes]
-        },
-        channel: :email
-      }
+      actor: params[:admin],
+      notifiable: params[:application],
+      metadata: {
+        'reason' => params[:reason],
+        'notes' => params[:notes]
+      },
+      channel: :email
     )
   end
 

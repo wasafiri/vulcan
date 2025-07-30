@@ -6,7 +6,7 @@ class ProofAttachmentServiceTest < ActiveSupport::TestCase
   include ActionDispatch::TestProcess
 
   setup do
-    # Disconnect any lingering database connections and set up Active Storage properly
+    # Disconnect any lingering database connections and set up Active Storage
     disconnect_test_database_connections
     setup_active_storage_test
 

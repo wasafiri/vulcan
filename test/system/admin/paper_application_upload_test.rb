@@ -58,9 +58,6 @@ module Admin
       # Also wait for the common sections (Application Details, etc.) to become visible
       find('[data-applicant-type-target="commonSections"]', visible: true, wait: 10)
 
-      # Additional wait to ensure Stimulus controllers have fully processed the visibility changes
-      sleep 0.5
-
       # 3. Fill in Applicant's Information (with explicit field clearing to prevent concatenation)
       within 'fieldset[data-applicant-type-target="adultSection"]' do
         find('input[name="constituent[first_name]"]').set('').set('John')
@@ -70,7 +67,7 @@ module Admin
         find('input[name="constituent[phone]"]').set('').set("202555#{timestamp[-4..]}")
         find('input[name="constituent[physical_address_1]"]').set('').set('123 Main St')
         find('input[name="constituent[city]"]').set('').set('Baltimore')
-        find('input[name="constituent[state]"]').set('').set('MD')  # This was causing MD->MDMD concatenation
+        find('input[name="constituent[state]"]').set('').set('MD') # This was causing MD->MDMD concatenation
         find('input[name="constituent[zip_code]"]').set('').set('21201')
       end
 
@@ -171,7 +168,7 @@ module Admin
       find('[data-applicant-type-target="commonSections"]', visible: true, wait: 10)
 
       # Additional wait to ensure Stimulus controllers have fully processed the visibility changes
-      sleep 0.5
+      sleep 0.1
 
       # 2. Fill constituent (adult) information using explicit field clearing to prevent concatenation
       within 'fieldset[data-applicant-type-target="adultSection"]' do
@@ -185,10 +182,10 @@ module Admin
         find('input[name="constituent[physical_address_1]"]').set('').set('123 Main St')
         find('input[name="constituent[city]"]').set('').set('Baltimore')
         find('input[name="constituent[zip_code]"]').set('').set('21201')
-        find('input[name="constituent[state]"]').set('').set('MD')  # Prevent MD->MDMD concatenation
+        find('input[name="constituent[state]"]').set('').set('MD') # Prevent MD->MDMD concatenation
       end
 
-      # Now fill in the common sections that should be visible
+      # Fill in the common sections that should be visible
       within '[data-applicant-type-target="commonSections"]' do
         # Fill in application details
         within 'fieldset', text: 'Application Details' do
@@ -238,10 +235,10 @@ module Admin
       # Use direct assignment for file input since we're testing the controller behavior not the UI
       attach_file 'income_proof', Rails.root.join('test/fixtures/files/sample.pdf')
 
-      # Now switch to reject
+      # Switch to reject
       find("input[id='reject_income_proof']", visible: :all).click
 
-      # The file input should be empty now
+      # The file input should be empty
       file_input = find("input[name='income_proof']", visible: :all)
       assert_empty file_input.value, 'File input should be cleared when switching to reject'
 
@@ -264,7 +261,7 @@ module Admin
     test 'full upload flow with valid inputs succeeds' do
       fill_in_minimum_required_fields
 
-      # Handle proof documents properly
+      # Handle proof documents
       # Income proof accept with file
       find("input[id='accept_income_proof']", visible: :all).click
       attach_file 'income_proof', Rails.root.join('test/fixtures/files/sample.pdf')

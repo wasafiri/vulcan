@@ -3,7 +3,7 @@
 class ApplicationMailbox < ActionMailbox::Base
   # Order matters: More specific routes first.
 
-  # Use lambdas with direct string comparison for robustness
+  # Use lambdas with direct string comparison
   routing lambda { |inbound_email|
     result = (inbound_email.mail.to || []).include?('medical-cert@mdmat.org')
     Rails.logger.info "MAILBOX ROUTING: medical-cert check = #{result} (to: #{inbound_email.mail.to})"

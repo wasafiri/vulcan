@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# Configure Active Storage to handle PDFs properly
+# Configure Active Storage to handle PDFs
 Rails.application.config.active_storage.content_types_allowed_inline = ['application/pdf']
 
 # Configure Active Storage to serve PDFs with proper content disposition

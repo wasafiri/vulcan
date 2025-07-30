@@ -44,7 +44,10 @@ module ConstituentPortal
       NotificationService.expects(:create_and_deliver!).with(
         type: 'training_requested',
         recipient: anything,
-        options: anything
+        actor: anything,
+        notifiable: anything,
+        metadata: anything,
+        channel: :email
       ).times(admin_count).returns(nil)
 
       # Test that the service method is called, not that notifications are actually created

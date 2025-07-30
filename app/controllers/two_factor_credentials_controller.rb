@@ -294,7 +294,7 @@ class TwoFactorCredentialsController < ApplicationController
   end
 
   def regenerate_qr_code_for_failed_setup
-    # Ensure @secret is properly validated from params or session
+    # Ensure @secret is validated from params or session
     challenge_data = TwoFactorAuth.retrieve_challenge(session)
     raw_secret = params[:secret] || challenge_data[:metadata]&.dig(:secret)
     @secret = validate_base32_secret(raw_secret) # Always validate before use

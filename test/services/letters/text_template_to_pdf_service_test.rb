@@ -61,7 +61,7 @@ module Letters
       # Call the method under test
       result = service.send(:render_template_with_variables)
 
-      # Verify that all variables were properly substituted
+      # Verify that all variables were substituted
       assert_includes result, "Hello #{@user.first_name},"
       assert_includes result, "Your username is #{@user.email}."
       assert_includes result, 'Your temporary password is SecurePassword123.'

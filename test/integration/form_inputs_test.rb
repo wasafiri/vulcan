@@ -201,7 +201,7 @@ class FormInputsTest < ActionDispatch::IntegrationTest
     assert_select "input[type='checkbox'][name*='maryland_resident']:not([checked])"
     assert_select "input[type='checkbox'][name*='self_certify_disability']:not([checked])"
 
-    # Now let's check a form with pre-checked checkboxes
+    # Check a form with pre-checked checkboxes
     # Update the user directly for disability attributes
     @user.update!(hearing_disability: true)
     # Update the application for its own attributes and set status to draft

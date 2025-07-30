@@ -64,7 +64,7 @@ module ConstituentPortal
 
     def edit
       # Initialize medical_provider_attributes with existing data for form fields
-      # Use Struct for fixed set of known attributes so Rails fields_for can properly bind
+      # Use Struct for fixed set of known attributes so Rails fields_for can bind
       medical_provider_struct = Struct.new(:name, :phone, :fax, :email)
       @application.medical_provider_attributes = medical_provider_struct.new(
         @application.medical_provider_name,
@@ -382,11 +382,9 @@ module ConstituentPortal
         NotificationService.create_and_deliver!(
           type: 'review_requested',
           recipient: admin,
-          options: {
-            actor: current_user,
-            notifiable: @application,
-            channel: :email
-          }
+          actor: current_user,
+          notifiable: @application,
+          channel: :email
         )
       end
     end

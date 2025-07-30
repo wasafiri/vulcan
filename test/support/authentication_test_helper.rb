@@ -8,7 +8,6 @@
 # – Unit/other        → sign_in_for_unit_test
 #
 # For system tests, see SystemTestAuthentication module.
-#
 module AuthenticationTestHelper
   # Include shared authentication core functionality
   include AuthenticationCore

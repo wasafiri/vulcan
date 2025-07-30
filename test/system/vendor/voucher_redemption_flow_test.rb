@@ -80,7 +80,7 @@ module VendorPortal
       # Should see success message from locale file
       assert_text 'Identity verification successful.'
 
-      # Should now be on redemption page
+      # Should be on redemption page
       assert_text 'Voucher Redemption'
       assert_text @voucher.code
 
@@ -236,13 +236,11 @@ module VendorPortal
         system_test_sign_in(@vendor)
       rescue RuntimeError => e
         # If authentication check fails but we're actually signed in, continue
-        if e.message.include?("Sign-in failed") && current_path != sign_in_path
-          debug_puts "Authentication check failed but user is signed in - continuing test"
-        else
-          raise
-        end
+        raise unless e.message.include?('Sign-in failed') && current_path != sign_in_path
+
+        debug_puts 'Authentication check failed but user is signed in - continuing test'
       end
-      
+
       visit vendor_portal_dashboard_path
       assert_text 'Vendor Dashboard'
     end

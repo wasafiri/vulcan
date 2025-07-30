@@ -2,8 +2,7 @@
 
 module Letters
   # This service converts database-stored email text templates to PDFs for printing
-  # It allows us to maintain a single source of templates (in the database)
-  # instead of separate email templates and letter HTML files
+  # It allows us to maintain a single source of templates (in the database with versioning logic)
   class TextTemplateToPdfService
     attr_reader :template_name, :format, :template, :variables, :recipient
 

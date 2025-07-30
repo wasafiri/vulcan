@@ -3,7 +3,7 @@
 # Tests for MedicalCertificationMailbox
 #
 # These tests verify that medical certification submissions via email:
-# - Are properly validated (sender, application status, attachments)
+# - Are validated (sender, application status, attachments)
 # - Process attachments correctly
 # - Create appropriate audit records
 # - Send expected notifications

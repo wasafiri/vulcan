@@ -30,7 +30,6 @@ class ApplicationStorageDecorator
   delegate :medical_certification_status, to: :application
 
   # ActiveStorage attachment accessors that avoid triggering eager loading
-
   # Direct access to attachments will use safe versions instead
   def income_proof
     self

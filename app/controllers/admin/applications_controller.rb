@@ -24,6 +24,7 @@ module Admin
     # RequestMetadataHelper: Provides standardized request metadata methods
     # Key methods: basic_request_metadata, audit_metadata, proof_submission_metadata
     include RequestMetadataHelper
+
     before_action :set_application, only: %i[
       show edit update
       request_documents review_proof update_proof_status

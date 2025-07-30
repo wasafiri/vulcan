@@ -6,7 +6,8 @@ module VendorPortal
   class InterfaceTest < ApplicationSystemTestCase
     setup do
       @vendor = create(:vendor, :approved)
-      @voucher = create(:voucher, :active)
+      @voucher = create(:voucher, :active, vendor: @vendor)
+
       system_test_sign_in(@vendor)
     end
 
@@ -155,7 +156,7 @@ module VendorPortal
 
     test 'dashboard shows appropriate alerts' do
       # Test with a pending vendor
-      @vendor.update!(status: :pending)
+      @vendor.update!(vendor_authorization_status: :pending)
 
       visit vendor_portal_dashboard_path
       clear_pending_connections_fast

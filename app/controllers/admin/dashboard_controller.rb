@@ -12,7 +12,7 @@ module Admin
 
     private
 
-    # Dashboard metrics loading is now handled by the DashboardMetricsLoading concern
+    # Dashboard metrics loading is handled in the DashboardMetricsLoading concern
 
     def calculate_training_requests
       # Try notifications first, fallback to training sessions

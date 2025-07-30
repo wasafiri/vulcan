@@ -41,22 +41,22 @@ describe("ChartToggleController", () => {
   test("toggles chart visibility when button is clicked", () => {
     // Get the controller instance that was automatically created
     const controller = application.getControllerForElementAndIdentifier(element, "chart-toggle")
-    
+
     // Chart should be hidden initially
     expect(chartElement).toHaveClass("hidden")
     expect(buttonElement.textContent.trim()).toBe("Show Chart")
-    
+
     // Manually call the toggle method
     controller.toggle()
-    
-    // Chart should now be visible
+
+    // Chart should be visible
     expect(chartElement.classList.contains("hidden")).toBe(false)
     expect(buttonElement.textContent.trim()).toBe("Hide Chart")
     expect(buttonElement.getAttribute("aria-expanded")).toBe("true")
-    
+
     // Call the toggle method again
     controller.toggle()
-    
+
     // Chart should be hidden again
     expect(chartElement.classList.contains("hidden")).toBe(true)
     expect(buttonElement.textContent.trim()).toBe("Show Chart")
@@ -66,17 +66,17 @@ describe("ChartToggleController", () => {
   test("maintains accessibility attributes when toggling", () => {
     // Initial state
     expect(buttonElement.getAttribute("aria-expanded")).toBe("false")
-    
+
     // Show chart
     buttonElement.click()
-    
+
     // Check accessibility attributes
     expect(buttonElement.getAttribute("aria-expanded")).toBe("true")
     expect(buttonElement.getAttribute("aria-controls")).toBe("monthly-totals-chart")
-    
+
     // Hide chart
     buttonElement.click()
-    
+
     // Check accessibility attributes again
     expect(buttonElement.getAttribute("aria-expanded")).toBe("false")
     expect(buttonElement.getAttribute("aria-controls")).toBe("monthly-totals-chart")

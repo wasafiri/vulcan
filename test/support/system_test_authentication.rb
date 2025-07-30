@@ -4,7 +4,7 @@ require 'timeout'
 
 # SystemTestAuthentication
 #
-# This module provides simplified and robust authentication capabilities for system tests.
+# This module provides simplified authentication capabilities for system tests.
 # It focuses on UI-based sign-in and sign-out with minimal error recovery logic.
 module SystemTestAuthentication
   extend ActiveSupport::Concern
@@ -91,14 +91,11 @@ module SystemTestAuthentication
           body: 'skip_2fa=true'
         });
       JS
-      # Wait briefly for the request to complete
-      sleep(0.1)
     end
 
     # Wait for form to be ready with more specific selectors
     assert_selector('form[action="/sign_in"]', wait: 10)
 
-    # Use a more robust form filling approach
     within('form[action="/sign_in"]') do
       fill_in 'email-input', with: user.email
       fill_in 'password-input', with: 'password123'
@@ -111,39 +108,46 @@ module SystemTestAuthentication
     # Wait for Turbo navigation to fully complete (this handles redirect chains)
     wait_for_turbo(timeout: 10)
 
-    # Check if authentication succeeded but redirect is pending
-    if current_path == sign_in_path
-      debug_puts "Current path after sign-in attempt: #{current_path}"
-      debug_puts "Page title: #{page.title}"
-      debug_puts "Page has error text: #{page.has_text?('Invalid email or password')}"
-      debug_puts "Page has flash messages: #{page.has_css?('.flash-message')}"
-      if page.has_css?('.flash-message, [role="alert"], .alert, .notice')
-        flash_text = page.find('.flash-message, [role="alert"], .alert, .notice', wait: 1).text rescue 'Could not read flash message'
-        debug_puts "Flash message text: #{flash_text}"
-        
-        # If we see "Signed in successfully", authentication worked but redirect may be delayed
-        if flash_text.include?('Signed in successfully')
-          debug_puts "Authentication succeeded, waiting for redirect..."
-          # Wait for redirect to admin dashboard
-          expected_dashboard_path = user_dashboard_path(user)
-          begin
-            # Give more time for the redirect to happen
-            using_wait_time(15) do
-              page.has_current_path?(expected_dashboard_path, wait: 15)
-            end
-            debug_puts "Successfully redirected to #{current_path}"
-          rescue Capybara::ExpectationNotMet
-            debug_puts "Redirect did not happen, manual navigation..."
-            visit expected_dashboard_path
-            wait_for_page_stable
-          end
+    # Instead of immediately checking if we're still on sign-in page,
+    # wait for either successful redirect OR flash error message to appear
+    # This handles the timing issue where redirect hasn't completed yet
+
+    expected_dashboard_path = user_dashboard_path(user)
+
+    using_wait_time(10) do # Give redirect more time to complete
+      # Wait for EITHER successful redirect OR error message
+      # This is better than checking current_path immediately
+      # Try to wait for successful redirect to dashboard
+      if page.has_current_path?(expected_dashboard_path, wait: 8)
+        # Success! Continue to dashboard verification below
+      elsif page.has_text?('Invalid email or password', wait: 2)
+        # Clear authentication failure
+        take_screenshot
+        raise "❌ Sign-in failed for #{user.email} - invalid credentials detected."
+      elsif page.has_css?('.flash-message, [role="alert"], .alert, .notice', wait: 2)
+        # Check for any flash messages (success or error)
+        flash_text = page.find('.flash-message, [role="alert"], .alert, .notice', wait: 1).text
+
+        if flash_text.include?('Signed in successfully') || flash_text.include?('signed in')
+          # Success message found, wait a bit more for redirect
+          page.has_current_path?(expected_dashboard_path, wait: 5) # Wait for redirect
         else
+          # Error message in flash
           take_screenshot
-          raise "❌ Sign-in failed for #{user.email} - still on sign-in page. Check credentials or user status."
+          raise "❌ Sign-in failed for #{user.email} - error in flash message: #{flash_text}"
         end
+      elsif current_path == sign_in_path
+        # Still on sign-in page after waiting, likely failed
+        take_screenshot
+        raise "❌ Sign-in failed for #{user.email} - still on sign-in page after waiting for redirect."
+      end
+    rescue Capybara::ElementNotFound => e
+      # Final fallback - if we're on the expected dashboard, consider it success
+      if current_path == expected_dashboard_path
+        debug_puts 'Authentication successful despite Capybara timeout - on correct dashboard'
       else
         take_screenshot
-        raise "❌ Sign-in failed for #{user.email} - still on sign-in page. Check credentials or user status."
+        raise "❌ Sign-in failed for #{user.email} - timeout waiting for redirect. Current path: #{current_path}"
       end
     end
 
@@ -153,7 +157,7 @@ module SystemTestAuthentication
       assert_current_path(verify_path, wait: 10)
       assert_selector('form', wait: 10)
       debug_puts "Successfully redirected to verification page for #{user.email}"
-    elsif current_path.match?(%r{/two_factor_authentication/verify})
+    elsif current_path&.match?(%r{/two_factor_authentication/verify})
       # Check if user has 2FA and we're on a verification page
       assert_selector('form', wait: 10)
       debug_puts "User #{user.email} has 2FA enabled, on verification page: #{current_path}"
@@ -161,17 +165,17 @@ module SystemTestAuthentication
       # For normal sign-in, we expect to be redirected to dashboard
       expected_dashboard_path = user_dashboard_path(user)
       assert_current_path(expected_dashboard_path, wait: 10)
-      
+
       # Check for appropriate dashboard heading based on user type
       dashboard_heading = case user.type
-      when 'Users::Administrator'
-        'Admin Dashboard'
-      when 'Users::Vendor'
-        'Vendor Dashboard'  
-      else
-        'Dashboard'
-      end
-      
+                          when 'Users::Administrator'
+                            'Admin Dashboard'
+                          when 'Users::Vendor'
+                            'Vendor Dashboard'
+                          else
+                            'Dashboard'
+                          end
+
       assert_selector('h1', text: dashboard_heading, wait: 10)
       wait_for_stimulus_controller('forms') if has_selector?('[data-controller*="forms"]', wait: 1)
       debug_puts "Successfully signed in as #{user.email}"
@@ -209,23 +213,23 @@ module SystemTestAuthentication
       assert_current_path(verify_path, wait: 10)
       assert_selector('form', wait: 10)
       debug_puts "Successfully redirected to verification page for #{user.email} on retry"
-    elsif current_path.match?(%r{/two_factor_authentication/verify})
+    elsif current_path&.match?(%r{/two_factor_authentication/verify})
       assert_selector('form', wait: 10)
       debug_puts "User #{user.email} has 2FA enabled, on verification page: #{current_path} on retry"
     else
       expected_dashboard_path = user_dashboard_path(user)
       assert_current_path(expected_dashboard_path, wait: 10)
-      
+
       # Check for appropriate dashboard heading based on user type
       dashboard_heading = case user.type
-      when 'Users::Administrator'
-        'Admin Dashboard'
-      when 'Users::Vendor'
-        'Vendor Dashboard'  
-      else
-        'Dashboard'
-      end
-      
+                          when 'Users::Administrator'
+                            'Admin Dashboard'
+                          when 'Users::Vendor'
+                            'Vendor Dashboard'
+                          else
+                            'Dashboard'
+                          end
+
       assert_selector('h1', text: dashboard_heading, wait: 10)
       wait_for_stimulus_controller('forms') if has_selector?('[data-controller*="forms"]', wait: 1)
       debug_puts "Successfully signed in as #{user.email} on retry"
@@ -248,8 +252,6 @@ module SystemTestAuthentication
           body: 'skip_2fa=true'
         });
       JS
-      # Wait briefly for the request to complete
-      sleep(0.1)
     end
     system_test_sign_in(user)
   end
@@ -297,8 +299,8 @@ module SystemTestAuthentication
       rescue StandardError
         # Ignore errors during manual cleanup
       end
-      # Clear the session hash manually
-      Capybara.session_pool.each_value { |session| session.instance_variable_set(:@driver, nil) }
+      # Clear sessions using the public API
+      Capybara.reset_sessions!
     rescue StandardError => e
       debug_puts "Error during session reset, continuing: #{e.message}"
     end
@@ -319,6 +321,18 @@ module SystemTestAuthentication
   end
 
   private
+
+  # Helper to wait for a redirect to a specific path, or visit it manually on timeout.
+  # This uses a waiting assertion inside a rescue block to handle timeouts gracefully,
+  # aligning with Capybara's best practices.
+  def wait_for_redirect_or_visit(path, timeout: 15)
+    assert_current_path(path, wait: timeout)
+    debug_puts "Successfully redirected to #{current_path}"
+  rescue Capybara::ExpectationNotMet
+    debug_puts "Redirect to #{path} did not happen in time, manually navigating..."
+    visit path
+    wait_for_page_stable
+  end
 
   def debug_puts(msg)
     puts msg if ENV['VERBOSE_TESTS']
@@ -421,7 +435,7 @@ module SystemTestAuthentication
     end
   end
 
-  # Robust visit method that handles pending connections gracefully
+  # Visit method that handles pending connections gracefully
   def visit_with_retry(path, max_retries: 3)
     success = false
     max_retries.times do |attempt|

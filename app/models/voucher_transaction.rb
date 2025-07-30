@@ -2,6 +2,7 @@
 
 class VoucherTransaction < ApplicationRecord
   include Groupdate
+
   belongs_to :voucher
   belongs_to :vendor, class_name: 'User'
   belongs_to :invoice, optional: true

@@ -7,15 +7,15 @@ module ConstituentPortal
   class TrainingRequestsSystemTest < ApplicationSystemTestCase
     setup do
       @constituent = create(:constituent)
-      
+
       # Create an application for the constituent
-      @application = create(:application, 
-                           user: @constituent, 
-                           status: :in_progress,
-                           household_size: 2, 
-                           annual_income: 30000,
-                           maryland_resident: true, 
-                           self_certify_disability: true)
+      @application = create(:application,
+                            user: @constituent,
+                            status: :in_progress,
+                            household_size: 2,
+                            annual_income: 30_000,
+                            maryland_resident: true,
+                            self_certify_disability: true)
 
       # Set Current.user to avoid validation errors in callbacks
       Current.user = create(:admin)

@@ -265,7 +265,7 @@ FactoryBot.define do
     phone_type { 'voice' }
     business_tax_id { "ABCDEF#{rand(100_000..999_999)}" }
     terms_accepted_at { Time.current }
-    status { :approved } # Default to an approved vendor
+    vendor_authorization_status { :approved } # Default to an approved vendor
     w9_status { :approved } # Default to W9 approved
 
     after(:create) do |vendor|
@@ -288,12 +288,12 @@ FactoryBot.define do
     end
 
     trait :pending_approval do
-      status { :pending }
+      vendor_authorization_status { :pending }
       w9_status { :pending_review }
     end
 
     trait :not_yet_submitted_w9 do
-      status { :pending }
+      vendor_authorization_status { :pending }
       w9_status { :not_submitted }
       after(:build) do |vendor|
         vendor.w9_form.detach if vendor.w9_form.attached?

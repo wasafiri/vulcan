@@ -38,7 +38,7 @@ module Admin
         # Wait for the new entry to appear native Capybara wait
         find('tr', text: 'Status Change', wait: 15)
 
-        # Now verify all the text
+        # Verify all the text
         assert_text 'Status Change'
         assert_text 'Application submitted for review'
         assert_text @admin.full_name
@@ -58,7 +58,7 @@ module Admin
       assert result[:success], "Failed to attach proof: #{result[:error]&.message}"
       @application.reload
 
-      # Now handle browser interactions
+      # Handle browser interactions
       visit admin_application_path(@application)
       wait_for_turbo
 
@@ -79,10 +79,10 @@ module Admin
       within '#proofRejectionModal' do
         # Wait for modal to be fully loaded
         assert_selector('textarea[name="rejection_reason"]', wait: 5)
-        
+
         # Manually set the proof type since the JS controller might not work in tests
         page.execute_script("document.getElementById('rejection-proof-type').value = 'income'")
-        
+
         # Click rejection reason button and wait for Stimulus to populate textarea
         assert_selector('button', text: 'Wrong Document Type', wait: 3)
         click_button 'Wrong Document Type'
@@ -93,7 +93,7 @@ module Admin
         # Submit form and wait for modal to close
         click_button 'Submit'
       end
-      
+
       # Wait for modal to disappear
       assert_no_selector '#proofRejectionModal', visible: true, wait: 10
 
@@ -107,7 +107,7 @@ module Admin
         # Wait for the new entry to appear with longer timeout
         find('tr', text: 'Admin Review', wait: 15)
 
-        # Now verify all the text
+        # Verify all the text
         assert_text 'Admin rejected Income proof - The document you submitted is not an acceptable type of income proof'
         assert_text @admin.full_name
       end
@@ -130,7 +130,7 @@ module Admin
         # Wait for the new entry to appear with longer timeout
         assert_selector('tr', text: 'Medical certification requested', wait: 15)
 
-        # Now verify all the text
+        # Verify all the text
         assert_text "Medical certification requested from #{@application.medical_provider_name}"
         assert_text @admin.full_name
       end
@@ -178,7 +178,7 @@ module Admin
         # Wait for the new entry to appear with longer timeout
         assert_selector('tr', text: 'Voucher Assigned', wait: 15)
 
-        # Now verify all the text
+        # Verify all the text
         assert_text 'Voucher Assigned'
         assert_text @admin.full_name
         assert_match(/Voucher \w+ assigned with value \$[\d,]+\.\d{2}/, page.text)

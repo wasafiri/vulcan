@@ -3,6 +3,7 @@
 module Admin
   class GuardianRelationshipsController < Admin::BaseController
     include UserServiceIntegration
+
     before_action :set_guardian, only: %i[new create]
     before_action :set_relationship, only: [:destroy]
 

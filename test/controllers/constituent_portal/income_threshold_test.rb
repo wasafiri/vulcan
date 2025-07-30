@@ -5,6 +5,7 @@ require 'test_helper'
 module ConstituentPortal
   class IncomeThresholdTest < ActionDispatch::IntegrationTest
     include AuthenticationTestHelper
+
     setup do
       # Use factory bot instead of fixture
       @user = create(:constituent)

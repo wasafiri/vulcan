@@ -9,13 +9,13 @@ import { Controller } from "@hotwired/stimulus"
 export default class extends Controller {
   connect() {
     // This controller acts as a bridge for legacy flash messages and delegates to the new global AppNotifications service.
-    // Note: Flash message processing is now handled centrally by the NotificationService on turbo:load
+    // Note: Flash message processing is handled centrally by the NotificationService on turbo:load
     // No need to duplicate processing here since NotificationService handles the rails-flash-messages script tag
   }
 
   /**
    * Handle flash events from RailsRequestService.
-   * This method now delegates to the new global AppNotifications service.
+   * This method delegates to the new global AppNotifications service.
    * @param {CustomEvent} event - The flash event
    */
   handleFlashEvent(event) {
@@ -53,7 +53,7 @@ export default class extends Controller {
 
   /**
    * Show a flash message. Delegates to AppNotifications.
-   * This method is now a wrapper for the new service.
+   * This method is a wrapper for the new service.
    * @param {string} message The message to display
    * @param {string} type The type of message (success, error, info)
    */
@@ -63,7 +63,7 @@ export default class extends Controller {
 
   /**
    * Legacy method - no longer used.
-   * Flash message processing is now handled centrally by NotificationService.
+   * Flash message processing is handled centrally by NotificationService.
    * This method is kept for backwards compatibility during transition.
    */
   processQueuedMessages() {
@@ -77,7 +77,7 @@ export default class extends Controller {
    * The methods below are retained only to satisfy existing calls during the transition phase.
    */
 
-  // These methods are now effectively no-ops or wrappers,
+  // These methods are effectively no-ops or wrappers,
   // as their functionality is handled by window.AppNotifications.
   createNotification(message, type) { /* no-op */ }
   getNotificationClasses(type) { return ''; }

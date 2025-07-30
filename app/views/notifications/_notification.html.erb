@@ -73,7 +73,7 @@
     
     <% if notification.email_tracking? %>
       <div class="mt-2 flex justify-between">
-        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <%= notification.delivery_status_badge_class %>">
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <%= delivery_status_badge_class(notification) %>">
           <%= notification.delivery_status || 'Processing' %>
         </span>
         

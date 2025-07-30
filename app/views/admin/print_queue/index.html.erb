@@ -21,7 +21,7 @@
     <h2 class="text-xl font-semibold mb-4">Pending Letters (<%= @pending_letters.count %>)</h2>
     
     <% if @pending_letters.any? %>
-      <!-- Form with data-turbo=false to ensure file download works properly -->
+      <!-- Form with data-turbo=false to ensure file download works -->
       <%= form_tag '', method: :get, id: "letters-actions-form", class: "relative", data: { turbo: false, controller: "checkbox-select-all" } do %>
         <div class="bg-white shadow-md rounded-lg overflow-hidden mb-4">
           <table class="min-w-full divide-y divide-gray-200">

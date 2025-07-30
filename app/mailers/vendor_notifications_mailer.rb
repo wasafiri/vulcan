@@ -187,10 +187,11 @@ class VendorNotificationsMailer < ApplicationMailer
   end
 
   def render_transactions_html(transactions)
-    '<table><thead><tr><th>Date</th><th>Voucher</th><th>Amount</th></tr></thead><tbody>' +
-      transactions.map do |t|
-        "<tr><td>#{t.processed_at.strftime('%Y-%m-%d')}</td><td>#{t.voucher.code}</td><td>#{number_to_currency(t.amount)}</td></tr>"
-      end.join + '</tbody></table>'
+    rows = transactions.map do |t|
+      "<tr><td>#{t.processed_at.strftime('%Y-%m-%d')}</td><td>#{t.voucher.code}</td><td>#{number_to_currency(t.amount)}</td></tr>"
+    end.join
+
+    "<table><thead><tr><th>Date</th><th>Voucher</th><th>Amount</th></tr></thead><tbody>#{rows}</tbody></table>"
   end
 
   def render_transactions_text(transactions)

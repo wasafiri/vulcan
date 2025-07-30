@@ -3,6 +3,7 @@
 module ConstituentPortal
   class DependentsController < ApplicationController
     include UserServiceIntegration
+
     before_action :authenticate_user!
     before_action :require_constituent! # Ensure only constituents can manage dependents
     before_action :set_current_user
@@ -76,7 +77,7 @@ module ConstituentPortal
       # Destroying the dependent User record itself is more complex:
       # - Only if no other guardians?
       # - Only if no applications?
-      # For now, focus on destroying the relationship from current_user's perspective.
+      # Focus on destroying the relationship from current_user's perspective.
       relationship = @dependent.guardian_relationships_as_dependent.find_by(guardian_user: current_user)
 
       if relationship&.destroy
@@ -139,7 +140,8 @@ module ConstituentPortal
                          [errors.to_s]
                        end
 
-      Rails.logger.error "Failed to create dependent: #{error_messages.join(', ')}"
+      error_prefix = Rails.env.test? ? '[TEST_VALIDATION] ' : ''
+      Rails.logger.error "#{error_prefix}Failed to create dependent: #{error_messages.join(', ')}"
 
       # Set up form variables for re-rendering
       @dependent_user ||= User.new(dependent_user_params)

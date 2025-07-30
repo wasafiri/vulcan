@@ -2,7 +2,6 @@
 
 # Helper module for managing proofs in tests
 module ProofTestHelper
-  # Clear all Current context attributes to ensure test isolation
   def clear_current_context
     Current.user = nil
     Current.proof_attachment_service_context = nil
@@ -85,8 +84,7 @@ module ProofTestHelper
 
   # Legacy method for compatibility - sets up basic attachment mocks
   def setup_attachment_mocks_for_audit_logs
-    # This is a no-op method for compatibility with existing tests
-    # Tests should use factory traits instead
+    # This is a no-op method for compatibility with existing tests. Tests should use factory traits instead
   end
 
   # Legacy method for compatibility - prepares application for testing

@@ -19,7 +19,7 @@ module Admin
       visit admin_applications_path
       assert_selector 'h1', text: 'Admin Dashboard'
 
-      # Now visit the new paper application form
+      # Visit the new paper application form
       visit new_admin_paper_application_path
 
       # Explicitly select the "Adult" radio button

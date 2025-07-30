@@ -139,7 +139,7 @@ module ConstituentPortal
       check 'I certify that I am a resident of Maryland'
       fill_in 'Household Size', with: 2
       fill_in 'Annual Income', with: 50_000
-      
+
       # Fill minimal medical provider info for draft
       within "section[aria-labelledby='medical-info-heading']" do
         fill_in 'Name', with: 'Draft Doctor'
@@ -147,11 +147,11 @@ module ConstituentPortal
         fill_in 'Email', with: 'draft@example.com'
         check 'I authorize the release and sharing of my medical information as described above'
       end
-      
+
       # Upload required documents for draft
       attach_file 'Proof of Residency', @valid_image
       attach_file 'Income Verification', @valid_pdf
-      
+
       click_button 'Save Application'
       wait_for_turbo
 

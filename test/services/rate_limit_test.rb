@@ -121,7 +121,7 @@ class RateLimitTest < ActiveSupport::TestCase
     cache_key = "rate_limit:#{@action}:#{@method}:#{@identifier}"
     Rails.cache.expects(:increment).with(cache_key, 1, has_entry(expires_in: @period_hours.hours)).returns(1)
 
-    # Now make the check, which should not raise any errors
+    # Make the check, which should not raise any errors
     assert_nothing_raised do
       RateLimit.check!(@action, @identifier, @method)
     end
@@ -171,10 +171,10 @@ class RateLimitTest < ActiveSupport::TestCase
     # Travel to after the rate limit period
     travel_to Time.current + @period_hours.hours + 1.minute
 
-    # Now mock current_usage_count to return 0 (as if expired)
+    # Mock current_usage_count to return 0 (as if expired)
     RateLimit.any_instance.stubs(:current_usage_count).returns(0)
 
-    # Check should now pass again
+    # Check should pass again
     assert_nothing_raised do
       RateLimit.check!(@action, @identifier, @method)
     end

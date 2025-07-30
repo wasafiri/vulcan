@@ -9,8 +9,8 @@ module AdminNamespace
       @admin = users(:admin_david)
       @constituent = users(:constituent_john)
       @application = create(:application, user: @constituent, status: :approved,
-                           household_size: 2, annual_income: 30000,
-                           maryland_resident: true, self_certify_disability: true)
+                                          household_size: 2, annual_income: 30_000,
+                                          maryland_resident: true, self_certify_disability: true)
 
       # Set Current.user to avoid validation errors in callbacks
       Current.user = @admin

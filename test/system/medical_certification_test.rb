@@ -22,12 +22,11 @@ class MedicalCertificationTest < ApplicationSystemTestCase
 
   # Test 1: Simple test that just verifies the certification section exists in admin view
   test 'admin can view medical certification section' do
-    # Sign in with defensive waiting
     system_test_sign_in(@admin)
     wait_for_turbo
-    
+
     visit admin_application_path(@application)
-    
+
     # Wait for page to be fully loaded
     wait_for_turbo
     wait_for_network_idle(timeout: 10) if respond_to?(:wait_for_network_idle)
@@ -38,19 +37,18 @@ class MedicalCertificationTest < ApplicationSystemTestCase
     # Verify medical provider info is displayed
     assert_text @application.medical_provider_name, wait: 10
     assert_text @application.medical_provider_phone, wait: 10
-    
+
     # Clear any pending network connections to prevent timeout during teardown
     clear_pending_network_connections if respond_to?(:clear_pending_network_connections)
   end
 
   # Test 2: Test sending a certification request
   test 'admin can send medical certification request' do
-    # Sign in with defensive waiting
     system_test_sign_in(@admin)
     wait_for_turbo
-    
+
     visit admin_application_path(@application)
-    
+
     # Wait for page to be fully loaded
     wait_for_turbo
     wait_for_network_idle(timeout: 10) if respond_to?(:wait_for_network_idle)
@@ -61,21 +59,21 @@ class MedicalCertificationTest < ApplicationSystemTestCase
     else
       click_button 'Resend Request'
     end
-    
+
     # Wait for form submission to complete
     wait_for_turbo
 
     # Check for success indicators - flexible approach that handles various flash message formats
-    if (page.has_text?('success', wait: 10) && page.has_text?('sent', wait: 5)) || 
+    if (page.has_text?('success', wait: 10) && page.has_text?('sent', wait: 5)) ||
        (page.has_text?('successfully', wait: 10) && page.has_text?('Certification', wait: 5))
       # Test passes - found success indicators
     elsif page.has_text?('error', wait: 5) || page.has_text?('failed', wait: 5)
-      flunk "Found error message on page"
+      flunk 'Found error message on page'
     else
       # Fallback - look for any success message pattern
-      assert page.has_text?(/success|sent|successfully/i, wait: 10), "Expected to find success message on page"
+      assert page.has_text?(/success|sent|successfully/i, wait: 10), 'Expected to find success message on page'
     end
-    
+
     # Clear any pending network connections to prevent timeout during teardown
     clear_pending_network_connections if respond_to?(:clear_pending_network_connections)
   end
@@ -104,24 +102,24 @@ class MedicalCertificationTest < ApplicationSystemTestCase
 
     # Visit application page
     visit constituent_portal_application_path(@application)
-    
+
     # Wait for page to be fully loaded
     wait_for_turbo
     wait_for_network_idle(timeout: 10) if respond_to?(:wait_for_network_idle)
-    
+
     # Wait for application details to fully load
     assert_text 'Application Details', wait: 15
 
     # Verify medical certification section is shown (with more flexible matching)
-    assert_text 'Medical', wait: 10  # More flexible - just look for "Medical" text
-    assert_text 'Certification', wait: 10  # Then look for "Certification" text
+    assert_text 'Medical', wait: 10 # More flexible - just look for "Medical" text
+    assert_text 'Certification', wait: 10 # Then look for "Certification" text
 
     # Verify medical provider info is displayed
     assert_text @application.medical_provider_name, wait: 10
 
     # Verify certification status
     assert_selector '.certification-status', text: 'Requested', wait: 10
-    
+
     # Clear any pending network connections to prevent timeout during teardown
     clear_pending_network_connections if respond_to?(:clear_pending_network_connections)
   end
@@ -131,13 +129,13 @@ class MedicalCertificationTest < ApplicationSystemTestCase
     # Update application directly in DB to remove email
     @application.update_columns(medical_provider_email: nil)
 
-    # Sign in as admin with defensive waiting
+    # Sign in as admin
     system_test_sign_in(@admin)
     wait_for_turbo
 
     # Visit application show page
     visit admin_application_path(@application)
-    
+
     # Wait for page to be fully loaded
     wait_for_turbo
     wait_for_network_idle(timeout: 10) if respond_to?(:wait_for_network_idle)
@@ -148,21 +146,21 @@ class MedicalCertificationTest < ApplicationSystemTestCase
     else
       click_button 'Resend Request'
     end
-    
+
     # Wait for form submission to complete
     wait_for_turbo
 
     # Look for error indicators - flexible approach that handles various error message formats
-    if (page.has_text?('Failed to process', wait: 10) && page.has_text?('certification request', wait: 5)) || 
-       (page.has_text?('Medical provider email is required', wait: 10))
+    if (page.has_text?('Failed to process', wait: 10) && page.has_text?('certification request', wait: 5)) ||
+       page.has_text?('Medical provider email is required', wait: 10)
       # Test passes - found expected error content
     elsif page.has_text?('success', wait: 5) && page.has_text?('sent', wait: 5)
-      flunk "Found success message when we expected an error"
+      flunk 'Found success message when we expected an error'
     else
       # Fallback - look for any error message pattern
-      assert page.has_text?(/error|failed|required/i, wait: 10), "Expected to find error message on page"
+      assert page.has_text?(/error|failed|required/i, wait: 10), 'Expected to find error message on page'
     end
-    
+
     # Clear any pending network connections to prevent timeout during teardown
     clear_pending_network_connections if respond_to?(:clear_pending_network_connections)
   end

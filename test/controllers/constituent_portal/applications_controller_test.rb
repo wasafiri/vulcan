@@ -392,7 +392,7 @@ module ConstituentPortal
       assert_select 'p', /Filename:/
     end
 
-    # Test FPL thresholds with a more robust, deterministic approach
+    # Test FPL thresholds with a robust, deterministic approach
     test 'should return FPL thresholds' do
       # Set up FPL policies with standard values for testing
       setup_fpl_policies
