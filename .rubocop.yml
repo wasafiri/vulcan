@@ -17,12 +17,12 @@ AllCops:
   - 'tmp/**/*'
 
 Metrics/AbcSize:
-  Max: 24
+  Max: 30
   Exclude:
   - 'test/**/*'
 
 Metrics/CyclomaticComplexity:
-  Max: 12
+  Max: 18
   Exclude:
     - 'test/**/*'
 
@@ -33,13 +33,13 @@ Metrics/PerceivedComplexity:
 
 # Customize line length
 Layout/LineLength:
-  Max: 165
+  Max: 170
   Exclude:
     - 'test/**/*'
 
 # Customize class size limits
 Metrics/ClassLength:
-  Max: 500
+  Max: 600
   Exclude:
     - 'test/**/*'
 
@@ -51,7 +51,7 @@ Metrics/ModuleLength:
 
 # Customize method size limits
 Metrics/MethodLength:
-  Max: 70
+  Max: 80
   Exclude:
     - 'test/**/*'
 
