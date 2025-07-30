@@ -8,7 +8,7 @@ module ConstituentPortal
     setup do
       # Set up FPL policies for income validation
       setup_fpl_policies
-      
+
       @constituent = create(:constituent)
       sign_in_for_integration_test(@constituent)
 

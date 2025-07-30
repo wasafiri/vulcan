@@ -13,7 +13,7 @@ module Admin
       @approved_app = create(:application, :approved)
 
       # Create applications with proofs needing review
-      @app_with_pending_proof = create(:application, 
+      @app_with_pending_proof = create(:application,
         status: 'in_progress',
         income_proof_status: 'not_reviewed',
         residency_proof_status: 'not_reviewed'
@@ -60,10 +60,10 @@ module Admin
 
     test 'common tasks section shows correct links with counts' do
       visit admin_applications_path
-      
+
       # Wait for page to fully load and authenticate
       assert_selector 'h1', text: 'Admin Dashboard', wait: 10
-      
+
       # Wait for common tasks section to be present before making assertions
       assert_selector "section[aria-labelledby='common-tasks-heading']", wait: 10
 
@@ -169,7 +169,7 @@ module Admin
 
       # Test that users can access key administrative functions
       assert_selector "a[aria-label*='paper application']"  # Can upload papers
-      assert_selector "a[aria-label*='policies']"          # Can edit policies  
+      assert_selector "a[aria-label*='policies']"          # Can edit policies
       assert_selector "a[aria-label*='products']"          # Can manage products
       assert_selector "a[aria-label*='reports']"           # Can view reports
 

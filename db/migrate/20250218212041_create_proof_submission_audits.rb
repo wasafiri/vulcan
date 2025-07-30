@@ -15,8 +15,8 @@ class CreateProofSubmissionAudits < ActiveRecord::Migration[8.0]
       t.index :submission_method
       t.index :inbound_email_id
       t.index :created_at
-      t.index [ :user_id, :created_at ], name: 'idx_proof_audits_user_created'
-      t.index [ :application_id, :created_at ], name: 'idx_proof_audits_app_created'
+      t.index %i[user_id created_at], name: 'idx_proof_audits_user_created'
+      t.index %i[application_id created_at], name: 'idx_proof_audits_app_created'
     end
   end
 end

@@ -73,11 +73,11 @@ class W9ReviewTest < ActiveSupport::TestCase
     # Use truncation strategy for this test to ensure after_commit callbacks fire
     DatabaseCleaner.strategy = :truncation
     DatabaseCleaner.clean
-    
+
     # Recreate test data since we cleaned the database
     vendor = create(:vendor, :with_w9)
     admin = create(:admin)
-    
+
     assert_equal 'pending_review', vendor.w9_status
 
     W9Review.create!(
@@ -98,11 +98,11 @@ class W9ReviewTest < ActiveSupport::TestCase
     # Use truncation strategy for this test to ensure after_commit callbacks fire
     DatabaseCleaner.strategy = :truncation
     DatabaseCleaner.clean
-    
+
     # Recreate test data since we cleaned the database
     vendor = create(:vendor, :with_w9)
     admin = create(:admin)
-    
+
     assert_equal 'pending_review', vendor.w9_status
 
     W9Review.create!(

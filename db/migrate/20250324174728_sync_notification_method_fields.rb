@@ -10,7 +10,7 @@ class SyncNotificationMethodFields < ActiveRecord::Migration[8.0]
         AND users.communication_preference = 0
         AND users.type = 'Constituent';
     SQL
-    
+
     # Remove the notification_method column as it's redundant with communication_preference
     remove_column :users, :notification_method
   end
@@ -18,7 +18,7 @@ class SyncNotificationMethodFields < ActiveRecord::Migration[8.0]
   def down
     # Add back the notification_method column if we need to roll back
     add_column :users, :notification_method, :integer
-    
+
     # Set notification_method based on communication_preference for consistency
     execute <<-SQL
       UPDATE users

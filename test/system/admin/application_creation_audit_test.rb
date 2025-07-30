@@ -112,7 +112,7 @@ module Admin
       # Verify the audit log shows the application creation
       # Wait for the audit log section to be present and populated
       assert_selector '#audit-logs'
-      
+
       # Use Capybara's intelligent waiting to wait for the specific audit log text to appear
       # This handles the timing between application submission and audit log updates
       within '#audit-logs' do

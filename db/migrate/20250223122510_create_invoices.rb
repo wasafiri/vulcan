@@ -16,8 +16,8 @@ class CreateInvoices < ActiveRecord::Migration[8.0]
       t.index :status
       t.index :invoice_number, unique: true
       t.index :payment_date
-      t.index [ :vendor_id, :status ]
-      t.index [ :start_date, :end_date ]
+      t.index %i[vendor_id status]
+      t.index %i[start_date end_date]
     end
   end
 end

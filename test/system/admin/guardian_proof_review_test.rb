@@ -7,7 +7,7 @@ module AdminTests
     setup do
       # Force a clean browser session for each test
       Capybara.reset_sessions!
-      
+
       @admin = create(:admin)
       @application = create(:application, :in_progress_with_pending_proofs, :submitted_by_guardian, :old_enough_for_new_application)
 
@@ -23,7 +23,7 @@ module AdminTests
             click_button 'Close' if has_button?('Close', wait: 1)
           end
         end
-        
+
         if has_selector?('#residencyProofReviewModal', visible: true, wait: 1)
           within('#residencyProofReviewModal') do
             click_button 'Close' if has_button?('Close', wait: 1)
@@ -33,7 +33,7 @@ module AdminTests
         # Browser might be in a bad state, reset it
         Capybara.reset_sessions!
       end
-      
+
       # Always ensure clean session state between tests
       Capybara.reset_sessions!
     end
@@ -58,7 +58,7 @@ module AdminTests
         assert_content 'Guardian Application'
         assert_content 'This application was submitted by a Guardian User (parent) on behalf of a dependent'
         assert_content 'Please verify this relationship when reviewing these proof documents'
-        
+
         # Close the modal to prevent interference with subsequent tests
         click_button 'Close'
       end
@@ -85,7 +85,7 @@ module AdminTests
         assert_content 'Guardian Application'
         assert_content 'This application was submitted by a Guardian User (parent) on behalf of a dependent'
         assert_content 'Please verify this relationship when reviewing these proof documents'
-        
+
         # Close the modal to prevent interference with subsequent tests
         click_button 'Close'
       end
@@ -94,16 +94,16 @@ module AdminTests
     test 'does not display guardian alert for non-guardian applications' do
       # Always sign in fresh for each test
       system_test_sign_in(@admin)
-      
+
       # Create a regular application (not from a guardian) with all required fields
-      regular_constituent = create(:constituent, 
+      regular_constituent = create(:constituent,
         email: "regular_test_#{Time.now.to_i}_#{rand(10_000)}@example.com",
         first_name: 'Regular',
         last_name: 'User'
       )
-      regular_application = create(:application, 
-        :in_progress_with_pending_proofs, 
-        :old_enough_for_new_application, 
+      regular_application = create(:application,
+        :in_progress_with_pending_proofs,
+        :old_enough_for_new_application,
         user: regular_constituent,
         household_size: 2,
         annual_income: 30_000,
@@ -125,17 +125,17 @@ module AdminTests
 
       # Ensure proofs are properly saved and processed
       regular_application.reload
-      
+
       visit admin_application_path(regular_application)
 
       # Wait for basic page structure first
       assert_selector 'body', wait: 5
-      
+
       # Wait for page to load completely with intelligent waiting
       # Use a more specific selector that indicates the page has fully loaded
       assert_selector 'h1', text: /Application.*Details/, wait: 15
-      
-      # Use intelligent waiting - assert_selector will wait automatically  
+
+      # Use intelligent waiting - assert_selector will wait automatically
       assert_selector '#attachments-section', wait: 10
       assert_selector '#attachments-section', text: 'Income Proof'
       assert_selector '#attachments-section', text: 'Residency Proof'

@@ -27,7 +27,7 @@ FactoryBot.define do
 
     admin do
       unique_id = SecureRandom.hex(6)
-      # Generate a valid 10-digit phone number: 555-XXX-XXXX format  
+      # Generate a valid 10-digit phone number: 555-XXX-XXXX format
       phone_suffix = (unique_id.to_i(16) % 10_000_000).to_s.rjust(7, '0')
       create(:admin,
              email: "pqi_admin_#{unique_id}@example.com",

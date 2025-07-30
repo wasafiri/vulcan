@@ -36,7 +36,7 @@ class PrintQueueItemTest < ActiveSupport::TestCase
   teardown do
     # Log test execution time for performance monitoring
     if defined?(measure_time) && @start_time
-      true 
+      true
     end
   end
 

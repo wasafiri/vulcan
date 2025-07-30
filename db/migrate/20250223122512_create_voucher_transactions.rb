@@ -17,8 +17,8 @@ class CreateVoucherTransactions < ActiveRecord::Migration[8.0]
       t.index :status
       t.index :processed_at
       t.index :reference_number
-      t.index [ :vendor_id, :status ]
-      t.index [ :voucher_id, :transaction_type ]
+      t.index %i[vendor_id status]
+      t.index %i[voucher_id transaction_type]
     end
   end
 end

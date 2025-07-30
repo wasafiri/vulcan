@@ -10,10 +10,10 @@ module Admin
       @admin = create(:admin)
       @vendor = users(:vendor_ray) # Use seeded vendor
       @vendor2 = users(:vendor_teltex) # Use second seeded vendor
-      
+
       # Create invoices with dates far in the past to avoid overlap with existing data
-      @invoice = create(:invoice, :pending, :with_transactions, 
-                       vendor: @vendor, 
+      @invoice = create(:invoice, :pending, :with_transactions,
+                       vendor: @vendor,
                        start_date: 1.year.ago.beginning_of_day,
                        end_date: 50.weeks.ago.end_of_day,
                        transaction_count: 1,

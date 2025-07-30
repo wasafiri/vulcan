@@ -8,7 +8,7 @@ module VendorPortal
       setup_fpl_policies
 
       # Create an approved vendor user
-      @vendor_user = create(:vendor, :approved, 
+      @vendor_user = create(:vendor, :approved,
                             email_verified: true,
                             phone: '555-123-4567',
                             phone_type: 'voice',

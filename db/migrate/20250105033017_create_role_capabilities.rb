@@ -6,6 +6,6 @@ class CreateRoleCapabilities < ActiveRecord::Migration[8.0]
       t.timestamps
     end
 
-    add_index :role_capabilities, [ :user_id, :capability ], unique: true
+    add_index :role_capabilities, %i[user_id capability], unique: true
   end
 end

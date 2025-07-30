@@ -208,7 +208,7 @@ module Admin
           puts "=== DEBUG: Current URL after visit: #{current_url_value}"
           puts "=== DEBUG: Page title: #{page.title rescue 'ERROR GETTING TITLE'}"
           puts "=== DEBUG: Has sign-in form?: #{has_selector?('form[action="/sign_in"]', wait: 1)}"
-          
+
           # If browser is completely corrupted (about:blank), force full restart
           if current_url_value == 'about:blank' || current_url_value == 'ERROR_GETTING_URL'
             puts "=== DEBUG: Browser completely corrupted, forcing restart"
@@ -222,8 +222,8 @@ module Admin
             visit_with_retry(admin_application_path(@application), max_retries: 2)
             wait_for_turbo
           end
-          
-          # Ensure we're on the right page 
+
+          # Ensure we're on the right page
           assert_selector 'h1#application-title', wait: 15
 
           # Wait for attachments section to be present

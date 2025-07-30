@@ -56,10 +56,10 @@ module Admin
     test 'admin can approve a medical certification during upload' do
       @application.update!(medical_certification_status: 'requested')
       visit admin_application_path(@application)
-      
+
       # Wait for page to be fully loaded
       wait_for_turbo
-      
+
       # Ensure the form is present before interacting
       assert_selector '[data-testid="medical-certification-upload-form"]', wait: 10
 
@@ -71,13 +71,13 @@ module Admin
 
       # Wait for form submission to complete
       wait_for_turbo
-      
+
       assert_text 'Medical certification successfully uploaded and approved', wait: 10
       @application.reload
       assert @application.medical_certification.attached?, 'Medical certification file should be attached'
       assert_equal 'approved', @application.medical_certification_status
       assert_audit_event('medical_certification_status_changed', actor: @admin, auditable: @application)
-      
+
       # Clear any pending network connections to prevent timeout during teardown
       clear_pending_network_connections if respond_to?(:clear_pending_network_connections)
     end
@@ -85,10 +85,10 @@ module Admin
     test 'admin can reject a medical certification without uploading' do
       @application.update!(medical_certification_status: 'requested')
       visit admin_application_path(@application)
-      
+
       # Wait for page to be fully loaded
       wait_for_turbo
-      
+
       # Ensure the form is present before interacting
       assert_selector '[data-testid="medical-certification-upload-form"]', wait: 10
 
@@ -102,13 +102,13 @@ module Admin
 
       # Wait for form submission to complete
       wait_for_turbo
-      
+
       assert_text 'Medical certification rejected and provider notified', wait: 10
       @application.reload
       assert_equal 'rejected', @application.medical_certification_status
       assert_equal 'missing_information', @application.medical_certification_rejection_reason
       assert_audit_event('medical_certification_status_changed', actor: @admin, auditable: @application)
-      
+
       # Clear any pending network connections to prevent timeout during teardown
       clear_pending_network_connections if respond_to?(:clear_pending_network_connections)
     end
@@ -118,10 +118,10 @@ module Admin
     test 'admin sees error when trying to approve without a file' do
       @application.update!(medical_certification_status: 'requested')
       visit admin_application_path(@application)
-      
+
       # Wait for page to be fully loaded
       wait_for_turbo
-      
+
       # Ensure the form is present before interacting
       assert_selector '[data-testid="medical-certification-upload-form"]', wait: 10
 
@@ -135,14 +135,14 @@ module Admin
 
       # Wait for any request processing to complete
       wait_for_turbo
-      
+
       # Verify error message is displayed
       assert_text 'Please select a file to upload', wait: 10
 
       # Verify status remained 'requested'
       @application.reload
       assert_equal 'requested', @application.medical_certification_status
-      
+
       # Clear any pending network connections to prevent timeout during teardown
       clear_pending_network_connections if respond_to?(:clear_pending_network_connections)
     end
@@ -150,10 +150,10 @@ module Admin
     test 'admin sees error when trying to reject without a reason' do
       @application.update!(medical_certification_status: 'requested')
       visit admin_application_path(@application)
-      
+
       # Wait for page to be fully loaded
       wait_for_turbo
-      
+
       # Ensure the form is present before interacting
       assert_selector '[data-testid="medical-certification-upload-form"]', wait: 10
 
@@ -167,14 +167,14 @@ module Admin
 
       # Wait for any request processing to complete
       wait_for_turbo
-      
+
       # Verify error message is displayed
       assert_text 'Please select a rejection reason', wait: 10
 
       # Verify status remained 'requested'
       @application.reload
       assert_equal 'requested', @application.medical_certification_status
-      
+
       # Clear any pending network connections to prevent timeout during teardown
       clear_pending_network_connections if respond_to?(:clear_pending_network_connections)
     end

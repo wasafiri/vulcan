@@ -18,7 +18,7 @@ class CreateVouchers < ActiveRecord::Migration[8.0]
       t.index :code, unique: true
       t.index :status
       t.index :issued_at
-      t.index [ :vendor_id, :status ]
+      t.index %i[vendor_id status]
     end
   end
 end

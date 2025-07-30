@@ -7,7 +7,7 @@ module Applications
     setup do
       # Set up FPL policies for income validation
       setup_fpl_policies
-      
+
       @admin = create(:admin)
       @guardian = create(:constituent, email: 'guardian@example.com')
     end

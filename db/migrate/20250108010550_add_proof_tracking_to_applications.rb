@@ -18,16 +18,16 @@ class AddProofTrackingToApplications < ActiveRecord::Migration[8.0]
     add_column :applications, :needs_review_since, :datetime
 
     # Add indexes for common queries
-    add_index :proof_reviews, [ :application_id, :proof_type, :created_at ]
-    add_index :proof_reviews, [ :admin_id, :created_at ]
+    add_index :proof_reviews, %i[application_id proof_type created_at]
+    add_index :proof_reviews, %i[admin_id created_at]
     add_index :proof_reviews, :status
     add_index :proof_reviews, :reviewed_at
-    add_index :proof_reviews, [ :application_id, :proof_type, :status ]
+    add_index :proof_reviews, %i[application_id proof_type status]
 
     # Indexes for applications table
     add_index :applications, :needs_review_since
     add_index :applications, :last_proof_submitted_at
     add_index :applications, :total_rejections
-    add_index :applications, [ :status, :needs_review_since ]
+    add_index :applications, %i[status needs_review_since]
   end
 end

@@ -293,10 +293,10 @@ class TwoFactorAuthenticationFlowTest < ApplicationSystemTestCase
     puts "=== DEBUG: User verified: #{@user.verified}"
     puts "=== DEBUG: User valid?: #{@user.valid?}"
     puts "=== DEBUG: User errors: #{@user.errors.full_messages}" unless @user.valid?
-    
+
     # Ensure user is properly saved and reloaded
     @user.reload
-    
+
     system_test_sign_in(@user)
 
     # Complete 2FA authentication to get to profile page

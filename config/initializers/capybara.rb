@@ -55,9 +55,9 @@ if Rails.env.test?
 
     # Enable aria-label support
     config.enable_aria_label = true
-    
+
     # Configure test_id for cleaner element finding (following writeup best practices)
-    config.test_id = "data-testid"
+    config.test_id = 'data-testid'
 
     # Save path for Capybara screenshots
     config.save_path = Rails.root.join('tmp/capybara')

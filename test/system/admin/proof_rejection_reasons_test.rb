@@ -7,7 +7,7 @@ module Admin
     setup do
       # Force a clean browser session for each test
       Capybara.reset_sessions!
-      
+
       setup_fpl_policies
 
       @admin = create(:admin)
@@ -40,13 +40,13 @@ module Admin
             click_button 'Cancel' if has_button?('Cancel', wait: 1)
           end
         end
-        
+
         if has_selector?('#incomeProofReviewModal', visible: true, wait: 1)
           within('#incomeProofReviewModal') do
             click_button 'Close' if has_button?('Close', wait: 1)
           end
         end
-        
+
         if has_selector?('#residencyProofReviewModal', visible: true, wait: 1)
           within('#residencyProofReviewModal') do
             click_button 'Close' if has_button?('Close', wait: 1)
@@ -56,7 +56,7 @@ module Admin
         # Browser might be in a bad state, reset it
         Capybara.reset_sessions!
       end
-      
+
       # Always ensure clean session state between tests
       Capybara.reset_sessions!
     end
@@ -98,7 +98,7 @@ module Admin
         assert_selector "button[data-reason-type='missingAmount']", text: 'Missing Amount'
         assert_selector "button[data-reason-type='exceedsThreshold']", text: 'Income Exceeds Threshold'
         assert_selector "button[data-reason-type='outdatedSsAward']", text: 'Outdated SS Award Letter'
-        
+
         # Close the modal to prevent interference with subsequent tests
         click_button 'Cancel'
       end
@@ -141,7 +141,7 @@ module Admin
         assert_selector "button[data-reason-type='missingAmount']", visible: false
         assert_selector "button[data-reason-type='exceedsThreshold']", visible: false
         assert_selector "button[data-reason-type='outdatedSsAward']", visible: false
-        
+
         # Close the modal to prevent interference with subsequent tests
         click_button 'Cancel'
       end
@@ -171,12 +171,12 @@ module Admin
 
         # Wait for textarea to be populated - use intelligent waiting
         assert_selector("textarea[name='rejection_reason']")
-        
+
         # Verify the field gets populated with the expected content
         reason_field = find("textarea[name='rejection_reason']")
         assert reason_field.value.present?, 'Rejection reason field should be populated'
         assert_includes reason_field.value, 'does not show your name'
-        
+
         # Close the modal to prevent interference with subsequent tests
         click_button 'Cancel'
       end
@@ -208,7 +208,7 @@ module Admin
 
         # Wait for the textarea to be populated after button click
         assert_selector("textarea[name='rejection_reason']")
-        
+
         # Verify field is populated, then modify it
         reason_field = find("textarea[name='rejection_reason']")
         assert reason_field.value.present?, 'Field should be populated before modification'
@@ -219,7 +219,7 @@ module Admin
 
         # Verify the custom message was set correctly
         assert_equal custom_message, reason_field.value
-        
+
         # Close the modal to prevent interference with subsequent tests
         click_button 'Cancel'
       end

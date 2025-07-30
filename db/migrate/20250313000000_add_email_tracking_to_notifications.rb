@@ -4,7 +4,7 @@ class AddEmailTrackingToNotifications < ActiveRecord::Migration[8.0]
     add_column :notifications, :delivery_status, :string
     add_column :notifications, :delivered_at, :datetime
     add_column :notifications, :opened_at, :datetime
-    
+
     add_index :notifications, :message_id
   end
 end

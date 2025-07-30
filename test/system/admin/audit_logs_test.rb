@@ -7,7 +7,7 @@ module Admin
     setup do
       # Force a clean browser session for each test
       Capybara.reset_sessions!
-      
+
       @admin = users(:admin_david)
 
       # Create application with explicit attributes to ensure it exists
@@ -46,7 +46,7 @@ module Admin
             click_button 'Close' if has_button?('Close', wait: 1)
           end
         end
-        
+
         if has_selector?('#residencyProofReviewModal', visible: true, wait: 1)
           within('#residencyProofReviewModal') do
             click_button 'Close' if has_button?('Close', wait: 1)
@@ -56,10 +56,10 @@ module Admin
         # Browser might be in a bad state, reset it
         Capybara.reset_sessions!
       end
-      
+
       # Restore original environment variables
       ENV['MAILER_HOST'] = @original_mailer_host
-      
+
       # Always ensure clean session state between tests
       Capybara.reset_sessions!
     end
