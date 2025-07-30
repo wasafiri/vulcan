@@ -4,11 +4,11 @@ namespace :test do
   desc 'Compile assets for testing'
   task compile_assets: :environment do
     puts 'Compiling CSS assets for tests...'
-    system('npm run build:css') || raise('Failed to compile CSS assets')
+    system('yarn build:css') || raise('Failed to compile CSS assets')
     puts 'CSS assets compiled successfully!'
 
     puts 'Compiling JavaScript assets for tests...'
-    system('npm run build') || raise('Failed to compile JavaScript assets')
+    system('yarn build') || raise('Failed to compile JavaScript assets')
     puts 'JavaScript assets compiled successfully!'
   end
 
