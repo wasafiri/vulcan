@@ -96,7 +96,7 @@ jobs:
         run: bin/rails db:setup
         
       - name: Run tests
-        run: bin/rails test test:system test
+        run: bin/rails test:all
         
       - name: Upload test artifacts
         if: failure()
