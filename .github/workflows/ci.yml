@@ -1,22 +1,33 @@
-name: CI
+name: Rails CI Pipeline
 
 on:
-  pull_request:
   push:
-    branches: [ main ]
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  RAILS_ENV: test
+  POSTGRES_DB: mat_vulcan_test
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+  DATABASE_URL: postgres://postgres:postgres@localhost:5432/mat_vulcan_test
+  NODE_VERSION: '22.12.0'
 
 jobs:
-  scan_ruby:
+  security_scan:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: .ruby-version
           bundler-cache: true
-      - name: Scan for common Rails security vulnerabilities using static analysis
+          
+      - name: Run Brakeman security scan
         run: bin/brakeman --no-pager
 
   lint:
@@ -24,32 +35,26 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: .ruby-version
           bundler-cache: true
-      - name: Lint code for consistent style
+          
+      - name: Run RuboCop
         run: bin/rubocop -f github
 
-  test:
-    runs-on: ubuntu-22.04
-    env:
-      RAILS_ENV: test
-      DATABASE_USERNAME: postgres
-      DATABASE_PASSWORD: postgres
-      # Browser stability environment variables
-      CHROME_NO_SANDBOX: true
-      DISPLAY: :99.0
+  tests:
+    runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:17
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: vulcan_test
-        ports:
-          - 5432:5432
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        ports: ['5432:5432']
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -57,39 +62,42 @@ jobs:
           --health-retries 5
 
     steps:
-      - name: Install packages
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y build-essential git libpq-dev node-gyp pkg-config python-is-python3 google-chrome-stable xvfb
-
-      - name: Setup virtual display for headless browser
-        run: |
-          export DISPLAY=:99.0
-          Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
-
       - name: Checkout code
         uses: actions/checkout@v4
-
+        
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: .ruby-version
           bundler-cache: true
-
-      - name: Setup Database
-        run: |
-          bin/rails db:test:prepare
-
-      - name: Seed test database for system tests
-        run: |
-          RAILS_ENV=test bin/rails db:seed
-
-      - name: Run tests
-        run: |
-          bin/rails test test:system
-
-      - name: Keep screenshots from failed system tests
-        uses: actions/upload-artifact@v4
-        if: failure()
+          
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          name: screenshots
-          path: ${{ github.workspace }}/tmp/screenshots
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'yarn'
+          
+      - name: Install JS dependencies
+        run: yarn install --frozen-lockfile
+        
+      - name: Build assets
+        run: |
+          mkdir -p app/assets/builds
+          yarn run build
+          yarn run build:css
+        
+      - name: Database setup
+        run: bin/rails db:setup
+        
+      - name: Run tests
+        run: bin/rails test test:system test
+        
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts
+          path: |
+            ${{ github.workspace }}/tmp/screenshots
+            ${{ github.workspace }}/tmp/screenshots_failures
           if-no-files-found: ignore
