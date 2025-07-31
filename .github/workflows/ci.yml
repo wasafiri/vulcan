@@ -11,7 +11,7 @@ env:
   POSTGRES_DB: mat_vulcan_test
   POSTGRES_USER: postgres
   POSTGRES_PASSWORD: postgres
-  DATABASE_URL: postgres://postgres:postgres@localhost:5432/mat_vulcan_test
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mat_vulcan_test
   NODE_VERSION: '22.12.0'
 
 jobs:
