@@ -3,7 +3,7 @@
 require 'test_helper'
 
 module ConstituentPortal
-  class IncomeThresholdTest < ActionDispatch::IntegrationTest
+  class IncomeThresholdControllerTest < ActionDispatch::IntegrationTest
     include AuthenticationTestHelper
 
     setup do
