@@ -85,7 +85,7 @@ class ProofAttachmentMetricsJobTest < ActiveJob::TestCase
 
     # Should create notifications for all administrators
     expected_notifications = User.where(type: 'Users::Administrator').count
-    assert expected_notifications > 0, 'Should have administrators to notify'
+    assert expected_notifications.positive?, 'Should have administrators to notify'
     assert_equal expected_notifications, Notification.count, 'Should create one notification per administrator'
 
     # Check that each notification has the correct content
@@ -158,7 +158,7 @@ class ProofAttachmentMetricsJobTest < ActiveJob::TestCase
     assert_equal 0, Notification.count, 'Should not create notifications when failures below threshold'
   end
 
-  test "creates notifications when failure count meets threshold with poor success rate" do
+  test 'creates notifications when failure count meets threshold with poor success rate' do
     # Clear all events and notifications for a clean slate
     Event.delete_all
     Notification.delete_all
@@ -183,20 +183,18 @@ class ProofAttachmentMetricsJobTest < ActiveJob::TestCase
 
     # Create fewer successful events to ensure success rate < 95%
     # 5 failures + 1 success = 16.7% success rate (well below 95%)
-    1.times do |i|
-      Event.create!(
-        action: 'income_proof_attached',
-        user: @application.user,
-        auditable: @application,
-        metadata: {
-          proof_type: 'income',
-          submission_method: 'web',
-          success: true,
-          timestamp: (base_time - ((i + 10) * 2).minutes).iso8601
-        },
-        created_at: base_time - ((i + 10) * 2).minutes
-      )
-    end
+    Event.create!(
+      action: 'income_proof_attached',
+      user: @application.user,
+      auditable: @application,
+      metadata: {
+        proof_type: 'income',
+        submission_method: 'web',
+        success: true,
+        timestamp: (base_time - ((0 + 10) * 2).minutes).iso8601
+      },
+      created_at: base_time - ((0 + 10) * 2).minutes
+    )
 
     # Run the job - should create notifications since failures (5) >= threshold (5) AND success rate < 95%
     ProofAttachmentMetricsJob.perform_now

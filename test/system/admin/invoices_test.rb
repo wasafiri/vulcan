@@ -19,14 +19,14 @@ module Admin
                         transaction_count: 1,
                         amount_per_transaction: 99.99)
       @pending_invoice = create(:invoice, :pending, vendor: @vendor2,
-                               start_date: 48.weeks.ago.beginning_of_day,
-                               end_date: 46.weeks.ago.end_of_day)
+                                 start_date: 48.weeks.ago.beginning_of_day,
+                                 end_date: 46.weeks.ago.end_of_day)
       @approved_invoice = create(:invoice, :approved, vendor: @vendor,
-                                start_date: 44.weeks.ago.beginning_of_day,
-                                end_date: 42.weeks.ago.end_of_day)
+                                  start_date: 44.weeks.ago.beginning_of_day,
+                                  end_date: 42.weeks.ago.end_of_day)
       @paid_invoice = create(:invoice, :paid, vendor: @vendor2,
-                            start_date: 40.weeks.ago.beginning_of_day,
-                            end_date: 38.weeks.ago.end_of_day)
+                             start_date: 40.weeks.ago.beginning_of_day,
+                             end_date: 38.weeks.ago.end_of_day)
       sign_in(@admin)
     end
 

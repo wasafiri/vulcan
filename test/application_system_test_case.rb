@@ -422,7 +422,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
 
   # Reduced parallelism for system tests to improve browser stability
   # Use fewer workers in CI environments to reduce resource contention
-  default_workers = (ENV['CI'] || ENV['HEROKU_TEST_RUN_ID']) ? 2 : 4
+  default_workers = ENV['CI'] || ENV['HEROKU_TEST_RUN_ID'] ? 2 : 4
   parallelize(workers: ENV.fetch('SYSTEM_TEST_WORKERS', default_workers).to_i, with: :processes)
 
   # Database cleaning strategy for system tests

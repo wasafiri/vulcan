@@ -57,7 +57,7 @@ module ConstituentPortal
       assert_equal 'Training request submitted. An administrator will contact you to schedule your session.',
                    flash[:notice]
 
-      # Note: Notification details are not verified here because we're mocking the NotificationService
+      # NOTE: Notification details are not verified here because we're mocking the NotificationService
       # The actual notification creation is tested by verifying the service calls above
     end
 

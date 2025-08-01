@@ -3,6 +3,12 @@
 require 'test_helper'
 
 class ActiveStorageValidatableTest < ActiveSupport::TestCase
+  # Define a Struct for file params outside the test block to avoid constant definition in block
+  FileParams = Struct.new(:blank?, :content_type, :byte_size) do
+    # Alias byte_size to size to match the expected interface
+    alias_method :size, :byte_size
+  end
+
   # Create a simple test model that includes the concern
   class TestModel
     include ActiveModel::Model
@@ -10,18 +16,20 @@ class ActiveStorageValidatableTest < ActiveSupport::TestCase
     include ActiveModel::Validations
     include ActiveStorageValidatable
 
+    # Define a Struct for attachment doubles
+    AttachmentDouble = Struct.new(:attached?, :content_type, :byte_size) do
+      # ActiveStorage attachments use byte_size method
+      # No alias needed since the concern already calls byte_size
+    end
+
     attr_accessor :test_attachment
 
     def initialize
-      @test_attachment = OpenStruct.new(attached?: false)
+      @test_attachment = AttachmentDouble.new(false, nil, nil)
     end
 
     def attach_file(content_type:, size:)
-      @test_attachment = OpenStruct.new(
-        attached?: true,
-        content_type: content_type,
-        byte_size: size
-      )
+      @test_attachment = AttachmentDouble.new(true, content_type, size)
     end
   end
 
@@ -65,29 +73,17 @@ class ActiveStorageValidatableTest < ActiveSupport::TestCase
 
   test 'class method validates file params correctly' do
     # Test valid file
-    valid_file = OpenStruct.new(
-      blank?: false,
-      content_type: 'application/pdf',
-      size: 2.megabytes
-    )
+    valid_file = FileParams.new(false, 'application/pdf', 2.megabytes)
     errors = TestModel.validate_file_params(valid_file)
     assert_empty errors
 
     # Test invalid content type
-    invalid_file = OpenStruct.new(
-      blank?: false,
-      content_type: 'application/exe',
-      size: 2.megabytes
-    )
+    invalid_file = FileParams.new(false, 'application/exe', 2.megabytes)
     errors = TestModel.validate_file_params(invalid_file)
     assert_includes errors, 'Invalid file type. Please upload a PDF or an image file (jpg, jpeg, png, tiff, bmp).'
 
     # Test file too large
-    large_file = OpenStruct.new(
-      blank?: false,
-      content_type: 'application/pdf',
-      size: 10.megabytes
-    )
+    large_file = FileParams.new(false, 'application/pdf', 10.megabytes)
     errors = TestModel.validate_file_params(large_file)
     assert_includes errors, 'File is too large. Maximum size allowed is 5MB.'
 

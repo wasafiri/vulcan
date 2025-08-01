@@ -109,7 +109,7 @@ module Admin
 
         # Debug: Check if we need to authenticate
         if has_selector?('form[action="/sign_in"]', wait: 2)
-          puts "=== DEBUG: Need to re-authenticate"
+          puts '=== DEBUG: Need to re-authenticate'
           system_test_sign_in(@admin)
           visit admin_application_path(@application)
           wait_for_turbo

@@ -99,8 +99,7 @@ module AdminTests
       regular_constituent = create(:constituent,
                                    email: "regular_test_#{Time.now.to_i}_#{rand(10_000)}@example.com",
                                    first_name: 'Regular',
-                                   last_name: 'User'
-      )
+                                   last_name: 'User')
       regular_application = create(:application,
                                    :in_progress_with_pending_proofs,
                                    :old_enough_for_new_application,
@@ -108,8 +107,7 @@ module AdminTests
                                    household_size: 2,
                                    annual_income: 30_000,
                                    maryland_resident: true,
-                                   self_certify_disability: true
-      )
+                                   self_certify_disability: true)
 
       # Manually attach proofs since the factory trait isn't working
       regular_application.income_proof.attach(
@@ -133,7 +131,7 @@ module AdminTests
 
       # Wait for page to load completely with intelligent waiting
       # Use a more specific selector that indicates the page has fully loaded
-      assert_selector 'h1', text: /Application.*Details/, wait: 15
+      assert_selector 'h1#application-title', wait: 15
 
       # Use intelligent waiting - assert_selector will wait automatically
       assert_selector '#attachments-section', wait: 10

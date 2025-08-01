@@ -281,14 +281,14 @@ class InboundEmailProcessingTest < ActionDispatch::IntegrationTest
       )
     end
 
-    unless EmailTemplate.exists?(name: 'email_footer_text', format: :text)
-      EmailTemplate.create!(
-        name: 'email_footer_text',
-        format: :text,
-        subject: 'Footer Template',
-        body: "\n\nThank you,\nThe MAT Team\nContact: %<contact_email>s",
-        description: 'Standard email footer partial.'
-      )
-    end
+    return if EmailTemplate.exists?(name: 'email_footer_text', format: :text)
+
+    EmailTemplate.create!(
+      name: 'email_footer_text',
+      format: :text,
+      subject: 'Footer Template',
+      body: "\n\nThank you,\nThe MAT Team\nContact: %<contact_email>s",
+      description: 'Standard email footer partial.'
+    )
   end
 end

@@ -157,8 +157,10 @@ module Admin
       assert_selector 'h1#application-title', wait: 10
 
       # Use intelligent waiting - assert_selector will wait automatically
-      assert_selector('button[data-modal-id="incomeProofReviewModal"]', wait: 10)
-      find('button[data-modal-id="incomeProofReviewModal"]').click
+      assert_selector('button[data-modal-id="incomeProofReviewModal"]', wait: 15)
+      # Use a fresh find to avoid stale element references
+      modal_button = find('button[data-modal-id="incomeProofReviewModal"]', wait: 10)
+      modal_button.click
 
       within('#incomeProofReviewModal') do
         click_button 'Reject'

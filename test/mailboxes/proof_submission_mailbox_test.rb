@@ -331,7 +331,7 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
   # ===========================================================
   # Safely retrieves the most recent event for debugging purposes
   # Includes error handling to prevent test failures from event retrieval issues
-  def get_latest_event
+  def fetch_latest_event
     Event.order(created_at: :desc).first
   rescue StandardError => e
     puts "Error retrieving latest event: #{e.message}"
@@ -359,7 +359,7 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
     Event.expects(:create!).with(has_entry(action: 'proof_submission_processed')).once
 
     # Track performance for optimization
-        # No bounce expected here - email should process successfully
+    # No bounce expected here - email should process successfully
     assert_nothing_raised do
       result = safe_receive_email(
         to: MatVulcan::InboundEmailConfig.inbound_email_address,
@@ -388,7 +388,7 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
   # 4. Verify that :bounce is thrown (indicating proper bounce handling)
   # 5. Verify notification email is sent to inform sender
   test 'bounces email from unknown sender' do
-        # We need to stub the Event creation completely to avoid FK violations and focus on the bounce behavior
+    # We need to stub the Event creation completely to avoid FK violations and focus on the bounce behavior
     Event.stubs(:create!).returns(true)
 
     # In a bounce scenario, we need to verify that:
@@ -428,7 +428,7 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
   # 4. Send email from constituent without active application
   # 5. Verify bounce occurs and proper audit event is created
   test 'bounces email from constituent without active application' do
-        # Create a constituent without an active application using FactoryBot
+    # Create a constituent without an active application using FactoryBot
     # Use a unique email to prevent conflicts with other tests
     unique_email = "mark.smith.#{SecureRandom.hex(4)}@example.com"
     constituent_without_app = create(:constituent, email: unique_email)
@@ -455,8 +455,8 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
       )
 
       # Verify the correct audit event was created
-      latest_event = get_latest_event
-      assert_equal 'proof_submission_inactive_application', latest_event&.action
+      event_record = fetch_latest_event
+      assert_equal 'proof_submission_inactive_application', event_record&.action
     end
   end
 
@@ -470,7 +470,7 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
   # 3. Verify bounce occurs due to missing attachments
   # 4. Verify proper audit event is created
   test 'bounces email without attachments' do
-        # First, ensure the mail object is correctly delivered before the bounce
+    # First, ensure the mail object is correctly delivered before the bounce
     mail_double = mock('Mail')
     mail_double.expects(:deliver_now).returns(true)
     ApplicationNotificationsMailer.expects(:proof_submission_error).returns(mail_double)
@@ -485,8 +485,8 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
       )
 
       # Verify the correct audit event was created
-      latest_event = get_latest_event
-      assert_equal 'proof_submission_no_attachments', latest_event&.action
+      event_record = fetch_latest_event
+      assert_equal 'proof_submission_no_attachments', event_record&.action
     end
   end
 
@@ -501,7 +501,7 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
   # 4. Verify bounce occurs due to max rejections policy
   # 5. Verify proper audit event is created
   test 'bounces email when max rejections reached' do
-        # Update the application to have max rejections
+    # Update the application to have max rejections
     max_rejections = 3 # Use the value we set up in the setup method
     @application.update_columns(total_rejections: max_rejections) # Use update_columns to bypass callbacks
 
@@ -527,8 +527,8 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
       end
 
       # Verify the correct audit event was created
-      latest_event = get_latest_event
-      assert_equal 'proof_submission_max_rejections_reached', latest_event&.action
+      event_record = fetch_latest_event
+      assert_equal 'proof_submission_max_rejections_reached', event_record&.action
     end
   end
 
@@ -748,7 +748,7 @@ class ProofSubmissionMailboxTest < ActionMailbox::TestCase
     ProofSubmissionMailbox.any_instance.stubs(:validate_attachments).returns(true)
     ProofSubmissionMailbox.any_instance.stubs(:attach_proof).returns(true)
 
-        # Expect proper audit event creation for multiple attachments
+    # Expect proper audit event creation for multiple attachments
     Event.expects(:create!).with(has_entry(action: 'proof_submission_received')).once
     Event.expects(:create!).with(has_entry(action: 'proof_submission_processed')).once
 

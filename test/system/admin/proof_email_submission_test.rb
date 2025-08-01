@@ -188,7 +188,7 @@ module Admin
 
           # Debug: Check if we need to authenticate again
           if has_selector?('form[action="/sign_in"]', wait: 2)
-            puts "=== DEBUG: Need to re-authenticate after truncation"
+            puts '=== DEBUG: Need to re-authenticate after truncation'
             3.times do |auth_attempt|
               begin
                 system_test_sign_in(@admin)
@@ -206,26 +206,26 @@ module Admin
           # Debug: Check what page we're actually on
           current_url_value = begin
                                 current_url
-                              rescue
+                              rescue StandardError
                                 'ERROR_GETTING_URL'
                               end
           puts "=== DEBUG: Current URL after visit: #{current_url_value}"
           puts "=== DEBUG: Page title: #{begin
                                            page.title
-                                         rescue
+                                         rescue StandardError
                                            'ERROR GETTING TITLE'
                                          end}"
           puts "=== DEBUG: Has sign-in form?: #{has_selector?('form[action="/sign_in"]', wait: 1)}"
 
           # If browser is completely corrupted (about:blank), force full restart
           if current_url_value == 'about:blank' || current_url_value == 'ERROR_GETTING_URL'
-            puts "=== DEBUG: Browser completely corrupted, forcing restart"
+            puts '=== DEBUG: Browser completely corrupted, forcing restart'
             Capybara.reset_sessions!
             system_test_sign_in(@admin)
             visit_with_retry(admin_application_path(@application), max_retries: 3)
             wait_for_turbo
           elsif has_selector?('form[action="/sign_in"]', wait: 1)
-            puts "=== DEBUG: Still on sign-in page, authenticating again"
+            puts '=== DEBUG: Still on sign-in page, authenticating again'
             system_test_sign_in(@admin)
             visit_with_retry(admin_application_path(@application), max_retries: 2)
             wait_for_turbo

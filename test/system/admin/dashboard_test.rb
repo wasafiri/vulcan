@@ -16,8 +16,7 @@ module Admin
       @app_with_pending_proof = create(:application,
                                        status: 'in_progress',
                                        income_proof_status: 'not_reviewed',
-                                       residency_proof_status: 'not_reviewed'
-      )
+                                       residency_proof_status: 'not_reviewed')
 
       # Create application with medical certification received
       @app_with_medical_cert = create(:application, :in_progress)
@@ -88,9 +87,9 @@ module Admin
       # Verify we're on the filtered page
       assert_current_path admin_applications_path(filter: 'proofs_needing_review')
 
-      # Verify the link is highlighted
+      # Verify the link is highlighted (with explicit wait for DOM updates)
       within "section[aria-labelledby='common-tasks-heading']" do
-        assert_selector 'a.bg-gray-50', text: /Proofs Needing Review/
+        assert_selector 'a.bg-gray-50', text: /Proofs Needing Review/, wait: 10
       end
 
       # Go back to main page
