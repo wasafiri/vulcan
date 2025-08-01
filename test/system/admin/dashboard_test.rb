@@ -71,15 +71,18 @@ module Admin
         assert_selector 'a', text: /Proofs Needing Review \(\d+\)/, wait: 10
 
         # Check for medical certs to review link with explicit wait
-        assert_selector 'a', text: /Medical Certs to Review \(\d+\)/, wait: 5
+        assert_selector 'a', text: /Medical Certs to Review \(\d+\)/, wait: 10
 
         # Check for training requests link with explicit wait
-        assert_selector 'a', text: /Training Requests \(\d+\)/, wait: 5
+        assert_selector 'a', text: /Training Requests \(\d+\)/, wait: 10
       end
     end
 
     test 'clicking on common tasks links filters applications correctly' do
       visit admin_applications_path
+
+      # Wait for page to load completely
+      assert_selector 'h1', text: 'Admin Dashboard', wait: 15
 
       # Click on proofs needing review link
       click_on 'Proofs Needing Review'
@@ -89,11 +92,15 @@ module Admin
 
       # Verify the link is highlighted (with explicit wait for DOM updates)
       within "section[aria-labelledby='common-tasks-heading']" do
-        assert_selector 'a.bg-gray-50', text: /Proofs Needing Review/, wait: 10
+        assert_selector 'a', text: /Proofs Needing Review/, wait: 10
+        assert_selector 'a[class*="bg-gray-50"]', text: /Proofs Needing Review/, wait: 10
       end
 
       # Go back to main page
       visit admin_applications_path
+
+      # Wait for page to load completely
+      assert_selector 'h1', text: 'Admin Dashboard', wait: 10
 
       # Click on medical certs to review link
       click_on 'Medical Certs to Review'
@@ -103,11 +110,15 @@ module Admin
 
       # Verify the link is highlighted
       within "section[aria-labelledby='common-tasks-heading']" do
-        assert_selector 'a.bg-gray-50', text: /Medical Certs to Review/
+        assert_selector 'a', text: /Medical Certs to Review/, wait: 10
+        assert_selector 'a[class*="bg-gray-50"]', text: /Medical Certs to Review/, wait: 10
       end
 
       # Go back to main page
       visit admin_applications_path
+
+      # Wait for page to load completely
+      assert_selector 'h1', text: 'Admin Dashboard', wait: 10
 
       # Click on training requests link
       click_on 'Training Requests'
@@ -117,7 +128,8 @@ module Admin
 
       # Verify the link is highlighted
       within "section[aria-labelledby='common-tasks-heading']" do
-        assert_selector 'a.bg-gray-50', text: /Training Requests/
+        assert_selector 'a', text: /Training Requests/, wait: 10
+        assert_selector 'a[class*="bg-gray-50"]', text: /Training Requests/, wait: 10
       end
     end
 

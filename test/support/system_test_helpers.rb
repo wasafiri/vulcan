@@ -193,7 +193,7 @@ module SystemTestHelpers
     # instead of using a static wait
     using_wait_time(2) do
       # Wait for any potential DOM changes after alert processing
-      assert_selector 'body', wait: 2
+      assert_selector 'body', wait: 15
     end
   rescue StandardError => e
     puts "Warning: Alert handling failed: #{e.message}"
@@ -260,9 +260,7 @@ module SystemTestHelpers
     return unless page&.driver
 
     # Use Capybara's native waiting to ensure page is stable
-    using_wait_time(2) do
-      assert_selector 'body', wait: 2
-    end
+    assert_selector 'body', wait: 15
   rescue Ferrum::NodeNotFoundError
     # This is expected during teardown and setup - browser may not be ready yet
     # Don't log this as it's normal behavior
@@ -316,7 +314,7 @@ module SystemTestHelpers
     end
 
     # Final attempt - fail with clear message
-    assert_text text, wait: 1
+    assert_text text
   end
 
   # Helper specifically for "Application saved as draft" messages

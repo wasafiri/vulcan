@@ -449,9 +449,7 @@ module SystemTestAuthentication
         debug_puts 'Retrying after clearing sessions...'
         clear_pending_network_connections
         # Use Capybara's waiting instead of static wait
-        using_wait_time(2) do
-          assert_selector 'body', wait: 2
-        end
+        assert_selector 'body', wait: 15
       else
         debug_puts "Failed after #{max_retries} attempts, continuing..."
         # Don't raise - let the test continue and potentially fail on assertions

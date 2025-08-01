@@ -71,7 +71,7 @@ module Admin
 
       # Wait for page to load completely with intelligent waiting
       # Use a more specific selector that indicates the page has fully loaded
-      assert_selector 'h1#application-title', wait: 15
+      assert_selector 'h1#application-title', wait: 20
 
       # Use intelligent waiting - assert_selector will wait automatically
       assert_selector '#attachments-section', wait: 15

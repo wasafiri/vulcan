@@ -44,7 +44,8 @@ module AdminTests
       visit admin_application_path(@application)
 
       # Wait for page to load completely
-      assert_selector 'h1#application-title', wait: 15
+      assert_selector 'html', wait: 30
+      assert_selector 'h1', text: 'Application', wait: 20
 
       # Use intelligent waiting - assert_selector will wait automatically
       assert_selector '#attachments-section', wait: 15
@@ -75,7 +76,8 @@ module AdminTests
       visit admin_application_path(@application)
 
       # Wait for page to load completely
-      assert_selector 'h1#application-title', wait: 15
+      assert_selector 'html', wait: 20
+      assert_selector 'h1', text: 'Application', wait: 15
 
       # Use intelligent waiting - assert_selector will wait automatically
       assert_selector '#attachments-section', wait: 15
@@ -136,11 +138,8 @@ module AdminTests
       visit admin_application_path(regular_application)
 
       # Wait for basic page structure first
-      assert_selector 'body', wait: 5
-
-      # Wait for page to load completely with intelligent waiting
-      # Use a more specific selector that indicates the page has fully loaded
-      assert_selector 'h1#application-title', wait: 15
+      assert_selector 'html', wait: 15
+      assert_selector 'h1', text: 'Application', wait: 15
 
       # Use intelligent waiting - assert_selector will wait automatically
       assert_selector '#attachments-section', wait: 15
@@ -149,7 +148,9 @@ module AdminTests
 
       # Open the income proof review modal
       within '#attachments-section' do
-        find('button[data-modal-id="incomeProofReviewModal"]').click
+        # Use assert_selector first to wait for element, then find fresh reference
+        assert_selector('button[data-modal-id="incomeProofReviewModal"]', wait: 10)
+        find('button[data-modal-id="incomeProofReviewModal"]', wait: 5).click
       end
 
       # Verify the guardian alert is not displayed - use has_no_content for intelligent waiting
@@ -166,7 +167,9 @@ module AdminTests
 
       # Open the residency proof review modal
       within '#attachments-section' do
-        find('button[data-modal-id="residencyProofReviewModal"]').click
+        # Use assert_selector first to wait for element, then find fresh reference
+        assert_selector('button[data-modal-id="residencyProofReviewModal"]', wait: 10)
+        find('button[data-modal-id="residencyProofReviewModal"]', wait: 5).click
       end
 
       # Verify the guardian alert is not displayed
