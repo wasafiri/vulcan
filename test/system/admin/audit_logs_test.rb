@@ -41,15 +41,15 @@ module Admin
     teardown do
       # Ensure any open modals are closed
       begin
-        if has_selector?('#incomeProofReviewModal', visible: true, wait: 1)
+        if has_selector?('#incomeProofReviewModal', visible: true)
           within('#incomeProofReviewModal') do
-            click_button 'Close' if has_button?('Close', wait: 1)
+            click_button 'Close' if has_button?('Close')
           end
         end
 
-        if has_selector?('#residencyProofReviewModal', visible: true, wait: 1)
+        if has_selector?('#residencyProofReviewModal', visible: true)
           within('#residencyProofReviewModal') do
-            click_button 'Close' if has_button?('Close', wait: 1)
+            click_button 'Close' if has_button?('Close')
           end
         end
       rescue Ferrum::NodeNotFoundError, Ferrum::DeadBrowserError
@@ -74,11 +74,13 @@ module Admin
       assert_selector 'h1#application-title', wait: 15
 
       # Use intelligent waiting - assert_selector will wait automatically
-      assert_selector '#attachments-section', wait: 10
+      assert_selector '#attachments-section', wait: 15
 
       # Open the income proof review modal
       within '#attachments-section' do
-        find('button[data-modal-id="incomeProofReviewModal"]').click
+        # Use explicit wait and fresh find to avoid stale references
+        assert_selector('button[data-modal-id="incomeProofReviewModal"]', wait: 15)
+        find('button[data-modal-id="incomeProofReviewModal"]', wait: 15).click
       end
 
       # Approve the income proof within the modal

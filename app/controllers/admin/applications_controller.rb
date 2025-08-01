@@ -364,8 +364,7 @@ module Admin
         format.turbo_stream do
           render turbo_stream: turbo_stream.update('pipeline_chart_frame',
                                                    partial: 'pipeline_chart',
-                                                   locals: { data: @pipeline_chart_data }
-          )
+                                                   locals: { data: @pipeline_chart_data })
         end
       end
     end

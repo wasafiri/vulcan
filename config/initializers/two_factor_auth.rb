@@ -73,7 +73,7 @@ module TwoFactorAuth
     session.delete(SESSION_KEYS[:temp_user_id])
     session.delete(SESSION_KEYS[:available_methods])
     session.delete(SESSION_KEYS[:return_path])
-    # Note: Challenge is NOT cleared here - it should be cleared after successful sign_in
+    # NOTE: Challenge is NOT cleared here - it should be cleared after successful sign_in
     mark_verified(session)
     Rails.logger.info('[2FA] Authentication completed and session marked as verified (challenge preserved)')
   end

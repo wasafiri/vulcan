@@ -365,38 +365,33 @@ module Admin
           )
         else
           # Multi-term search - try to match full name or individual terms
-          # First try to match the full query as a concatenated name
           full_name_term = "%#{@q.downcase}%"
           full_name_query = base_query.where(
             "LOWER(CONCAT(first_name, ' ', last_name)) ILIKE :q OR LOWER(email) ILIKE :q", q: full_name_term
           )
 
+          return full_name_query unless full_name_query.empty?
+
           # If no results from full name search, try individual terms
-          if full_name_query.empty?
-            # Build search conditions using Arel to avoid SQL injection warnings
-            table = User.arel_table
-            search_condition = nil
-
-            search_terms.each do |term|
-              term_pattern = "%#{term.downcase}%"
-
-              # Create condition for this term across all searchable fields
-              term_condition = table[:first_name].lower.matches(term_pattern)
-                                                 .or(table[:last_name].lower.matches(term_pattern))
-                                                 .or(table[:email].lower.matches(term_pattern))
-
-              # Combine with previous conditions using OR
-              search_condition = search_condition ? search_condition.or(term_condition) : term_condition
-            end
-
-            base_query.where(search_condition)
-          else
-            full_name_query
-          end
+          condition = build_multi_term_condition(search_terms)
+          base_query.where(condition)
         end
       else
         # If no query, return empty results
         base_query.none
+      end
+    end
+
+    # Build Arel condition for multi-term search
+    def build_multi_term_condition(terms)
+      table = User.arel_table
+      terms.inject(nil) do |condition, term|
+        term_pattern = "%#{term.downcase}%"
+        term_cond = table[:first_name].lower.matches(term_pattern)
+                                      .or(table[:last_name].lower.matches(term_pattern))
+                                      .or(table[:email].lower.matches(term_pattern))
+
+        condition ? condition.or(term_cond) : term_cond
       end
     end
 

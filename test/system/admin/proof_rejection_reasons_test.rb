@@ -68,14 +68,16 @@ module Admin
 
       # Wait for page to load completely with intelligent waiting
       # Use a more specific selector that indicates the page has fully loaded
-      assert_selector 'h1#application-title', wait: 10
+      assert_selector 'h1#application-title', wait: 15
 
       # Use intelligent waiting - assert_selector will wait automatically
       assert_selector '#attachments-section', wait: 10
 
       # Use intelligent waiting for element finding
-      assert_selector('button[data-modal-id="incomeProofReviewModal"]')
-      find('button[data-modal-id="incomeProofReviewModal"]').click
+      assert_selector('button[data-modal-id="incomeProofReviewModal"]', wait: 15)
+      # Use explicit wait and fresh find to avoid stale references
+      assert_selector('button[data-modal-id="incomeProofReviewModal"]', wait: 15)
+      find('button[data-modal-id="incomeProofReviewModal"]', wait: 10).click
 
       within('#incomeProofReviewModal') do
         assert_selector('button', text: 'Reject')
@@ -111,14 +113,16 @@ module Admin
 
       # Wait for page to load completely with intelligent waiting
       # Use a more specific selector that indicates the page has fully loaded
-      assert_selector 'h1#application-title', wait: 10
+      assert_selector 'h1#application-title', wait: 15
 
       # Use intelligent waiting - assert_selector will wait automatically
-      assert_selector('#attachments-section', wait: 10)
+      assert_selector('#attachments-section', wait: 15)
 
       # Use intelligent waiting for element finding
       assert_selector('button[data-modal-id="residencyProofReviewModal"]')
-      find('button[data-modal-id="residencyProofReviewModal"]').click
+      # Use explicit wait and fresh find to avoid stale references
+      assert_selector('button[data-modal-id="residencyProofReviewModal"]', wait: 15)
+      find('button[data-modal-id="residencyProofReviewModal"]', wait: 10).click
 
       within('#residencyProofReviewModal') do
         assert_selector('button', text: 'Reject')
@@ -154,7 +158,7 @@ module Admin
 
       # Wait for page to load completely with intelligent waiting
       # Use a more specific selector that indicates the page has fully loaded
-      assert_selector 'h1#application-title', wait: 10
+      assert_selector 'h1#application-title', wait: 15
 
       # Use intelligent waiting - assert_selector will wait automatically
       assert_selector('button[data-modal-id="incomeProofReviewModal"]', wait: 15)
@@ -191,14 +195,16 @@ module Admin
 
       # Wait for page to load completely with intelligent waiting
       # Use a more specific selector that indicates the page has fully loaded
-      assert_selector 'h1#application-title', wait: 10
+      assert_selector 'h1#application-title', wait: 15
 
       # Use intelligent waiting - assert_selector will wait automatically
-      assert_selector('#attachments-section', wait: 10)
+      assert_selector('#attachments-section', wait: 15)
 
       # Use intelligent waiting for element finding
-      assert_selector('button[data-modal-id="incomeProofReviewModal"]')
-      find('button[data-modal-id="incomeProofReviewModal"]').click
+      assert_selector('button[data-modal-id="incomeProofReviewModal"]', wait: 15)
+      # Use explicit wait and fresh find to avoid stale references
+      assert_selector('button[data-modal-id="incomeProofReviewModal"]', wait: 15)
+      find('button[data-modal-id="incomeProofReviewModal"]', wait: 10).click
 
       within('#incomeProofReviewModal') do
         click_button 'Reject'

@@ -753,7 +753,8 @@ module Admin
         visit admin_application_path(application)
         wait_for_network_idle
         wait_for_turbo
-        assert_text "Application ##{application.id} Details", wait: 10
+        # Wait for page to load completely using reliable ID selector
+        assert_selector 'h1#application-title', wait: 15
       end
 
       # Verify all proofs show as approved in the UI

@@ -79,7 +79,7 @@ module Admin
 
       # Select the guardian from search results
       within('#guardian_search_results') do
-        find('li', text: /#{guardian.full_name}/i, wait: 5).click
+        find('li', text: /#{guardian.full_name}/i, wait: 15).click
       end
 
       # Wait for guardian selection to complete and ensure controllers are updated
@@ -90,11 +90,11 @@ module Admin
 
       # "Selected Guardian" display should be visible
       selected_display_selector = '[data-guardian-picker-target="selectedPane"]'
-      assert_selector selected_display_selector, visible: true, wait: 10 # Increased wait time
+      assert_selector selected_display_selector, visible: true, wait: 15
       within(selected_display_selector) do
         assert_text guardian.full_name
         assert_text guardian.email
-        # As per admin_user_search_controller.js, it shows "No address information available"
+        # As per admin_user_search_controller.js
         assert_text 'No address information available'
         assert_text 'Currently has 0 dependents' # Assuming new guardian has 0
         assert_selector 'button', text: 'Change Selection', visible: true

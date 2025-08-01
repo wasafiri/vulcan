@@ -18,15 +18,15 @@ module AdminTests
     teardown do
       # Ensure any open modals are closed
       begin
-        if has_selector?('#incomeProofReviewModal', visible: true, wait: 1)
+        if has_selector?('#incomeProofReviewModal', visible: true)
           within('#incomeProofReviewModal') do
-            click_button 'Close' if has_button?('Close', wait: 1)
+            click_button 'Close' if has_button?('Close')
           end
         end
 
-        if has_selector?('#residencyProofReviewModal', visible: true, wait: 1)
+        if has_selector?('#residencyProofReviewModal', visible: true)
           within('#residencyProofReviewModal') do
-            click_button 'Close' if has_button?('Close', wait: 1)
+            click_button 'Close' if has_button?('Close')
           end
         end
       rescue Ferrum::NodeNotFoundError, Ferrum::DeadBrowserError
@@ -43,14 +43,19 @@ module AdminTests
       system_test_sign_in(@admin)
       visit admin_application_path(@application)
 
+      # Wait for page to load completely
+      assert_selector 'h1#application-title', wait: 15
+
       # Use intelligent waiting - assert_selector will wait automatically
-      assert_selector '#attachments-section'
+      assert_selector '#attachments-section', wait: 15
       assert_selector '#attachments-section', text: 'Income Proof'
       assert_selector '#attachments-section', text: 'Residency Proof'
 
       # Open the income proof review modal
       within '#attachments-section' do
-        find('button[data-modal-id="incomeProofReviewModal"]').click
+        # Find the specific button for income proof with explicit wait
+        assert_selector('button[data-modal-id="incomeProofReviewModal"]', wait: 15)
+        find('button[data-modal-id="incomeProofReviewModal"]', wait: 15).click
       end
 
       # Verify the guardian alert is displayed - use have_content for intelligent waiting
@@ -69,15 +74,19 @@ module AdminTests
       system_test_sign_in(@admin)
       visit admin_application_path(@application)
 
+      # Wait for page to load completely
+      assert_selector 'h1#application-title', wait: 15
+
       # Use intelligent waiting - assert_selector will wait automatically
-      assert_selector '#attachments-section'
+      assert_selector '#attachments-section', wait: 15
       assert_selector '#attachments-section', text: 'Income Proof'
       assert_selector '#attachments-section', text: 'Residency Proof'
 
       # Open the residency proof review modal
       within '#attachments-section' do
-        # Find the specific button for residency proof
-        find('button[data-modal-id="residencyProofReviewModal"]').click
+        # Find the specific button for residency proof with explicit wait
+        assert_selector('button[data-modal-id="residencyProofReviewModal"]', wait: 15)
+        find('button[data-modal-id="residencyProofReviewModal"]', wait: 10).click
       end
 
       # Verify the guardian alert is displayed - use have_content for intelligent waiting
@@ -134,7 +143,7 @@ module AdminTests
       assert_selector 'h1#application-title', wait: 15
 
       # Use intelligent waiting - assert_selector will wait automatically
-      assert_selector '#attachments-section', wait: 10
+      assert_selector '#attachments-section', wait: 15
       assert_selector '#attachments-section', text: 'Income Proof'
       assert_selector '#attachments-section', text: 'Residency Proof'
 

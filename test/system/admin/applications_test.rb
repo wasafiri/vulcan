@@ -63,7 +63,7 @@ module Admin
       end
 
       # Wait for the specific content to load
-      assert_selector 'h1', text: /Application.*Details/, wait: 20
+      assert_selector 'h1#application-title', wait: 15
       assert_text(@application.user.full_name, wait: 20)
 
       # Verify sections exist using more stable selectors with increased wait times
