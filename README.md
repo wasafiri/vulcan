@@ -46,7 +46,7 @@ Vulcan is a Ruby on Rails application that facilitates Maryland Accessible Telec
    - Automated eligibility checks with real-time validation
    - Waiting period enforcement
    - Training session limits
-   - Income verification rules with FPL threshold validation
+   - Income verification rules with Federal Poverty Level (FPL) threshold validation
 
 8. **Constituent Portal**
    - Application status checking with detailed progress tracking
@@ -60,22 +60,30 @@ Vulcan is a Ruby on Rails application that facilitates Maryland Accessible Telec
    - Standardized session management built off of `authentication-zero` skeleton
 
 10. **Unified Notification System**
-    - Multi-channel delivery: Email, physical letters, SMS, and in-app alerts
-    - Template-based generation for both emails and printable letters (PDF)
+    - Multi-channel delivery to constituents: Email, physical letters, SMS, and in-app flash alerts
+    - Template-based generation for both emails and printable letters (PDF) with versioning 
     - Centralized print queue management for batch processing
     - Delivery and open tracking with robust failure and bounce handling
 
 11. **Advanced Admin Portal**
-    - Comprehensive dashboard with real-time application pipeline metrics and charts
+    - Application dashboard with real-time application pipeline metrics and charts
     - Fiscal year reporting for applications, vouchers, and vendor activity
     - Detailed, filterable views for all system entities
     - Secure interfaces for managing users, roles, and system policies
 
 12. **Audit & Event System**
-    - Comprehensive audit trails for every action taken by users and admins
+    - Audit trails for application creation, submission, and status changes
+    - Audit trails for proof submission, review, approval, and rejection
+    - Audit trails for medical certification requests and responses
+    - Audit trails for voucher generation, assignment, redemption, and cancellation
+    - Audit trails for vendor W9 review and approval processes
+    - Audit trails for training session scheduling, completion, and status changes
+    - Audit trails for evaluation assignments and additional information requests
+    - Audit trails for all policy changes and system configuration updates
+    - Audit trails for email delivery tracking, bounces, and failures
+    - Audit trails for user profile updates and security key recovery
     - Intelligent event deduplication to provide a clean, readable history
     - Centralized logging services for consistency and reliability
-    - Full visibility into application status changes, communications, and reviews
 
 ## Current Implementation Status
 
@@ -101,8 +109,10 @@ Vulcan is a Ruby on Rails application that facilitates Maryland Accessible Telec
 - ✅ Enhanced vendor transaction tracking
 - ✅ Real-time income threshold validation
 - ✅ Comprehensive audit logging with intelligent event deduplication
+- ⏳ HIPAA compliant document signing system for Disability Cerification Forms (in progress)
 - ⏳ Document OCR processing (planned)
 - ⏳ Enhanced reporting system (in progress)
+- ⏳ Enhanced training assignment, tracking, analytics, workflow and communications
 
 ## Technical Stack
 
