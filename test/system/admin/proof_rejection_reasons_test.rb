@@ -68,7 +68,7 @@ module Admin
 
       # Wait for page to load completely with intelligent waiting
       # Use a more specific selector that indicates the page has fully loaded
-      assert_selector 'h1', text: /Application.*Details/, wait: 10
+      assert_selector 'h1#application-title', wait: 10
 
       # Use intelligent waiting - assert_selector will wait automatically
       assert_selector '#attachments-section', wait: 10
@@ -111,7 +111,7 @@ module Admin
 
       # Wait for page to load completely with intelligent waiting
       # Use a more specific selector that indicates the page has fully loaded
-      assert_selector 'h1', text: /Application.*Details/, wait: 10
+      assert_selector 'h1#application-title', wait: 10
 
       # Use intelligent waiting - assert_selector will wait automatically
       assert_selector('#attachments-section', wait: 10)
@@ -154,7 +154,7 @@ module Admin
 
       # Wait for page to load completely with intelligent waiting
       # Use a more specific selector that indicates the page has fully loaded
-      assert_selector 'h1', text: /Application.*Details/, wait: 10
+      assert_selector 'h1#application-title', wait: 10
 
       # Use intelligent waiting - assert_selector will wait automatically
       assert_selector('button[data-modal-id="incomeProofReviewModal"]', wait: 10)
@@ -189,7 +189,7 @@ module Admin
 
       # Wait for page to load completely with intelligent waiting
       # Use a more specific selector that indicates the page has fully loaded
-      assert_selector 'h1', text: /Application.*Details/, wait: 10
+      assert_selector 'h1#application-title', wait: 10
 
       # Use intelligent waiting - assert_selector will wait automatically
       assert_selector('#attachments-section', wait: 10)

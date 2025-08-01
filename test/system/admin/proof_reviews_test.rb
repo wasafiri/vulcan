@@ -49,7 +49,7 @@ module Admin
         end
 
         # Verify page loaded before proceeding
-        assert_selector 'h1', text: /Application.*Details/, wait: 15
+        assert_selector 'h1#application-title', wait: 10, wait: 15
       rescue Ferrum::NodeNotFoundError, Ferrum::DeadBrowserError => e
         puts "Browser corruption detected during page visit: #{e.message}"
         if respond_to?(:force_browser_restart, true)
@@ -62,7 +62,7 @@ module Admin
         # Retry the visit after restart and re-authentication
         visit admin_application_path(@application)
         wait_for_page_stable
-        assert_selector 'h1', text: /Application.*Details/, wait: 15
+        assert_selector 'h1#application-title', wait: 10, wait: 15
       end
 
       # Ensure attachments section is present and visible before interacting
@@ -91,7 +91,7 @@ module Admin
       end
 
       # Use intelligent waiting
-      assert_selector 'h1', text: /Application.*Details/
+      assert_selector 'h1#application-title', wait: 10
       assert_text(@application.user.full_name)
 
       # Look for proof status information (using intelligent waiting)
