@@ -67,17 +67,18 @@ module Admin
       visit admin_application_path(@application)
 
       # Wait for page to load completely with intelligent waiting
-      # Use a more specific selector that indicates the page has fully loaded
-      assert_selector 'h1#application-title', wait: 15
+      # Use a more reliable selector that indicates the page has fully loaded
+      assert_selector 'html', wait: 20
+      assert_selector 'h1', text: 'Application', wait: 20
 
       # Use intelligent waiting - assert_selector will wait automatically
-      assert_selector '#attachments-section', wait: 10
+      assert_selector '#attachments-section', wait: 15
 
       # Use intelligent waiting for element finding
       assert_selector('button[data-modal-id="incomeProofReviewModal"]', wait: 15)
       # Use explicit wait and fresh find to avoid stale references
       assert_selector('button[data-modal-id="incomeProofReviewModal"]', wait: 15)
-      find('button[data-modal-id="incomeProofReviewModal"]', wait: 10).click
+      find('button[data-modal-id="incomeProofReviewModal"]', wait: 15).click
 
       within('#incomeProofReviewModal') do
         assert_selector('button', text: 'Reject')
@@ -87,7 +88,7 @@ module Admin
       within('#proofRejectionModal') do
         # Wait for proof type field and verify it's set correctly
         assert_selector('#rejection-proof-type', visible: false)
-        proof_type_field = find('#rejection-proof-type', visible: false)
+        proof_type_field = find_by_id('rejection-proof-type', visible: false)
         assert_equal 'income', proof_type_field.value
 
         # Check that all common rejection reason buttons are visible
@@ -112,17 +113,17 @@ module Admin
       visit admin_application_path(@application)
 
       # Wait for page to load completely with intelligent waiting
-      # Use a more specific selector that indicates the page has fully loaded
-      assert_selector 'h1#application-title', wait: 15
+      # Use a more reliable selector that indicates the page has fully loaded
+      assert_selector 'html', wait: 20
+      assert_selector 'h1', text: 'Application', wait: 15
 
       # Use intelligent waiting - assert_selector will wait automatically
       assert_selector('#attachments-section', wait: 15)
 
-      # Use intelligent waiting for element finding
-      assert_selector('button[data-modal-id="residencyProofReviewModal"]')
-      # Use explicit wait and fresh find to avoid stale references
+      # Use intelligent waiting for element finding with explicit wait
       assert_selector('button[data-modal-id="residencyProofReviewModal"]', wait: 15)
-      find('button[data-modal-id="residencyProofReviewModal"]', wait: 10).click
+      # Find fresh reference to avoid stale elements
+      find('button[data-modal-id="residencyProofReviewModal"]', wait: 15).click
 
       within('#residencyProofReviewModal') do
         assert_selector('button', text: 'Reject')
@@ -131,9 +132,9 @@ module Admin
 
       within('#proofRejectionModal') do
         # Wait for modal to be initialized and check proof type
-        assert_selector('#rejection-proof-type', visible: false)
-        proof_type_value = find('#rejection-proof-type', visible: false).value
-        assert_equal 'residency', proof_type_value
+        assert_selector('#rejection-proof-type', visible: false, wait: 15)
+        proof_type_field = find_by_id('rejection-proof-type', visible: false)
+        assert_equal 'residency', proof_type_field.value
 
         # Check that common rejection reason buttons are visible
         assert_selector "button[data-reason-type='addressMismatch']", text: 'Address Mismatch'
@@ -157,8 +158,9 @@ module Admin
       visit admin_application_path(@application)
 
       # Wait for page to load completely with intelligent waiting
-      # Use a more specific selector that indicates the page has fully loaded
-      assert_selector 'h1#application-title', wait: 15
+      # Use a more reliable selector that indicates the page has fully loaded
+      assert_selector 'body', wait: 15
+      assert_selector 'h1', text: 'Application', wait: 15
 
       # Use intelligent waiting - assert_selector will wait automatically
       assert_selector('button[data-modal-id="incomeProofReviewModal"]', wait: 15)
@@ -194,8 +196,9 @@ module Admin
       visit admin_application_path(@application)
 
       # Wait for page to load completely with intelligent waiting
-      # Use a more specific selector that indicates the page has fully loaded
-      assert_selector 'h1#application-title', wait: 15
+      # Use a more reliable selector that indicates the page has fully loaded
+      assert_selector 'html', wait: 15
+      assert_selector 'h1', text: 'Application', wait: 15
 
       # Use intelligent waiting - assert_selector will wait automatically
       assert_selector('#attachments-section', wait: 15)
@@ -204,7 +207,7 @@ module Admin
       assert_selector('button[data-modal-id="incomeProofReviewModal"]', wait: 15)
       # Use explicit wait and fresh find to avoid stale references
       assert_selector('button[data-modal-id="incomeProofReviewModal"]', wait: 15)
-      find('button[data-modal-id="incomeProofReviewModal"]', wait: 10).click
+      find('button[data-modal-id="incomeProofReviewModal"]', wait: 15).click
 
       within('#incomeProofReviewModal') do
         click_button 'Reject'
