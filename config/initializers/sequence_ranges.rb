@@ -4,7 +4,7 @@
 # High, non-sequential IDs prevent enumeration attacks and make IDs harder to guess
 Rails.application.config.after_initialize do
   # Skip in test environment and when database tasks are running (like migrations)
-  if !Rails.env.test? && !defined?(Rails::DBConsole) && ENV['DISABLE_DATABASE_ENVIRONMENT_CHECK'].blank?
+  if false && !Rails.env.test? && !defined?(Rails::DBConsole) && ENV['DISABLE_DATABASE_ENVIRONMENT_CHECK'].blank?
     begin
       # Check if we're using PostgreSQL
       if ActiveRecord::Base.connection.adapter_name.downcase.include?('postgresql')
