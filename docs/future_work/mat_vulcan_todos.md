@@ -338,7 +338,7 @@ The application has evolved from a traditional equipment ordering system to a co
 - **Vendor Integration**: Vendor portal for voucher redemption with product selection
 - **Transaction Tracking**: Comprehensive audit trails for all voucher transactions
 - **Invoice Generation**: Automated invoice generation for vendor payments
-- **Product Association**: Products are now associated with applications through voucher transactions
+- **Product Association**: Products are associated with applications through voucher transactions
 
 ### Guardian Relationship System
 A comprehensive guardian/dependent management system has been implemented:

@@ -133,7 +133,7 @@ module Admin
       assert_redirected_to admin_print_queue_index_path
       assert_equal '2 letters marked as printed', flash[:notice]
 
-      # Verify both letters are now marked as printed
+      # Verify both letters are marked as printed
       @pending_letter.reload
       @pending_letter2.reload
       assert_equal 'printed', @pending_letter.status

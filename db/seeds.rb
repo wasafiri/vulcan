@@ -14,7 +14,7 @@ require 'active_record/fixtures'
 
 # Helper method to conditionally output messages
 def seed_puts(message)
-  puts message if ENV['VERBOSE_TESTS'] || Rails.env.development?
+  Rails.logger.debug message if ENV['VERBOSE_TESTS'] || Rails.env.development?
 end
 
 # Helper method for error messages (always shown)
