@@ -332,15 +332,17 @@
         <div class="bg-white rounded-lg shadow p-6">
           <h3 id="pipeline-heading" class="text-lg font-medium text-gray-900 mb-4">FY<%= @current_fiscal_year.to_s[-2..-1] %> Application Pipeline</h3>
           <%= turbo_frame_tag "pipeline_chart_frame" do %>
-          <div class="h-64" 
-               data-controller="reports-chart" 
-               data-reports-chart-current-data-value="<%= @pipeline_chart_data.to_json %>"
-               data-reports-chart-previous-data-value="<%= {}.to_json %>"
-               data-reports-chart-type-value="bar"
-               data-reports-chart-title-value="Application Pipeline"
-               data-reports-chart-hidden-class="hidden">
-            <div class="sr-only" aria-labelledby="pipeline-heading">
-              Chart showing application pipeline: <%= @submitted_count %> submitted, <%= @in_review_count %> in review, and <%= @approved_count %> approved applications.
+          <div>
+            <div data-controller="reports-chart" 
+                 data-reports-chart-current-data-value="<%= @pipeline_chart_data.to_json %>"
+                 data-reports-chart-previous-data-value="<%= {}.to_json %>"
+                 data-reports-chart-type-value="bar"
+                 data-reports-chart-title-value="Application Pipeline"
+                 data-reports-chart-hidden-class="hidden"
+                 style="position: relative; height: 300px; width: 100%;">
+              <div class="sr-only" aria-labelledby="pipeline-heading">
+                Chart showing application pipeline: <%= @submitted_count %> submitted, <%= @in_review_count %> in review, and <%= @approved_count %> approved applications.
+              </div>
             </div>
           </div>
           <% end %>
@@ -368,15 +370,17 @@
         <div class="bg-white rounded-lg shadow p-6">
           <h3 id="status-breakdown-heading" class="text-lg font-medium text-gray-900 mb-2">Status Breakdown</h3>
           <p class="text-sm text-gray-500 mb-4">Current FY Application Breakdown</p>
-          <div class="h-64" 
-               data-controller="reports-chart" 
-               data-reports-chart-current-data-value="<%= @status_chart_data.to_json %>"
-               data-reports-chart-previous-data-value="<%= {}.to_json %>"
-               data-reports-chart-type-value="polarArea"
-               data-reports-chart-title-value="Status Breakdown"
-               data-reports-chart-hidden-class="hidden">
-            <div class="sr-only" aria-labelledby="status-breakdown-heading">
-              Chart showing status breakdown: <%= @draft_count %> draft, <%= @in_progress_count %> in progress, <%= @approved_count %> approved, and <%= @rejected_count %> rejected applications.
+          <div>
+            <div data-controller="reports-chart" 
+                 data-reports-chart-current-data-value="<%= @status_chart_data.to_json %>"
+                 data-reports-chart-previous-data-value="<%= {}.to_json %>"
+                 data-reports-chart-type-value="polarArea"
+                 data-reports-chart-title-value="Status Breakdown"
+                 data-reports-chart-hidden-class="hidden"
+                 style="position: relative; height: 300px; width: 100%;">
+              <div class="sr-only" aria-labelledby="status-breakdown-heading">
+                Chart showing status breakdown: <%= @draft_count %> draft, <%= @in_progress_count %> in progress, <%= @approved_count %> approved, and <%= @rejected_count %> rejected applications.
+              </div>
             </div>
           </div>
           <div class="mt-4 grid grid-cols-2 gap-4">

@@ -35,15 +35,18 @@
           </dl>
           
           <%# Current FY Applications Chart %>
-          <div class="mt-4" 
-               data-controller="reports-chart" 
-               data-reports-chart-current-data-value="<%= { 'Submitted' => @current_fy_applications, 'Draft' => @current_fy_draft_applications }.to_json %>"
-               data-reports-chart-previous-data-value="<%= { 'Submitted' => 0, 'Draft' => 0 }.to_json %>"
-               data-reports-chart-type-value="bar"
-               data-reports-chart-compact-value="true"
-               data-reports-chart-title-value="Current FY Applications">
-            <div class="sr-only">
-              Chart showing current fiscal year applications: <%= @current_fy_applications %> submitted and <%= @current_fy_draft_applications %> draft applications.
+          <div class="mt-4">
+            <div style="position: relative; height: 200px; width: 100%;"
+                 data-controller="reports-chart" 
+                 data-reports-chart-chart-height-value="200" 
+                 data-reports-chart-current-data-value="<%= { 'Submitted' => @current_fy_applications, 'Draft' => @current_fy_draft_applications }.to_json %>"
+                 data-reports-chart-previous-data-value="<%= { 'Submitted' => 0, 'Draft' => 0 }.to_json %>"
+                 data-reports-chart-type-value="bar"
+                 data-reports-chart-compact-value="true"
+                 data-reports-chart-title-value="Current FY Applications">
+              <div class="sr-only">
+                Chart showing current fiscal year applications: <%= @current_fy_applications %> submitted and <%= @current_fy_draft_applications %> draft applications.
+              </div>
             </div>
           </div>
         </div>
@@ -63,29 +66,34 @@
           </dl>
           
           <%# Previous FY Applications Chart %>
-          <div class="mt-4" 
-               data-controller="reports-chart" 
-               data-reports-chart-current-data-value="<%= { 'Submitted' => @previous_fy_applications, 'Draft' => @previous_fy_draft_applications }.to_json %>"
-               data-reports-chart-previous-data-value="<%= { 'Submitted' => 0, 'Draft' => 0 }.to_json %>"
-               data-reports-chart-type-value="bar"
-               data-reports-chart-compact-value="true"
-               data-reports-chart-title-value="Previous FY Applications">
-            <div class="sr-only">
-              Chart showing previous fiscal year applications: <%= @previous_fy_applications %> submitted and <%= @previous_fy_draft_applications %> draft applications.
+          <div class="mt-4">
+            <div style="position: relative; height: 200px; width: 100%;"
+                 data-controller="reports-chart" 
+                 data-reports-chart-chart-height-value="200" 
+                 data-reports-chart-current-data-value="<%= { 'Submitted' => @previous_fy_applications, 'Draft' => @previous_fy_draft_applications }.to_json %>"
+                 data-reports-chart-previous-data-value="<%= { 'Submitted' => 0, 'Draft' => 0 }.to_json %>"
+                 data-reports-chart-type-value="bar"
+                 data-reports-chart-compact-value="true"
+                 data-reports-chart-title-value="Previous FY Applications">
+              <div class="sr-only">
+                Chart showing previous fiscal year applications: <%= @previous_fy_applications %> submitted and <%= @previous_fy_draft_applications %> draft applications.
+              </div>
             </div>
           </div>
         </div>
       </div>
       
       <%# Applications Comparison Chart %>
-      <div class="mt-4" 
-           data-controller="reports-chart" 
-           data-reports-chart-current-data-value="<%= @applications_chart_data[:current].to_json %>"
-           data-reports-chart-previous-data-value="<%= @applications_chart_data[:previous].to_json %>"
-           data-reports-chart-type-value="bar"
-           data-reports-chart-title-value="Applications Comparison">
-        <div id="chart-description-applications" class="sr-only">
-          This chart compares the number of applications submitted and draft applications between the current fiscal year and the previous fiscal year.
+      <div class="mt-4">
+        <div style="position: relative; height: 300px; width: 100%;"
+             data-controller="reports-chart" 
+             data-reports-chart-current-data-value="<%= @applications_chart_data[:current].to_json %>"
+             data-reports-chart-previous-data-value="<%= @applications_chart_data[:previous].to_json %>"
+             data-reports-chart-type-value="bar"
+             data-reports-chart-title-value="Applications Comparison">
+          <div id="chart-description-applications" class="sr-only">
+            This chart compares the number of applications submitted and draft applications between the current fiscal year and the previous fiscal year.
+          </div>
         </div>
       </div>
     </section>
@@ -112,15 +120,18 @@
           </dl>
           
           <%# Current FY Vouchers Chart %>
-          <div class="mt-4" 
-               data-controller="reports-chart" 
-               data-reports-chart-current-data-value="<%= { 'Issued' => @current_fy_vouchers, 'Unredeemed' => @current_fy_unredeemed_vouchers }.to_json %>"
-               data-reports-chart-previous-data-value="<%= { 'Issued' => 0, 'Unredeemed' => 0 }.to_json %>"
-               data-reports-chart-type-value="bar"
-               data-reports-chart-compact-value="true"
-               data-reports-chart-title-value="Current FY Vouchers">
-            <div class="sr-only">
-              Chart showing current fiscal year vouchers: <%= @current_fy_vouchers %> issued and <%= @current_fy_unredeemed_vouchers %> unredeemed vouchers.
+          <div class="mt-4">
+            <div style="position: relative; height: 200px; width: 100%;"
+                 data-controller="reports-chart" 
+                 data-reports-chart-chart-height-value="200" 
+                 data-reports-chart-current-data-value="<%= { 'Issued' => @current_fy_vouchers, 'Unredeemed' => @current_fy_unredeemed_vouchers }.to_json %>"
+                 data-reports-chart-previous-data-value="<%= { 'Issued' => 0, 'Unredeemed' => 0 }.to_json %>"
+                 data-reports-chart-type-value="bar"
+                 data-reports-chart-compact-value="true"
+                 data-reports-chart-title-value="Current FY Vouchers">
+              <div class="sr-only">
+                Chart showing current fiscal year vouchers: <%= @current_fy_vouchers %> issued and <%= @current_fy_unredeemed_vouchers %> unredeemed vouchers.
+              </div>
             </div>
           </div>
         </div>
@@ -143,29 +154,34 @@
           </dl>
           
           <%# Previous FY Vouchers Chart %>
-          <div class="mt-4" 
-               data-controller="reports-chart" 
-               data-reports-chart-current-data-value="<%= { 'Issued' => @previous_fy_vouchers, 'Unredeemed' => @previous_fy_unredeemed_vouchers }.to_json %>"
-               data-reports-chart-previous-data-value="<%= { 'Issued' => 0, 'Unredeemed' => 0 }.to_json %>"
-               data-reports-chart-type-value="bar"
-               data-reports-chart-compact-value="true"
-               data-reports-chart-title-value="Previous FY Vouchers">
-            <div class="sr-only">
-              Chart showing previous fiscal year vouchers: <%= @previous_fy_vouchers %> issued and <%= @previous_fy_unredeemed_vouchers %> unredeemed vouchers.
+          <div class="mt-4">
+            <div style="position: relative; height: 200px; width: 100%;"
+                 data-controller="reports-chart" 
+                 data-reports-chart-chart-height-value="200" 
+                 data-reports-chart-current-data-value="<%= { 'Issued' => @previous_fy_vouchers, 'Unredeemed' => @previous_fy_unredeemed_vouchers }.to_json %>"
+                 data-reports-chart-previous-data-value="<%= { 'Issued' => 0, 'Unredeemed' => 0 }.to_json %>"
+                 data-reports-chart-type-value="bar"
+                 data-reports-chart-compact-value="true"
+                 data-reports-chart-title-value="Previous FY Vouchers">
+              <div class="sr-only">
+                Chart showing previous fiscal year vouchers: <%= @previous_fy_vouchers %> issued and <%= @previous_fy_unredeemed_vouchers %> unredeemed vouchers.
+              </div>
             </div>
           </div>
         </div>
       </div>
       
       <%# Vouchers Comparison Chart %>
-      <div class="mt-4" 
-           data-controller="reports-chart" 
-           data-reports-chart-current-data-value="<%= @vouchers_chart_data[:current].to_json %>"
-           data-reports-chart-previous-data-value="<%= @vouchers_chart_data[:previous].to_json %>"
-           data-reports-chart-type-value="bar"
-           data-reports-chart-title-value="Voucher Statistics Comparison">
-        <div id="chart-description-vouchers" class="sr-only">
-          This chart compares voucher statistics between the current fiscal year and the previous fiscal year, including total vouchers issued and unredeemed vouchers.
+      <div class="mt-4">
+        <div style="position: relative; height: 300px; width: 100%;"
+             data-controller="reports-chart" 
+             data-reports-chart-current-data-value="<%= @vouchers_chart_data[:current].to_json %>"
+             data-reports-chart-previous-data-value="<%= @vouchers_chart_data[:previous].to_json %>"
+             data-reports-chart-type-value="bar"
+             data-reports-chart-title-value="Voucher Statistics Comparison">
+          <div id="chart-description-vouchers" class="sr-only">
+            This chart compares voucher statistics between the current fiscal year and the previous fiscal year, including total vouchers issued and unredeemed vouchers.
+          </div>
         </div>
       </div>
       
@@ -181,7 +197,8 @@
           <span class="text-sm font-medium text-gray-900"><%= number_to_currency(@previous_fy_voucher_value) %></span>
         </div>
         
-        <div data-controller="reports-chart" 
+        <div style="position: relative; height: 300px; width: 100%;"
+             data-controller="reports-chart" 
              data-reports-chart-current-data-value="<%= { 'Total Value' => @current_fy_voucher_value.to_f }.to_json %>"
              data-reports-chart-previous-data-value="<%= { 'Total Value' => @previous_fy_voucher_value.to_f }.to_json %>"
              data-reports-chart-type-value="bar"
@@ -212,15 +229,18 @@
           </dl>
           
           <%# Current FY Services Chart %>
-          <div class="mt-4" 
-               data-controller="reports-chart" 
-               data-reports-chart-current-data-value="<%= { 'Training' => @current_fy_trainings, 'Evaluation' => @current_fy_evaluations }.to_json %>"
-               data-reports-chart-previous-data-value="<%= { 'Training' => 0, 'Evaluation' => 0 }.to_json %>"
-               data-reports-chart-type-value="bar"
-               data-reports-chart-compact-value="true"
-               data-reports-chart-title-value="Current FY Services">
-            <div class="sr-only">
-              Chart showing current fiscal year services: <%= @current_fy_trainings %> training sessions and <%= @current_fy_evaluations %> evaluation sessions.
+          <div class="mt-4">
+            <div style="position: relative; height: 200px; width: 100%;"
+                 data-controller="reports-chart" 
+                 data-reports-chart-chart-height-value="200" 
+                 data-reports-chart-current-data-value="<%= { 'Training' => @current_fy_trainings, 'Evaluation' => @current_fy_evaluations }.to_json %>"
+                 data-reports-chart-previous-data-value="<%= { 'Training' => 0, 'Evaluation' => 0 }.to_json %>"
+                 data-reports-chart-type-value="bar"
+                 data-reports-chart-compact-value="true"
+                 data-reports-chart-title-value="Current FY Services">
+              <div class="sr-only">
+                Chart showing current fiscal year services: <%= @current_fy_trainings %> training sessions and <%= @current_fy_evaluations %> evaluation sessions.
+              </div>
             </div>
           </div>
         </div>
@@ -239,15 +259,18 @@
           </dl>
           
           <%# Previous FY Services Chart %>
-          <div class="mt-4" 
-               data-controller="reports-chart" 
-               data-reports-chart-current-data-value="<%= { 'Training' => @previous_fy_trainings, 'Evaluation' => @previous_fy_evaluations }.to_json %>"
-               data-reports-chart-previous-data-value="<%= { 'Training' => 0, 'Evaluation' => 0 }.to_json %>"
-               data-reports-chart-type-value="bar"
-               data-reports-chart-compact-value="true"
-               data-reports-chart-title-value="Previous FY Services">
-            <div class="sr-only">
-              Chart showing previous fiscal year services: <%= @previous_fy_trainings %> training sessions and <%= @previous_fy_evaluations %> evaluation sessions.
+          <div class="mt-4">
+            <div style="position: relative; height: 200px; width: 100%;"
+                 data-controller="reports-chart" 
+                 data-reports-chart-chart-height-value="200" 
+                 data-reports-chart-current-data-value="<%= { 'Training' => @previous_fy_trainings, 'Evaluation' => @previous_fy_evaluations }.to_json %>"
+                 data-reports-chart-previous-data-value="<%= { 'Training' => 0, 'Evaluation' => 0 }.to_json %>"
+                 data-reports-chart-type-value="bar"
+                 data-reports-chart-compact-value="true"
+                 data-reports-chart-title-value="Previous FY Services">
+              <div class="sr-only">
+                Chart showing previous fiscal year services: <%= @previous_fy_trainings %> training sessions and <%= @previous_fy_evaluations %> evaluation sessions.
+              </div>
             </div>
           </div>
         </div>
@@ -267,7 +290,8 @@
           </div>
         </div>
         
-        <div data-controller="reports-chart" 
+        <div style="position: relative; height: 300px; width: 100%;"
+             data-controller="reports-chart" 
              data-reports-chart-current-data-value="<%= @services_chart_data[:current].to_json %>"
              data-reports-chart-previous-data-value="<%= @services_chart_data[:previous].to_json %>"
              data-reports-chart-type-value="radar"
@@ -297,15 +321,18 @@
           </dl>
           
           <%# Vendor Activity Bar Chart (instead of pie) %>
-          <div class="mt-4" 
-               data-controller="reports-chart" 
-               data-reports-chart-current-data-value="<%= { 'Recent' => @recent_active_vendors, 'Other' => (@active_vendors - @recent_active_vendors) }.to_json %>"
-               data-reports-chart-previous-data-value="<%= { 'Recent' => 0, 'Other' => 0 }.to_json %>"
-               data-reports-chart-type-value="bar"
-               data-reports-chart-compact-value="true"
-               data-reports-chart-title-value="Vendor Activity">
-            <div class="sr-only">
-              Chart showing vendor activity: <%= @recent_active_vendors %> vendors active in the last month out of <%= @active_vendors %> total active vendors.
+          <div class="mt-4">
+            <div style="position: relative; height: 200px; width: 100%;"
+                 data-controller="reports-chart" 
+                 data-reports-chart-chart-height-value="200" 
+                 data-reports-chart-current-data-value="<%= { 'Recent' => @recent_active_vendors, 'Other' => (@active_vendors - @recent_active_vendors) }.to_json %>"
+                 data-reports-chart-previous-data-value="<%= { 'Recent' => 0, 'Other' => 0 }.to_json %>"
+                 data-reports-chart-type-value="bar"
+                 data-reports-chart-compact-value="true"
+                 data-reports-chart-title-value="Vendor Activity">
+              <div class="sr-only">
+                Chart showing vendor activity: <%= @recent_active_vendors %> vendors active in the last month out of <%= @active_vendors %> total active vendors.
+              </div>
             </div>
           </div>
         </div>
@@ -362,14 +389,16 @@
       </div>
       
       <%# MFR Chart - Horizontal Bar Chart %>
-      <div class="mt-4 bg-gray-50 rounded p-4" 
-           data-controller="reports-chart" 
-           data-reports-chart-current-data-value="<%= @mfr_chart_data[:current].to_json %>"
-           data-reports-chart-previous-data-value="<%= @mfr_chart_data[:previous].to_json %>"
-           data-reports-chart-type-value="horizontalBar"
-           data-reports-chart-title-value="MFR Data">
-        <div id="chart-description-mfr" class="sr-only">
-          This horizontal bar chart shows the number of applications approved and vouchers issued during the previous fiscal year for MFR reporting purposes.
+      <div class="mt-4 bg-gray-50 rounded p-4">
+        <div style="position: relative; height: 300px; width: 100%;"
+             data-controller="reports-chart" 
+             data-reports-chart-current-data-value="<%= @mfr_chart_data[:current].to_json %>"
+             data-reports-chart-previous-data-value="<%= @mfr_chart_data[:previous].to_json %>"
+             data-reports-chart-type-value="horizontalBar"
+             data-reports-chart-title-value="MFR Data">
+          <div id="chart-description-mfr" class="sr-only">
+            This horizontal bar chart shows the number of applications approved and vouchers issued during the previous fiscal year for MFR reporting purposes.
+          </div>
         </div>
       </div>
     </section>
