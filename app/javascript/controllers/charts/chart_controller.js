@@ -74,13 +74,8 @@ export default class extends ChartBaseController {
     // 4) Turn string values into numbers (with fallback to 0)
     const numericData = this.prepareChartData()
 
-    // 5) Build an "animated" override on top of base defaults
-    const responsiveOverrides = {
-      animation: {
-        duration: 800,
-        easing: "easeOutQuart"
-      }
-    }
+    // 5) Use responsive overrides (animations controlled globally)
+    const responsiveOverrides = {}
 
     // 6) Custom plugin/scale settings (legends, tooltips, axis labels, etc.)
     const customOptions = {

@@ -21,6 +21,9 @@ class ReportsChartController extends ChartBaseController {
   connect() {
     super.connect()
     
+    // Generate unique ID for this controller instance
+    this.controllerId = Math.random().toString(36).substr(2, 4)
+    
     const Chart = this.getChart()
     if (!Chart) {
       return this.handleUnavailable()
@@ -52,13 +55,13 @@ class ReportsChartController extends ChartBaseController {
   // Stimulus value change callbacks for live updates
   currentDataValueChanged() {
     if (this.chartInstance && this.validateData(this.currentDataValue, "current data")) {
-      this.initializeChart()
+      this.updateChartData()
     }
   }
 
   previousDataValueChanged() {
     if (this.chartInstance) {
-      this.initializeChart()
+      this.updateChartData()
     }
   }
 
@@ -90,15 +93,33 @@ class ReportsChartController extends ChartBaseController {
     }
   }
 
+  // Update existing chart with new data (Chart.js best practice)
+  updateChartData() {
+    if (!this.chartInstance) {
+      return
+    }
+
+    const { labels, currentValues, previousValues } = this.extractData()
+    
+    // Update chart data directly per Chart.js docs
+    this.chartInstance.data.labels = labels
+    this.chartInstance.data.datasets[0].data = currentValues
+    if (this.chartInstance.data.datasets[1]) {
+      this.chartInstance.data.datasets[1].data = previousValues
+    }
+    
+    // Call update() to render changes (with no animation for performance)
+    this.chartInstance.update('none')
+  }
+
   renderChart() {
     const Chart = this.getChart()
     
     // Clean up any existing chart
     this.cleanupExistingChart()
 
-    // Override chartHeightValue based on compact mode
-    const height = this.compactValue ? 200 : this.chartHeightValue
-    this.chartHeightValue = height
+    // Container sizing is handled by ERB templates
+    // Compact mode should be handled in the template, not JavaScript
     
     // Create and mount canvas
     const { canvas, desc } = this.createCanvas(
@@ -114,7 +135,7 @@ class ReportsChartController extends ChartBaseController {
     const { labels, currentValues, previousValues } = this.extractData()
     const config = this.buildConfig(Chart, labels, currentValues, previousValues)
 
-    // Create chart directly 
+    // Create chart instance
     this.chartInstance = new Chart(ctx, config)
   }
 

@@ -58,10 +58,6 @@ if (process.env?.NODE_ENV === "development") {
   })
 }
 
-// Configure Chart.js global defaults
-if (typeof window !== 'undefined' && window.Chart) {
-  chartConfig.configureGlobalDefaults(window.Chart)
-}
 
 // Admin Controllers
 application.register("role-select", RoleSelectController)

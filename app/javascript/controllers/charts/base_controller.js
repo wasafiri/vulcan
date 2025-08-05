@@ -22,8 +22,8 @@ class ChartBaseController extends Controller {
 
   connect() {
     this.cleanupExistingChart()
-    this.element.style.width = '100%'
-    this.element.style.height = this.chartHeightValue + 'px'
+    // Chart.js container positioning is handled by ERB templates
+    // Controller only manages chart behavior, not styling
   }
 
   disconnect() {
@@ -48,10 +48,13 @@ class ChartBaseController extends Controller {
 
   createCanvas(ariaLabel, ariaDesc) {
     const canvas = document.createElement("canvas")
-    canvas.style.display = 'block'
-    canvas.style.width = '100%'
-    canvas.style.height = '100%'
 
+    // When responsive: false, Chart.js requires the canvas to have explicit dimensions.
+    // We set them here based on the container's calculated width and the specified height.
+    // This prevents Chart.js from entering its own measurement logic, which causes recursion.
+    canvas.width = this.element.clientWidth
+    canvas.height = this.chartHeightValue
+    
     // Add accessibility attributes
     canvas.setAttribute("role", "img")
     canvas.setAttribute("aria-label", ariaLabel)
@@ -77,6 +80,12 @@ class ChartBaseController extends Controller {
   mountCanvas(canvas, desc) {
     // Clear container and mount canvas with description
     this.element.textContent = ""
+    
+    // Add fallback content inside canvas for accessibility (Chart.js docs recommendation)
+    const fallback = document.createElement("p")
+    fallback.textContent = canvas.getAttribute("aria-label") || "Chart data visualization"
+    canvas.appendChild(fallback)
+    
     this.element.appendChild(canvas)
     this.element.appendChild(desc)
   }
@@ -153,9 +162,9 @@ class ChartBaseController extends Controller {
     return chartConfig.formatters
   }
 
-  // Deep merge helper for chart options (delegated to service)
+  // Simple merge helper for chart options
   mergeOptions(defaultOptions, customOptions) {
-    return chartConfig.deepMerge(defaultOptions, customOptions)
+    return chartConfig.mergeOptions(defaultOptions, customOptions)
   }
 
   // Get compact configuration
