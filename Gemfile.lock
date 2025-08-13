@@ -409,15 +409,15 @@ GEM
     ruby_parser (3.21.1)
       racc (~> 1.5)
       sexp_processor (~> 4.16)
-    rubyzip (3.0.0.rc2)
+    rubyzip (3.0.1)
     safety_net_attestation (0.4.0)
       jwt (~> 2.0)
     securerandom (0.4.1)
-    selenium-webdriver (4.34.0)
+    selenium-webdriver (4.35.0)
       base64 (~> 0.2)
       logger (~> 1.4)
       rexml (~> 3.2, >= 3.2.5)
-      rubyzip (>= 1.2.2, < 3.0)
+      rubyzip (>= 1.2.2, < 4.0)
       websocket (~> 1.0)
     sexp_processor (4.17.3)
     smart_properties (1.17.0)
@@ -548,7 +548,7 @@ DEPENDENCIES
   rubocop-capybara
   rubocop-factory_bot
   rubocop-rails
-  rubyzip (= 3.0.0.rc2)
+  rubyzip (= 3.0.1)
   selenium-webdriver
   smarter_csv
   solid_cable
