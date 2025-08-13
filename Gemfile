@@ -33,7 +33,7 @@ gem 'rotp'
 # gem for QR code generation for TOTP
 gem 'rqrcode'
 # gem for creating zip files
-gem 'rubyzip', '3.0.0.rc2'
+gem 'rubyzip', '3.0.1'
 # hotwire's modest JavaScript framework [https://stimulus.hotwired.dev]
 gem 'stimulus-rails'
 # Add HTTP asset caching/compression and X-Sendfile acceleration to Puma [https://github.com/basecamp/thruster/]
