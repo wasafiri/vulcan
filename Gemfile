@@ -27,7 +27,7 @@ gem 'propshaft'
 # use the Puma web server [https://github.com/puma/puma]
 gem 'puma', '>= 6.6.0'
 # rails framework
-gem 'rails', '~> 8.0.2'
+gem 'rails', '~> 8.0.4'
 # gem for one-time passwords for SMS 2fa
 gem 'rotp'
 # gem for QR code generation for TOTP
