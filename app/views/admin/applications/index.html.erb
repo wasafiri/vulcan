@@ -38,11 +38,11 @@
                   <span>Upload Paper Application</span>
                 <% end %>
                 
-                <%= link_to admin_print_queue_index_path, class: "relative inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
-                  <span class="inline-block pr-2">Print Queue</span>
-                  <% pending_count = PrintQueueItem.pending.count rescue 0 %>
+                <%= link_to admin_print_queue_index_path, class: "inline-flex items-center px-4 py-2 min-h-[44px] border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
+                  <span>Print Queue</span>
+                  <% pending_count = @print_queue_pending_count || 0 %>
                   <% if pending_count > 0 %>
-                    <span class="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white">
+                    <span class="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white">
                       <%= pending_count %>
                     </span>
                   <% end %>
@@ -166,7 +166,8 @@
           <div class="mt-2">
             <%= link_to params[:filter] == 'active' ? admin_applications_path : admin_applications_path(filter: 'active'),
                 class: "inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                aria: { label: params[:filter] == 'active' ? "View all applications" : "View only active applications" } do %>
+                aria: { label: params[:filter] == 'active' ? "View all applications" : "View only active applications" },
+                data: { turbo_frame: "applications_list" } do %>
               <span><%= params[:filter] == 'active' ? 'View All Applications' : 'View Only Active Applications' %></span>
               <svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -182,7 +183,8 @@
           <div class="mt-2">
             <%= link_to params[:filter] == 'approved' ? admin_applications_path : admin_applications_path(filter: 'approved'),
                 class: "inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                aria: { label: params[:filter] == 'approved' ? "View all applications" : "View only approved applications" } do %>
+                aria: { label: params[:filter] == 'approved' ? "View all applications" : "View only approved applications" },
+                data: { turbo_frame: "applications_list" } do %>
               <span><%= params[:filter] == 'approved' ? 'View All Applications' : 'View Only Approved' %></span>
               <svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -199,19 +201,29 @@
       <div class="flex flex-wrap gap-4">
         <%= link_to admin_applications_path(filter: 'proofs_needing_review'),
             class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 #{params[:filter] == 'proofs_needing_review' ? 'bg-gray-50' : ''}",
-            aria: { label: "View applications with proofs needing review" } do %>
+            aria: { label: "View applications with proofs needing review" },
+            data: { turbo_frame: "applications_list" } do %>
           <span>Proofs Needing Review (<%= @proofs_needing_review_count %>)</span>
         <% end %>
         
         <%= link_to admin_applications_path(filter: 'medical_certs_to_review'),
             class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 #{params[:filter] == 'medical_certs_to_review' ? 'bg-gray-50' : ''}",
-            aria: { label: "View applications with medical certifications to review" } do %>
+            aria: { label: "View applications with medical certifications to review" },
+            data: { turbo_frame: "applications_list" } do %>
           <span>Medical Certs to Review (<%= @medical_certs_to_review_count %>)</span>
+        <% end %>
+
+        <%= link_to admin_applications_path(filter: 'digitally_signed_needs_review'),
+            class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 #{params[:filter] == 'digitally_signed_needs_review' ? 'bg-gray-50' : ''}",
+            aria: { label: "View applications digitally signed but needing admin review" },
+            data: { turbo_frame: "applications_list" } do %>
+          <span>Digitally Signed (Needs Review) (<%= @digitally_signed_needs_review_count %>)</span>
         <% end %>
         
         <%= link_to admin_applications_path(filter: 'training_requests'),
             class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 #{params[:filter] == 'training_requests' ? 'bg-gray-50' : ''}",
-            aria: { label: "View applications with training requests" } do %>
+            aria: { label: "View applications with training requests" },
+            data: { turbo_frame: "applications_list" } do %>
           <span>Training Requests (<%= @training_requests_count %>)</span>
         <% end %>
       </div>
@@ -225,17 +237,16 @@
       </div>
       
       <div class="p-4 border-b">
-        <%= form_tag admin_applications_path, method: :get, class: "flex flex-wrap items-center gap-4" do %>
+        <%= form_tag admin_applications_path, method: :get, class: "flex flex-wrap items-center gap-4", data: { turbo_frame: "applications_list" } do %>
           <div class="flex items-center gap-2">
             <%= label_tag :status, "Status:", class: "text-sm font-medium text-gray-700" %>
             <%= select_tag :status, options_for_select([
               ["All", ""],
               ["Draft", "draft"],
-              ["Submitted", "submitted"],
-              ["In Review", "in_review"],
+              ["In Progress", "in_progress"],
               ["Approved", "approved"],
               ["Rejected", "rejected"]
-            ], params[:status]), class: "rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" %>
+            ], params[:status]), class: "rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50", onchange: "this.form.requestSubmit()" %>
           </div>
           
           <div class="flex items-center gap-2">
@@ -246,7 +257,7 @@
               ["Previous FY", "previous_fy"],
               ["Last 30 Days", "last_30"],
               ["Last 90 Days", "last_90"]
-            ], params[:date_range]), class: "rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" %>
+            ], params[:date_range]), class: "rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50", onchange: "this.form.requestSubmit()" %>
           </div>
           
           <div class="flex items-center gap-2">
@@ -263,39 +274,54 @@
 
           <div class="flex items-center gap-2">
             <%= label_tag :managing_guardian_q, "Managing Guardian:", class: "text-sm font-medium text-gray-700" %>
-            <%= text_field_tag :managing_guardian_q, params[:managing_guardian_q], placeholder: "Search guardian...", class: "rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" %>
+            <div class="relative rounded-md shadow-sm">
+              <%= text_field_tag :managing_guardian_q, params[:managing_guardian_q], placeholder: "Search guardian...", class: "focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-3 pr-10 py-2 sm:text-sm border-gray-300 rounded-md" %>
+              <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                </svg>
+              </div>
+            </div>
           </div>
 
           <div class="flex items-center gap-2">
             <%= label_tag :dependent_q, "Dependent:", class: "text-sm font-medium text-gray-700" %>
-            <%= text_field_tag :dependent_q, params[:dependent_q], placeholder: "Search dependent...", class: "rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-ring-indigo-200 focus:ring-opacity-50" %>
+            <div class="relative rounded-md shadow-sm">
+              <%= text_field_tag :dependent_q, params[:dependent_q], placeholder: "Search dependent...", class: "focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-3 pr-10 py-2 sm:text-sm border-gray-300 rounded-md" %>
+              <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                </svg>
+              </div>
+            </div>
           </div>
 
           <div class="flex items-center gap-2">
-            <%= check_box_tag :for_minors, "true", params[:for_minors].present?, class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" %>
+            <%= check_box_tag :for_minors, "true", params[:for_minors].present?, class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded", onchange: "this.form.requestSubmit()" %>
             <%= label_tag :for_minors, "Show only dependent applications", class: "text-sm font-medium text-gray-700" %>
           </div>
 
-          <%= submit_tag "Apply Filters", class: "inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
-          <%= link_to "Clear Filters", admin_applications_path, class: "ml-2 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+          <%= link_to "Clear Filters", admin_applications_path, class: "inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500", data: { turbo_frame: "applications_list" } %>
         <% end %>
       </div>
 
-      <div class="overflow-x-auto">
-        <% if @applications.present? %>
-          <%= render partial: 'applications_table', locals: { applications: @applications } %>
-        <% else %>
-          <div class="p-6 text-center">
-            <p class="text-gray-500">No applications found</p>
+      <%= turbo_frame_tag "applications_list" do %>
+        <div class="overflow-x-auto">
+          <% if @applications.present? %>
+            <%= render partial: 'applications_table', locals: { applications: @applications } %>
+          <% else %>
+            <div class="p-6 text-center">
+              <p class="text-gray-500">No applications found</p>
+            </div>
+          <% end %>
+        </div>
+
+        <%# Pagination %>
+        <% if @pagy && @pagy.pages > 1 %>
+          <div class="px-4 py-3 border-t">
+            <%== pagy_nav(@pagy) %>
           </div>
         <% end %>
-      </div>
-
-      <%# Pagination %>
-      <% if @pagy && @pagy.pages > 1 %>
-        <div class="px-4 py-3 border-t">
-          <%== pagy_nav(@pagy) %>
-        </div>
       <% end %>
     </section>
 
@@ -339,7 +365,7 @@
                  data-reports-chart-type-value="bar"
                  data-reports-chart-title-value="Application Pipeline"
                  data-reports-chart-hidden-class="hidden"
-                 style="position: relative; height: 300px; width: 100%;">
+                 class="relative w-full h-[300px]">
               <div class="sr-only" aria-labelledby="pipeline-heading">
                 Chart showing application pipeline: <%= @submitted_count %> submitted, <%= @in_review_count %> in review, and <%= @approved_count %> approved applications.
               </div>
@@ -377,7 +403,7 @@
                  data-reports-chart-type-value="polarArea"
                  data-reports-chart-title-value="Status Breakdown"
                  data-reports-chart-hidden-class="hidden"
-                 style="position: relative; height: 300px; width: 100%;">
+                 class="relative w-full h-[300px]">
               <div class="sr-only" aria-labelledby="status-breakdown-heading">
                 Chart showing status breakdown: <%= @draft_count %> draft, <%= @in_progress_count %> in progress, <%= @approved_count %> approved, and <%= @rejected_count %> rejected applications.
               </div>
@@ -397,7 +423,7 @@
                   total = draft_count + in_progress_count + approved_count + rejected_count
                   if total > 0
                 %>
-                  (<%= number_to_percentage((draft_count.to_f / total) * 100, precision: 1) %>)
+                  (<%= calculate_percentage(draft_count, total) %>)
                 <% end %>
               </span>
             </div>
@@ -406,7 +432,7 @@
               <span class="text-sm font-bold">
                 <%= @in_progress_count || 0 %>
                 <% if total > 0 %>
-                  (<%= number_to_percentage((in_progress_count.to_f / total) * 100, precision: 1) %>)
+                  (<%= calculate_percentage(in_progress_count, total) %>)
                 <% end %>
               </span>
             </div>
@@ -415,7 +441,7 @@
               <span class="text-sm font-bold">
                 <%= @approved_count || 0 %>
                 <% if total > 0 %>
-                  (<%= number_to_percentage((approved_count.to_f / total) * 100, precision: 1) %>)
+                  (<%= calculate_percentage(approved_count, total) %>)
                 <% end %>
               </span>
             </div>
@@ -424,7 +450,7 @@
               <span class="text-sm font-bold">
                 <%= @rejected_count || 0 %>
                 <% if total > 0 %>
-                  (<%= number_to_percentage((rejected_count.to_f / total) * 100, precision: 1) %>)
+                  (<%= calculate_percentage(rejected_count, total) %>)
                 <% end %>
               </span>
             </div>

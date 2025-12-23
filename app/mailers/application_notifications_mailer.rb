@@ -16,7 +16,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
 
     # Set up mail options with CC for alternate contact if provided
     mail_options = {
-      to: @user.email,
+      to: @user.effective_email,
       subject: 'Your Application Has Been Submitted',
       message_stream: 'notifications'
     }
@@ -41,7 +41,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
 
     variables = build_proof_approved_variables(application, proof_review)
 
-    send_email(application.user.email, text_template, variables)
+    send_email(application.user.effective_email, text_template, variables)
   rescue StandardError => e
     Rails.logger.error("Failed to send proof approval email for application #{application&.id}, proof_review #{proof_review&.id}: #{e.message}")
     Rails.logger.error(e.backtrace.join("\n"))
@@ -79,7 +79,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
 
     variables = build_max_rejections_variables(application, reapply_date)
 
-    send_email(application.user.email, text_template, variables)
+    send_email(application.user.effective_email, text_template, variables)
   rescue StandardError => e
     Rails.logger.error("Failed to send max rejections email for application #{application&.id}: #{e.message}")
     Rails.logger.error(e.backtrace.join("\n"))
@@ -170,7 +170,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
     rendered_subject, rendered_text_body = text_template.render(**variables)
 
     message = mail(
-      to: user.email,
+      to: user.effective_email,
       subject: rendered_subject,
       message_stream: 'notifications'
     ) do |format|
@@ -187,7 +187,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
   end
 
   def proof_received(application, proof_type)
-    template_name = 'application_notifications_proof_approved'
+    template_name = 'application_notifications_proof_received'
     text_template = find_email_template(template_name)
 
     variables = build_proof_received_variables(application, proof_type)
@@ -197,7 +197,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
     rendered_subject = rendered_subject.gsub(/approved/i, 'received').gsub(/Approved/i, 'Received')
 
     mail(
-      to: application.user.email,
+      to: application.user.effective_email,
       subject: rendered_subject,
       message_stream: 'notifications'
     ) do |format|
@@ -301,6 +301,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
     base_variables = build_base_email_variables(header_title, 'MAT Program')
     proof_variables = {
       user_first_name: user.first_name,
+      constituent_full_name: user.full_name,
       organization_name: 'MAT Program',
       proof_type_formatted: proof_type_formatted,
       rejection_reason: proof_review.rejection_reason,
@@ -319,12 +320,12 @@ class ApplicationNotificationsMailer < ApplicationMailer
       {
         remaining_attempts_message_text: build_remaining_attempts_message(remaining_attempts, reapply_date),
         default_options_text: build_default_options_text(sign_in_url_value),
-        archived_message_text: nil
+        archived_message_text: ''
       }
     else
       {
-        remaining_attempts_message_text: nil,
-        default_options_text: nil,
+        remaining_attempts_message_text: '',
+        default_options_text: '',
         archived_message_text: build_archived_message(reapply_date)
       }
     end
@@ -373,16 +374,18 @@ class ApplicationNotificationsMailer < ApplicationMailer
 
   def build_proof_approved_variables(application, proof_review)
     user = application.user
+    organization_name = Policy.get('organization_name') || 'MAT Program'
     proof_type_formatted = format_proof_type(proof_review.proof_type)
     all_proofs_approved = application.respond_to?(:all_proofs_approved?) && application.all_proofs_approved?
+    all_proofs_approved_message_text = all_proofs_approved ? 'All required documents for your application have now been approved.' : ''
     header_title = "Document Review Update: #{proof_type_formatted.capitalize} Approved"
 
     base_variables = build_base_email_variables(header_title, 'MAT Program')
     proof_variables = {
       user_first_name: user.first_name,
-      organization_name: 'MAT Program',
+      organization_name: organization_name,
       proof_type_formatted: proof_type_formatted,
-      all_proofs_approved_message_text: all_proofs_approved ? 'All required documents for your application have now been approved.' : nil
+      all_proofs_approved_message_text: all_proofs_approved_message_text
     }
 
     base_variables.merge(proof_variables).compact
@@ -627,8 +630,7 @@ class ApplicationNotificationsMailer < ApplicationMailer
     received_variables = {
       user_first_name: user.first_name,
       organization_name: organization_name,
-      proof_type_formatted: proof_type_formatted,
-      all_proofs_approved_message_text: nil
+      proof_type_formatted: proof_type_formatted
     }
 
     base_variables.merge(received_variables).compact

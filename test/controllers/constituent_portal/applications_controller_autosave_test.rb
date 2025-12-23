@@ -43,6 +43,9 @@ module ConstituentPortal
     end
 
     test 'should autosave Application field for new draft' do
+      # Delete the existing draft so a new one can be created
+      @draft_application.destroy
+      
       # Test autosaving for a new application (no ID provided)
       assert_difference('Application.count') do
         patch autosave_field_constituent_portal_applications_path,
@@ -70,7 +73,7 @@ module ConstituentPortal
             as: :json
 
       # Verify the response indicates error
-      assert_response :unprocessable_entity
+      assert_response :unprocessable_content
       response_data = response.parsed_body
       assert_not response_data['success']
       assert response_data['errors'].present?
@@ -226,7 +229,7 @@ module ConstituentPortal
             as: :json
 
       # Verify the response indicates error
-      assert_response :unprocessable_entity
+      assert_response :unprocessable_content
       response_data = response.parsed_body
       assert_not response_data['success']
       assert response_data['errors'].present?
@@ -242,7 +245,7 @@ module ConstituentPortal
             as: :json
 
       # Verify the response indicates error
-      assert_response :unprocessable_entity
+      assert_response :unprocessable_content
       response_data = response.parsed_body
       assert_not response_data['success']
       assert response_data['errors'].present?

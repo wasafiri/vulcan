@@ -26,8 +26,8 @@ module ConstituentPortal
     class ApplicationCreationError < StandardError; end
     class DisabilityValidationError < StandardError; end
 
-    before_action :authenticate_user!, except: [:fpl_thresholds]
-    before_action :require_constituent!, except: [:fpl_thresholds]
+    before_action :authenticate_user!
+    before_action :require_constituent!
     before_action :set_application, only: %i[show edit update verify submit]
     before_action :ensure_editable, only: %i[edit update]
     before_action :setup_address_for_form, only: %i[new edit]
@@ -57,6 +57,8 @@ module ConstituentPortal
     end
 
     def new
+      return if redirect_to_existing_application
+
       initialize_new_application
       setup_applicant_context
       setup_form_dependencies
@@ -72,6 +74,8 @@ module ConstituentPortal
         @application.medical_provider_fax,
         @application.medical_provider_email
       )
+      # Set applicant user for form display (dependent if application is for dependent, otherwise current user)
+      @applicant_user = @application.for_dependent? ? @application.user : current_user
     end
 
     def create
@@ -155,7 +159,7 @@ module ConstituentPortal
         redirect_with_notice(constituent_portal_application_path(@application),
                              'Application submitted successfully!')
       else
-        render :verify, status: :unprocessable_entity
+        render :verify, status: :unprocessable_content
       end
     end
 
@@ -199,31 +203,16 @@ module ConstituentPortal
       render_autosave_error('An error occurred during autosave', :internal_server_error)
     end
 
-    # Legacy AJAX endpoint for FPL thresholds - delegates to IncomeThresholdCalculationService
-    # TODO: Consider removing this endpoint in favor of server-rendered data
-    def fpl_thresholds
-      thresholds = {}
-      modifier = nil
-
-      (1..8).each do |size|
-        result = IncomeThresholdCalculationService.call(size)
-        if result.success?
-          thresholds[size.to_s] = result.data[:base_fpl]
-          modifier ||= result.data[:modifier] # Get modifier from first successful call
-        else
-          thresholds[size.to_s] = 0 # Fallback for failed calculations
-        end
-      end
-
-      render json: { thresholds: thresholds, modifier: modifier || 400 }
-    end
-
-    # Helper methods for FPL data - delegates to IncomeThresholdCalculationService
+    # Server-rendered FPL data helper methods
+    # These inject threshold data into HTML data attributes for client-side validation
+    # This is the Rails-idiomatic approach: data is rendered once on page load, avoiding
+    # unnecessary AJAX requests for static configuration data.
     # See: app/services/income_threshold_calculation_service.rb for core FPL logic
     helper_method :fpl_thresholds_json, :fpl_modifier_value
 
     def fpl_thresholds_json
       # Generate FPL threshold data for JavaScript using IncomeThresholdCalculationService
+      # Returns JSON string of base FPL values for household sizes 1-8
       thresholds = (1..8).to_h do |size|
         result = IncomeThresholdCalculationService.call(size)
         if result.success?
@@ -236,7 +225,8 @@ module ConstituentPortal
     end
 
     def fpl_modifier_value
-      # Get FPL modifier percentage via IncomeThresholdCalculationService (uses any household size)
+      # Get FPL modifier percentage via IncomeThresholdCalculationService
+      # Returns the policy-configured modifier (e.g., 400 for 400% FPL)
       result = IncomeThresholdCalculationService.call(1)
       if result.success?
         result.data[:modifier]
@@ -250,6 +240,7 @@ module ConstituentPortal
     def initialize_new_application
       @application = current_user.applications.new
       @application.medical_provider_attributes ||= {}
+      @applicant_user = current_user # Default to current user for self applications
     end
 
     def setup_applicant_context
@@ -320,6 +311,7 @@ module ConstituentPortal
       @application.user = dependent
       @application.user_id = dependent.id
       @application.managing_guardian_id = current_user.id
+      @applicant_user = dependent # Set for use in view to display correct disability flags
     end
 
     def for_dependent_application?
@@ -334,6 +326,62 @@ module ConstituentPortal
       # AddressHelper concern: Uses standardized address creation from user data
       # Flow: address_from_user(user) -> creates ApplicationDataStructures::Address object
       @address = address_from_user(current_user)
+    end
+
+    # Application existence checks (memoized for performance)
+    # Determines the target user ID (self or dependent) for application operations
+    def target_user_id
+      @target_user_id ||= params[:user_id].presence&.to_i || current_user.id
+    end
+
+    # Finds existing draft application for target user
+    # For dependent applications, only finds drafts managed by current guardian
+    def existing_draft
+      @existing_draft ||= begin
+        scope = Application.draft_for_constituent(target_user_id)
+        # If this is for a dependent (user_id param present and != current_user),
+        # only look for applications managed by current user
+        scope = scope.where(managing_guardian_id: current_user.id) if params[:user_id].present? && target_user_id != current_user.id
+        scope.first
+      end
+    end
+
+    # Finds existing active (non-draft) application for target user
+    # For dependent applications, only finds active apps managed by current guardian
+    def existing_active_application
+      @existing_active_application ||= begin
+        scope = Application.active_for_constituent(target_user_id)
+        # If this is for a dependent (user_id param present and != current_user),
+        # only look for applications managed by current user
+        scope = scope.where(managing_guardian_id: current_user.id) if params[:user_id].present? && target_user_id != current_user.id
+        scope.first
+      end
+    end
+
+    # Check and redirect if existing application (draft or active) exists
+    # Returns true if redirected, false otherwise
+    def redirect_to_existing_application
+      # Priority 1: Redirect to edit if draft exists (user has unfinished work)
+      if existing_draft
+        user_name = existing_draft.user.full_name
+        redirect_with_notice(
+          edit_constituent_portal_application_path(existing_draft),
+          "Continuing your draft application for #{user_name}"
+        )
+        return true
+      end
+
+      # Priority 2: Block if active application exists (already submitted/processing)
+      if existing_active_application
+        user_name = existing_active_application.user.full_name
+        redirect_with_alert(
+          constituent_portal_application_path(existing_active_application),
+          "#{user_name} already has an active application. Please wait for this application to be processed."
+        )
+        return true
+      end
+
+      false
     end
 
     def handle_creation_failure(result)
@@ -354,7 +402,7 @@ module ConstituentPortal
       end
 
       prepare_medical_provider_for_edit
-      render :edit, status: :unprocessable_entity
+      render :edit, status: :unprocessable_content
     end
 
     def determine_update_notice(original_status, application)
@@ -397,7 +445,7 @@ module ConstituentPortal
           message: result[:message]
         }, status: :ok
       else
-        render json: { success: false, errors: result[:errors] }, status: :unprocessable_entity
+        render json: { success: false, errors: result[:errors] }, status: :unprocessable_content
       end
     end
 
@@ -461,23 +509,14 @@ module ConstituentPortal
     end
 
     def find_application_by_standard_query
-      Application.where(id: params[:id])
-                 .where(
-                   'user_id = :uid
-                   OR managing_guardian_id = :uid
-                   OR EXISTS (
-                       SELECT 1 FROM guardian_relationships gr
-                       WHERE gr.guardian_id = :uid
-                         AND gr.dependent_id = applications.user_id
-                   )',
-                   uid: current_user.id
-                 )
-                 .first
+      # Use model scope for Rails-centric query building
+      Application.accessible_by(current_user).find_by(id: params[:id])
     end
 
     def find_application_by_flexible_query
-      app = Application.find_by(id: params[:id], user_id: current_user.id)
-      app&.user == current_user ? app : nil
+      # Fallback: check if application exists and is accessible
+      app = Application.find_by(id: params[:id])
+      app&.accessible_by?(current_user) ? app : nil
     end
 
     def handle_application_not_found
@@ -486,10 +525,24 @@ module ConstituentPortal
     end
 
     def ensure_editable
-      return if @application.status_draft?
+      # Check if application status allows editing
+      unless @application.status_draft?
+        redirect_to constituent_portal_application_path(@application),
+                    alert: 'This application has already been submitted and cannot be edited.'
+        return
+      end
 
-      redirect_to constituent_portal_application_path(@application),
-                  alert: 'This application has already been submitted and cannot be edited.'
+      # Use model's authorization method (Rails-centric approach)
+      return if @application.editable_by?(current_user)
+
+      # Provide specific feedback based on the situation
+      if @application.for_dependent?
+        redirect_to constituent_portal_application_path(@application),
+                    alert: 'This application is managed by a guardian. Only the managing guardian can edit it.'
+      else
+        redirect_to constituent_portal_application_path(@application),
+                    alert: 'You do not have permission to edit this application.'
+      end
     end
 
     def application_params

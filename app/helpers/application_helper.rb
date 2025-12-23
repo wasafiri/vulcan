@@ -8,10 +8,12 @@ module ApplicationHelper
   include BadgeHelper
 
   def flash_class_for(flash_type)
-    case flash_type
-    when 'notice' then 'bg-green-100 border border-green-400 text-green-700'
-    when 'alert' then 'bg-red-100 border border-red-400 text-red-700'
-    else 'bg-blue-100 border border-blue-400 text-blue-700'
+    case flash_type.to_s
+    when 'notice', 'success' then 'bg-green-100 border border-green-400 text-green-700'
+    when 'alert', 'error' then 'bg-red-100 border border-red-400 text-red-700'
+    when 'warning' then 'bg-yellow-100 border border-yellow-400 text-yellow-700'
+    when 'info' then 'bg-blue-100 border border-blue-400 text-blue-700'
+    else 'bg-gray-100 border border-gray-400 text-gray-700'
     end
   end
 
@@ -64,6 +66,23 @@ module ApplicationHelper
                 class: "px-3 py-2 text-sm font-medium rounded-full whitespace-nowrap inline-flex items-center justify-center #{badge_class_for(
                   :certification, application.medical_certification_status
                 )}")
+  end
+
+  def document_signing_status_badge(application)
+    return nil unless application.document_signing_status.present?
+    return nil if application.document_signing_status == 'not_sent'
+    
+    status = application.document_signing_status
+    label = case status.to_s
+            when 'sent' then 'Sent for Signing'
+            when 'opened' then 'Opened by Provider'
+            when 'signed' then 'Signed by Provider'
+            when 'declined' then 'Declined by Provider'
+            else status.to_s.humanize
+            end
+
+    content_tag(:span, label,
+                class: "px-2 py-1 text-xs font-medium rounded-full whitespace-nowrap inline-flex items-center justify-center #{badge_class_for(:document_signing, status)}")
   end
 
   # Determines the appropriate proof review button text based on proof status
