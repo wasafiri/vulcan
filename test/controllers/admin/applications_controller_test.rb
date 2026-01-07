@@ -244,5 +244,58 @@ module Admin
       # in the database - we'll check the response message instead to verify the
       # controller understood the right response from the service
     end
+
+    test 'should send document signing request successfully' do
+      # Mock the service to match actual controller call signature
+      mock_result = OpenStruct.new(success?: true, message: 'Document signing request sent successfully')
+      mock_service = mock('service')
+      mock_service.stubs(:call).returns(mock_result)
+      DocumentSigning::SubmissionService.stubs(:new).with(
+        application: @application,
+        actor: @admin,
+        service: 'docuseal'
+      ).returns(mock_service)
+
+      post send_document_signing_request_admin_application_path(@application)
+
+      assert_redirected_to admin_application_path(@application)
+      follow_redirect!(headers: { 'X-Test-User-Id' => @test_user_id.to_s })
+      assert_response :success
+      assert_match(/Document signing request sent successfully/, flash[:notice])
+    end
+
+    test 'should handle document signing request failure' do
+      # Mock a failed service call to match actual controller call signature
+      mock_result = OpenStruct.new(success?: false, message: 'Medical provider email is required')
+      mock_service = mock('service')
+      mock_service.stubs(:call).returns(mock_result)
+      DocumentSigning::SubmissionService.stubs(:new).with(
+        application: @application,
+        actor: @admin,
+        service: 'docuseal'
+      ).returns(mock_service)
+
+      post send_document_signing_request_admin_application_path(@application)
+
+      assert_redirected_to admin_application_path(@application)
+      follow_redirect!(headers: { 'X-Test-User-Id' => @test_user_id.to_s })
+      assert_response :success
+      assert_match(/Medical provider email is required/, flash[:alert])
+    end
+
+    test 'should pass correct parameters to document signing service' do
+      # Verify that the service is called with the right parameters including service param
+      mock_service = mock('service')
+      mock_service.stubs(:call).returns(OpenStruct.new(success?: true, message: 'Success'))
+      DocumentSigning::SubmissionService.expects(:new).with(
+        application: @application,
+        actor: @admin,
+        service: 'docuseal'
+      ).returns(mock_service).once
+
+      post send_document_signing_request_admin_application_path(@application)
+
+      assert_redirected_to admin_application_path(@application)
+    end
   end
 end

@@ -1,7 +1,6 @@
 <main class="container mx-auto px-4 py-8" role="main" aria-labelledby="application-title">
   <div data-controller="modal">
   <div class="max-w-7xl mx-auto">
-    <%= render 'shared/flash' %>
     <!-- Header Section -->
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
       <h1 id="application-title" class="text-3xl font-bold text-gray-900 mb-4 md:mb-0">
@@ -77,8 +76,8 @@
         <div>
           <dt class="text-sm font-medium text-gray-500">Email</dt>
           <dd class="mt-1 text-sm text-gray-900">
-            <% if @application.user&.email.present? %>
-              <%= mail_to @application.user.email, class: "text-indigo-600 hover:text-indigo-500" %>
+            <% if @application.user&.effective_email.present? %>
+              <%= mail_to @application.user.effective_email, class: "text-indigo-600 hover:text-indigo-500" %>
             <% else %>
               No email provided
             <% end %>
@@ -155,7 +154,7 @@
         </div>
         <div>
           <dt class="text-sm font-medium text-gray-500">Income Verification Status</dt>
-          <dd class="mt-1 text-sm text-gray-900"><%= @application.income_proof_status&.titleize || "Pending" %></dd>
+          <dd class="mt-1 text-sm text-gray-900"><%= proof_status_badge('income', @application.income_proof_status) %></dd>
         </div>
         <div>
           <dt class="text-sm font-medium text-gray-500">Income Details</dt>
@@ -194,97 +193,8 @@
     </section>
 
     <!-- Medical Certification Section -->
-    <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="certification-title" data-testid="medical-certification-section">
-      <div class="flex justify-between items-start">
-        <h2 id="certification-title" class="text-xl font-semibold text-gray-900">Medical Certification</h2>
-        <%= medical_certification_status_badge(@application) %>
-      </div>
-
-      <div class="mt-6 space-y-4">
-        <!-- Fax Upload Form and History -->
-        <%= render "medical_certification_upload" %>
-
-        <!-- Provider Information -->
-        <% if @application.medical_provider_name.present? %>
-          <div class="mb-4" data-testid="provider-information">
-            <h3 class="text-sm font-medium text-gray-700 mb-2">Provider Information</h3>
-            <div class="pl-4 border-l-2 border-gray-200">
-              <p class="text-sm font-medium text-gray-900"><%= @application.medical_provider_name %></p>
-              <p class="text-sm text-gray-600">
-                <% if @application.medical_provider_phone.present? %>
-                  Phone: <%= @application.medical_provider_phone %>
-                <% end %>
-                <% if @application.respond_to?(:medical_provider_fax) && @application.medical_provider_fax.present? %>
-                  <% if @application.medical_provider_phone.present? %> / <% end %>
-                  Fax: <%= @application.medical_provider_fax %>
-                <% end %>
-                <% if @application.medical_provider_email.present? %>
-                  <br>Email: <%= @application.medical_provider_email %>
-                <% end %>
-              </p>
-            </div>
-          </div>
-        <% end %>
-
-        <!-- Action Buttons -->
-        <div class="mt-6">
-          <%
-            # Use instance variables that might be preloaded in the controller
-            # or load them once if not already available
-            request_count = @application.medical_certification_request_count || 0
-
-            if !defined?(@latest_certification_request) || @latest_certification_request.nil?
-              @latest_certification_request = Notification
-                .where(notifiable: @application, action: "medical_certification_requested")
-                .order(created_at: :desc)
-                .limit(1)
-                .first
-            end
-
-            if !defined?(@latest_certification_reject) || @latest_certification_reject.nil?
-              @latest_certification_reject = Notification
-                .where(notifiable: @application, action: "medical_certification_rejected")
-                .order(created_at: :desc)
-                .limit(1)
-                .first
-            end
-
-            # Check if we have both a request and a rejection, and if the request is more recent than the rejection
-            requested_after_rejection = @latest_certification_request.present? &&
-                                       @latest_certification_reject.present? &&
-                                       @latest_certification_request.created_at > @latest_certification_reject.created_at
-          %>
-
-          <% if @application.medical_certification_status == "not_requested" ||
-                @application.medical_certification_status == "rejected" ||
-                (@application.medical_certification_status == "requested" && !@application.medical_certification.attached?) %>
-            <!-- Send Request button -->
-            <% button_text = request_count.zero? ? "Send Request" : "Resend Request" %>
-            <%= button_to resend_medical_certification_admin_application_path(@application),
-                method: :post,
-                class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500",
-                data: {
-                  turbo_confirm: "Do you want to #{request_count.zero? ? 'send' : 'resend'} #{@application.medical_provider_name} the request to fill out #{@application.constituent_full_name}'s disability certification form?"
-                } do %>
-              <%= button_text %>
-            <% end %>
-          <% elsif (@application.medical_certification_status == "received" ||
-                 (@application.medical_certification_status == "requested" && @application.medical_certification.attached?) ||
-                 requested_after_rejection) &&
-                 !["approved"].include?(@application.medical_certification_status) %>
-            <!-- Review button - Show this only when we have a certification to review AND it's not already accepted/approved -->
-            <button type="button"
-                  data-action="click->modal#open"
-                  data-modal-id="medicalCertificationReviewModal"
-                  class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">
-              Review Certification
-            </button>
-          <!-- View Certification Button Moved to Medical Certification Upload Partial -->
-          <% end %>
-
-          <%# View History button removed - history already shown in the certification section %>
-        </div>
-      </div>
+    <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="certification-title" id="medical-certification-section" data-testid="medical-certification-section">
+      <%= render "medical_certification_section" %>
     </section>
 
     <!-- Attachments Section (Proofs) -->

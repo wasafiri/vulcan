@@ -1,90 +1,118 @@
 # frozen_string_literal: true
 
 module Admin
-  class UsersController < ApplicationController
+  # Controller for managing users in the admin interface
+  # Inherits from BaseController for Pagy pagination support
+  class UsersController < BaseController
     include ParamCasting
     include UserServiceIntegration
 
-    before_action :authenticate_user!
-    before_action :require_admin!
+    DependentSummary = Struct.new(
+      :id,
+      :name,
+      :date_of_birth,
+      :city,
+      :state,
+      :last_app,
+      :last_app_status,
+      :last_app_date,
+      :has_active_app,
+      :eligible_date,
+      :eligible_now,
+      :relationship_types,
+      keyword_init: true
+    )
 
+    # Define the mapping from expected demodulized names to full namespaced names.
+    # These should match the actual class names under the Users module.
+    VALID_USER_TYPES = {
+      'Admin' => 'Users::Administrator',
+      'Administrator' => 'Users::Administrator',
+      'Evaluator' => 'Users::Evaluator',
+      'Constituent' => 'Users::Constituent',
+      'Vendor' => 'Users::Vendor',
+      'Trainer' => 'Users::Trainer'
+    }.freeze
+
+    # Main index action with filtering, pagination, and dashboard metrics
+    # Supports both full page loads and Turbo Frame updates
     def index
-      setup_index_parameters
-      @users = build_index_query.limit(10).to_a
+      # Handle special case: paper application form user search
+      if turbo_frame_request_for_search_results?
+        handle_search_frame_request
+        return
+      end
+
+      # Load dashboard metrics for stats cards
+      load_user_metrics
+
+      # Build filtered and paginated user list
+      base_scope = User.all
+      filtered_scope = apply_user_filters(base_scope)
+      @pagy, @users = paginate_users(filtered_scope)
+
+      # Optimize for N+1 prevention
+      optimize_users_for_index_view(@users.to_a)
 
       respond_to do |format|
-        format.html { handle_html_response }
-        format.json { handle_json_response }
+        format.html
+        format.json { render json: @users.as_json(only: %i[id first_name last_name email]) }
       end
     end
 
-    # Setup parameters for index action
-    def setup_index_parameters
-      @q = params[:q]
-      @role_filter = params[:role] # e.g., "guardian" or "dependent" from paper app form
-      @frame_id = params[:turbo_frame_id] # e.g., "guardian_search_results"
+    private
+
+    # Load metrics for dashboard stats cards
+    def load_user_metrics
+      @user_counts_by_role = User.group(:type).count
+      @needs_review_count = User.where(needs_duplicate_review: true).count
+      @guardian_count = GuardianRelationship.select(:guardian_id).distinct.count
+      @dependent_count = GuardianRelationship.select(:dependent_id).distinct.count
+      @total_users_count = User.count
     end
 
-    # Build query for index action (DRY version of build_search_query)
-    def build_index_query
-      base_query = User.order(:type, :last_name, :first_name)
+    # Apply filters using Users::FilterService
+    def apply_user_filters(scope)
+      result = Users::FilterService.new(scope, params).apply_filters
+      if result.success?
+        result.data
+      else
+        Rails.logger.warn "User filter error: #{result.message}"
+        scope.order(:type, :last_name, :first_name)
+      end
+    end
+
+    # Paginate users with error handling
+    def paginate_users(scope)
+      pagy(scope, items: 25)
+    rescue StandardError => e
+      Rails.logger.error "Pagination failed: #{e.message}"
+      [Pagy.new(count: scope.count, page: 1, items: 25), scope.limit(25)]
+    end
+
+    # Handle Turbo Frame requests for paper application user search
+    def handle_search_frame_request
+      @q = params[:q]
+      @role_filter = params[:role]
+      @frame_id = params[:turbo_frame_id]
 
       if @q.present?
-        apply_search_filter(base_query)
-      elsif turbo_frame_request_for_search_results?
-        base_query.none
+        @users = Users::FilterService.new(User.all, q: @q).apply_filters.data.limit(10).to_a
+        enhance_constituent_users(@users)
       else
-        base_query
+        @users = []
       end
-    end
 
-    # Apply search filter to query (shared logic)
-    def apply_search_filter(query)
-      query_term = "%#{@q.downcase}%"
-      query.where(
-        'LOWER(first_name) ILIKE :q OR LOWER(last_name) ILIKE :q OR LOWER(email) ILIKE :q', q: query_term
-      )
-    end
-
-    # Check if this is a turbo frame request for search results
-    def turbo_frame_request_for_search_results?
-      turbo_frame_request_id&.end_with?('_search_results')
-    end
-
-    # Handle HTML format response
-    def handle_html_response
-      if search_results_frame_request?
-        render_search_results_partial
-      elsif full_page_load_without_query?
-        handle_full_page_load
-      end
-    end
-
-    # Handle JSON format response
-    def handle_json_response
-      render json: @users.as_json(only: %i[id first_name last_name email])
-    end
-
-    # Check if this is a search results frame request
-    def search_results_frame_request?
-      turbo_frame_request_id == "#{@role_filter}_search_results" || @frame_id == "#{@role_filter}_search_results"
-    end
-
-    # Check if this is a full page load without query
-    def full_page_load_without_query?
-      @q.blank?
-    end
-
-    # Render search results partial
-    def render_search_results_partial
       render partial: 'admin/users/user_search_results_list', locals: { users: @users, role: @role_filter }
     end
 
-    # Handle full page load with all users
-    def handle_full_page_load
-      @users = User.order(:type, :last_name, :first_name).to_a
-      optimize_users_for_index_view(@users)
+    # Check if this is a turbo frame request for search results (paper app form)
+    def turbo_frame_request_for_search_results?
+      turbo_frame_request_id&.end_with?('_search_results') ||
+        params[:turbo_frame_id]&.end_with?('_search_results')
     end
+
+    public
 
     def show
       @user = User.find(params[:id])
@@ -202,32 +230,26 @@ module Admin
         render json: {
           success: false,
           errors: extract_error_messages(result.data[:errors] || [result.message])
-        }, status: :unprocessable_entity
+        }, status: :unprocessable_content
       end
     end
 
-    # New dedicated search endpoint for user search
+    # Dedicated search endpoint for user search (used by paper application form)
     def search
       @q = params[:q]
-      @role_filter = params[:role] # e.g., "guardian" or "dependent" from paper app form
+      @role_filter = params[:role]
       @frame_id = "#{@role_filter}_search_results"
 
-      @users = build_search_query.limit(10).to_a
+      if @q.present?
+        result = Users::FilterService.new(User.all, q: @q).apply_filters
+        @users = result.success? ? result.data.limit(10).to_a : []
+      else
+        @users = []
+      end
+
       enhance_constituent_users(@users)
-
-      render partial: 'admin/users/user_search_results_list', locals: { users: @users, role: @role_filter }
+      render 'admin/users/search'
     end
-
-    # Define the mapping from expected demodulized names to full namespaced names.
-    # These should match the actual class names under the Users module.
-    VALID_USER_TYPES = {
-      'Admin' => 'Users::Administrator',
-      'Administrator' => 'Users::Administrator',
-      'Evaluator' => 'Users::Evaluator',
-      'Constituent' => 'Users::Constituent',
-      'Vendor' => 'Users::Vendor',
-      'Trainer' => 'Users::Trainer'
-    }.freeze
 
     def update_role
       user = User.find(params[:id])
@@ -236,12 +258,13 @@ module Admin
       namespaced_role = validate_and_normalize_role(params[:role], user.id)
       return if performed? # Early return if validation failed and response was rendered
 
-      unless can_update_user_role?(user, namespaced_role)
-        render_self_update_error
+      unless user.prevent_self_role_update?(current_user, namespaced_role)
+        Rails.logger.warn "Admin::UsersController#update_role - Denied self role change attempt by user_id: #{current_user.id}"
+        render json: { success: false, message: 'You cannot change your own role.' }, status: :forbidden
         return
       end
 
-      if role_unchanged?(user, namespaced_role)
+      if user.type == namespaced_role
         handle_unchanged_role(user, namespaced_role)
       else
         handle_role_change(user, namespaced_role)
@@ -305,7 +328,7 @@ module Admin
 
     # Render capability error response
     def render_capability_error(message)
-      render json: { message: message, success: false }, status: :unprocessable_entity
+      render json: { message: message, success: false }, status: :unprocessable_content
     end
 
     # Handle capability operation errors
@@ -314,16 +337,16 @@ module Admin
       render json: {
         success: false,
         message: error.message
-      }, status: :unprocessable_entity
+      }, status: :unprocessable_content
     end
 
     def update
       @user = User.find(params[:id])
 
       if @user.update(admin_user_params)
-        redirect_to admin_user_path(@user), notice: 'User was successfully updated.'
+        redirect_to admin_user_path(@user), notice: t('.user_update_pass')
       else
-        render :edit, status: :unprocessable_entity
+        render :edit, status: :unprocessable_content
       end
     end
 
@@ -347,52 +370,81 @@ module Admin
       @applications = @user.applications.order(application_date: :desc)
     end
 
-    private
+    # Returns a server-rendered list of a guardian's dependents with eligibility metadata
+    def dependents
+      @guardian = User.find(params[:id])
+      waiting_period_years = Policy.get('waiting_period_years') || 3
+      @dependents = build_dependent_summaries(@guardian, waiting_period_years)
 
-    # Build search query based on search parameters
-    def build_search_query
-      base_query = User.order(:last_name, :first_name)
-
-      if @q.present?
-        # Split search terms to handle multi-word searches like "Guardian Test"
-        search_terms = @q.strip.split(/\s+/)
-
-        if search_terms.length == 1
-          # Single term search - search in first_name, last_name, or email
-          query_term = "%#{search_terms.first.downcase}%"
-          base_query.where(
-            'LOWER(first_name) ILIKE :q OR LOWER(last_name) ILIKE :q OR LOWER(email) ILIKE :q', q: query_term
-          )
-        else
-          # Multi-term search - try to match full name or individual terms
-          full_name_term = "%#{@q.downcase}%"
-          full_name_query = base_query.where(
-            "LOWER(CONCAT(first_name, ' ', last_name)) ILIKE :q OR LOWER(email) ILIKE :q", q: full_name_term
-          )
-
-          return full_name_query unless full_name_query.empty?
-
-          # If no results from full name search, try individual terms
-          condition = build_multi_term_condition(search_terms)
-          base_query.where(condition)
-        end
-      else
-        # If no query, return empty results
-        base_query.none
+      respond_to do |format|
+        format.html { render 'admin/users/dependents' }
+        format.json { render json: dependents_json_response(@guardian, waiting_period_years) }
+      end
+    rescue ActiveRecord::RecordNotFound
+      @guardian = nil
+      @dependents = []
+      respond_to do |format|
+        format.html { render 'admin/users/dependents', status: :ok }
+        format.json { render json: { guardian_id: nil, dependents: [] }, status: :ok }
       end
     end
 
-    # Build Arel condition for multi-term search
-    def build_multi_term_condition(terms)
-      table = User.arel_table
-      terms.inject(nil) do |condition, term|
-        term_pattern = "%#{term.downcase}%"
-        term_cond = table[:first_name].lower.matches(term_pattern)
-                                      .or(table[:last_name].lower.matches(term_pattern))
-                                      .or(table[:email].lower.matches(term_pattern))
+    # Returns last known application values for a guardian or related dependents
+    def last_application_values
+      user = User.find(params[:id])
 
-        condition ? condition.or(term_cond) : term_cond
+      # Gather candidate applications: user's own and their dependents'
+      candidate_apps = Application.where(user_id: [user.id] + user.dependents.pluck(:id))
+                                  .order(application_date: :desc)
+      last_app = candidate_apps.first
+
+      if last_app
+        render json: {
+          success: true,
+          application_id: last_app.id,
+          application_date: last_app.application_date,
+          applicant_name: last_app.user&.full_name,
+          household_size: last_app.household_size,
+          annual_income: last_app.annual_income,
+          maryland_resident: last_app.maryland_resident,
+          medical_provider_name: last_app.medical_provider_name,
+          medical_provider_phone: last_app.medical_provider_phone,
+          medical_provider_fax: last_app.medical_provider_fax,
+          medical_provider_email: last_app.medical_provider_email
+        }
+      else
+        render json: { success: true, application_id: nil }
       end
+    end
+
+    private
+
+    # Build DependentSummary objects for a guardian's dependents
+    def build_dependent_summaries(guardian, waiting_period_years)
+      guardian.dependents.map do |dep|
+        last_app = dep.applications.order(application_date: :desc).first
+        has_active_app = dep.applications.where.not(status: %i[archived rejected]).exists?
+        eligible_date = last_app ? (last_app.application_date + waiting_period_years.years) : Time.current
+        eligible_now = !has_active_app && eligible_date <= Time.current
+        relationship_types = guardian.relationship_types_for_dependent(dep) rescue [] # rubocop:disable Style/RescueModifier
+
+        DependentSummary.new(
+          id: dep.id, name: dep.full_name, date_of_birth: dep.date_of_birth,
+          city: dep.city, state: dep.state, last_app: last_app,
+          last_app_status: last_app&.status, last_app_date: last_app&.application_date,
+          has_active_app: has_active_app, eligible_date: eligible_date,
+          eligible_now: eligible_now, relationship_types: relationship_types
+        )
+      end
+    end
+
+    # Build JSON response hash for dependents endpoint
+    def dependents_json_response(guardian, waiting_period_years)
+      {
+        guardian_id: guardian.id,
+        waiting_period_years: waiting_period_years,
+        dependents: @dependents.map(&:to_h)
+      }
     end
 
     # Enhance constituent users with relationship data to avoid N+1 queries
@@ -433,21 +485,7 @@ module Admin
     def enhance_user_with_relationship_data(user, relationship_data)
       user.instance_variable_set(:@dependents_count, relationship_data[:dependents_counts][user.id] || 0)
       user.instance_variable_set(:@has_guardian, relationship_data[:has_guardian].include?(user.id))
-
-      # Add helper methods to access the data
-      class << user
-        def dependents_count
-          @dependents_count || 0
-        end
-
-        def guardian?
-          (@dependents_count || 0).positive?
-        end
-
-        def dependent?
-          @has_guardian || false
-        end
-      end
+      add_relationship_helper_methods_to_user(user)
     end
 
     # Replace users in array with enhanced versions
@@ -472,28 +510,12 @@ module Admin
         render json: {
           success: false,
           message: "Invalid role specified: '#{raw_role_param}'. Please select a valid role."
-        }, status: :unprocessable_entity
+        }, status: :unprocessable_content
         return nil
       end
 
       Rails.logger.info "Admin::UsersController#update_role - Determined namespaced_role: #{namespaced_role.inspect} for user_id: #{user_id}"
       namespaced_role
-    end
-
-    def can_update_user_role?(user, namespaced_role)
-      user.prevent_self_role_update?(current_user, namespaced_role)
-    end
-
-    def render_self_update_error
-      Rails.logger.warn "Admin::UsersController#update_role - Denied self role change attempt by user_id: #{current_user.id}"
-      render json: {
-        success: false,
-        message: 'You cannot change your own role.'
-      }, status: :forbidden
-    end
-
-    def role_unchanged?(user, namespaced_role)
-      user.type == namespaced_role
     end
 
     def handle_unchanged_role(user, namespaced_role)
@@ -517,7 +539,7 @@ module Admin
       new_klass = namespaced_role.safe_constantize
       if new_klass.blank? || new_klass.ancestors.exclude?(User)
         Rails.logger.error "Admin::UsersController#update_role - Invalid target class for STI: #{namespaced_role}"
-        render json: { success: false, message: 'Invalid target role class.' }, status: :unprocessable_entity
+        render json: { success: false, message: 'Invalid target role class.' }, status: :unprocessable_content
         return nil
       end
       new_klass
@@ -525,6 +547,7 @@ module Admin
 
     def convert_user_to_new_type(user, new_klass)
       converted_user = user.becomes(new_klass)
+      converted_user.type = new_klass.name # Explicitly set the type column for STI
       clear_type_specific_fields(user, converted_user)
       converted_user
     end
@@ -542,7 +565,7 @@ module Admin
     end
 
     def save_converted_user(converted_user, original_user)
-      if converted_user.save
+      if converted_user.save(validate: false)
         handle_successful_user_conversion(converted_user)
       else
         handle_failed_user_conversion(converted_user, original_user)
@@ -551,40 +574,20 @@ module Admin
 
     def handle_successful_user_conversion(converted_user)
       update_user_capabilities(converted_user, params[:capabilities]) if params[:capabilities].present?
-      log_successful_conversion(converted_user)
-      render_conversion_success(converted_user)
-    end
-
-    def handle_failed_user_conversion(converted_user, original_user)
-      log_failed_conversion(converted_user, original_user)
-      render_conversion_error(converted_user)
-    end
-
-    def log_successful_conversion(converted_user)
       Rails.logger.info "Admin::UsersController#update_role - Successfully updated user_id: #{converted_user.id} to type: #{converted_user.type}"
-    end
-
-    def log_failed_conversion(converted_user, original_user)
-      Rails.logger.error "Admin::UsersController#update_role - Failed to save converted_user_id: #{original_user.id} " \
-                         "as type #{converted_user.type}: #{converted_user.errors.full_messages.join(', ')}"
-    end
-
-    def render_conversion_success(converted_user)
       render json: {
         success: true,
         message: "#{converted_user.full_name}'s role updated to #{converted_user.type.demodulize.titleize}."
       }
     end
 
-    def render_conversion_error(converted_user)
+    def handle_failed_user_conversion(converted_user, original_user)
+      Rails.logger.error "Admin::UsersController#update_role - Failed to save converted_user_id: #{original_user.id} " \
+                         "as type #{converted_user.type}: #{converted_user.errors.full_messages.join(', ')}"
       render json: {
         success: false,
         message: converted_user.errors.full_messages.join(', ')
-      }, status: :unprocessable_entity
-    end
-
-    def require_admin!
-      redirect_to root_path, alert: 'Not authorized' unless current_user&.admin?
+      }, status: :unprocessable_content
     end
 
     def user_params
@@ -664,11 +667,16 @@ module Admin
 
     # Preload all data needed for the users index view
     def preload_user_index_data(user_ids)
+      guardian_rels = load_guardian_relationships(user_ids)
+      dependent_rels = load_dependent_relationships(user_ids)
+
       {
         guardian_counts: load_guardian_counts(user_ids),
         has_guardian_ids: load_has_guardian_ids(user_ids),
-        guardian_rels: load_guardian_relationships(user_ids),
-        guardian_users: load_guardian_users(user_ids),
+        guardian_rels: guardian_rels,
+        guardian_users: load_related_users_from_relationships(guardian_rels, :guardian_id),
+        dependent_rels: dependent_rels,
+        dependent_users: load_related_users_from_relationships(dependent_rels, :dependent_id),
         capabilities_by_user: load_capabilities_by_user(user_ids)
       }
     end
@@ -688,13 +696,17 @@ module Admin
       GuardianRelationship.where(dependent_id: user_ids).group_by(&:dependent_id)
     end
 
-    # Load guardian users referenced in relationships
-    def load_guardian_users(user_ids)
-      guardian_rels = load_guardian_relationships(user_ids)
-      guardian_user_ids = guardian_rels.values.flatten.map(&:guardian_id).uniq
-      return {} unless guardian_user_ids.any?
+    # Load dependent relationships grouped by guardian
+    def load_dependent_relationships(user_ids)
+      GuardianRelationship.where(guardian_id: user_ids).group_by(&:guardian_id)
+    end
 
-      User.where(id: guardian_user_ids).index_by(&:id)
+    # Load users referenced in relationships (works for both guardians and dependents)
+    def load_related_users_from_relationships(relationships, user_id_field)
+      user_ids = relationships.values.flatten.map(&user_id_field).uniq
+      return {} unless user_ids.any?
+
+      User.where(id: user_ids).index_by(&:id)
     end
 
     # Load capabilities grouped by user
@@ -720,16 +732,18 @@ module Admin
       has_guardian_ids = preloaded_data[:has_guardian_ids]
       guardian_rels = preloaded_data[:guardian_rels]
       guardian_users = preloaded_data[:guardian_users]
+      dependent_rels = preloaded_data[:dependent_rels]
+      dependent_users = preloaded_data[:dependent_users]
 
       user.define_singleton_method(:dependents_count) { guardian_counts[id] || 0 }
       user.define_singleton_method(:guardian?) { (guardian_counts[id] || 0).positive? }
       user.define_singleton_method(:dependent?) { has_guardian_ids.include?(id) }
 
-      add_guardian_relationship_methods(user, guardian_rels, guardian_users)
+      add_guardian_relationship_methods(user, guardian_rels, guardian_users, dependent_rels, dependent_users)
     end
 
     # Add guardian relationship methods to user
-    def add_guardian_relationship_methods(user, guardian_rels, guardian_users)
+    def add_guardian_relationship_methods(user, guardian_rels, guardian_users, dependent_rels, dependent_users)
       user.define_singleton_method(:guardian_relationships_as_dependent) do
         rels = guardian_rels[id] || []
         # Set guardian_user for each relationship
@@ -744,6 +758,29 @@ module Admin
       user.define_singleton_method(:guardians) do
         guardian_relationships_as_dependent.map(&:guardian_user).compact
       end
+
+      user.define_singleton_method(:guardian_for_contact) do
+        return nil unless dependent?
+
+        @guardian_for_contact ||= guardian_relationships_as_dependent.first&.guardian_user
+      end
+
+      # Add guardian_relationships_as_guardian method for guardians
+      user.define_singleton_method(:guardian_relationships_as_guardian) do
+        rels = dependent_rels[id] || []
+        # Set dependent_user for each relationship
+        rels.each do |rel|
+          rel.define_singleton_method(:dependent_user) do
+            dependent_users&.fetch(dependent_id, nil)
+          end
+        end
+        rels
+      end
+
+      # Add dependents method for guardians
+      user.define_singleton_method(:dependents) do
+        guardian_relationships_as_guardian.map(&:dependent_user).compact
+      end
     end
 
     # Add capability methods to user
@@ -753,40 +790,17 @@ module Admin
       end
 
       user.define_singleton_method(:available_capabilities) do
-        Admin::UsersController.get_available_capabilities_for_user_type(type)
+        User.available_capabilities_for_type(type)
       end
 
       user.define_singleton_method(:inherent_capabilities) do
-        Admin::UsersController.get_inherent_capabilities_for_user_type(type)
+        User.inherent_capabilities_for_type(type)
       end
     end
 
     # Add role methods to user
     def add_role_methods(user)
       user.define_singleton_method(:role_type) { type&.demodulize || 'Unknown' }
-    end
-
-    class << self
-      # Get available capabilities for a user type
-      def get_available_capabilities_for_user_type(user_type)
-        case user_type
-        when 'Users::Evaluator' then %w[can_evaluate]
-        when 'Users::Trainer' then %w[can_train]
-        when 'Users::Constituent' then %w[can_train can_evaluate]
-        else
-          []
-        end
-      end
-
-      # Get inherent capabilities for a user type
-      def get_inherent_capabilities_for_user_type(user_type)
-        case user_type
-        when 'Users::Evaluator' then %w[can_evaluate]
-        when 'Users::Trainer' then %w[can_train]
-        else
-          []
-        end
-      end
     end
   end
 end

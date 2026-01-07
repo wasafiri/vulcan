@@ -87,12 +87,12 @@ module Admin
 
       if @email_template.update(email_template_params.merge(updated_by: current_user))
         log_template_update_event
-        redirect_to admin_email_template_path(@email_template), notice: 'Email template was successfully updated.'
+        redirect_to admin_email_template_path(@email_template), notice: t('.e_template_update_pass')
       else
         # Re-prepare sample data for form re-render on validation failure
         @sample_data = view_context.sample_data_for_template(@email_template.name)
         flash.now[:alert] = "Failed to update template: #{@email_template.errors.full_messages.join(', ')}"
-        render :edit, status: :unprocessable_entity
+        render :edit, status: :unprocessable_content
       end
     end
 
@@ -136,7 +136,7 @@ module Admin
     def set_template
       @email_template = EmailTemplate.find(params[:id])
     rescue ActiveRecord::RecordNotFound
-      redirect_to admin_email_templates_path, alert: 'Email template not found.'
+      redirect_to admin_email_templates_path, alert: t('alerts.e_template_not_found')
     end
 
     # Load the definition from the constant based on the template name
@@ -197,7 +197,7 @@ module Admin
 
     def handle_invalid_form
       flash.now[:alert] = "Invalid email address: #{@test_email_form.errors.full_messages.join(', ')}"
-      render :new_test_email, status: :unprocessable_entity
+      render :new_test_email, status: :unprocessable_content
     end
 
     def handle_test_email_error(error)
@@ -210,7 +210,7 @@ module Admin
       )
 
       flash.now[:alert] = "Failed to send test email: #{error.message}. Check sample data and template syntax."
-      render :new_test_email, status: :unprocessable_entity
+      render :new_test_email, status: :unprocessable_content
     end
   end
 end

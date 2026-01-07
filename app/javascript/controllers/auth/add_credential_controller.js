@@ -1,15 +1,13 @@
 import { Controller } from "@hotwired/stimulus"
 import { railsRequest } from "../../services/rails_request"
-import { applyTargetSafety } from "../../mixins/target_safety"
 import Auth, { registerWebAuthn } from "../../auth.js"
-import { setVisible } from "../../utils/visibility"
 
 class AddCredentialController extends Controller {
   // Define the expected value for the callback URL
   static values = { callbackUrl: String }
   // Define the target for the nickname input
   static targets = ["nicknameInput", "submitButton"]
-  static outlets = ["flash"] // Declare flash outlet
+
 
   connect() {
     if (process.env.NODE_ENV !== 'production') {
@@ -37,18 +35,20 @@ class AddCredentialController extends Controller {
     event.preventDefault(); // Prevent default button click / form submission
 
     // Show loading state
-    this.showFlashMessage("Preparing your security key...", "info");
-    this.withTarget('submitButton', (target) => {
-      target.disabled = true;
-    })
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Preparing your security key...")
+    }
+    if (this.hasSubmitButtonTarget) {
+      this.submitButtonTarget.disabled = true;
+    }
 
     // Get the nickname
-    const nickname = this.safeTarget('nicknameInput')?.value;
+    const nickname = this.hasNicknameInputTarget ? this.nicknameInputTarget.value : null;
     if (!nickname) {
-      this.showFlashMessage("Please enter a nickname for your security key.", "error");
-      this.withTarget('submitButton', (target) => {
-        target.disabled = false;
-      })
+      console.error("Please enter a nickname for your security key.")
+      if (this.hasSubmitButtonTarget) {
+        this.submitButtonTarget.disabled = false;
+      }
       return;
     }
 
@@ -71,15 +71,17 @@ class AddCredentialController extends Controller {
         if (process.env.NODE_ENV !== 'production') {
           console.log("Received credential options:", credentialOptions)
         }
-        this.showFlashMessage("Please follow your browser's prompts to register your security key...", "info");
+        if (process.env.NODE_ENV !== 'production') {
+          console.log("Please follow your browser's prompts to register your security key...")
+        }
 
         // Check if we have the callback URL value
         if (!this.hasCallbackUrlValue) {
           console.error("Missing callback URL value. Check the data attribute in the view.");
-          this.showFlashMessage("Configuration error. Please try again or contact support.", "error");
-          this.withTarget('submitButton', (target) => {
-            target.disabled = false;
-          })
+          console.error("Configuration error. Please try again or contact support.");
+          if (this.hasSubmitButtonTarget) {
+            this.submitButtonTarget.disabled = false;
+          }
           return;
         }
 
@@ -95,46 +97,25 @@ class AddCredentialController extends Controller {
 
         // Step 4: Handle non-redirect result (errors)
         if (!webauthnResult.success) {
-          this.showFlashMessage(webauthnResult.message || "Security key registration failed", "error");
+          console.error("Security key registration failed:", webauthnResult.message || "Unknown error");
           console.error("Error details:", webauthnResult.details);
 
-          this.withTarget('submitButton', (target) => {
-            target.disabled = false;
-          })
+          if (this.hasSubmitButtonTarget) {
+            this.submitButtonTarget.disabled = false;
+          }
         }
         // Successful registrations will redirect automatically from auth.js
       }
 
     } catch (error) {
       console.error("Error in WebAuthn flow:", error);
-      this.showFlashMessage(`Error: ${error.message || "Something went wrong. Please try again."}`, "error");
+      console.error(`Error: ${error.message || "Something went wrong. Please try again."}`);
 
-      this.withTarget('submitButton', (target) => {
-        target.disabled = false;
-      })
-    }
-  }
-
-  // Use flash outlet for consistent notifications
-  showFlashMessage(message, type) {
-    if (this.hasFlashOutlet) {
-      if (type === 'success') {
-        this.flashOutlet.showSuccess(message)
-      } else if (type === 'error') {
-        this.flashOutlet.showError(message)
-      } else {
-        this.flashOutlet.showInfo(message)
-      }
-    } else {
-      // Fallback to console if flash outlet is not connected
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn(`Flash outlet not connected. Message (${type}): ${message}`)
+      if (this.hasSubmitButtonTarget) {
+        this.submitButtonTarget.disabled = false;
       }
     }
   }
 }
-
-// Apply target safety mixin
-applyTargetSafety(AddCredentialController)
 
 export default AddCredentialController

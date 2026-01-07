@@ -8,7 +8,7 @@ module Applications
 
     attr_reader :params, :admin, :application, :constituent, :errors, :guardian_user_for_app
 
-    def initialize(params:, admin:, skip_income_validation: false)
+    def initialize(params:, admin:, skip_income_validation: false, skip_proof_processing: false)
       super()
       @params = params.with_indifferent_access
       @admin = admin
@@ -18,6 +18,7 @@ module Applications
       @errors = []
       @temp_passwords = {}
       @skip_income_validation = skip_income_validation
+      @skip_proof_processing = skip_proof_processing
     end
 
     def create
@@ -27,7 +28,7 @@ module Applications
       application_created = ActiveRecord::Base.transaction do
         return failure('Constituent processing failed') unless process_constituent
         return failure('Application creation failed') unless create_application
-        return failure('Proof upload failed') unless process_proof_uploads
+        return failure('Proof upload failed') unless @skip_proof_processing || process_proof_uploads
 
         @application.persisted?
       end
@@ -101,8 +102,11 @@ module Applications
       new_guardian_attrs = params[:new_guardian_attributes]
       applicant_data = params[:constituent]
       relationship_type = params[:relationship_type]
+      dependent_id = params[:dependent_id]
 
-      if guardian_scenario?(guardian_id, new_guardian_attrs, applicant_data)
+      if existing_dependent_scenario?(guardian_id, dependent_id)
+        process_existing_dependent(guardian_id, dependent_id, relationship_type)
+      elsif guardian_scenario?(guardian_id, new_guardian_attrs, applicant_data)
         process_guardian_dependent(guardian_id, new_guardian_attrs, applicant_data, relationship_type)
       elsif self_applicant_scenario?(applicant_data)
         process_self_applicant(applicant_data)
@@ -116,6 +120,63 @@ module Applications
       (guardian_id.present? || attributes_present?(new_guardian_attrs)) &&
         attributes_present?(applicant_data) &&
         params[:applicant_type] == 'dependent'
+    end
+
+    def existing_dependent_scenario?(guardian_id, dependent_id)
+      guardian_id.present? && dependent_id.present? && params[:applicant_type] == 'dependent'
+    end
+
+    def process_existing_dependent(guardian_id, dependent_id, relationship_type)
+      guardian = User.find_by(id: guardian_id)
+      dependent = User.find_by(id: dependent_id)
+
+      return add_error('Guardian not found') unless guardian
+      return add_error('Dependent not found') unless dependent
+
+      return false unless ensure_guardian_relationship(guardian, dependent, relationship_type)
+      return false unless update_dependent_and_validate_eligibility(dependent)
+
+      @guardian_user_for_app = guardian
+      @constituent = dependent
+      true
+    end
+
+    def ensure_guardian_relationship(guardian, dependent, relationship_type)
+      rel = GuardianRelationship.find_by(guardian_id: guardian.id, dependent_id: dependent.id)
+      return true if rel.present?
+
+      return add_error('Relationship type required to relate guardian and dependent') if relationship_type.blank?
+
+      begin
+        GuardianRelationship.create!(guardian_user: guardian, dependent_user: dependent, relationship_type: relationship_type)
+        true
+      rescue ActiveRecord::RecordInvalid => e
+        add_error("Failed to create relationship: #{e.record.errors.full_messages.join(', ')}")
+        false
+      end
+    end
+
+    def update_dependent_and_validate_eligibility(dependent)
+      # Update dependent information if provided (contact info may have changed)
+      return false if params[:constituent].present? && attributes_present?(params[:constituent]) && !update_dependent_contact_info(dependent)
+
+      # Validate no active application for dependent
+      return add_error('This dependent already has an active or pending application.') if Application.where(user_id: dependent.id).where.not(status: :archived).exists?
+
+      waiting_period_eligible?(dependent)
+    end
+
+    def waiting_period_eligible?(dependent)
+      # Fast-path waiting period check for better UX (model validation remains authoritative)
+      last_app = dependent.applications.order(application_date: :desc).first
+      return true if last_app.blank?
+
+      waiting_period = Policy.get('waiting_period_years') || 3
+      eligible_date = last_app.application_date + waiting_period.years
+      return true if eligible_date <= Time.current
+
+      add_error("Dependent is not yet eligible. Reapply after #{eligible_date.to_date.strftime('%B %d, %Y')}")
+      false
     end
 
     def self_applicant_scenario?(applicant_data)
@@ -171,6 +232,44 @@ module Applications
                       end
       add_error(error_message)
       false
+    end
+
+    def update_dependent_contact_info(dependent)
+      attrs = params[:constituent]
+      return true if attrs.blank?
+
+      updates = build_dependent_contact_updates(attrs)
+      return true if updates.empty?
+
+      if dependent.update(updates)
+        Rails.logger.info "Updated contact info for dependent #{dependent.id}: #{updates.keys.join(', ')}"
+        true
+      else
+        add_error("Failed to update dependent information: #{dependent.errors.full_messages.join(', ')}")
+        false
+      end
+    rescue ActiveRecord::RecordInvalid => e
+      add_error("Failed to update dependent information: #{e.record.errors.full_messages.join(', ')}")
+      false
+    end
+
+    def build_dependent_contact_updates(attrs)
+      updates = {}
+
+      # Email (may come as dependent_email)
+      updates[:email] = attrs[:dependent_email] if attrs[:dependent_email].present?
+
+      # Phone (may come as dependent_phone)
+      updates[:phone] = attrs[:dependent_phone] if attrs[:dependent_phone].present?
+
+      # Address fields
+      updates[:physical_address_1] = attrs[:physical_address_1] if attrs[:physical_address_1].present?
+      updates[:physical_address_2] = attrs[:physical_address_2] if attrs[:physical_address_2].present?
+      updates[:city] = attrs[:city] if attrs[:city].present?
+      updates[:state] = attrs[:state] if attrs[:state].present?
+      updates[:zip_code] = attrs[:zip_code] if attrs[:zip_code].present?
+
+      updates
     end
 
     def create_application
@@ -248,17 +347,10 @@ module Applications
     def process_accept_proof(type)
       file_present = params["#{type}_proof"].present? || params["#{type}_proof_signed_id"].present?
 
-      if Current.paper_context? && !file_present
-        # Paper context without file - just approve status
-        @application.update!("#{type}_proof_status" => Application.public_send("#{type}_proof_statuses")['approved'])
-        log_proof_submission(type, false)
-        true
-      elsif file_present
-        attach_and_approve_proof(type)
-      else
-        add_error("Please upload a file for #{type} proof")
-        false
-      end
+      # Approval requires an attachment in all contexts. Only rejections may proceed without files.
+      return add_error("Please upload a file for #{type} proof before approving") unless file_present
+
+      attach_and_approve_proof(type)
     end
 
     def attach_and_approve_proof(type) # rubocop:disable Naming/PredicateMethod
@@ -279,7 +371,6 @@ module Applications
         return false
       end
 
-      @application.update!("#{type}_proof_status" => Application.public_send("#{type}_proof_statuses")['approved'])
       true
     end
 

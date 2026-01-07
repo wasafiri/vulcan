@@ -1,55 +1,67 @@
-default: &default
+# PostgreSQL configuration for Rails 8 with Solid Queue
+#
+# Connection pool sizing:
+# - Primary: RAILS_MAX_THREADS (default 10)
+# - Queue: SOLID_QUEUE_POOL_SIZE (default 10, needs threads + 2 for polling/heartbeat)
+
+common: &common
   adapter: postgresql
   encoding: unicode
-  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS", 10) %>
+  timeout: 5000
+  connect_timeout: 10
+  checkout_timeout: 30
   <% if ENV["DATABASE_PASSWORD"].to_s.strip != "" %>
   password: <%= ENV["DATABASE_PASSWORD"] %>
   <% end %>
 
 development:
-  primary: &primary
-    <<: *default
+  primary: &primary_development
+    <<: *common
     database: mat_vulcan_development
     host: localhost
     port: 5432
     username: <%= ENV.fetch("DATABASE_USERNAME", "postgres") %>
-    <% if ENV["DATABASE_PASSWORD"].to_s.strip != "" %>
-    password: <%= ENV["DATABASE_PASSWORD"] %>
-    <% end %>
-    pool: 5
-    timeout: 5000
+    gssencmode: disable  # Disable GSSAPI to prevent macOS fork crashes
   queue:
-    <<: *primary
-    database: mat_vulcan_development
+    <<: *primary_development
+    database: mat_vulcan_queue_development  # Separate database for Solid Queue
+    pool: <%= ENV.fetch("SOLID_QUEUE_POOL_SIZE", 10) %>
+  cable:
+    <<: *primary_development
+    database: mat_vulcan_cable_development
+    migrations_paths: db/cable_migrate
 
 test:
-  primary: &test
-    <<: *default
+  primary: &primary_test
+    <<: *common
     database: mat_vulcan_test
     host: localhost
     port: 5432
     username: <%= ENV.fetch("DATABASE_USERNAME", "postgres") %>
-    <% if ENV["DATABASE_PASSWORD"].to_s.strip != "" %>
-    password: <%= ENV["DATABASE_PASSWORD"] %>
-    <% end %>
-    pool: 5
-    timeout: 5000
+    gssencmode: disable  # Disable GSSAPI to prevent macOS fork crashes
   queue:
-    <<: *test
-    database: mat_vulcan_test
+    <<: *primary_test
+    database: mat_vulcan_queue_test
+    pool: <%= ENV.fetch("SOLID_QUEUE_POOL_SIZE", 10) %>
+  cable:
+    <<: *primary_test
+    database: mat_vulcan_cable_test
+    migrations_paths: db/cable_migrate
 
 production:
   primary: &primary_production
-    <<: *default
+    <<: *common
     url: <%= ENV['DATABASE_URL'] %>
-    pool: 5
-    timeout: 5000
-  cache:
-    <<: *primary_production
-    url: <%= ENV['DATABASE_URL'] %>
+    pool: <%= ENV.fetch("RAILS_MAX_THREADS", 10) %>
   queue:
     <<: *primary_production
-    url: <%= ENV['DATABASE_URL'] %>
+    url: <%= ENV['QUEUE_DATABASE_URL'] || ENV['DATABASE_URL'] %>
+    pool: <%= ENV.fetch("SOLID_QUEUE_POOL_SIZE", 10) %>
+  cache:
+    <<: *primary_production
+    url: <%= ENV['CACHE_DATABASE_URL'] || ENV['DATABASE_URL'] %>
   cable:
     <<: *primary_production
-    url: <%= ENV['DATABASE_URL'] %>
+    url: <%= ENV['CABLE_DATABASE_URL'] || ENV['DATABASE_URL'] %>
+    migrations_paths: db/cable_migrate

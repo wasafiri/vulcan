@@ -7,10 +7,12 @@
               local: true, 
               class: "space-y-8", 
               data: { 
-                controller: "autosave", 
+                controller: "income-validation currency-formatter autosave", 
                 autosave_target: "form",
                 autosave_url_value: autosave_field_constituent_portal_application_path(@application),
-                autosave_debounce_wait_value: 1000
+                autosave_debounce_wait_value: 1000,
+                "income-validation-fpl-thresholds-value": fpl_thresholds_json,
+                "income-validation-modifier-value": fpl_modifier_value
               }) do |f| %>
    
    <!-- Autosave status indicator -->
@@ -18,18 +20,27 @@
    <div class="bg-white shadow sm:rounded-lg" aria-labelledby="application_form_heading">
      <h2 id="application_form_heading" class="sr-only">Application Details Form</h2>
 
-     <% if @application.errors.any? %>
-       <div class="bg-red-50 p-4 rounded-t-lg" role="alert" aria-labelledby="error_messages">
-         <h3 id="error_messages" class="text-red-800 font-medium">
-           <%= pluralize(@application.errors.count, "error") %> prohibited this application from being saved:
-         </h3>
-         <ul class="mt-2 list-disc list-inside text-sm text-red-700">
-           <% @application.errors.full_messages.each do |msg| %>
-             <li><%= msg %></li>
-           <% end %>
-         </ul>
-       </div>
-     <% end %>
+    <% if @application.errors.any? %>
+      <div id="error-summary" class="bg-red-50 p-4 rounded-t-lg" role="alert" aria-live="assertive" aria-labelledby="error_messages" aria-atomic="true" tabindex="-1" autofocus>
+        <h3 id="error_messages" class="text-red-800 font-medium">
+          <%= pluralize(@application.errors.count, "error") %> prohibited this application from being saved:
+        </h3>
+        <ul class="mt-2 list-disc list-inside text-sm text-red-700">
+          <% @application.errors.full_messages.each do |msg| %>
+            <li><%= msg %></li>
+          <% end %>
+        </ul>
+      </div>
+      <script>
+        // Focus the error summary for screen reader users
+        document.addEventListener('DOMContentLoaded', function() {
+          var errorSummary = document.getElementById('error-summary');
+          if (errorSummary) {
+            errorSummary.focus();
+          }
+        });
+      </script>
+    <% end %>
 
      <div class="p-6 space-y-6">
        <!-- Application Status Display -->
@@ -70,7 +81,8 @@
                 min: 1,
                 class: "focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md",
                 "aria-describedby": "household_size_help",
-                required: true %>
+                required: true,
+                data: { "income-validation-target": "householdSize" } %>
           </div>
           <p class="mt-2 text-sm text-gray-500" id="household_size_help">
             Total number of people living in your household
@@ -87,13 +99,19 @@
                 step: "0.01",
                 class: "pl-7 focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md",
                 "aria-describedby": "annual_income_help",
-                required: true %>
+                required: true,
+                data: { "income-validation-target": "annualIncome", currency_formatter_target: "input" } %>
           </div>
-          <p class="mt-2 text-sm text-gray-500" id="annual_income_help">
-            Total yearly household income before taxes
-          </p>
+          <div class="mt-2">
+            <p class="text-sm text-gray-500" id="annual_income_help">
+              Total yearly household income before taxes
+            </p>
+          </div>
         </div>
       </fieldset>
+
+       <!-- Income Threshold Warning Container -->
+       <div id="income-threshold-warning" hidden class="hidden" data-income-validation-target="warningContainer"></div>
 
         <!-- Applicant and Guardian Display -->
         <section aria-labelledby="applicant-guardian-title" class="space-y-4 p-4 bg-gray-50 rounded">
@@ -137,10 +155,12 @@
            
            <div class="grid sm:grid-cols-2 gap-4">
              <% disabilities = [:hearing, :vision, :speech, :mobility, :cognition] %>
+             <%# Use application's user for dependent applications, not current_user %>
+             <% applicant_user = @application.user || current_user %>
              <% disabilities.each do |disability| %>
                <div class="flex items-center">
                  <%= f.check_box "#{disability}_disability",
-                     checked: params.dig(:application, "#{disability}_disability") == "1" || current_user.send("#{disability}_disability"),
+                     checked: params.dig(:application, "#{disability}_disability") == "1" || applicant_user.send("#{disability}_disability"),
                      class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
                      "aria-describedby": "#{disability}-description" %>
                  <%= f.label "#{disability}_disability", disability.to_s.titleize,
@@ -220,18 +240,19 @@
      <div class="px-6 py-4 bg-gray-50 flex items-center justify-end space-x-3 rounded-b-lg">
        <%= link_to "Cancel",
            constituent_portal_application_path(@application),
-           class: "inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+           class: "px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
            role: "button" %>
            
        <%= f.submit "Save Application",
            name: "save_draft",
-           class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+           class: "px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
            "aria-label": "Save application draft" %>
 
        <%= f.submit "Submit Application", 
            name: "submit_application",
-           class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500",
-           "aria-label": "Submit final application" %>
+           class: "px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500",
+           "aria-label": "Submit final application",
+           data: { "income-validation-target": "submitButton" } %>
      </div>
    </div>
  <% end %>

@@ -15,6 +15,8 @@ module Applications
       return autosave_error_result('File uploads are not supported for autosave') if file_field?
 
       initialize_application
+      return autosave_error_result('Unable to find or create application') if @application.nil?
+
       save_field
     end
 
@@ -36,17 +38,59 @@ module Applications
       @application = if params[:id].present?
                        find_existing_application
                      else
-                       create_new_application
+                       find_or_create_draft_application
                      end
     end
 
     def find_existing_application
-      current_user.applications.find_by(id: params[:id]) || create_new_application
+      # Search in both user's own applications and applications they manage as guardian
+      application = current_user.applications.find_by(id: params[:id]) ||
+                    current_user.managed_applications.find_by(id: params[:id])
+
+      application || find_or_create_draft_application
     end
 
-    def create_new_application
+    def find_or_create_draft_application
+      # Determine if this is for a dependent based on params
+      # Could come from multiple sources: user_id param or nested application[user_id]
+      dependent_id = params[:user_id].presence || params.dig(:application, :user_id).presence
+
+      # Build query to find existing draft
+      # For dependent applications: match both user_id (the dependent) and managing_guardian_id (current user)
+      # For self applications: match user_id and no managing_guardian_id
+      draft_query = Application.draft.order(created_at: :desc)
+
+      draft_query = if dependent_id.present?
+                      # Looking for a dependent's draft application managed by current user
+                      draft_query.where(user_id: dependent_id, managing_guardian_id: current_user.id)
+                    else
+                      # Looking for current user's own draft application (not as a guardian)
+                      draft_query.where(user_id: current_user.id, managing_guardian_id: nil)
+                    end
+
+      existing_draft = draft_query.first
+
+      # Return existing draft if found, otherwise create new
+      return existing_draft if existing_draft
+
+      # Check for active application before creating new draft
+      # This prevents creating drafts when user already has submitted/processing application
+      target_user_id = dependent_id || current_user.id
+      active_application = Application.active_for_constituent(target_user_id).first
+      return nil if active_application
+
+      create_new_application(dependent_id)
+    end
+
+    def create_new_application(dependent_id = nil)
       current_user.applications.new.tap do |app|
         apply_default_attributes(app)
+
+        # Set up dependent relationship if this is for a dependent
+        if dependent_id.present?
+          app.user_id = dependent_id
+          app.managing_guardian_id = current_user.id
+        end
       end
     end
 
@@ -102,7 +146,9 @@ module Applications
 
     def save_user_field(attribute)
       value = cast_user_field_value(attribute, field_value)
-      current_user.update_column(attribute, value)
+      # Update the target user (dependent if this is a dependent application, otherwise current_user)
+      target_user = @application.for_dependent? ? @application.user : current_user
+      target_user.update_column(attribute, value)
       @application.update_column(:last_visited_step, attribute) if @application.persisted?
       { success: true }
     rescue StandardError => e

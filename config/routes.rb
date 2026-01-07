@@ -101,7 +101,7 @@ Rails.application.routes.draw do
     get 'dashboard', to: 'dashboard#index', as: :dashboard # Add dashboard route
     root to: 'applications#index'
 
-    resources :guardian_relationships, only: %i[new create destroy]
+    resources :guardian_relationships, only: %i[destroy]
 
     resources :recovery_requests, only: %i[index show] do
       member do
@@ -129,7 +129,7 @@ Rails.application.routes.draw do
       collection do
         post :send_rejection_notification
         post :reject_for_income
-        get :fpl_thresholds
+        get :dependent_form
       end
     end
 
@@ -158,6 +158,8 @@ Rails.application.routes.draw do
         patch :update_certification_status
         post :resend_medical_certification
         patch :upload_medical_certification
+        post :send_document_signing_request
+        post :queue_medical_certification_form
       end
 
       resources :notes, only: [:create], controller: 'application_notes'
@@ -197,6 +199,8 @@ Rails.application.routes.draw do
       end
 
       member do
+        get :dependents
+        get :last_application_values
         post :approve
         post :suspend
         post :reactivate
@@ -336,7 +340,6 @@ Rails.application.routes.draw do
     resources :dependents
     resources :applications, path: 'applications', except: [:destroy] do
       collection do
-        get :fpl_thresholds
         patch :autosave_field
       end
 
@@ -370,5 +373,6 @@ Rails.application.routes.draw do
     resources :email_events, only: [:create]
     resources :medical_certifications, only: [:create]
     post 'twilio/fax_status', to: 'twilio#fax_status', as: :twilio_fax_status
+    post 'docuseal/medical_certification', to: 'docuseal#medical_certification'
   end
 end

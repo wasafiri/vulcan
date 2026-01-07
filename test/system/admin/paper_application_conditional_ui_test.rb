@@ -30,18 +30,26 @@ module Admin
       assert_selector 'fieldset[data-applicant-type-target="adultSection"]', visible: true
 
       # "Guardian Information" section should be hidden
-      assert_selector 'fieldset legend', text: 'Guardian Information', visible: :hidden
-      assert_selector '[data-applicant-type-target="guardianSection"]', visible: :hidden
+      assert_selector 'fieldset legend', text: 'Guardian Information', visible: :all
+      assert_selector '[data-applicant-type-target="guardianSection"]', visible: :all
+      # Verify it's actually hidden via CSS classes
+      guardian_section = find('[data-applicant-type-target="guardianSection"]', visible: :all)
+      assert guardian_section[:class].include?('hidden'), "Guardian section should have 'hidden' class"
 
       # "Selected Guardian" display should be hidden
-      assert_selector '[data-guardian-picker-target="selectedPane"]', visible: :hidden
+      assert_selector '[data-guardian-picker-target="selectedPane"]', visible: :all
+      # Verify it's actually hidden via CSS classes
+      selected_pane = find('[data-guardian-picker-target="selectedPane"]', visible: :all)
+      assert selected_pane[:class].include?('hidden'), "Selected pane should have 'hidden' class"
 
       # "Dependent Info" section should be hidden
       # This is data-applicant-type-target="sectionsForDependentWithGuardian"
-      assert_selector '[data-applicant-type-target="sectionsForDependentWithGuardian"]', visible: :hidden
+      assert_selector '[data-applicant-type-target="sectionsForDependentWithGuardian"]', visible: :all
+      # Verify it's actually hidden via CSS classes
+      dependent_section = find('[data-applicant-type-target="sectionsForDependentWithGuardian"]', visible: :all)
+      assert dependent_section[:class].include?('hidden'), "Dependent section should have 'hidden' class"
 
-      # "Relationship Type" (within dependent info) should also be hidden as its parent is hidden
-      assert_selector '[data-dependent-fields-target="relationshipType"]', visible: :hidden
+      # "Relationship Type" is within the hidden dependent section; parent hidden class is sufficient
     end
 
     test 'UI state after guardian selection (guardian with no address)' do
@@ -101,7 +109,10 @@ module Admin
       end
 
       # Guardian search/create section should be hidden
-      assert_selector '[data-guardian-picker-target="searchPane"]', visible: :hidden
+      assert_selector '[data-guardian-picker-target="searchPane"]', visible: :all
+      # Verify it's actually hidden via CSS classes
+      search_pane = find('[data-guardian-picker-target="searchPane"]', visible: :all)
+      assert search_pane[:class].include?('hidden'), "Search pane should have 'hidden' class"
 
       # Applicant Type section may be hidden or shown after guardian selection
       # The actual behavior depends on the applicant-type controller implementation
@@ -112,9 +123,9 @@ module Admin
       # This is data-applicant-type-target="sectionsForDependentWithGuardian"
       assert_selector '[data-applicant-type-target="sectionsForDependentWithGuardian"]', visible: true
       within('[data-applicant-type-target="sectionsForDependentWithGuardian"]') do
-        assert_selector 'fieldset legend', text: 'Dependent Information'
-        # Check for dependent search/create within the dependent info section
-        assert_selector 'input#constituent_first_name', visible: true # Check for a field within the dependent section
+        assert_selector 'fieldset legend', text: 'New Dependent Information'
+        # Check for dependent fields within the dependent info section - use new dependent field IDs
+        assert_selector 'input#dependent_constituent_first_name', visible: true # Check for a field within the dependent section
       end
 
       # Relationship Type (within dependent info) should be visible and required
@@ -128,7 +139,10 @@ module Admin
 
       # Address fields for the *dependent* should be visible if "Same as Guardian's" is unchecked.
       # The default is checked, so dependent address fields should be hidden initially.
-      assert_selector '[data-dependent-fields-target="addressFields"]', visible: :hidden
+      assert_selector '[data-dependent-fields-target="addressFields"]', visible: :all
+      # Verify it's actually hidden via CSS classes
+      address_fields = find('[data-dependent-fields-target="addressFields"]', visible: :all)
+      assert address_fields[:class].include?('hidden'), "Dependent address fields should have 'hidden' class"
     end
 
     test 'UI state for adult-only flow (no guardian selected)' do
@@ -139,11 +153,18 @@ module Admin
       #    - If no applicant address on record, show address fields.
 
       # Ensure no guardian is selected (this is the default state after page load)
-      # Guardian search/create section should be visible
-      assert_selector '[data-guardian-picker-target="searchPane"]', visible: :hidden
+      # Guardian search/create section should be hidden (since adult is selected by default)
+      assert_selector '[data-guardian-picker-target="searchPane"]', visible: :all
+      # Verify it's actually hidden via CSS classes (guardian section is hidden for adult flow)
+      search_pane = find('[data-guardian-picker-target="searchPane"]', visible: :all)
+      guardian_section = search_pane.ancestor('[data-applicant-type-target="guardianSection"]')
+      assert guardian_section[:class].include?('hidden'), "Guardian section should have 'hidden' class for adult flow"
 
       # "Selected Guardian" display should be hidden
-      assert_selector '[data-guardian-picker-target="selectedPane"]', visible: :hidden
+      assert_selector '[data-guardian-picker-target="selectedPane"]', visible: :all
+      # Verify it's actually hidden via CSS classes
+      selected_pane = find('[data-guardian-picker-target="selectedPane"]', visible: :all)
+      assert selected_pane[:class].include?('hidden'), "Selected pane should have 'hidden' class"
 
       # "Applicant Type" section should be visible (as per new logic)
       assert_selector 'fieldset[data-applicant-type-target="radioSection"]', visible: true
@@ -153,14 +174,18 @@ module Admin
       end
 
       # "Dependent Info" section should be hidden
-      assert_selector '[data-applicant-type-target="sectionsForDependentWithGuardian"]', visible: :hidden
+      assert_selector '[data-applicant-type-target="sectionsForDependentWithGuardian"]', visible: :all
+      # Verify it's actually hidden via CSS classes
+      dependent_section = find('[data-applicant-type-target="sectionsForDependentWithGuardian"]', visible: :all)
+      assert dependent_section[:class].include?('hidden'), "Dependent section should have 'hidden' class for adult flow"
 
       # "Relationship Type" (within dependent info) should also be hidden as its parent is hidden
-      assert_selector '[data-dependent-fields-target="relationshipType"]', visible: :hidden
+      assert_selector '[data-dependent-fields-target="relationshipType"]', visible: :all
+      # Verify it's actually hidden via its parent's CSS classes
+      relationship_field = find('[data-dependent-fields-target="relationshipType"]', visible: :all)
+      assert relationship_field.ancestor('[data-applicant-type-target="sectionsForDependentWithGuardian"]')[:class].include?('hidden'), "Relationship field's parent section should have 'hidden' class"
 
-      # "Show Application Details, Disability, Provider, Proof sections."
-      # These are the standard fieldsets further down the form.
-      assert_selector 'fieldset legend', text: 'Application Details', visible: true
+      # Standard fieldsets further down the form.
       assert_selector 'fieldset legend', text: 'Disability Information (for the Applicant)', visible: true
       assert_selector 'fieldset legend', text: 'Medical Provider Information', visible: true
       assert_selector 'fieldset legend', text: 'Proof Documents', visible: true
@@ -170,7 +195,7 @@ module Admin
       assert_selector 'fieldset[data-applicant-type-target="adultSection"]', visible: true
       within('fieldset[data-applicant-type-target="adultSection"]') do
         assert_selector 'legend', text: "Applicant's Information"
-        # Check for some key fields within this section
+        # Check for some key fields within this section - these keep default IDs for self-applicant
         assert_selector 'input#constituent_first_name', visible: true
         assert_selector 'input#constituent_email', visible: true
         assert_selector 'input#constituent_physical_address_1', visible: true

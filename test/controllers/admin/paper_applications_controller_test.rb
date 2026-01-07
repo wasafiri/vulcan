@@ -552,7 +552,7 @@ module Admin
         }
       end
 
-      assert_response :unprocessable_entity
+      assert_response :unprocessable_content
       assert_match 'Income exceeds the maximum threshold for the household size.', flash[:alert]
     end
 
@@ -601,23 +601,29 @@ module Admin
       }
 
       # Check that the response is unprocessable entity
-      assert_response :unprocessable_entity
+      assert_response :unprocessable_content
     end
 
-    test 'should get fpl_thresholds' do
-      get fpl_thresholds_admin_paper_applications_path, headers: default_headers
+    test 'helper methods return correct FPL data' do
+      # Test that the helper methods provide correct server-rendered data
+      get new_admin_paper_application_path, headers: default_headers
       assert_response :success
 
-      json_response = response.parsed_body # Use Rails' response.parsed_body helper
-      assert_equal 15_650, json_response['thresholds']['1']
-      assert_equal 21_150, json_response['thresholds']['2']
-      assert_equal 26_650, json_response['thresholds']['3']
-      assert_equal 32_150, json_response['thresholds']['4']
-      assert_equal 37_650, json_response['thresholds']['5']
-      assert_equal 43_150, json_response['thresholds']['6']
-      assert_equal 48_650, json_response['thresholds']['7']
-      assert_equal 54_150, json_response['thresholds']['8']
-      assert_equal 400, json_response['modifier']
+      # The helper methods should be available in the controller
+      thresholds_json = @controller.fpl_thresholds_json
+      modifier = @controller.fpl_modifier_value
+
+      # Parse the JSON and verify values
+      thresholds = JSON.parse(thresholds_json)
+      assert_equal 15_650, thresholds['1']
+      assert_equal 21_150, thresholds['2']
+      assert_equal 26_650, thresholds['3']
+      assert_equal 32_150, thresholds['4']
+      assert_equal 37_650, thresholds['5']
+      assert_equal 43_150, thresholds['6']
+      assert_equal 48_650, thresholds['7']
+      assert_equal 54_150, thresholds['8']
+      assert_equal 400, modifier
     end
 
     test 'should send rejection notification' do
@@ -634,7 +640,7 @@ module Admin
         phone: '555-123-4567',
         household_size: '2',
         annual_income: '100000',
-        notification_method: 'email',
+        communication_preference: 'email',
         additional_notes: 'Income exceeds threshold'
       }
 
@@ -650,7 +656,7 @@ module Admin
         phone: '555-123-4567',
         household_size: '2',
         annual_income: '100000',
-        notification_method: 'letter',
+        communication_preference: 'letter',
         additional_notes: 'Income exceeds threshold'
       }
 
@@ -700,7 +706,7 @@ module Admin
       end
 
       # Expect unprocessable entity
-      assert_response :unprocessable_entity
+      assert_response :unprocessable_content
     end
 
     test 'should handle missing constituent gracefully in notification job' do
@@ -837,7 +843,124 @@ module Admin
         }
       end
 
-      assert_response :unprocessable_entity
+      assert_response :unprocessable_content
+    end
+
+    test 'self-application should not use guardian_attributes when constituent data is missing' do
+      # This test verifies that disability_attrs from applicant_attributes are NOT incorrectly
+      # merged with guardian_attributes when creating a self-application.
+      #
+      # Bug scenario: If constituent[:first_name] is blank but guardian_attributes is present,
+      # the old code would use guardian_attributes.deep_merge(disability_attrs) as the constituent,
+      # which incorrectly merges the applicant's disabilities into the guardian's data.
+      #
+      # Expected behavior: Self-applications should only use constituent data, not guardian_attributes.
+
+      guardian_email = "guardian.should.not.be.used.#{Time.now.to_i}@example.com"
+
+      ProofAttachmentService.stubs(:attach_proof).returns({ success: true })
+      ApplicationNotificationsMailer.stubs(:account_created).returns(stub(deliver_later: true))
+
+      # Submit a self-application with guardian_attributes but NO constituent[:first_name]
+      # This should fail validation, NOT create a user from guardian_attributes with the applicant's disabilities
+      assert_no_difference 'User.count', 'Should not create user from guardian_attributes for self-application' do
+        post admin_paper_applications_path, headers: default_headers, params: {
+          applicant_type: 'self',
+          guardian_attributes: {
+            first_name: 'GuardianFirstName',
+            last_name: 'GuardianLastName',
+            email: guardian_email,
+            phone: '555-111-2222',
+            physical_address_1: '100 Guardian Rd',
+            city: 'Guardville',
+            state: 'MD',
+            zip_code: '21001'
+          },
+          constituent: {
+            # Deliberately leaving first_name blank to trigger the bug scenario
+            email: '', # empty email
+            hearing_disability: '0'
+          },
+          applicant_attributes: {
+            self_certify_disability: '1',
+            hearing_disability: '1', # This should go to the applicant, NOT the guardian
+            vision_disability: '1'
+          },
+          application: {
+            household_size: 1,
+            annual_income: 10_000,
+            maryland_resident: '1',
+            medical_provider_name: 'Dr. Test',
+            medical_provider_phone: '555-333-4444',
+            medical_provider_email: 'dr.test@example.com'
+          }
+        }
+      end
+
+      # Verify no user was created with the guardian's email and applicant's disabilities
+      created_user = User.find_by(email: guardian_email)
+      assert_nil created_user, 'No user should be created from guardian_attributes for a self-application'
+
+      # The response should indicate failure due to missing constituent data
+      assert_response :unprocessable_content
+    end
+
+    test 'self-application disability attrs should apply to constituent not guardian' do
+      # This test verifies that when both constituent and guardian_attributes are present,
+      # the applicant's disability flags go to the constituent (applicant), not the guardian.
+
+      constituent_email = "self.applicant.disability.#{Time.now.to_i}@example.com"
+      income_proof_file = fixture_file_upload(Rails.root.join('test/fixtures/files/test_income_proof.pdf'), 'application/pdf')
+      residency_proof_file = fixture_file_upload(Rails.root.join('test/fixtures/files/test_residency_proof.pdf'), 'application/pdf')
+
+      ProofAttachmentService.stubs(:attach_proof).returns({ success: true })
+      ApplicationNotificationsMailer.stubs(:account_created).returns(stub(deliver_later: true))
+
+      assert_difference 'User.count', 1 do
+        post admin_paper_applications_path, headers: default_headers, params: {
+          applicant_type: 'self',
+          constituent: {
+            first_name: 'SelfApplicant',
+            last_name: 'WithDisability',
+            email: constituent_email,
+            phone: '555-222-3333',
+            physical_address_1: '200 Applicant Way',
+            city: 'Appville',
+            state: 'MD',
+            zip_code: '21002'
+          },
+          applicant_attributes: {
+            self_certify_disability: '1',
+            hearing_disability: '1',
+            vision_disability: '1',
+            speech_disability: '0',
+            mobility_disability: '0',
+            cognition_disability: '0'
+          },
+          application: {
+            household_size: 1,
+            annual_income: 10_000,
+            maryland_resident: '1',
+            self_certify_disability: '1',
+            medical_provider_name: 'Dr. Self',
+            medical_provider_phone: '555-444-5555',
+            medical_provider_email: 'dr.self@example.com'
+          },
+          income_proof: income_proof_file,
+          residency_proof: residency_proof_file,
+          income_proof_action: 'accept',
+          residency_proof_action: 'accept'
+        }
+      end
+
+      # Verify the applicant was created with the correct disabilities
+      applicant = User.find_by(email: constituent_email)
+      assert applicant, 'Applicant should be created'
+      assert applicant.hearing_disability, 'Applicant should have hearing disability from applicant_attributes'
+      assert applicant.vision_disability, 'Applicant should have vision disability from applicant_attributes'
+      assert_not applicant.speech_disability, 'Applicant should not have speech disability'
+      assert_not applicant.mobility_disability, 'Applicant should not have mobility disability'
+      assert_not applicant.cognition_disability, 'Applicant should not have cognition disability'
     end
   end
 end
