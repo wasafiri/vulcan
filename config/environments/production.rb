@@ -51,7 +51,6 @@ Rails.application.configure do
   # Don't log any deprecations.
   config.active_support.report_deprecations = false
 
-  # Replace the default in-process memory cache store with a durable alternative.
   config.cache_store = :solid_cache_store
 
   # Replace the default in-process and non-durable queuing backend for Active Job.
@@ -63,7 +62,9 @@ Rails.application.configure do
   # config.action_mailer.raise_delivery_errors = false
 
   # Set host to be used by links generated in mailer templates.
-  config.action_mailer.default_url_options = { host: 'example.com' }
+  # Configure via APPLICATION_HOST environment variable (e.g., "myapp.herokuapp.com")
+  # Default provided for build-time asset compilation; real value required at runtime
+  config.action_mailer.default_url_options = { host: ENV.fetch('APPLICATION_HOST', 'example.com'), protocol: 'https' }
 
   # Specify outgoing SMTP server. Remember to add smtp/* credentials via rails credentials:edit.
   # config.action_mailer.smtp_settings = {

@@ -4,7 +4,7 @@ module Admin
   class EmailTemplatesController < Admin::BaseController
     include Pagy::Backend # Include Pagy for pagination
 
-    before_action :set_template, only: %i[show edit update new_test_email send_test]
+    before_action :set_template, only: %i[show edit update new_test_email send_test toggle_disabled]
     before_action :load_template_definition, only: %i[show edit update new_test_email] # Load definition for relevant actions
 
     # GET /admin/email_templates
@@ -87,12 +87,12 @@ module Admin
 
       if @email_template.update(email_template_params.merge(updated_by: current_user))
         log_template_update_event
-        redirect_to admin_email_template_path(@email_template), notice: 'Email template was successfully updated.'
+        redirect_to admin_email_template_path(@email_template), notice: t('.e_template_update_pass')
       else
         # Re-prepare sample data for form re-render on validation failure
         @sample_data = view_context.sample_data_for_template(@email_template.name)
         flash.now[:alert] = "Failed to update template: #{@email_template.errors.full_messages.join(', ')}"
-        render :edit, status: :unprocessable_entity
+        render :edit, status: :unprocessable_content
       end
     end
 
@@ -110,6 +110,44 @@ module Admin
       end
     rescue StandardError => e
       handle_test_email_error(e)
+    end
+
+    # PATCH /admin/email_templates/:id/toggle_disabled
+    def toggle_disabled
+      new_state = !@email_template.enabled
+      if @email_template.update(enabled: new_state)
+        action = new_state ? 'enabled' : 'disabled'
+        log_audit_event('email_template_toggled', enabled: new_state)
+        redirect_to admin_email_templates_path,
+                    notice: "Email template '#{@email_template.name}' has been #{action}."
+      else
+        redirect_to admin_email_templates_path,
+                    alert: "Failed to update template: #{@email_template.errors.full_messages.join(', ')}"
+      end
+    end
+
+    # PATCH /admin/email_templates/bulk_disable
+    def bulk_disable
+      count = EmailTemplate.update_all(enabled: false)
+      Event.create!(
+        user: current_user,
+        action: 'email_templates_bulk_disabled',
+        metadata: { count: count }
+      )
+      redirect_to admin_email_templates_path,
+                  notice: "All #{count} email templates have been disabled."
+    end
+
+    # PATCH /admin/email_templates/bulk_enable
+    def bulk_enable
+      count = EmailTemplate.update_all(enabled: true)
+      Event.create!(
+        user: current_user,
+        action: 'email_templates_bulk_enabled',
+        metadata: { count: count }
+      )
+      redirect_to admin_email_templates_path,
+                  notice: "All #{count} email templates have been enabled."
     end
 
     private
@@ -136,7 +174,7 @@ module Admin
     def set_template
       @email_template = EmailTemplate.find(params[:id])
     rescue ActiveRecord::RecordNotFound
-      redirect_to admin_email_templates_path, alert: 'Email template not found.'
+      redirect_to admin_email_templates_path, alert: t('alerts.e_template_not_found')
     end
 
     # Load the definition from the constant based on the template name
@@ -197,7 +235,7 @@ module Admin
 
     def handle_invalid_form
       flash.now[:alert] = "Invalid email address: #{@test_email_form.errors.full_messages.join(', ')}"
-      render :new_test_email, status: :unprocessable_entity
+      render :new_test_email, status: :unprocessable_content
     end
 
     def handle_test_email_error(error)
@@ -210,7 +248,7 @@ module Admin
       )
 
       flash.now[:alert] = "Failed to send test email: #{error.message}. Check sample data and template syntax."
-      render :new_test_email, status: :unprocessable_entity
+      render :new_test_email, status: :unprocessable_content
     end
   end
 end

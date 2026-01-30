@@ -1,5 +1,4 @@
 import { Controller } from "@hotwired/stimulus"
-import { applyTargetSafety } from "../../mixins/target_safety"
 import { setVisible } from "../../utils/visibility"
 import { createFormChangeDebounce } from "../../utils/debounce"
 
@@ -35,7 +34,7 @@ class DependentFieldsController extends Controller {
     "dependentZip"
   ]
 
-  static outlets = ["flash"] // Declare flash outlet
+  
   static values = {
     copyFromGuardian: Boolean
   }
@@ -48,23 +47,26 @@ class DependentFieldsController extends Controller {
     this.debouncedApplicantTypeChange = createFormChangeDebounce(() => this.executeApplicantTypeChange())
 
     // Set initial state based on checkboxes if available - use target safety
-    this.withTarget('sameAddressCheckbox', (checkbox) => {
+    if (this.hasSameAddressCheckboxTarget) {
+      const checkbox = this.sameAddressCheckboxTarget
       if (this.hasAddressFieldsTarget) {
         this.toggleContactFields({ target: checkbox })
       }
-    })
+    }
 
-    this.withTarget('sameEmailCheckbox', (checkbox) => {
+    if (this.hasSameEmailCheckboxTarget) {
+      const checkbox = this.sameEmailCheckboxTarget
       if (this.hasDependentEmailTarget) {
         this.toggleEmailField({ target: checkbox })
       }
-    })
+    }
 
-    this.withTarget('samePhoneCheckbox', (checkbox) => {
+    if (this.hasSamePhoneCheckboxTarget) {
+      const checkbox = this.samePhoneCheckboxTarget
       if (this.hasDependentPhoneTarget) {
         this.togglePhoneField({ target: checkbox })
       }
-    })
+    }
 
     // Listen for applicant-type change events from ApplicantTypeController
     this.formElement = this.element.closest("form")
@@ -94,7 +96,7 @@ class DependentFieldsController extends Controller {
    * @param {Event} event The change event from the checkbox
    */
   toggleContactFields(event) {
-    if (!this.hasRequiredTargets('addressFields')) {
+    if (!this.hasAddressFieldsTarget) {
       return
     }
 
@@ -123,12 +125,7 @@ class DependentFieldsController extends Controller {
   toggleEmailField(event) {
     const useGuardianEmail = event.target.checked;
 
-    if (!this.hasDependentEmailTarget) {
-      if (process.env.NODE_ENV !== 'production' && this.element.offsetParent !== null) {
-        console.warn("Missing dependentEmail target - check HTML structure");
-      }
-      return;
-    }
+    if (!this.hasDependentEmailTarget) return;
 
     // Use utility to handle email field visibility and required state
     setVisible(this.dependentEmailTarget, !useGuardianEmail, { required: !useGuardianEmail });
@@ -151,12 +148,7 @@ class DependentFieldsController extends Controller {
   togglePhoneField(event) {
     const useGuardianPhone = event.target.checked;
 
-    if (!this.hasDependentPhoneTarget) {
-      if (process.env.NODE_ENV !== 'production' && this.element.offsetParent !== null) {
-        console.warn("Missing dependentPhone target - check HTML structure");
-      }
-      return;
-    }
+    if (!this.hasDependentPhoneTarget) return;
 
     // Use utility to handle phone field visibility and required state
     setVisible(this.dependentPhoneTarget, !useGuardianPhone, { required: !useGuardianPhone });
@@ -187,9 +179,6 @@ class DependentFieldsController extends Controller {
       this.hasDependentZipTarget;
 
     if (!hasMinAddressTargets) {
-      if (process.env.NODE_ENV !== 'production' && this.element.offsetParent !== null) {
-        console.debug("Partial address fields missing - using available data");
-      }
 
       // Copy individual fields if available
       if (this.hasGuardianAddress1Target && this.hasDependentAddress1Target) {
@@ -298,14 +287,10 @@ class DependentFieldsController extends Controller {
 
     } catch (error) {
       console.error("DependentFieldsController: Error in executeApplicantTypeChange:", error);
-      if (this.hasFlashOutlet) {
-        this.flashOutlet.showError("An error occurred while updating dependent fields. Please try again.");
-      }
     }
   }
 }
 
 // Apply target safety mixin
-applyTargetSafety(DependentFieldsController)
 
 export default DependentFieldsController

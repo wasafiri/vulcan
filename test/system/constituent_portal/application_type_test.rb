@@ -14,12 +14,11 @@ module ConstituentPortal
     end
 
     test 'application type is displayed correctly on show page' do
-      # Visit the new application page
+      # Visit the new application page (self-application is the default)
       visit new_constituent_portal_application_path
       wait_for_turbo # Ensure the page is fully loaded before proceeding
 
-      # Ensure this is a self-application (not dependent) to avoid guardian validation issues
-      choose 'Myself' if page.has_css?('input[value="true"]', visible: false)
+      # Self-application is the default when visiting without user_id param.
 
       # Fill in required fields using our safe filling methods to prevent concatenation
       check 'I certify that I am a resident of Maryland'
@@ -60,8 +59,9 @@ module ConstituentPortal
       puts "DEBUG: Application type: #{application.application_type.inspect}"
 
       # Verify the application type is displayed correctly
-      # The application shows the actual value from the database
-      assert_text "Application Type: #{application.application_type&.titleize || 'Not specified'}"
+      # The view uses definition lists so label and value are separate
+      assert_selector 'dt', text: 'Application Type'
+      assert_selector 'dd', text: application.application_type&.titleize || 'Not specified'
 
       # Update the application type directly in the database
       application.update(application_type: 'new')
@@ -70,7 +70,8 @@ module ConstituentPortal
       visit current_path
 
       # Verify the updated application type is displayed
-      assert_text 'Application Type: New'
+      assert_selector 'dt', text: 'Application Type'
+      assert_selector 'dd', text: 'New'
 
       # Update the application type to renewal
       application.update(application_type: 'renewal')
@@ -79,17 +80,16 @@ module ConstituentPortal
       visit current_path
 
       # Verify the updated application type is displayed
-      assert_text 'Application Type: Renewal'
+      assert_selector 'dt', text: 'Application Type'
+      assert_selector 'dd', text: 'Renewal'
     end
 
     test 'self_certify_disability is set correctly' do
-      # Visit the new application page
+      # Visit the new application page (self-application is the default)
       visit new_constituent_portal_application_path
       wait_for_turbo # Ensure the page is fully loaded
 
-      # Ensure this is a self-application (not dependent) to avoid guardian validation issues
-      choose 'Myself' if page.has_css?('input[value="true"]', visible: false)
-
+      # Self-application is the default when visiting without user_id param.
       # Fill in required fields using safe methods to prevent concatenation
       check 'I certify that I am a resident of Maryland'
       safe_fill_household_and_income(3, 45_999)
@@ -142,8 +142,9 @@ module ConstituentPortal
       # Verify the self_certify_disability field is set correctly
       assert application.self_certify_disability, 'self_certify_disability should be true'
 
-      # Verify the self_certify_disability is displayed correctly on the show page
-      assert_text 'Self-Certified Disability: Yes'
+      # Verify the self_certify_disability is displayed correctly
+      assert_selector 'dt', text: 'Self-Certified Disability'
+      assert_selector 'dd', text: 'Yes'
     end
   end
 end

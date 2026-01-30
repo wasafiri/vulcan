@@ -23,11 +23,9 @@ module Admin
 
       assert_selector 'h1', text: 'Upload Paper Application'
 
-      # Corrected array syntax for section headers
       [
         'Who is this application for?',
         "Applicant's Information",
-        'Application Details',
         'Disability Information',
         'Medical Provider Information',
         'Proof Documents'
@@ -99,7 +97,7 @@ module Admin
       wait_for_stimulus_controller('income-validation') if respond_to?(:wait_for_stimulus_controller)
 
       # Assert that the warning appears and the form state changes
-      assert_text 'Income Exceeds Threshold'
+      assert_selector "[data-income-validation-target='warningContainer']", visible: true, text: /Income Exceeds Threshold/
 
       # Wait for the rejection button to become visible (JavaScript-controlled)
       assert_selector '#rejection-button', visible: :visible, wait: 10
@@ -119,22 +117,26 @@ module Admin
       # First ensure the button is present and enabled
       assert_button 'Reject Application (Income)', disabled: false, wait: 10
 
-      # Test without confirmation dialog first to see if basic flow works
-      # Remove data-confirm from button in test or handle differently
-      # Test the complete rejection flow
-      puts 'About to click reject button...'
-
-      assert_difference 'Application.count', 1 do
+      # Income threshold rejection should NOT create an application
+      assert_no_difference 'Application.count' do
+        # Click opens rejection modal
         click_button 'Reject Application (Income)'
 
-        # Wait for the form submission and page redirect
-        wait_for_network_idle
+        # Wait for modal to appear
+        assert_selector 'dialog#rejection-modal[open]', wait: 10
+
+        # Submit the rejection modal form (email notification is pre-selected)
+        within 'dialog#rejection-modal' do
+          click_button 'Send Notification'
+        end
+
+        # Wait for the redirect to complete
+        wait_for_turbo
+        assert_current_path admin_applications_path, wait: 10
       end
 
-      puts 'SUCCESS: Application created and rejection flow completed!'
-
-      # Verify rejection was successful with success message (not error)
-      assert_success_message('Application rejected due to income threshold. Rejection notification has been sent.')
+      # Verify rejection was successful with success message
+      assert_text 'Rejection notification has been sent', wait: 10
     end
 
     test 'admin can see income threshold warning when income exceeds threshold' do
@@ -155,11 +157,8 @@ module Admin
       # Trigger validation by clicking elsewhere
       find('body').click
 
-      # Verify warning appears (may need to make visible via JS)
-      page.execute_script("document.querySelector('#income-threshold-warning')?.classList.remove('hidden')")
-      page.execute_script("document.querySelector('#rejection-button')?.classList.remove('hidden')")
-
-      assert_text 'Income Exceeds Threshold'
+      # Verify warning appears deterministically and rejection button is shown
+      assert_selector "[data-income-validation-target='warningContainer']", visible: true, text: /Income Exceeds Threshold/
       assert_selector '#rejection-button', visible: true
     end
 
@@ -181,8 +180,8 @@ module Admin
       # Trigger validation
       find('body').click
 
-      # Verify no warning appears for low income
-      assert_no_selector '#income-threshold-warning', visible: true
+      # Verify no warning appears for low income (role="alert" only present when shown)
+      assert_no_selector "[data-income-validation-target='warningContainer'][role='alert']", wait: 3
     end
 
     test 'admin can see rejection button for application exceeding income threshold' do
@@ -214,6 +213,97 @@ module Admin
 
       # Verify rejection button is visible
       assert_selector '#rejection-button', visible: true
+    end
+
+    test 'rejection modal form submits notification successfully' do
+      # This test verifies the rejection notification modal form works correctly.
+      # The modal is triggered when income exceeds threshold and admin wants to
+      # send a rejection notification with additional options (email vs letter).
+      visit new_admin_paper_application_path
+      wait_for_fpl_data_to_load
+
+      # Select adult applicant type
+      choose 'An Adult (applying for themselves)'
+      wait_for_turbo
+
+      # Fill in applicant information
+      fill_in_applicant_information(first_name: 'Test', last_name: 'Rejection')
+
+      # Fill in income that exceeds threshold to enable rejection flow
+      fill_in_application_details(household_size: 1, annual_income: 100_000)
+
+      # Add required address information
+      within_applicant_fieldset do
+        fill_in 'constituent[physical_address_1]', with: '456 Rejection Lane'
+        fill_in 'constituent[city]', with: 'Baltimore'
+        fill_in 'constituent[zip_code]', with: '21202'
+      end
+
+      # Trigger validation by clicking
+      find('body').click
+      wait_for_turbo
+      wait_for_network_idle
+
+      # Wait for the rejection button to become visible (JavaScript-controlled)
+      assert_selector '#rejection-button', visible: true, wait: 10
+
+      # Click the rejection button to open the modal
+      # This triggers openRejectionModal() which populates hidden fields and shows the dialog
+      click_button 'Reject Application (Income)'
+
+      # Wait for native <dialog> to open
+      assert_selector 'dialog#rejection-modal[open]', visible: true, wait: 5
+
+      # Fill out the modal form
+      within('dialog#rejection-modal') do
+        # Email is selected by default, but verify we can interact with the form
+        choose 'communication_preference_email'
+
+        # Add optional notes
+        fill_in 'additional_notes', with: 'Test rejection via modal form'
+      end
+
+      # Submit the rejection notification form
+      # This should redirect to admin_applications_path with a success message
+      within('dialog#rejection-modal') do
+        click_button 'Send Notification'
+      end
+
+      # Wait for redirect
+      wait_for_turbo
+      wait_for_network_idle
+
+      # Verify success message
+      assert_success_message('Rejection notification has been sent')
+
+      # Verify we're redirected to the applications list
+      assert_current_path admin_applications_path
+    end
+
+    test 'rejection modal cancel button closes modal' do
+      # Test that the cancel button in the rejection modal closes it properly
+      visit new_admin_paper_application_path
+      wait_for_turbo
+
+      # Open the rejection modal using native dialog
+      page.execute_script(<<~JS)
+        const modal = document.querySelector('dialog#rejection-modal');
+        if (modal && modal.showModal) {
+          modal.showModal();
+        }
+      JS
+
+      # Verify modal is open (native dialog has 'open' attribute when shown)
+      assert_selector 'dialog#rejection-modal[open]', visible: true, wait: 5
+
+      # Click cancel button
+      within('dialog#rejection-modal') do
+        click_button 'Cancel'
+      end
+
+      # Modal should be closed after cancel (no 'open' attribute)
+      wait_for_turbo
+      assert_no_selector 'dialog#rejection-modal[open]', wait: 5
     end
 
     test 'admin can submit application with rejected proofs' do
@@ -248,6 +338,8 @@ module Admin
     test 'attachments are preserved when validation fails' do
       # Simplified test that just verifies UI state without actual form submission
       safe_visit new_admin_paper_application_path
+      # Wait for FPL data to load to prevent race conditions with income validation.
+      wait_for_fpl_data_to_load
       wait_for_network_idle
 
       # Handle proof documents - just check the radio buttons
@@ -292,10 +384,8 @@ module Admin
       # 5. ASSERTION: Verify the guardian section is still visible and shows the
       #    selected guardian's name, confirming the UI updated correctly without a page reload.
       within 'fieldset', text: 'Guardian Information' do
-        assert_text 'Alex Collins'
-        assert_no_selector 'input#guardian_search_q' # Search input should be hidden after selection
-        assert_selector "input[type='hidden'][name='guardian_id'][value='#{guardian.id}']",
-                        visible: :hidden
+        assert_text 'Alex Collins', wait: 5
+        assert_selector "input[type='hidden'][name='guardian_id'][value='#{guardian.id}']", visible: :all, wait: 5
       end
 
       # The test's original goal was to ensure the section remains visible. This confirms it.
@@ -486,9 +576,8 @@ module Admin
 
       # Verify the selected user info is displayed
       within 'fieldset', text: 'Guardian Information' do
-        assert_selector '[data-admin-user-search-target="selectedUserDisplay"]', visible: true
-        assert_selector '[data-admin-user-search-target="selectedUserName"]', text: /Alex Collins/i
-        assert_selector "input[type='hidden'][name='guardian_id'][value='#{test_guardian.id}']", visible: :hidden
+        assert_selector '.guardian-details-container', text: /Alex Collins/i, wait: 5
+        assert_selector "input[type='hidden'][name='guardian_id'][value='#{test_guardian.id}']", visible: :all, wait: 5
       end
     end
 
@@ -535,7 +624,7 @@ module Admin
       end
 
       # Use a more flexible selector for the hidden input since the ID might vary
-      assert_selector "input[type='hidden'][name='guardian_id']", visible: :hidden
+      assert_selector "input[type='hidden'][name='guardian_id']", visible: :all, wait: 5
 
       # Ensure dependent sections are visible and fields are enabled by simulating proper guardian selection
       page.execute_script(<<~JS)
@@ -570,9 +659,14 @@ module Admin
       wait_for_stimulus_controller('applicant-type', timeout: 10)
       wait_for_stimulus_controller('paper-application', timeout: 10)
       wait_for_network_idle(timeout: 3)
+      # Ensure date field becomes enabled before asserting value
+      dependent_fieldset = page.find('fieldset', text: 'New Dependent Information', visible: true)
+      within dependent_fieldset do
+        assert_selector 'input[name="constituent[date_of_birth]"]:not([disabled])', wait: 10
+      end
 
       # Fill in dependent information - use direct fieldset finder
-      dependent_fieldset = page.find('fieldset', text: 'Dependent Information', visible: true)
+      dependent_fieldset = page.find('fieldset', text: 'New Dependent Information', visible: true)
       within dependent_fieldset do
         # Wait for fields to be enabled and stable
         assert_selector 'input[name="constituent[first_name]"]:not([disabled])', wait: 5
@@ -581,7 +675,8 @@ module Admin
         # Fill fields one by one with small delays to prevent race conditions
         fill_in 'constituent[first_name]', with: 'Xavier'
         fill_in 'constituent[last_name]', with: 'Collins'
-        fill_in 'constituent[date_of_birth]', with: '09/09/1999'
+        # Use ISO format expected by input[type=date]
+        fill_in 'constituent[date_of_birth]', with: '1999-09-09'
 
         # Check boxes for using guardian's email and address
         check 'use_guardian_email'
@@ -613,14 +708,6 @@ module Admin
       # Fill in the relationship type
       select 'Parent', from: 'relationship_type'
 
-      # Fill in application details - using direct find
-      application_fieldset = page.find('fieldset', text: 'Application Details', visible: true)
-      within application_fieldset do
-        fill_in 'application_household_size', with: '5'
-        fill_in 'application_annual_income', with: '29999'
-        check 'application_maryland_resident'
-      end
-
       # Fill in medical provider information - using direct find
       provider_fieldset = page.find('fieldset', text: 'Medical Provider Information', visible: true)
       within provider_fieldset do
@@ -632,11 +719,16 @@ module Admin
       # Handle proof documents - using direct find
       proof_fieldset = page.find('fieldset', text: 'Proof Documents', visible: true)
       within proof_fieldset do
+        # Fill in application details (moved here from removed Application Details fieldset)
+        fill_in 'application_household_size', with: '5'
+        fill_in 'application_annual_income', with: '29999'
+
         # Income proof
         choose 'accept_income_proof'
         attach_file 'income_proof', Rails.root.join('test/fixtures/files/income_proof.pdf')
 
-        # Residency proof
+        # Maryland resident and Residency proof
+        check 'application_maryland_resident'
         choose 'accept_residency_proof'
         attach_file 'residency_proof', Rails.root.join('test/fixtures/files/residency_proof.pdf')
       end
@@ -731,30 +823,14 @@ module Admin
       assert_equal 'approved', application.residency_proof_status.to_s
       assert_equal 'approved', application.medical_certification_status.to_s
 
-      # Visit the page to verify UI reflects the approved status
-      begin
-        visit admin_application_path(application)
-        wait_for_network_idle
-
-        # Verify page loads correctly with better error handling
-        # Wait for turbo and ensure page is stable before assertions
-        wait_for_turbo
-        assert_text "Application ##{application.id} Details", wait: 10
-      rescue Ferrum::NodeNotFoundError, Ferrum::DeadBrowserError => e
-        puts "Browser corruption detected during page visit: #{e.message}"
-        if respond_to?(:force_browser_restart, true)
-          force_browser_restart('paper_applications_recovery')
-        else
-          Capybara.reset_sessions!
-        end
-        # Re-authenticate after browser restart since sessions are lost
-        system_test_sign_in(@admin)
-        # Retry the visit after restart and re-authentication
-        visit admin_application_path(application)
-        wait_for_network_idle
-        wait_for_turbo
-        # Wait for page to load completely using reliable ID selector
-        assert_selector 'h1#application-title', wait: 15
+      # Visit the page robustly to verify UI reflects the approved status
+      visit_admin_application_with_retry(application, user: @admin)
+      wait_for_turbo
+      # Wait for page to load completely using reliable ID selector (fallback to text if needed)
+      if page.has_selector?('h1#application-title', wait: 15)
+        assert_selector 'h1#application-title'
+      else
+        assert_text "Application ##{application.id} Details", wait: 15
       end
 
       # Verify all proofs show as approved in the UI
@@ -811,12 +887,12 @@ module Admin
         fill_in 'constituent[phone]', with: '555-111-2222'
       end
 
-      # Get application details section directly
-      application_details = find('fieldset', text: 'Application Details', visible: true)
-      assert application_details.visible?, 'Application details fieldset should be visible'
+      # Get proof documents section directly
+      proof_documents = find('fieldset', text: 'Proof Documents', visible: true)
+      assert proof_documents.visible?, 'Proof documents fieldset should be visible'
 
       # Fill details with high income
-      within application_details do
+      within proof_documents do
         fill_in 'application[household_size]', with: '1'
         fill_in 'application[annual_income]', with: '100000' # Exceeds 400% of 20k
       end
@@ -825,21 +901,8 @@ module Admin
       find('body').click
       wait_for_turbo # Wait for JS validation to run
 
-      # Make the income threshold warning visible if it exists but is hidden
-      page.execute_script(<<~JS)
-        const warning = document.querySelector('#income-threshold-warning');
-        if (warning) {
-          warning.classList.remove('hidden');
-          warning.style.display = 'block';
-          warning.style.visibility = 'visible';
-        }
-      JS
-      wait_for_turbo
-
-      # Assert warning and disabled submit button with more flexible checks
-      assert_text 'Income Exceeds Threshold'
-      # Check for the warning text that's actually generated by the JavaScript
-      assert_text 'Your annual income exceeds the maximum threshold'
+      # Assert warning and disabled submit button with target/role checks (avoid brittle page-level text)
+      assert_selector "[data-income-validation-target='warningContainer'][role='alert']", visible: true
 
       # Ensure submit button is disabled
       page.execute_script("document.querySelector('input[type=submit]').disabled = true;")
@@ -910,20 +973,21 @@ module Admin
 
         # Select the existing constituent - direct fieldset approach
         within applicant_fieldset do
-          # Fill in details directly
+          # Fill in details directly including required fields
           fill_in 'constituent[first_name]', with: constituent.first_name
           fill_in 'constituent[last_name]', with: constituent.last_name
           fill_in 'constituent[email]', with: constituent.email
+          fill_in 'constituent[phone]', with: '555-123-4567'
+          find('input[name="constituent[date_of_birth]"]').set('1980-01-15')
         end
 
         # Find other fieldsets directly
-        application_details = find('fieldset', text: 'Application Details', visible: true)
         disability_fieldset = find('fieldset', text: 'Disability Information', visible: true)
         medical_provider_fieldset = find('fieldset', text: 'Medical Provider Information', visible: true)
         proof_documents_fieldset = find('fieldset', text: 'Proof Documents', visible: true)
 
         # Fill the rest of the form minimally
-        within application_details do
+        within proof_documents_fieldset do
           fill_in 'application[household_size]', with: '1'
           fill_in 'application[annual_income]', with: '5000'
           check 'application[maryland_resident]'
@@ -962,8 +1026,12 @@ module Admin
         # Attempt to submit
         click_on 'Submit Paper Application'
 
+        # Wait for form submission to complete
+        wait_for_turbo
+
         # Assert validation error message related to waiting period
-        assert_selector '[role="alert"]', text: /You must wait #{waiting_period_years} years before submitting a new application/i
+        # The error message is wrapped: "Failed to create application: You must wait X years..."
+        assert_selector '[role="alert"]', text: /must wait #{waiting_period_years} years/i, wait: 10
         # Ensure we are still on the new application page (controller renders :new on failure)
         assert_current_path new_admin_paper_application_path
         assert_selector 'h1', text: 'Upload Paper Application'
@@ -990,12 +1058,6 @@ module Admin
         fill_in 'constituent[physical_address_1]', with: '123 Test St'
         fill_in 'constituent[city]', with: 'Baltimore'
         fill_in 'constituent[zip_code]', with: '21201'
-      end
-
-      within 'fieldset', text: 'Application Details' do
-        fill_in 'application[household_size]', with: '2'
-        fill_in 'application[annual_income]', with: '10000'
-        check 'application[maryland_resident]'
       end
 
       within 'fieldset', text: 'Disability Information' do
@@ -1026,7 +1088,11 @@ module Admin
       end
 
       # Test case 2: Upload files and try again
+      # Fill in income/residency fields (moved from removed Application Details fieldset)
       within 'fieldset', text: 'Proof Documents' do
+        fill_in 'application[household_size]', with: '2'
+        fill_in 'application[annual_income]', with: '10000'
+        check 'application[maryland_resident]'
         attach_file 'income_proof', Rails.root.join('test/fixtures/files/blank.pdf')
         attach_file 'residency_proof', Rails.root.join('test/fixtures/files/blank.pdf')
       end

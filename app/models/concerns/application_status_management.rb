@@ -5,7 +5,7 @@ module ApplicationStatusManagement
 
   included do
     after_save :handle_status_change, if: :saved_change_to_status?
-    after_save :auto_approve_if_eligible, if: :requirements_met_for_approval?
+    after_save :auto_approve_if_eligible, if: :should_auto_approve?
 
     enum :application_type, {
       new: 0,
@@ -39,6 +39,15 @@ module ApplicationStatusManagement
         )
       when 'awaiting_medical_response'
         where(status: statuses[:awaiting_documents])
+      when 'digitally_signed_needs_review'
+        where(
+          document_signing_status: document_signing_statuses[:signed]
+        ).where.not(
+          medical_certification_status: [
+            medical_certification_statuses[:approved],
+            medical_certification_statuses[:rejected]
+          ]
+        )
       end
     }
     scope :sorted_by, lambda { |column, direction|
@@ -92,17 +101,13 @@ module ApplicationStatusManagement
   end
 
   # --- Auto Approve Application Process ---
-  # Checks if the application itself is eligible for auto-approval.
-  # Eligibility requires income proof, residency proof, AND medical certification to be approved.
-  # This method is triggered after save if any of the relevant proof statuses change.
-  def requirements_met_for_approval?
-    # Only run this when relevant fields have changed
-    return false unless saved_change_to_income_proof_status? ||
-                        saved_change_to_residency_proof_status? ||
-                        saved_change_to_medical_certification_status?
-
-    # Only auto-approve applications that aren't already approved
-    return false if status_approved?
+  # Determines if the application should be auto-approved.
+  # Auto-approval occurs when all three requirements (income, residency, medical certification)
+  # are approved, regardless of the order in which they were approved.
+  # This check runs on every save to catch cases where requirements were met out of order.
+  def should_auto_approve?
+    # Don't auto-approve if already in a terminal state
+    return false if status_approved? || status_rejected? || status_archived?
 
     # Check if all requirements are met (income, residency, and medical certification approved)
     all_requirements_met?
@@ -122,13 +127,16 @@ module ApplicationStatusManagement
     create_auto_approval_audit_event(previous_status)
   end
 
-  # Updates the application status using the model's status update method
-  # This ensures proper status change records are created
+  # Updates the application status using Rails update! method
+  # The after_save callback handles status change record creation automatically
   def update_application_status_to_approved
-    # Use Current.user (the admin who triggered the action) instead of nil
-    # This ensures proper audit trail with the actual user who caused the auto-approval
-    acting_user = Current.user
-    update_status('approved', user: acting_user, notes: 'Auto-approved based on all requirements being met')
+    # Use Current.user (the admin who triggered the action) for audit trail
+    # Store notes for the callback to use
+    @pending_status_change_user = Current.user
+    @pending_status_change_notes = 'Auto-approved based on all requirements being met'
+
+    # Update status - log_status_change callback handles ApplicationStatusChange creation
+    update!(status: 'approved')
   end
 
   # Creates an audit event for the auto-approval

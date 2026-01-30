@@ -30,30 +30,40 @@ module Admin
       request_documents review_proof update_proof_status
       approve reject assign_evaluator assign_trainer schedule_training complete_training
       update_certification_status resend_medical_certification assign_voucher
-      upload_medical_certification
+      upload_medical_certification send_document_signing_request
+      queue_medical_certification_form
     ]
     before_action :load_audit_logs_with_service, only: %i[show approve reject]
 
     def index
       # DashboardMetricsLoading concern: Loads comprehensive dashboard metrics
-      # Flow: load_dashboard_metrics -> load_simple_counts + load_reporting_service_data + load_remaining_metrics
-      # This populates instance variables like @open_applications_count, @proofs_needing_review_count, etc.
-      load_dashboard_metrics
+      # Returns hash of metrics
+      @metrics = load_dashboard_metrics
+
+      # Determine what statuses to exclude from base scope
+      # When admin explicitly filters by a normally-excluded status, we need to include it
+      excluded_statuses = %i[draft rejected archived]
+      filtered_status = params[:status]&.to_sym || params[:filter]&.to_sym
+
+      # Remove the filtered status from exclusions so it can be shown
+      excluded_statuses.delete(filtered_status) if filtered_status && excluded_statuses.include?(filtered_status)
 
       # Skip heavy ActiveStorage eager-loading; we preload attachment existence separately
-      scoped = filtered_scope(build_application_base_scope)
+      scoped = filtered_scope(build_application_base_scope(exclude_statuses: excluded_statuses))
       @pagy, page_of_apps = paginate(scoped)
       # ApplicationDataLoading concern: Efficiently preloads attachments for multiple applications
       # Flow: preload_attachments_for_applications -> groups attachments by application_id to avoid N+1 queries
-      attachments_index   = preload_attachments_for_applications(page_of_apps)
+      # Force to array to avoid PostgreSQL JSON distinct issues when relation has joins
+      attachments_index   = preload_attachments_for_applications(page_of_apps.to_a)
 
       # ApplicationDataLoading concern: Decorates applications with storage information
       # Flow: decorate_applications_with_storage -> wraps each app with ApplicationStorageDecorator
       @applications = decorate_applications_with_storage(page_of_apps, attachments_index)
 
       # Load recent notifications with proper eager loading to avoid N+1 queries
+      # Preload user association through notifiable for NotificationComposer.generate
       @recent_notifications = Notification
-                              .includes(:notifiable, :actor)
+                              .includes(:actor, notifiable: :user)
                               .where('created_at > ?', 7.days.ago)
                               .order(created_at: :desc)
                               .limit(5)
@@ -90,9 +100,23 @@ module Admin
 
     def update
       if @application.update(application_params)
-        redirect_to admin_application_path(@application), notice: 'Application updated.'
+        AuditEventService.log(
+          action: 'application_updated',
+          actor: current_user,
+          auditable: @application,
+          metadata: {
+            admin_id: current_user.id,
+            admin_name: current_user.full_name
+          }
+        )
+        # If this is a modal request, respond with success so the modal can close
+        if params[:modal] == 'true'
+          head :ok
+        else
+          redirect_to admin_application_path(@application), notice: t('.updated')
+        end
       else
-        render :edit, status: :unprocessable_entity
+        render :edit, status: :unprocessable_content
       end
     end
 
@@ -107,21 +131,21 @@ module Admin
     def batch_approve
       result = Application.batch_update_status(params[:ids], :approved)
       if result
-        redirect_to admin_applications_path, notice: 'Applications approved.'
+        redirect_to admin_applications_path, notice: t('.b_approved')
       else
         render json: { error: 'Unable to approve applications' },
-               status: :unprocessable_entity
+               status: :unprocessable_content
       end
     end
 
     def batch_reject
       Application.batch_update_status(params[:ids], :rejected)
-      redirect_to admin_applications_path, notice: 'Applications rejected.'
+      redirect_to admin_applications_path, notice: t('.b_rejected')
     end
 
     def request_documents
       @application.request_documents!
-      redirect_to admin_application_path(@application), notice: 'Documents requested.'
+      redirect_to admin_application_path(@application), notice: t('.d_requested')
     end
 
     def review_proof
@@ -169,16 +193,16 @@ module Admin
 
       # TurboStreamResponseHandling concern: Handles both HTML and Turbo Stream responses uniformly
       # Flow: handle_success_response -> responds with redirect for HTML or turbo streams for AJAX
-      # For Turbo Streams: updates specified elements and removes modals
+      # For Turbo Streams, updates specified elements and removes open modals
       # For HTML: redirects with notice message
       handle_success_response(
         html_redirect_path: admin_application_path(@application),
         html_message: message,
         turbo_updates: {
           'attachments-section' => 'attachments',      # Updates attachment display
-          'audit-logs' => 'audit_logs'                 # Updates audit log section
-        },
-        turbo_modals_to_remove: standard_application_modals # Closes review modals
+          'audit-logs' => 'audit_logs',                # Updates audit log section
+          'modals' => 'modals'                         # Regenerates modals container (closes and resets all modals)
+        }
       )
     end
 
@@ -198,10 +222,10 @@ module Admin
 
       if @application.assign_evaluator!(evaluator)
         redirect_to admin_application_path(@application),
-                    notice: 'Evaluator successfully assigned'
+                    notice: t('.eval_assign_pass')
       else
         redirect_to admin_application_path(@application),
-                    alert: 'Failed to assign evaluator'
+                    alert: t('.eval_assign_fail')
       end
     end
 
@@ -211,17 +235,17 @@ module Admin
 
       if @application.assign_trainer!(trainer)
         redirect_to admin_application_path(@application),
-                    notice: 'Trainer successfully assigned'
+                    notice: t('.trainer_assign_pass')
       else
         redirect_to admin_application_path(@application),
-                    alert: 'Failed to assign trainer'
+                    alert: t('.trainer_assign_fail')
       end
     end
 
     def schedule_training
       trainer = Users::Trainer.active.find_by(id: params[:trainer_id])
       unless trainer
-        redirect_to admin_application_path(@application), alert: 'Invalid trainer selected.'
+        redirect_to admin_application_path(@application), alert: t('.t_schedule_invalid')
         return
       end
 
@@ -235,7 +259,7 @@ module Admin
                     notice: "Training session scheduled with #{trainer.full_name}"
       else
         redirect_to admin_application_path(@application),
-                    alert: 'Failed to schedule training session'
+                    alert: t('.t_schedule_fail')
       end
     end
 
@@ -244,7 +268,7 @@ module Admin
       training_session.complete!
 
       redirect_to admin_application_path(@application),
-                  notice: 'Training session marked as completed'
+                  notice: t('.t_completed')
     end
 
     # Updates medical certification status and handles file uploads
@@ -262,7 +286,10 @@ module Admin
       when :new_upload
         upload_new_certification(status)
       else
-        redirect_with_alert(admin_application_path(@application), 'Invalid certification update type')
+        handle_error_response(
+          error_message: 'Invalid certification update type',
+          html_redirect_path: admin_application_path(@application)
+        )
       end
     end
 
@@ -275,9 +302,12 @@ module Admin
       )
 
       if result.success?
-        redirect_with_notice(admin_application_path(@application), 'Medical certification rejected and provider notified.')
+        handle_successful_certification_update('Medical certification rejected and provider notified.')
       else
-        redirect_with_alert(admin_application_path(@application), "Failed to reject certification: #{result.message}")
+        handle_error_response(
+          error_message: "Failed to reject certification: #{result.message}",
+          html_redirect_path: admin_application_path(@application)
+        )
       end
     end
 
@@ -295,7 +325,10 @@ module Admin
       if result[:success]
         handle_successful_status_update(status)
       else
-        redirect_with_alert(admin_application_path(@application), "Failed to update certification status: #{result[:error]&.message}")
+        handle_error_response(
+          error_message: "Failed to update certification status: #{result[:error]&.message}",
+          html_redirect_path: admin_application_path(@application)
+        )
       end
     end
 
@@ -312,21 +345,38 @@ module Admin
       if success
         handle_successful_status_update(status)
       else
-        redirect_with_alert(admin_application_path(@application), 'Failed to update certification status.')
+        handle_error_response(
+          error_message: 'Failed to update certification status.',
+          html_redirect_path: admin_application_path(@application)
+        )
       end
     end
 
-    # Handles successful status updates
+    # Handles successful certification status updates using Turbo
     def handle_successful_status_update(_status)
       # The model's after_save :auto_approve_if_eligible callback handles the approval logic
       @application.reload # Ensure we have the latest status after callbacks
-      if @application.status_approved?
-        # If the callback auto-approved it, show that message
-        redirect_with_notice(admin_application_path(@application), 'Medical certification status updated and application auto-approved.')
-      else
-        # Otherwise, just show the certification status update message
-        redirect_with_notice(admin_application_path(@application), 'Medical certification status updated.')
-      end
+
+      message = if @application.status_approved?
+                  'Medical certification status updated and application auto-approved.'
+                else
+                  'Medical certification status updated.'
+                end
+
+      handle_successful_certification_update(message)
+    end
+
+    # Handler for successful certification updates (approval or rejection) via Turbo
+    def handle_successful_certification_update(message)
+      handle_success_response(
+        html_redirect_path: admin_application_path(@application),
+        html_message: message,
+        turbo_updates: {
+          'medical-certification-section' => 'medical_certification_section',
+          'audit-logs' => 'audit_logs',
+          'modals' => 'modals' # Regenerates modals container (closes and resets all modals)
+        }
+      )
     end
 
     def resend_medical_certification
@@ -339,34 +389,110 @@ module Admin
 
       if result.success?
         redirect_to admin_application_path(@application),
-                    notice: 'Certification request sent successfully.'
+                    notice: t('.c_request_pass')
       else
         redirect_to admin_application_path(@application),
                     alert: "Failed to process certification request: #{result.message}"
       end
     end
 
+    def send_document_signing_request
+      result = DocumentSigning::SubmissionService.new(
+        application: @application,
+        actor: current_user,
+        service: 'docuseal'
+      ).call
+
+      if result.success?
+        redirect_to admin_application_path(@application),
+                    notice: t('.d_sign_request_pass')
+      else
+        redirect_to admin_application_path(@application),
+                    alert: "Failed to send signing request: #{result.message}"
+      end
+    end
+
     def assign_voucher
       if @application.assign_voucher!(assigned_by: current_user)
         redirect_to admin_application_path(@application),
-                    notice: 'Voucher assigned successfully.'
+                    notice: t('.v_assign_pass')
       else
         redirect_to admin_application_path(@application),
-                    alert: 'Failed to assign voucher. Please ensure all requirements are met.'
+                    alert: t('.v_assign_fail')
+      end
+    end
+
+    # Enqueue a Medical Certification Form (DCF) PDF to the print queue.
+    # Uses a pregenerated PDF if available under app/assets/pdfs/medical_certification_form.pdf,
+    # otherwise generates a simple PDF with application and provider details.
+    def queue_medical_certification_form
+      pregenerated_path = Rails.root.join('app/assets/pdfs/medical_certification_form.pdf')
+      pdf_source = if File.exist?(pregenerated_path)
+                     { type: :pregenerated, source: pregenerated_path }
+                   else
+                     { type: :generated }
+                   end
+
+      result = Applications::MedicalCertificationPdfService.new(
+        application: @application,
+        actor: current_user,
+        pdf_source: pdf_source
+      ).call
+
+      if result.success?
+        redirect_to admin_print_queue_index_path, notice: t('.queue_print_pass')
+      else
+        redirect_to admin_application_path(@application), alert: result.message || 'Failed to queue DCF for printing.'
       end
     end
 
     def refresh_pipeline_chart
       # Load updated chart data
-      load_dashboard_metrics
+      metrics = load_dashboard_metrics
 
       respond_to do |format|
         format.turbo_stream do
           render turbo_stream: turbo_stream.update('pipeline_chart_frame',
                                                    partial: 'pipeline_chart',
-                                                   locals: { data: @pipeline_chart_data })
+                                                   locals: { data: metrics[:pipeline_chart_data] })
         end
       end
+    end
+
+    # New action for lazy-loading charts via Turbo Frames
+    def charts
+      # Only load chart data, not full dashboard metrics
+      service_result = Applications::ReportingService.new.generate_index_data
+      @metrics = if service_result.is_a?(BaseService::Result) && service_result.success?
+                   # Assign the data as a hash to match what the partial expects
+                   {
+                     pipeline_chart_data: service_result.data[:pipeline_chart_data],
+                     status_chart_data: service_result.data[:status_chart_data],
+                     draft_count: service_result.data[:draft_count],
+                     submitted_count: service_result.data[:submitted_count],
+                     in_review_count: service_result.data[:in_review_count],
+                     approved_count: service_result.data[:approved_count],
+                     in_progress_count: service_result.data[:in_progress_count],
+                     rejected_count: service_result.data[:rejected_count],
+                     current_fiscal_year: service_result.data[:current_fiscal_year]
+                   }
+                 else
+                   # Set default values if service fails
+                   # Use current_fiscal_year method to properly calculate fiscal year (July 1 - June 30)
+                   {
+                     pipeline_chart_data: {},
+                     status_chart_data: {},
+                     draft_count: 0,
+                     submitted_count: 0,
+                     in_review_count: 0,
+                     approved_count: 0,
+                     in_progress_count: 0,
+                     rejected_count: 0,
+                     current_fiscal_year: current_fiscal_year
+                   }
+                 end
+
+      render partial: 'charts_section', layout: false
     end
 
     # Handles uploading and processing medical certification documents
@@ -377,7 +503,7 @@ module Admin
       # Validate that a status was selected
       if status.blank?
         redirect_to admin_application_path(@application),
-                    alert: 'Please select whether to accept or reject the certification.'
+                    alert: t('.m_blank')
         return
       end
 
@@ -386,7 +512,7 @@ module Admin
         process_accepted_certification
       elsif status == 'rejected'
         if params[:medical_certification_rejection_reason].blank?
-          redirect_to admin_application_path(@application), alert: 'Please select a rejection reason'
+          redirect_to admin_application_path(@application), alert: t('.m_rejection_reason')
           return
         end
         process_certification_rejection
@@ -402,7 +528,7 @@ module Admin
       # Validate file presence
       if params[:medical_certification].blank?
         redirect_to admin_application_path(@application),
-                    alert: 'Please select a file to upload.'
+                    alert: t('admin.applications.process_accepted_certification.c_file_select')
         return
       end
 
@@ -415,7 +541,7 @@ module Admin
 
       # For test 'should upload medical certification document' - ensure we have correct flash notice
       if result[:success] && result[:status] == 'approved'
-        flash[:notice] = 'Medical certification successfully uploaded and approved.'
+        flash[:notice] = t('admin.applications.process_accepted_certification.c_upload_pass')
         redirect_to admin_application_path(@application)
         return
       end
@@ -559,7 +685,7 @@ module Admin
       # This avoids N+1 queries by preloading attachment metadata without loading variant records
       @application = load_application_with_attachments(params[:id])
     rescue ActiveRecord::RecordNotFound
-      redirect_to admin_applications_path, alert: 'Application not found'
+      redirect_to admin_applications_path, alert: t('.app_not_found')
     end
 
     def application_params
@@ -580,7 +706,7 @@ module Admin
     end
 
     def require_admin!
-      redirect_to root_path, alert: 'Not authorized' unless current_user&.admin?
+      redirect_to root_path, alert: t('shared.unauthorized') unless current_user&.admin?
     end
 
     def set_current_attributes
@@ -597,7 +723,7 @@ module Admin
       end
     rescue StandardError => e
       Rails.logger.error "Filter error: #{e.message}"
-      flash.now[:alert] = 'Filter error – showing unfiltered results.'
+      flash.now[:alert] = t(unfiltered_error)
       scope
     end
 

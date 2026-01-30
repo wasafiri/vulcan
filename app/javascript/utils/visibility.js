@@ -31,7 +31,7 @@ export function setVisible(element, visible, options = {}) {
 
   const { required, hiddenClass = 'hidden', ariaHidden } = options;
 
-  // Toggle visibility - handle both CSS classes and inline styles
+  // Toggle visibility
   if (visible) {
     element.classList.remove(hiddenClass);
     // Remove inline display:none that might override CSS classes
@@ -40,7 +40,8 @@ export function setVisible(element, visible, options = {}) {
     }
   } else {
     element.classList.add(hiddenClass);
-    // Set inline style for elements that start with inline display:none
+    // Set inline style as fallback in case CSS fails to load
+    // This prevents sensitive sections from being visible if .hidden class doesn't apply
     element.style.display = 'none';
   }
 

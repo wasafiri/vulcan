@@ -11,7 +11,7 @@ class Application < ApplicationRecord
     end
 
     def valid_phone?
-      phone.present? && phone.match?(/\A[\d\-\(\)\s\.]+\z/)
+      phone.present? && phone.match?(/\A[\d\-()\s.]+\z/)
     end
 
     def valid_email?
@@ -29,6 +29,10 @@ class Application < ApplicationRecord
       error&.message || message
     end
   end
+
+  # Field encryption - URLs contain PII-adjacent data and should be encrypted at rest
+  encrypts :document_signing_audit_url
+  encrypts :document_signing_document_url
 
   # Concerns
   include ApplicationStatusManagement
@@ -76,6 +80,14 @@ class Application < ApplicationRecord
     rejected: 4
   }, prefix: :medical_certification_status
 
+  enum :document_signing_status, {
+    not_sent: 0,        # No signing request sent yet
+    sent: 1,            # Signing request sent to provider
+    opened: 2,          # Provider opened the signing link
+    signed: 3,          # Provider completed signing
+    declined: 4         # Provider declined to sign
+  }, prefix: :document_signing_status
+
   # Associations - made more flexible to work with both Constituent and Users::Constituent
   belongs_to :user, -> { where("type = 'Users::Constituent' OR type = 'Constituent'") },
              class_name: 'User',
@@ -117,15 +129,14 @@ class Application < ApplicationRecord
   validates :medical_provider_name, presence: true, unless: :status_draft?
   validates :medical_provider_phone, presence: true, unless: :status_draft?
   validates :medical_provider_email, presence: true, unless: :status_draft?
-  validates :household_size, presence: true, unless: :status_draft?
-  validates :annual_income, presence: true, unless: :status_draft?
   validates :self_certify_disability, inclusion: { in: [true, false] }, unless: :status_draft?
   validates :alternate_contact_phone,
-            format: { with: /\A\+?[\d\-\(\)\s]+\z/, allow_blank: true }
+            format: { with: /\A\+?[\d\-()\s]+\z/, allow_blank: true }
   validates :alternate_contact_email,
             format: { with: URI::MailTo::EMAIL_REGEXP, allow_blank: true }
   validate :waiting_period_completed, on: :create
   validate :constituent_must_have_disability, if: :validate_disability?
+  validate :managing_guardian_cannot_be_applicant
 
   before_save :ensure_managing_guardian_set, if: :user_id_changed?
   # Callbacks
@@ -139,6 +150,19 @@ class Application < ApplicationRecord
     includes(:user, :proof_reviews, :training_sessions, :evaluations)
       .where('users.last_name ILIKE ?', "%#{query}%")
       .references(:users)
+  }
+
+  # Single constituent application scopes
+  # Find draft application for a specific constituent
+  scope :draft_for_constituent, lambda { |user_id|
+    draft.where(user_id: user_id)
+  }
+
+  # Find active (non-draft, non-archived, non-rejected) application for a specific constituent
+  # Excludes: draft (still being worked on), archived (historical), rejected (can start fresh)
+  scope :active_for_constituent, lambda { |user_id|
+    where(user_id: user_id)
+      .where.not(status: %i[draft archived rejected])
   }
 
   # Guardian/Dependent relationship scopes
@@ -157,9 +181,25 @@ class Application < ApplicationRecord
 
   # Returns all applications related to a guardian, either managed by them
   # or for one of their dependents (even if not managed by this guardian)
+  # NOTE: This scope is intentionally broad and should only be used for viewing, not editing
   scope :related_to_guardian, lambda { |guardian_user|
     managed_by(guardian_user)
       .or(for_dependents_of(guardian_user))
+  }
+
+  # Strict ownership scope: only returns applications the user can edit
+  # User can edit if they are:
+  # - The applicant (user_id) AND no managing guardian exists, OR
+  # - The managing guardian
+  scope :editable_by, lambda { |user|
+    where('(applications.user_id = :user_id AND applications.managing_guardian_id IS NULL)
+           OR applications.managing_guardian_id = :user_id', user_id: user.id)
+  }
+
+  # Returns applications the user can view (broader than editable)
+  # Currently same as editable_by (strict ownership model)
+  scope :accessible_by, lambda { |user|
+    editable_by(user)
   }
 
   # Alias scopes for approved applications
@@ -202,12 +242,19 @@ class Application < ApplicationRecord
       .with_attached_medical_certification
   }
 
+  # Scope for applications that have been digitally signed and need admin review
+  scope :digitally_signed_needs_review, lambda {
+    where(document_signing_status: :signed)
+      .where.not(status: %i[rejected archived])
+      .where.not(medical_certification_status: %i[approved rejected])
+  }
+
   # Class Methods for Analysis
   def self.pain_point_analysis
     draft
       .where.not(last_visited_step: [nil, ''])
       .group(:last_visited_step)
-      .order('count_all DESC')
+      .order(count_all: :desc)
       .count
   end
 
@@ -264,16 +311,19 @@ class Application < ApplicationRecord
   end
 
   # Application status change tracking
+  # @deprecated Use direct status updates instead - the after_save callback handles audit trail
+  # This method creates duplicate ApplicationStatusChange records and will be removed in a future version.
+  # Instead of: application.update_status(:approved, user: admin)
+  # Use: application.update!(status: :approved) # callback handles status_changes automatically
   def update_status(new_status, user: nil, notes: nil)
-    old_status = status
-    return unless update(status: new_status)
+    Rails.logger.warn '[DEPRECATION] Application#update_status is deprecated. Use direct status updates - callbacks handle audit trail.'
 
-    status_changes.create!(
-      from_status: old_status,
-      to_status: new_status,
-      user: user,
-      notes: notes
-    )
+    # Temporarily store user/notes for callback to use
+    @pending_status_change_user = user
+    @pending_status_change_notes = notes
+
+    # Update status - callback will create status_change record
+    update(status: new_status)
   end
 
   def medical_provider_name
@@ -294,6 +344,28 @@ class Application < ApplicationRecord
       guardian_id: managing_guardian_id,
       dependent_id: user_id
     )&.relationship_type
+  end
+
+  # Authorization methods
+  def editable_by?(user)
+    return false unless user
+
+    # Can edit if user is the owner (no guardian) or the managing guardian
+    is_owner = user_id == user.id && managing_guardian_id.nil?
+    is_managing_guardian = managing_guardian_id == user.id
+
+    is_owner || is_managing_guardian
+  end
+
+  def accessible_by?(user)
+    # For now, accessible means editable (strict ownership)
+    # Could be expanded in the future to allow read-only access for other guardians
+    editable_by?(user)
+  end
+
+  def viewable_by?(user)
+    # Alias for consistency with Rails authorization patterns
+    accessible_by?(user)
   end
 
   # Add a condition method to check if any alternate contact field changed
@@ -337,7 +409,10 @@ class Application < ApplicationRecord
     # Guard clause to prevent infinite recursion
     return if @logging_status_change
 
-    acting_user = Current.user || user # Ensure a user is always present
+    # Use pending user/notes from deprecated update_status, or fall back to Current.user
+    acting_user = @pending_status_change_user || Current.user || user
+    status_notes = @pending_status_change_notes
+
     return if acting_user.blank?
 
     @logging_status_change = true
@@ -347,7 +422,8 @@ class Application < ApplicationRecord
       status_changes.create!(
         from_status: status_before_last_save,
         to_status: status,
-        user: acting_user
+        user: acting_user,
+        notes: status_notes
       )
 
       # Also create Event record for other audit purposes
@@ -359,13 +435,17 @@ class Application < ApplicationRecord
           application_id: id,
           old_status: status_before_last_save,
           new_status: status,
-          submission_method: submission_method
+          submission_method: submission_method,
+          notes: status_notes
         }
       )
     rescue StandardError => e
       Rails.logger.error "Failed to log status change for application #{id}: #{e.message}"
     ensure
       @logging_status_change = false
+      # Clear pending attributes after use
+      @pending_status_change_user = nil
+      @pending_status_change_notes = nil
     end
   end
 
@@ -437,6 +517,14 @@ class Application < ApplicationRecord
     false
   end
 
+  def managing_guardian_cannot_be_applicant
+    return if managing_guardian_id.blank? || user_id.blank?
+
+    return unless managing_guardian_id == user_id
+
+    errors.add(:base, 'An application cannot be managed by the applicant themselves')
+  end
+
   # Ensures the managing_guardian_id is set when the application is for a dependent.
   # This is called before create and when user_id changes to automatically
   # associate the application with a guardian if a relationship exists.
@@ -450,6 +538,9 @@ class Application < ApplicationRecord
 
     # If there is a guardian relationship, set the managing_guardian_id.
     return unless guardian_relationship
+
+    # Additional safety check: ensure we're not creating a circular relationship
+    return if guardian_relationship.guardian_id == user_id
 
     Rails.logger.info "Setting managing_guardian_id to #{guardian_relationship.guardian_id} for application #{id}"
     self.managing_guardian_id = guardian_relationship.guardian_id

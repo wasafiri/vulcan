@@ -53,6 +53,7 @@ Rails.application.routes.draw do
     get 'verify/:type', to: 'two_factor_authentications#verify_method', as: :verify_method
     post 'verify/:type', to: 'two_factor_authentications#process_verification', as: :process_verification
     get 'verification_options/:type', to: 'two_factor_authentications#verification_options', as: :verification_options
+    post 'verify/sms/resend', to: 'two_factor_authentications#resend_sms_verification', as: :resend_sms_verification
 
     # Credential management routes (delegated to TwoFactorCredentialsController)
     get 'credentials/:type/new', to: 'two_factor_credentials#new_credential', as: :new_credential
@@ -101,7 +102,7 @@ Rails.application.routes.draw do
     get 'dashboard', to: 'dashboard#index', as: :dashboard # Add dashboard route
     root to: 'applications#index'
 
-    resources :guardian_relationships, only: %i[new create destroy]
+    resources :guardian_relationships, only: %i[destroy]
 
     resources :recovery_requests, only: %i[index show] do
       member do
@@ -129,7 +130,7 @@ Rails.application.routes.draw do
       collection do
         post :send_rejection_notification
         post :reject_for_income
-        get :fpl_thresholds
+        get :dependent_form
       end
     end
 
@@ -141,6 +142,7 @@ Rails.application.routes.draw do
         get  :filter
         get  :dashboard
         get  :refresh_pipeline_chart
+        get  :charts
       end
 
       member do
@@ -158,6 +160,8 @@ Rails.application.routes.draw do
         patch :update_certification_status
         post :resend_medical_certification
         patch :upload_medical_certification
+        post :send_document_signing_request
+        post :queue_medical_certification_form
       end
 
       resources :notes, only: [:create], controller: 'application_notes'
@@ -171,6 +175,11 @@ Rails.application.routes.draw do
       member do
         get :new_test_email
         post :send_test
+        patch :toggle_disabled
+      end
+      collection do
+        patch :bulk_disable
+        patch :bulk_enable
       end
     end
 
@@ -197,6 +206,8 @@ Rails.application.routes.draw do
       end
 
       member do
+        get :dependents
+        get :last_application_values
         post :approve
         post :suspend
         post :reactivate
@@ -306,7 +317,6 @@ Rails.application.routes.draw do
     end
   end
 
-  # Vendor portal routes
   namespace :vendor_portal do
     resource :dashboard, only: [:show], controller: :dashboard
     resource :profile, only: %i[edit update], controller: :profiles
@@ -330,13 +340,16 @@ Rails.application.routes.draw do
     resources :invoices, only: %i[index show]
   end
 
+  namespace :admin do
+    resources :feature_flags, only: %i[index update]
+  end
+
   # New constituent_portal namespace (replacing constituent)
   namespace :constituent_portal do
     resource :dashboard, only: [:show]
     resources :dependents
     resources :applications, path: 'applications', except: [:destroy] do
       collection do
-        get :fpl_thresholds
         patch :autosave_field
       end
 
@@ -370,5 +383,6 @@ Rails.application.routes.draw do
     resources :email_events, only: [:create]
     resources :medical_certifications, only: [:create]
     post 'twilio/fax_status', to: 'twilio#fax_status', as: :twilio_fax_status
+    post 'docuseal/medical_certification', to: 'docuseal#medical_certification'
   end
 end

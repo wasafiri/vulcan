@@ -1,12 +1,11 @@
 import { Controller } from "@hotwired/stimulus"
 import { railsRequest } from "../../services/rails_request"
-import { applyTargetSafety } from "../../mixins/target_safety"
 import { createFormChangeDebounce } from "../../utils/debounce"
 import { setVisible } from "../../utils/visibility"
 
 class AutosaveController extends Controller {
   static targets = ["form", "autosaveStatus", "fieldError"]
-  static outlets = ["flash"] // Declare flash outlet
+
   static values = {
     url: String,
     debounceWait: { type: Number, default: 1000 },
@@ -39,7 +38,7 @@ class AutosaveController extends Controller {
   }
 
   setupFieldListeners() {
-    if (!this.safeTarget('form', false)) return
+    if (!this.hasFormTarget) return
 
     // Get all form inputs except file inputs, buttons, and submit inputs
     const formInputs = this.formTarget.querySelectorAll(
@@ -164,11 +163,6 @@ class AutosaveController extends Controller {
         console.error('Autosave error:', error)
         this.updateStatus("Failed to save", "text-red-600")
 
-        // Also show as a global flash message
-        if (this.hasFlashOutlet) {
-          this.flashOutlet.showError("Autosave failed: " + (error.message || "An unknown error occurred."))
-        }
-
         // Handle error data if available
         if (error.data?.errors) {
           Object.entries(error.data.errors).forEach(([field, messages]) => {
@@ -193,7 +187,8 @@ class AutosaveController extends Controller {
   }
 
   updateStatus(message, cssClass) {
-    this.withTarget('autosaveStatus', (target) => {
+    if (this.hasAutosaveStatusTarget) {
+      const target = this.autosaveStatusTarget
       target.textContent = message
 
       // Reset classes
@@ -206,7 +201,7 @@ class AutosaveController extends Controller {
 
       // Use setVisible utility for consistent visibility management
       setVisible(target, !!message)
-    })
+    }
   }
 
   displayFieldError(element, message) {
@@ -275,6 +270,5 @@ class AutosaveController extends Controller {
 }
 
 // Apply target safety mixin
-applyTargetSafety(AutosaveController)
 
 export default AutosaveController

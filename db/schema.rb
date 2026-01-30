@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_07_28_215349) do
+ActiveRecord::Schema[8.0].define(version: 2026_01_13_164032) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -126,6 +126,18 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_28_215349) do
     t.string "alternate_contact_email"
     t.integer "income_proof_status", default: 0, null: false
     t.integer "residency_proof_status", default: 0, null: false
+    t.integer "document_signing_status", default: 0, null: false
+    t.string "document_signing_service"
+    t.string "document_signing_submission_id"
+    t.string "document_signing_submitter_id"
+    t.datetime "document_signing_requested_at"
+    t.datetime "document_signing_signed_at"
+    t.integer "document_signing_request_count", default: 0, null: false
+    t.text "document_signing_audit_url"
+    t.text "document_signing_document_url"
+    t.index ["document_signing_service"], name: "index_applications_on_document_signing_service"
+    t.index ["document_signing_status"], name: "index_applications_on_document_signing_status"
+    t.index ["document_signing_submission_id"], name: "index_applications_on_document_signing_submission_id"
     t.index ["income_proof_status"], name: "idx_applications_on_income_proof_status"
     t.index ["income_verified_by_id"], name: "index_applications_on_income_verified_by_id"
     t.index ["last_proof_submitted_at"], name: "index_applications_on_last_proof_submitted_at"
@@ -162,6 +174,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_28_215349) do
     t.integer "version", default: 1
     t.string "previous_subject"
     t.text "previous_body"
+    t.boolean "enabled", default: true, null: false
+    t.index ["enabled"], name: "index_email_templates_on_enabled"
     t.index ["name"], name: "index_email_templates_on_name", unique: true
     t.index ["updated_by_id"], name: "index_email_templates_on_updated_by_id"
   end
@@ -204,9 +218,18 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_28_215349) do
     t.jsonb "metadata", default: {}, null: false
     t.string "auditable_type"
     t.bigint "auditable_id"
+    t.index ["action", "auditable_type", "auditable_id"], name: "index_events_on_action_and_auditable"
     t.index ["auditable_type", "auditable_id"], name: "index_events_on_auditable"
     t.index ["metadata"], name: "index_events_on_metadata", using: :gin
     t.index ["user_id"], name: "index_events_on_user_id"
+  end
+
+  create_table "feature_flags", force: :cascade do |t|
+    t.string "name", null: false
+    t.boolean "enabled", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_feature_flags_on_name", unique: true
   end
 
   create_table "guardian_relationships", force: :cascade do |t|
@@ -309,7 +332,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_28_215349) do
     t.index ["admin_id"], name: "index_print_queue_items_on_admin_id"
     t.index ["application_id"], name: "index_print_queue_items_on_application_id"
     t.index ["constituent_id"], name: "index_print_queue_items_on_constituent_id"
-    t.check_constraint "letter_type >= 0 AND letter_type <= 10", name: "check_print_queue_items_on_letter_type"
+    t.check_constraint "letter_type >= 0 AND letter_type <= 11", name: "check_print_queue_items_on_letter_type"
   end
 
   create_table "products", force: :cascade do |t|
@@ -623,6 +646,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_28_215349) do
     t.string "dependent_email", comment: "Optional email for dependents; if blank, uses guardian email"
     t.string "dependent_phone", comment: "Optional phone for dependents; if blank, uses guardian phone"
     t.integer "vendor_authorization_status"
+    t.string "referral_source"
     t.index ["business_name"], name: "index_users_on_business_name"
     t.index ["business_tax_id"], name: "index_users_on_business_tax_id"
     t.index ["dependent_email"], name: "index_users_on_dependent_email"
