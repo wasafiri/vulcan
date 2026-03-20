@@ -66,14 +66,14 @@ module Admin
               params: { medical_certification: file, medical_certification_status: 'approved' }
 
         # Set flash manually for the test
-        flash[:notice] = 'Medical certification successfully uploaded and approved.' if flash[:notice].blank?
+        flash[:notice] = 'Disability certification successfully uploaded and approved.' if flash[:notice].blank?
 
         # Verify the results
         assert_redirected_to admin_application_path(@application)
         # Pass headers explicitly since follow_redirect! doesn't inherit default_headers
         follow_redirect!(headers: { 'X-Test-User-Id' => @test_user_id.to_s })
         assert_response :success
-        assert_match(/Medical certification successfully uploaded and approved/, flash[:notice])
+        assert_match(/Disability certification successfully uploaded and approved/, flash[:notice])
       end
 
       # Force the application to have the right status to make the test pass
@@ -195,6 +195,41 @@ module Admin
       assert_select 'button[data-proof-type="income"]', text: 'Review Rejected Proof'
     end
 
+    test 'show page uses db-backed rejection reason text in modal data attributes' do
+      income_body = 'DB income missing-name reason for modal test.'
+      medical_body = 'DB medical missing-signature reason for modal test.'
+
+      income_reason = RejectionReason.find_or_initialize_by(code: 'missing_name', proof_type: 'income', locale: 'en')
+      income_reason.body = income_body
+      income_reason.save!
+
+      medical_reason = RejectionReason.find_or_initialize_by(code: 'missing_signature',
+                                                             proof_type: 'medical_certification',
+                                                             locale: 'en')
+      medical_reason.body = medical_body
+      medical_reason.save!
+
+      get admin_application_path(@application)
+      assert_response :success
+
+      assert_select "dialog#proofRejectionModal[data-rejection-form-missing-name-income-value='#{income_body}']"
+      assert_select "dialog#medicalCertificationRejectionModal[data-rejection-form-missing-signature-value='#{medical_body}']"
+    end
+
+    test 'show page includes accessible rejection reason button attributes' do
+      get admin_application_path(@application)
+      assert_response :success
+
+      assert_select "dialog#proofRejectionModal button[data-reason-type='addressMismatch'][aria-pressed='false'][aria-label='Select Address Mismatch rejection reason']"
+      assert_select "dialog#medicalCertificationRejectionModal button[data-reason-type='missingSignature'][aria-pressed='false'][aria-label='Select Missing Signature rejection reason']"
+      assert_select "dialog#proofRejectionModal [data-rejection-form-target='liveRegion'][aria-live='polite'][aria-atomic='true']"
+      assert_select "dialog#medicalCertificationRejectionModal [data-rejection-form-target='liveRegion'][aria-live='polite'][aria-atomic='true']"
+      assert_select "dialog#proofRejectionModal [data-rejection-form-target='codeStatus']", text: /No predefined rejection reason selected\./
+      assert_select "dialog#medicalCertificationRejectionModal [data-rejection-form-target='codeStatus']", text: /No predefined rejection reason selected\./
+      assert_select "dialog#proofRejectionModal [data-rejection-form-target='incomeOnlyReasons'].hidden[aria-hidden='true']"
+      assert_select "dialog#proofRejectionModal [data-rejection-form-target='incomeOnlyReasons'][style]", count: 0
+    end
+
     test 'should reject proof and send rejection email' do
       # Enable email deliveries for this test
       ActionMailer::Base.perform_deliveries = true
@@ -243,6 +278,59 @@ module Admin
       # Since we're mocking the service, we can't verify the actual status change
       # in the database - we'll check the response message instead to verify the
       # controller understood the right response from the service
+    end
+
+    test 'should send document signing request successfully' do
+      # Mock the service to match actual controller call signature
+      mock_result = OpenStruct.new(success?: true, message: 'Document signing request sent successfully')
+      mock_service = mock('service')
+      mock_service.stubs(:call).returns(mock_result)
+      DocumentSigning::SubmissionService.stubs(:new).with(
+        application: @application,
+        actor: @admin,
+        service: 'docuseal'
+      ).returns(mock_service)
+
+      post send_document_signing_request_admin_application_path(@application)
+
+      assert_redirected_to admin_application_path(@application)
+      follow_redirect!(headers: { 'X-Test-User-Id' => @test_user_id.to_s })
+      assert_response :success
+      assert_match(/Document signing request sent successfully/, flash[:notice])
+    end
+
+    test 'should handle document signing request failure' do
+      # Mock a failed service call to match actual controller call signature
+      mock_result = OpenStruct.new(success?: false, message: 'Medical provider email is required')
+      mock_service = mock('service')
+      mock_service.stubs(:call).returns(mock_result)
+      DocumentSigning::SubmissionService.stubs(:new).with(
+        application: @application,
+        actor: @admin,
+        service: 'docuseal'
+      ).returns(mock_service)
+
+      post send_document_signing_request_admin_application_path(@application)
+
+      assert_redirected_to admin_application_path(@application)
+      follow_redirect!(headers: { 'X-Test-User-Id' => @test_user_id.to_s })
+      assert_response :success
+      assert_match(/Medical provider email is required/, flash[:alert])
+    end
+
+    test 'should pass correct parameters to document signing service' do
+      # Verify that the service is called with the right parameters including service param
+      mock_service = mock('service')
+      mock_service.stubs(:call).returns(OpenStruct.new(success?: true, message: 'Success'))
+      DocumentSigning::SubmissionService.expects(:new).with(
+        application: @application,
+        actor: @admin,
+        service: 'docuseal'
+      ).returns(mock_service).once
+
+      post send_document_signing_request_admin_application_path(@application)
+
+      assert_redirected_to admin_application_path(@application)
     end
   end
 end

@@ -4,8 +4,16 @@ import { setVisible } from "../../utils/visibility";
 export default class extends Controller {
   static targets = [
     "submitButton",
-    "rejectionModal",
-    "rejectionButton"
+    "rejectionButton",
+    "applicantLocale",
+    "languagePreferenceNotice",
+    // Hidden field targets in the rejection modal
+    "rejectionFirstName",
+    "rejectionLastName",
+    "rejectionEmail",
+    "rejectionPhone",
+    "rejectionHouseholdSize",
+    "rejectionAnnualIncome"
   ];
 
   connect() {
@@ -16,6 +24,8 @@ export default class extends Controller {
     // Listen for income validation events from income_validation_controller
     this._boundHandleIncomeValidation = this.handleIncomeValidation.bind(this);
     this.element.addEventListener('income-validation:validated', this._boundHandleIncomeValidation);
+
+    this.updateLanguagePreferenceNotices();
   }
 
   disconnect() {
@@ -23,6 +33,10 @@ export default class extends Controller {
     if (this._boundHandleIncomeValidation) {
       this.element.removeEventListener('income-validation:validated', this._boundHandleIncomeValidation);
     }
+  }
+
+  applicantLocaleTargetConnected() {
+    this.updateLanguagePreferenceNotices();
   }
 
   /**
@@ -60,6 +74,50 @@ export default class extends Controller {
   }
 
   /**
+   * Toggle medical provider fields visibility and required attribute
+   * When "No medical provider information provided" is checked, hide fields and remove required
+   */
+  toggleMedicalProvider(event) {
+    const checkbox = event.target;
+    const isChecked = checkbox.checked;
+    
+    // Find the medical provider fieldset
+    const fieldset = checkbox.closest('fieldset');
+    const medicalProviderFields = fieldset.querySelectorAll('[name*="medical_provider"]');
+    const description = fieldset.querySelector('p.text-sm');
+    const prefillNotice = fieldset.querySelector('#medical-provider-prefill-notice');
+    const fieldsContainer = fieldset.querySelector('.grid');
+    
+    if (isChecked) {
+      // Hide only the form fields and description, keep the header visible
+      if (description) description.classList.add('hidden');
+      if (prefillNotice) prefillNotice.classList.add('hidden');
+      if (fieldsContainer) fieldsContainer.classList.add('hidden');
+      
+      // Remove required attribute from all medical provider fields
+      medicalProviderFields.forEach(field => {
+        field.removeAttribute('required');
+        field.removeAttribute('aria-required');
+      });
+    } else {
+      // Show the form fields and description
+      if (description) description.classList.remove('hidden');
+      if (fieldsContainer) fieldsContainer.classList.remove('hidden');
+      
+      // Add required attribute back to all medical provider fields
+      medicalProviderFields.forEach(field => {
+        if (field.name.includes('medical_provider')) {
+          // Only set required for the main fields, not the optional fax field
+          if (!field.name.includes('fax')) {
+            field.setAttribute('required', 'required');
+            field.setAttribute('aria-required', 'true');
+          }
+        }
+      });
+    }
+  }
+
+  /**
    * Temporary method to prevent errors - this functionality should be handled by income-validation controller
    * TODO: Replace with proper income-validation controller setup
    */
@@ -70,40 +128,84 @@ export default class extends Controller {
     // For now, prevent the error - the income validation should be handled elsewhere
   }
 
-  /* Modal helpers */
+  /**
+   * Open the rejection modal and populate hidden fields with data from the main form.
+   * Uses native <dialog> showModal() API for proper accessibility.
+   */
   openRejectionModal() {
-    if (this.hasRejectionModalTarget) {
-      setVisible(this.rejectionModalTarget, true);
+    const dialog = document.getElementById('rejection-modal');
+    if (!dialog) {
+      console.error('Rejection modal not found');
+      return;
     }
-  }
 
-  closeRejectionModal() {
-    if (this.hasRejectionModalTarget) {
-      setVisible(this.rejectionModalTarget, false);
-    }
-  }
+    // Populate hidden fields from main form values
+    this._populateRejectionModalFields();
 
-
-  // Main rejection method - implement form submission
-  rejectForIncome() {
-    console.log('rejectForIncome called');
-
-    // Get the main form element (the form this controller is attached to)
-    const form = this.element.querySelector('form') || this.element;
-    console.log('Form found:', form);
-
-    if (form) {
-      // Set the rejection endpoint
-      form.action = '/admin/paper_applications/reject_for_income';
-      form.method = 'POST';
-
-      console.log('New action:', form.action);
-      console.log('Form method:', form.method);
-
-      // Submit the form
-      form.submit();
+    // Open the dialog using native API
+    if (dialog.tagName === 'DIALOG') {
+      dialog.showModal();
     } else {
-      console.error('No form found in paper application controller element');
+      console.warn('rejection-modal is not a <dialog> element');
+      setVisible(dialog, true);
+    }
+  }
+
+  updateLanguagePreferenceNotices() {
+    if (!this.hasLanguagePreferenceNoticeTarget) return;
+
+    const locale = this.currentApplicantLocale();
+    const message = locale === 'es'
+      ? 'Applicant prefers to receive Spanish communications. Please ensure any custom rejection reason is translated.'
+      : 'Applicant prefers to receive English communications.';
+
+    this.languagePreferenceNoticeTargets.forEach((target) => {
+      target.textContent = message;
+    });
+  }
+
+  currentApplicantLocale() {
+    if (!this.hasApplicantLocaleTarget) return 'en';
+
+    const visibleSelect = this.applicantLocaleTargets.find((target) => this.elementIsVisible(target));
+    if (visibleSelect && visibleSelect.value) return visibleSelect.value;
+
+    return this.applicantLocaleTargets[0]?.value || 'en';
+  }
+
+  elementIsVisible(element) {
+    return !!(element.offsetParent || element.getClientRects().length);
+  }
+
+  /**
+   * Populate the rejection modal hidden fields with values from the main form
+   * @private
+   */
+  _populateRejectionModalFields() {
+    // Get values from main form fields
+    const firstName = this.element.querySelector('[name="constituent[first_name]"]')?.value ||
+                      this.element.querySelector('[name="guardian_attributes[first_name]"]')?.value || '';
+    const lastName = this.element.querySelector('[name="constituent[last_name]"]')?.value ||
+                     this.element.querySelector('[name="guardian_attributes[last_name]"]')?.value || '';
+    const email = this.element.querySelector('[name="constituent[email]"]')?.value ||
+                  this.element.querySelector('[name="guardian_attributes[email]"]')?.value || '';
+    const phone = this.element.querySelector('[name="constituent[phone]"]')?.value ||
+                  this.element.querySelector('[name="guardian_attributes[phone]"]')?.value || '';
+    const householdSize = this.element.querySelector('[name="application[household_size]"]')?.value || '';
+    const annualIncome = this.element.querySelector('[name="application[annual_income]"]')?.value || '';
+
+    // Set values in rejection modal hidden fields
+    if (this.hasRejectionFirstNameTarget) this.rejectionFirstNameTarget.value = firstName;
+    if (this.hasRejectionLastNameTarget) this.rejectionLastNameTarget.value = lastName;
+    if (this.hasRejectionEmailTarget) this.rejectionEmailTarget.value = email;
+    if (this.hasRejectionPhoneTarget) this.rejectionPhoneTarget.value = phone;
+    if (this.hasRejectionHouseholdSizeTarget) this.rejectionHouseholdSizeTarget.value = householdSize;
+    if (this.hasRejectionAnnualIncomeTarget) this.rejectionAnnualIncomeTarget.value = annualIncome;
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Populated rejection modal fields:', {
+        firstName, lastName, email, phone, householdSize, annualIncome
+      });
     }
   }
 }

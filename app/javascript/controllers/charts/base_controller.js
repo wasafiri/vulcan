@@ -1,7 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
-import { createUIUpdateDebounce } from "../../utils/debounce"
 import { chartConfig } from "../../services/chart_config"
-import { applyTargetSafety } from "../../mixins/target_safety"
 
 /**
  * ChartBaseController
@@ -15,7 +13,7 @@ import { applyTargetSafety } from "../../mixins/target_safety"
  * - Data validation
  */
 class ChartBaseController extends Controller {
-  static outlets = ["flash"] // Declare flash outlet
+
   static values = {
     chartHeight: { type: Number, default: 300 }
   }
@@ -24,6 +22,11 @@ class ChartBaseController extends Controller {
     this.cleanupExistingChart()
     // Chart.js container positioning is handled by ERB templates
     // Controller only manages chart behavior, not styling
+
+    // Guard: do not attempt to initialize charts in hidden containers
+    if (!this.isVisible()) {
+      return
+    }
   }
 
   disconnect() {
@@ -49,12 +52,10 @@ class ChartBaseController extends Controller {
   createCanvas(ariaLabel, ariaDesc) {
     const canvas = document.createElement("canvas")
 
-    // When responsive: false, Chart.js requires the canvas to have explicit dimensions.
-    // We set them here based on the container's calculated width and the specified height.
-    // This prevents Chart.js from entering its own measurement logic, which causes recursion.
-    canvas.width = this.element.clientWidth
-    canvas.height = this.chartHeightValue
-    
+    // With responsive: true, Chart.js handles canvas sizing automatically
+    // based on the container's dimensions. Don't set explicit canvas size.
+    // The container must have explicit height (set in ERB templates).
+
     // Add accessibility attributes
     canvas.setAttribute("role", "img")
     canvas.setAttribute("aria-label", ariaLabel)
@@ -80,12 +81,12 @@ class ChartBaseController extends Controller {
   mountCanvas(canvas, desc) {
     // Clear container and mount canvas with description
     this.element.textContent = ""
-    
+
     // Add fallback content inside canvas for accessibility (Chart.js docs recommendation)
     const fallback = document.createElement("p")
     fallback.textContent = canvas.getAttribute("aria-label") || "Chart data visualization"
     canvas.appendChild(fallback)
-    
+
     this.element.appendChild(canvas)
     this.element.appendChild(desc)
   }
@@ -106,18 +107,19 @@ class ChartBaseController extends Controller {
 
   handleError(msg, err) {
     console.error(msg, err || "Unknown error")
+    console.error(`Chart Error: ${msg}`)
     this._showMessage("text-red-500", `Unable to load chart – ${msg}`)
-    if (this.hasFlashOutlet) {
-      this.flashOutlet.showError(`Chart Error: ${msg}`)
-    }
   }
 
   handleUnavailable() {
     console.warn("Chart.js not available, skipping chart initialization")
+    console.warn("Chart unavailable: Chart.js not loaded.")
     this._showMessage("text-gray-500", "Chart unavailable")
-    if (this.hasFlashOutlet) {
-      this.flashOutlet.showInfo("Chart unavailable: Chart.js not loaded.")
-    }
+  }
+
+  // Simple visibility check used to avoid layout-measure loops
+  isVisible() {
+    return this.element && this.element.offsetParent !== null
   }
 
   _showMessage(colorClass, text) {
@@ -289,6 +291,5 @@ class ChartBaseController extends Controller {
 }
 
 // Apply target safety mixin
-applyTargetSafety(ChartBaseController)
 
 export default ChartBaseController

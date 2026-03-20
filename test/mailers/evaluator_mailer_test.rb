@@ -1,22 +1,10 @@
 # frozen_string_literal: true
 
 require 'test_helper'
+require_relative 'email_template_mock_helper'
 
 class EvaluatorMailerTest < ActionMailer::TestCase
-  # Helper to create mock templates that respond to render method
-  def mock_template(subject_format, body_format)
-    template_instance = mock("email_template_instance_#{subject_format.gsub(/\s+/, '_')}")
-
-    # Stub the render method to return [rendered_subject, rendered_body]
-    # This simulates what the real EmailTemplate.render method does
-    template_instance.stubs(:render).with(any_parameters).returns([subject_format, body_format])
-
-    # Still stub subject and body for inspection if needed
-    template_instance.stubs(:subject).returns(subject_format)
-    template_instance.stubs(:body).returns(body_format)
-
-    template_instance
-  end
+  include EmailTemplateMockHelper
 
   setup do
     # Per project strategy, HTML emails are not used. Only stub for :text format.
@@ -36,11 +24,11 @@ class EvaluatorMailerTest < ActionMailer::TestCase
 
     # Stub EmailTemplate.find_by! for text format only
     EmailTemplate.stubs(:find_by!)
-                 .with(name: 'evaluator_mailer_new_evaluation_assigned', format: :text)
+                 .with(name: 'evaluator_mailer_new_evaluation_assigned', format: :text, locale: 'en')
                  .returns(new_evaluation_assigned_mock)
 
     EmailTemplate.stubs(:find_by!)
-                 .with(name: 'evaluator_mailer_evaluation_submission_confirmation', format: :text)
+                 .with(name: 'evaluator_mailer_evaluation_submission_confirmation', format: :text, locale: 'en')
                  .returns(evaluation_submission_mock)
 
     # Create test data using FactoryBot

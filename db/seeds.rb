@@ -255,7 +255,29 @@ def load_applications_fixture(fixtures_path, users_map)
       end
       filtered_attributes = attributes.slice(*Application.attribute_names)
       app = Application.new(filtered_attributes)
-      app.save!(validate: false)
+
+      # Use update_columns for approved status to bypass validation requiring attachments
+      # Proofs will be attached later in attach_files_to_applications
+      if app.status == 'approved' || app.income_proof_status == 'approved' || app.residency_proof_status == 'approved'
+        # Save without status fields first
+        temp_status = app.status
+        temp_income_status = app.income_proof_status
+        temp_residency_status = app.residency_proof_status
+
+        app.status = 'in_progress'
+        app.income_proof_status = 'not_reviewed'
+        app.residency_proof_status = 'not_reviewed'
+        app.save!(validate: false)
+
+        # Then update columns to set approved statuses without validation
+        app.update_columns(
+          status: Application.statuses[temp_status],
+          income_proof_status: Application.income_proof_statuses[temp_income_status],
+          residency_proof_status: Application.residency_proof_statuses[temp_residency_status]
+        )
+      else
+        app.save!(validate: false)
+      end
     end
   else
     seed_error "Applications fixture not found at #{app_fixture_file}"
@@ -456,6 +478,10 @@ else
       seed_puts '📧 Seeding email templates...'
       seed_email_templates
 
+      seed_puts '🚫 Seeding rejection reasons...'
+      load Rails.root.join('db/seeds/rejection_reasons.rb')
+      seed_rejection_reasons
+
       seed_puts '📁 Ensuring storage directory exists...'
       ensure_storage_directory
 
@@ -466,11 +492,11 @@ else
       verify_and_fix_missing_files
     end
   rescue StandardError => e
-    puts "❌ SEEDING FAILED: #{e.message}"
+    Rails.logger.debug { "❌ SEEDING FAILED: #{e.message}" }
     seed_error "Seeding failed: #{e.message}"
     Rails.logger.debug 'Backtrace:'
     e.backtrace.first(10).each { |line| Rails.logger.debug line }
-    exit 1
+    raise e
   else
     # Show summary of what was created
     seed_puts '📊 SEEDING SUMMARY:'
@@ -479,6 +505,7 @@ else
     seed_puts "   Products: #{Product.count}"
     seed_puts "   Policies: #{Policy.count}"
     seed_puts "   Email Templates: #{EmailTemplate.count}"
+    seed_puts "   Rejection Reasons: #{RejectionReason.count}"
     seed_puts "   Invoices: #{Invoice.count}"
     seed_puts "✅ SEEDING COMPLETED SUCCESSFULLY at #{Time.current}!"
     Rails.logger.debug 'Seeding completed successfully!' unless Rails.env.production?

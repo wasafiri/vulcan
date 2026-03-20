@@ -1,13 +1,15 @@
 <main class="container mx-auto px-4 py-8" role="main" aria-labelledby="application-title">
   <div data-controller="modal">
   <div class="max-w-7xl mx-auto">
-    <%= render 'shared/flash' %>
     <!-- Header Section -->
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
       <h1 id="application-title" class="text-3xl font-bold text-gray-900 mb-4 md:mb-0">
         Application #<%= @application.id %> Details
       </h1>
       <div class="flex space-x-4">
+        <%= link_to "Edit",
+            edit_admin_application_path(@application),
+            class: "inline-flex items-center px-4 py-2 border border-indigo-300 rounded-md shadow-sm text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
         <%= link_to admin_applications_path,
             class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
             aria: { label: "Return to applications list" } do %>
@@ -16,6 +18,7 @@
       </div>
     </div>
 
+    <%= turbo_frame_tag(turbo_frame_request_id || "application_show_#{@application.id}") do %>
     <!-- Application Status Section -->
     <div class="bg-white rounded-lg shadow p-6 mb-6">
       <div class="flex flex-col md:flex-row items-start md:items-center justify-between">
@@ -39,7 +42,7 @@
           <dt class="text-sm font-medium text-gray-500">Applicant</dt>
           <dd class="mt-1 text-sm text-gray-900">
             <% if @application.user.present? %>
-              <%= link_to @application.user.full_name, admin_user_path(@application.user), class: "text-indigo-600 hover:text-indigo-500" %>
+              <%= link_to @application.user.full_name, admin_user_path(@application.user), class: "text-indigo-600 hover:text-indigo-500", data: { turbo_frame: "_top" } %>
               <span class="text-gray-500">(ID: <%= @application.user.id %>)</span>
             <% else %>
               Unknown Applicant
@@ -50,7 +53,7 @@
           <div>
             <dt class="text-sm font-medium text-gray-500">Managed By</dt>
             <dd class="mt-1 text-sm text-gray-900">
-              <%= link_to @application.managing_guardian.full_name, admin_user_path(@application.managing_guardian), class: "text-indigo-600 hover:text-indigo-500" %>
+              <%= link_to @application.managing_guardian.full_name, admin_user_path(@application.managing_guardian), class: "text-indigo-600 hover:text-indigo-500", data: { turbo_frame: "_top" } %>
               <span class="text-gray-500">(ID: <%= @application.managing_guardian.id %>)</span>
               <% guardian_relationship = GuardianRelationship.find_by(guardian_id: @application.managing_guardian.id, dependent_id: @application.user.id) %>
               <% if guardian_relationship %>
@@ -77,8 +80,8 @@
         <div>
           <dt class="text-sm font-medium text-gray-500">Email</dt>
           <dd class="mt-1 text-sm text-gray-900">
-            <% if @application.user&.email.present? %>
-              <%= mail_to @application.user.email, class: "text-indigo-600 hover:text-indigo-500" %>
+            <% if @application.user&.effective_email.present? %>
+              <%= mail_to @application.user.effective_email, class: "text-indigo-600 hover:text-indigo-500" %>
             <% else %>
               No email provided
             <% end %>
@@ -155,7 +158,7 @@
         </div>
         <div>
           <dt class="text-sm font-medium text-gray-500">Income Verification Status</dt>
-          <dd class="mt-1 text-sm text-gray-900"><%= @application.income_proof_status&.titleize || "Pending" %></dd>
+          <dd class="mt-1 text-sm text-gray-900"><%= proof_status_badge('income', @application.income_proof_status) %></dd>
         </div>
         <div>
           <dt class="text-sm font-medium text-gray-500">Income Details</dt>
@@ -194,97 +197,8 @@
     </section>
 
     <!-- Medical Certification Section -->
-    <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="certification-title" data-testid="medical-certification-section">
-      <div class="flex justify-between items-start">
-        <h2 id="certification-title" class="text-xl font-semibold text-gray-900">Medical Certification</h2>
-        <%= medical_certification_status_badge(@application) %>
-      </div>
-
-      <div class="mt-6 space-y-4">
-        <!-- Fax Upload Form and History -->
-        <%= render "medical_certification_upload" %>
-
-        <!-- Provider Information -->
-        <% if @application.medical_provider_name.present? %>
-          <div class="mb-4" data-testid="provider-information">
-            <h3 class="text-sm font-medium text-gray-700 mb-2">Provider Information</h3>
-            <div class="pl-4 border-l-2 border-gray-200">
-              <p class="text-sm font-medium text-gray-900"><%= @application.medical_provider_name %></p>
-              <p class="text-sm text-gray-600">
-                <% if @application.medical_provider_phone.present? %>
-                  Phone: <%= @application.medical_provider_phone %>
-                <% end %>
-                <% if @application.respond_to?(:medical_provider_fax) && @application.medical_provider_fax.present? %>
-                  <% if @application.medical_provider_phone.present? %> / <% end %>
-                  Fax: <%= @application.medical_provider_fax %>
-                <% end %>
-                <% if @application.medical_provider_email.present? %>
-                  <br>Email: <%= @application.medical_provider_email %>
-                <% end %>
-              </p>
-            </div>
-          </div>
-        <% end %>
-
-        <!-- Action Buttons -->
-        <div class="mt-6">
-          <%
-            # Use instance variables that might be preloaded in the controller
-            # or load them once if not already available
-            request_count = @application.medical_certification_request_count || 0
-
-            if !defined?(@latest_certification_request) || @latest_certification_request.nil?
-              @latest_certification_request = Notification
-                .where(notifiable: @application, action: "medical_certification_requested")
-                .order(created_at: :desc)
-                .limit(1)
-                .first
-            end
-
-            if !defined?(@latest_certification_reject) || @latest_certification_reject.nil?
-              @latest_certification_reject = Notification
-                .where(notifiable: @application, action: "medical_certification_rejected")
-                .order(created_at: :desc)
-                .limit(1)
-                .first
-            end
-
-            # Check if we have both a request and a rejection, and if the request is more recent than the rejection
-            requested_after_rejection = @latest_certification_request.present? &&
-                                       @latest_certification_reject.present? &&
-                                       @latest_certification_request.created_at > @latest_certification_reject.created_at
-          %>
-
-          <% if @application.medical_certification_status == "not_requested" ||
-                @application.medical_certification_status == "rejected" ||
-                (@application.medical_certification_status == "requested" && !@application.medical_certification.attached?) %>
-            <!-- Send Request button -->
-            <% button_text = request_count.zero? ? "Send Request" : "Resend Request" %>
-            <%= button_to resend_medical_certification_admin_application_path(@application),
-                method: :post,
-                class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500",
-                data: {
-                  turbo_confirm: "Do you want to #{request_count.zero? ? 'send' : 'resend'} #{@application.medical_provider_name} the request to fill out #{@application.constituent_full_name}'s disability certification form?"
-                } do %>
-              <%= button_text %>
-            <% end %>
-          <% elsif (@application.medical_certification_status == "received" ||
-                 (@application.medical_certification_status == "requested" && @application.medical_certification.attached?) ||
-                 requested_after_rejection) &&
-                 !["approved"].include?(@application.medical_certification_status) %>
-            <!-- Review button - Show this only when we have a certification to review AND it's not already accepted/approved -->
-            <button type="button"
-                  data-action="click->modal#open"
-                  data-modal-id="medicalCertificationReviewModal"
-                  class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">
-              Review Certification
-            </button>
-          <!-- View Certification Button Moved to Medical Certification Upload Partial -->
-          <% end %>
-
-          <%# View History button removed - history already shown in the certification section %>
-        </div>
-      </div>
+    <section class="bg-white rounded-lg shadow p-6 mb-6" aria-labelledby="certification-title" id="medical-certification-section" data-testid="medical-certification-section">
+      <%= render "medical_certification_section" %>
     </section>
 
     <!-- Attachments Section (Proofs) -->
@@ -297,7 +211,7 @@
     <%= render "modals" %>
 
     <!-- Voucher Details Section -->
-    <% if @application.status_approved? && @application.medical_certification_status_approved? %>
+    <% if FeatureFlag.enabled?(:voucher_enabled) && @application.status_approved? && @application.medical_certification_status_approved? %>
       <%= render "voucher_details" %>
     <% end %>
 
@@ -306,18 +220,24 @@
       <h2 id="notes-title" class="text-xl font-semibold text-gray-900 mb-4">Admin Notes</h2>
 
     <!-- Note Form -->
-    <div class="mb-6 pb-6">
+    <div class="mb-6 pb-6 border-b border-gray-200">
       <%= form_with model: [:admin, @application, ApplicationNote.new], url: admin_application_notes_path(@application), local: true, class: "space-y-4" do |f| %>
         <div>
           <%= f.label :content, "Add a Note", class: "block text-sm font-medium text-gray-700" %>
           <%= f.text_area :content, rows: 3, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm", placeholder: "Enter your note here..." %>
-          <div class="mt-2">
-            <%= f.submit "Add Note", class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="flex items-center">
+            <%= f.check_box :internal_only, checked: true, class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" %>
+            <%= f.label :internal_only, "Internal only (not visible to constituent)", class: "ml-2 block text-sm text-gray-900" %>
+          </div>
+          <div>
+            <%= f.label :assigned_to_id, "Assign to", class: "block text-sm font-medium text-gray-700" %>
+            <%= f.select :assigned_to_id, options_for_select([["No assignment", nil]] + User.where(type: "Users::Administrator").active.map { |u| [u.full_name, u.id] }), {}, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" %>
           </div>
         </div>
-        <div class="flex items-center">
-          <%= f.check_box :internal_only, checked: true, class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" %>
-          <%= f.label :internal_only, "Internal only (not visible to constituent)", class: "ml-2 block text-sm text-gray-900" %>
+        <div class="mt-2">
+          <%= f.submit "Add Note", class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
         </div>
       <% end %>
     </div>
@@ -327,23 +247,56 @@
           <ul class="space-y-4">
             <% @application.application_notes.recent_first.each do |note| %>
               <li class="bg-gray-50 p-4 rounded-md">
-                <div class="flex justify-between items-start">
+                <div class="flex justify-between items-start gap-4" id="application-note-<%= note.id %>">
                   <div class="flex-1">
                     <p class="text-sm text-gray-900"><%= note.content %></p>
-                    <div class="mt-2 flex items-center text-xs text-gray-500">
+                    <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
                       <span><%= note.admin.full_name %></span>
                       <span class="mx-1">•</span>
                       <span><%= note.created_at.strftime("%B %d, %Y at %I:%M %p") %></span>
                       <% if note.internal_only %>
-                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
                           Internal Only
                         </span>
                       <% else %>
-                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
                           Visible to Constituent
                         </span>
                       <% end %>
+                      <% if note.assigned_to.present? %>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                          Assigned to <%= note.assigned_to.full_name %>
+                        </span>
+                      <% end %>
+                      <% if note.completed_at.present? %>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                          ✓ Done
+                        </span>
+                      <% end %>
                     </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <% if note.assigned_to.present? && note.assigned_to == current_user %>
+                      <% if note.completed_at.present? %>
+                        <%= button_to "Reopen", admin_application_note_path(@application, note), method: :patch, params: { mark_incomplete: true }, class: "text-xs px-2 py-1 text-gray-600 hover:text-gray-900 bg-white border border-gray-300 rounded hover:bg-gray-50", form: { style: "display: inline;" } %>
+                      <% else %>
+                        <%= button_to "Mark as Done", admin_application_note_path(@application, note), method: :patch, params: { mark_done: true }, class: "text-xs px-2 py-1 text-green-600 hover:text-green-900 bg-white border border-green-300 rounded hover:bg-green-50", form: { style: "display: inline;" } %>
+                      <% end %>
+                      <%= button_to "Unassign", admin_application_note_path(@application, note), method: :patch, params: { unassign: true }, class: "text-xs px-2 py-1 text-gray-600 hover:text-gray-900 bg-white border border-gray-300 rounded hover:bg-gray-50", form: { style: "display: inline;" } %>
+                    <% elsif note.assigned_to.present? %>
+                      <!-- Note is assigned to someone else, show no action buttons -->
+                    <% else %>
+                      <details class="group">
+                        <summary class="text-xs px-2 py-1 text-gray-600 hover:text-gray-900 bg-white border border-gray-300 rounded hover:bg-gray-50 cursor-pointer">
+                          Assign
+                        </summary>
+                        <div class="absolute right-0 mt-1 w-48 bg-white border border-gray-300 rounded-md shadow-lg z-10">
+                          <% User.where(type: "Users::Administrator").active.each do |admin| %>
+                            <%= button_to admin.full_name, admin_application_note_path(@application, note), method: :patch, params: { assigned_to_id: admin.id }, class: "block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-900 border-b border-gray-100 last:border-b-0", form: { style: "display: block;" } %>
+                          <% end %>
+                        </div>
+                      </details>
+                    <% end %>
                   </div>
                 </div>
               </li>
@@ -468,6 +421,7 @@
 
     <!-- Audit Logs Section -->
     <%= render "audit_logs" %>
+    <% end %>
   </div>
   </div>
 </main>

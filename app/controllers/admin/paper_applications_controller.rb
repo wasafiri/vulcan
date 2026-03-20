@@ -8,9 +8,10 @@ module Admin
     before_action :cast_complex_boolean_params, only: %i[create update]
 
     USER_BASE_FIELDS = %i[
-      first_name last_name email phone phone_type
+      first_name middle_initial last_name email phone phone_type
       physical_address_1 physical_address_2 city state zip_code
-      communication_preference
+      communication_preference locale date_of_birth
+      preferred_means_of_communication referral_source
     ].freeze
 
     USER_DISABILITY_FIELDS = %i[
@@ -21,7 +22,8 @@ module Admin
     DEPENDENT_BASE_FIELDS = %i[
       first_name last_name date_of_birth
       physical_address_1 physical_address_2 city state zip_code
-      dependent_email dependent_phone
+      dependent_email dependent_phone phone_type locale
+      preferred_means_of_communication referral_source
     ].freeze
 
     APPLICATION_FIELDS = %i[
@@ -60,6 +62,7 @@ module Admin
 
       if service_result
         success_message = generate_success_message(service.application)
+        send_medical_certification_notification_if_needed(service.application)
         handle_success_response(
           html_redirect_path: admin_application_path(service.application),
           html_message: success_message,
@@ -67,6 +70,7 @@ module Admin
           turbo_redirect_path: admin_application_path(service.application)
         )
       else
+        Rails.logger.info "[PaperApplicationsController] Handling service failure, request format: #{request.format}"
         handle_service_failure(service)
       end
     end
@@ -96,31 +100,32 @@ module Admin
       end
     end
 
-    # Legacy AJAX endpoint for FPL thresholds - delegates to IncomeThresholdCalculationService
-    # TODO: Consider removing this endpoint in favor of server-rendered data
-    def fpl_thresholds
-      thresholds = {}
-      modifier = nil
-
-      (1..8).each do |size|
-        result = IncomeThresholdCalculationService.call(size)
-        if result.success?
-          thresholds[size] = result.data[:base_fpl]
-          modifier ||= result.data[:modifier] # Get modifier from first successful call
-        else
-          thresholds[size] = 0 # Fallback for failed calculations
-        end
+    # Load dependent form for editing or creating new dependent
+    # Used by Turbo Frame to dynamically load pre-filled form when existing dependent selected
+    def dependent_form
+      if params[:dependent_id].present?
+        @dependent = User.find_by(id: params[:dependent_id])
+        @mode = :edit
+      else
+        @dependent = nil
+        @mode = :new
       end
 
-      render json: { thresholds: thresholds, modifier: modifier || 400 }
+      render turbo_stream: turbo_stream.replace(
+        'dependent_info_form',
+        partial: 'admin/paper_applications/dependent_form',
+        locals: { dependent: @dependent, mode: @mode }
+      )
     end
 
-    # Helper methods for FPL data - delegates to IncomeThresholdCalculationService
+    # Server-rendered FPL data helper methods
+    # These inject threshold data into HTML data attributes for client-side validation
     # See: app/services/income_threshold_calculation_service.rb for core FPL logic
     helper_method :fpl_thresholds_json, :fpl_modifier_value
 
     def fpl_thresholds_json
       # Generate FPL threshold data for JavaScript using IncomeThresholdCalculationService
+      # Returns JSON string of base FPL values for household sizes 1-8
       thresholds = (1..8).to_h do |size|
         result = IncomeThresholdCalculationService.call(size)
         if result.success?
@@ -133,7 +138,8 @@ module Admin
     end
 
     def fpl_modifier_value
-      # Get FPL modifier percentage via IncomeThresholdCalculationService (uses any household size)
+      # Get FPL modifier percentage via IncomeThresholdCalculationService
+      # Returns the policy-configured modifier (e.g., 400 for 400% FPL)
       result = IncomeThresholdCalculationService.call(1)
       if result.success?
         result.data[:modifier]
@@ -143,16 +149,25 @@ module Admin
     end
 
     def reject_for_income
-      service = initialize_rejection_service
-      return handle_service_failure(service) unless service.create
+      # Build constituent params from form data for notification (no application created)
+      constituent_params = build_constituent_params_for_notification
+      notification_params = build_notification_params
 
-      application = service.application
-      log_successful_rejection(application)
-      send_rejection_notification_for_application(application)
-      log_audit_event(application)
+      # Send rejection notification without creating an application
+      ApplicationNotificationsMailer.income_threshold_exceeded(
+        constituent_params,
+        notification_params
+      ).deliver_later
 
-      redirect_to admin_applications_path,
-                  notice: 'Application rejected due to income threshold. Rejection notification has been sent.'
+      # Log the rejection event (no application to reference)
+      log_income_threshold_rejection(constituent_params, notification_params)
+
+      handle_success_response(
+        html_redirect_path: admin_applications_path,
+        html_message: 'Application rejected due to income threshold. Rejection notification has been sent.',
+        turbo_message: 'Application rejected due to income threshold. Rejection notification has been sent.',
+        turbo_redirect_path: admin_applications_path
+      )
     end
 
     def send_rejection_notification
@@ -160,13 +175,17 @@ module Admin
       constituent_params = build_constituent_params_for_notification
       notification_params = build_notification_params
 
-      notification_method = params[:notification_method]
+      notification_method = params[:communication_preference]
 
       if notification_method == 'letter'
         # For letter notifications, queue for printing
         # This would integrate with a print queue system
-        redirect_to admin_applications_path,
-                    notice: 'Rejection letter has been queued for printing'
+        handle_success_response(
+          html_redirect_path: admin_applications_path,
+          html_message: 'Rejection letter has been queued for printing',
+          turbo_message: 'Rejection letter has been queued for printing',
+          turbo_redirect_path: admin_applications_path
+        )
       else
         # For email notifications, send immediately
         ApplicationNotificationsMailer.income_threshold_exceeded(
@@ -174,53 +193,25 @@ module Admin
           notification_params
         ).deliver_later
 
-        redirect_to admin_applications_path,
-                    notice: 'Rejection notification has been sent'
+        handle_success_response(
+          html_redirect_path: admin_applications_path,
+          html_message: 'Rejection notification has been sent',
+          turbo_message: 'Rejection notification has been sent',
+          turbo_redirect_path: admin_applications_path
+        )
       end
     end
 
     private
 
-    def initialize_rejection_service
-      service_params = paper_application_processing_params
-      service_params[:application] ||= {}
-      service_params[:application][:status] = 'rejected'
-
-      Applications::PaperApplicationService.new(
-        params: service_params,
-        admin: current_user,
-        skip_income_validation: true
-      )
-    end
-
-    def log_successful_rejection(application)
-      Rails.logger.debug { "Successfully rejected application #{application.id}" }
-    end
-
-    def send_rejection_notification_for_application(application)
-      ApplicationNotificationsMailer.income_threshold_exceeded(
-        user_contact_attributes(application.user),
-        rejection_notification_params(application)
-      ).deliver_later
-    end
-
-    def user_contact_attributes(user)
-      user.attributes.slice('first_name', 'last_name', 'email', 'phone')
-    end
-
-    def rejection_notification_params(application)
-      threshold_amount = calculate_income_threshold(application.household_size)
-
-      {
-        household_size: application.household_size,
-        annual_income: application.annual_income,
-        threshold_amount: threshold_amount
-      }
-    end
-
     def calculate_income_threshold(household_size)
       threshold_result = IncomeThresholdCalculationService.new(household_size).call
       threshold_result.success? ? threshold_result.data[:threshold] : 0
+    end
+
+    def calculate_income_threshold_from_params(notification_params)
+      household_size = notification_params['household_size'] || notification_params[:household_size]
+      calculate_income_threshold(household_size)
     end
 
     def log_audit_event(application)
@@ -229,6 +220,21 @@ module Admin
         actor: Current.user,
         auditable: application,
         metadata: audit_metadata(application)
+      )
+    end
+
+    def log_income_threshold_rejection(constituent_params, notification_params)
+      AuditEventService.log(
+        action: 'income_threshold_rejection_no_application',
+        actor: Current.user,
+        auditable: nil, # No application was created
+        metadata: {
+          constituent_name: "#{constituent_params['first_name']} #{constituent_params['last_name']}",
+          constituent_email: constituent_params['email'],
+          income: notification_params['annual_income'],
+          household_size: notification_params['household_size'],
+          threshold: calculate_income_threshold_from_params(notification_params)
+        }
       )
     end
 
@@ -258,21 +264,42 @@ module Admin
     end
 
     def repopulate_form_data(service, existing_application)
+      submitted_params = build_submitted_params
+      
+      # Get or build constituent with submitted data
+      constituent = service.constituent || existing_application&.user || Constituent.new
+      
+      # If constituent is a new record, populate it with submitted data
+      if constituent.new_record? && submitted_params[:constituent].present?
+        constituent.assign_attributes(submitted_params[:constituent])
+      end
+      
+      # Get or build application with submitted data
+      application = service.application || existing_application || Application.new
+      if application.new_record? && submitted_params[:application].present?
+        application.assign_attributes(submitted_params[:application])
+      end
+      
       @paper_application = {
-        application: service.application || existing_application || Application.new,
-        constituent: service.constituent || existing_application&.user || Constituent.new,
+        application: application,
+        constituent: constituent,
         guardian_user_for_app: service.guardian_user_for_app,
-        submitted_params: build_submitted_params
+        applicant_attributes: submitted_params[:applicant_attributes] || {},
+        guardian_attributes: submitted_params[:guardian_attributes] || {},
+        submitted_params: submitted_params
       }
     end
 
     def build_submitted_params
-      params.to_unsafe_h.slice(
+      params.permit(
         :applicant_type, :relationship_type, :guardian_id, :dependent_id,
-        :guardian_attributes, :applicant_attributes, :application, :constituent,
         :email_strategy, :phone_strategy, :address_strategy,
-        :use_guardian_email, :use_guardian_phone, :use_guardian_address
-      )
+        :use_guardian_email, :use_guardian_phone, :use_guardian_address,
+        application: APPLICATION_FIELDS,
+        applicant_attributes: USER_DISABILITY_FIELDS,
+        constituent: (USER_BASE_FIELDS + DEPENDENT_BASE_FIELDS + USER_DISABILITY_FIELDS),
+        guardian_attributes: (USER_BASE_FIELDS + USER_DISABILITY_FIELDS)
+      ).to_h.with_indifferent_access
     end
 
     def log_file_and_form_params
@@ -299,79 +326,113 @@ module Admin
 
     # Main method to construct parameters for the PaperApplicationService
     def paper_application_processing_params
-      service_params = build_base_service_params
-      add_application_params(service_params)
-      add_user_params(service_params)
-      add_proof_params(service_params)
+      permitted = permitted_paper_params
+
+      service_params = base_params_from(permitted)
+      apply_strategies!(service_params, permitted)
+      disability_attrs = merge_application_and_disabilities!(service_params, permitted)
+      merge_user_params!(service_params, permitted, disability_attrs)
+      add_proof_params_from!(service_params, permitted)
 
       Rails.logger.debug { "Final service params: #{service_params.inspect}" }
       service_params
     end
 
-    def build_base_service_params
-      current_applicant_type = determine_applicant_type
-
-      service_params = params.permit(:relationship_type, :guardian_id, :dependent_id)
-                             .to_h.with_indifferent_access
-      service_params[:applicant_type] = current_applicant_type
-      service_params[:email_strategy] = determine_email_strategy
-      service_params[:phone_strategy] = determine_phone_strategy
-      service_params[:address_strategy] = determine_address_strategy
-
-      service_params
+    def inferred_dependent_application_from(permitted)
+      (permitted[:guardian_id].present? || permitted[:guardian_attributes].present?) &&
+        permitted.dig(:constituent, :first_name).present?
     end
 
-    def determine_applicant_type
-      # Infer applicant_type if guardian_id OR guardian_attributes is present and constituent data exists
-      return params[:applicant_type] if params[:applicant_type].present? && !inferred_dependent_application?
-
-      inferred_dependent_application? ? 'dependent' : params[:applicant_type]
+    def permitted_paper_params
+      params.permit(
+        :relationship_type, :guardian_id, :dependent_id, :applicant_type,
+        :email_strategy, :phone_strategy, :address_strategy,
+        :use_guardian_email, :use_guardian_phone, :use_guardian_address,
+        :income_proof_action, :income_proof, :income_proof_signed_id,
+        :income_proof_rejection_reason, :income_proof_custom_rejection_reason,
+        :residency_proof_action, :residency_proof, :residency_proof_signed_id,
+        :residency_proof_rejection_reason, :residency_proof_custom_rejection_reason,
+        :medical_certification_action, :medical_certification, :medical_certification_signed_id,
+        :medical_certification_rejection_reason, :medical_certification_custom_rejection_reason,
+        :no_medical_provider_information,
+        application: APPLICATION_FIELDS,
+        applicant_attributes: USER_DISABILITY_FIELDS,
+        constituent: (USER_BASE_FIELDS + DEPENDENT_BASE_FIELDS + USER_DISABILITY_FIELDS),
+        guardian_attributes: (USER_BASE_FIELDS + USER_DISABILITY_FIELDS)
+      ).to_h.with_indifferent_access
     end
 
-    def add_application_params(service_params)
-      service_params[:application] = permitted_application_attributes if params[:application].present?
-      service_params[:application] ||= {}
-
-      # Handle applicant disability attributes
-      applicant_attrs = permitted_applicant_disability_attributes
-      service_params[:application][:self_certify_disability] = applicant_attrs.delete(:self_certify_disability) if applicant_attrs.key?(:self_certify_disability)
-
-      service_params[:applicant_disability_attrs] = applicant_attrs
+    def base_params_from(permitted)
+      base = permitted.slice(:relationship_type, :guardian_id, :dependent_id, :no_medical_provider_information)
+      base[:applicant_type] = compute_applicant_type(permitted)
+      base
     end
 
-    def add_user_params(service_params)
-      if service_params[:applicant_type] == 'dependent'
-        add_dependent_params(service_params)
-      else
-        add_self_applicant_params(service_params)
+    def compute_applicant_type(permitted)
+      # Dependent indicators (guardian + constituent data) take precedence
+      return 'dependent' if inferred_dependent_application_from(permitted)
+
+      # Use explicit value if provided, otherwise default to 'self'
+      permitted[:applicant_type].presence || 'self'
+    end
+
+    def apply_strategies!(service_params, permitted)
+      dependent = service_params[:applicant_type] == 'dependent'
+
+      service_params[:email_strategy] = determine_strategy(permitted, :email_strategy, :use_guardian_email, dependent)
+      service_params[:phone_strategy] = determine_strategy(permitted, :phone_strategy, :use_guardian_phone, dependent)
+      service_params[:address_strategy] = determine_strategy(permitted, :address_strategy, :use_guardian_address, dependent)
+    end
+
+    def determine_strategy(permitted, strategy_key, checkbox_key, dependent)
+      return permitted[strategy_key] if permitted[strategy_key].present?
+      return 'dependent' unless dependent
+
+      to_boolean(permitted[checkbox_key]) ? 'guardian' : 'dependent'
+    end
+
+    def merge_application_and_disabilities!(service_params, permitted)
+      app = (permitted[:application] || {}).dup
+      disability_attrs = (permitted[:applicant_attributes] || {}).dup
+      app[:self_certify_disability] = disability_attrs.delete(:self_certify_disability) if disability_attrs.key?(:self_certify_disability)
+      service_params[:application] = app
+      disability_attrs
+    end
+
+    def merge_user_params!(service_params, permitted, disability_attrs)
+      constituent_attrs = (permitted[:constituent] || {}).dup
+      service_params[:constituent] = constituent_attrs.deep_merge(disability_attrs)
+
+      return unless service_params[:applicant_type] == 'dependent'
+
+      service_params[:new_guardian_attributes] = permitted[:guardian_attributes] if service_params[:guardian_id].blank? && permitted[:guardian_attributes].present?
+    end
+
+    def add_proof_params_from!(service_params, permitted)
+      %w[income residency].each do |type|
+        action_key = "#{type}_proof_action"
+        file_key   = "#{type}_proof"
+        signed_key = "#{type}_proof_signed_id"
+        reason_key        = "#{type}_proof_rejection_reason"
+        custom_reason_key = "#{type}_proof_custom_rejection_reason"
+
+        service_params[action_key] = permitted[action_key]
+        file_val = permitted[file_key]
+        signed_val = permitted[signed_key]
+        service_params[file_key] = file_val if file_val.present?
+        service_params[signed_key] = signed_val if signed_val.present?
+        service_params[reason_key] = permitted[reason_key]
+        service_params[custom_reason_key] = permitted[custom_reason_key]
       end
-    end
 
-    def add_dependent_params(service_params)
-      # The APPLICANT is the DEPENDENT
-      constituent_attrs = params[:constituent].present? ? permitted_constituent_attributes : {}
-      applicant_attrs = service_params.delete(:applicant_disability_attrs) || {}
-      service_params[:constituent] = constituent_attrs.deep_merge(applicant_attrs)
-
-      # Handle the Guardian separately
-      return unless service_params[:guardian_id].blank? && params[:guardian_attributes].present?
-
-      service_params[:new_guardian_attributes] = permitted_guardian_attributes
-    end
-
-    def add_self_applicant_params(service_params)
-      # The APPLICANT is the self-applying adult
-      applicant_attrs = service_params.delete(:applicant_disability_attrs) || {}
-
-      service_params[:constituent] = if params[:constituent].present? && params.expect(constituent: [:first_name]).present?
-                                       permitted_constituent_attributes.deep_merge(applicant_attrs)
-                                     elsif params[:guardian_attributes].present?
-                                       # "Create New Guardian" form was filled for self-applicant
-                                       permitted_guardian_attributes.deep_merge(applicant_attrs)
-                                     else
-                                       # Fallback: ensure only disability flags are passed
-                                       applicant_attrs
-                                     end
+      # Handle medical certification (uses different naming convention)
+      service_params[:medical_certification_action] = permitted[:medical_certification_action]
+      file_val = permitted[:medical_certification]
+      signed_val = permitted[:medical_certification_signed_id]
+      service_params[:medical_certification] = file_val if file_val.present?
+      service_params[:medical_certification_signed_id] = signed_val if signed_val.present?
+      service_params[:medical_certification_rejection_reason] = permitted[:medical_certification_rejection_reason]
+      service_params[:medical_certification_custom_rejection_reason] = permitted[:medical_certification_custom_rejection_reason]
     end
 
     # Translate checkbox UI to email strategy parameter
@@ -422,51 +483,7 @@ module Admin
     # Helper to determine if this is a dependent application based on guardian presence
     def inferred_dependent_application?
       (params[:guardian_id].present? || params[:guardian_attributes].present?) &&
-        params[:constituent].present? && params.expect(constituent: [:first_name]).present?
-    end
-
-    def permitted_guardian_attributes
-      if params[:guardian_attributes].present?
-        params.expect(guardian_attributes: [*USER_BASE_FIELDS, *USER_DISABILITY_FIELDS])
-              .to_h.with_indifferent_access
-      else
-        {}
-      end
-    end
-
-    def permitted_constituent_attributes
-      # For constituents (including dependents), permit all standard user fields plus dependent-specific fields
-      permitted_fields = USER_BASE_FIELDS + DEPENDENT_BASE_FIELDS + USER_DISABILITY_FIELDS
-      params.expect(constituent: [*permitted_fields]).to_h.with_indifferent_access
-    end
-
-    def permitted_applicant_disability_attributes
-      if params[:applicant_attributes].present?
-        params.expect(applicant_attributes: [*USER_DISABILITY_FIELDS]).to_h.with_indifferent_access
-      else
-        {}
-      end
-    end
-
-    def permitted_application_attributes
-      params.expect(application: [*APPLICATION_FIELDS]).to_h.with_indifferent_access
-    end
-
-    def add_proof_params(service_params)
-      # ... (original add_proof_params logic)
-      %w[income residency].each do |type|
-        action_key = "#{type}_proof_action"
-        service_params[action_key] = params[action_key]
-
-        file_key = "#{type}_proof"
-        service_params[file_key] = params[file_key] if params[file_key].present?
-
-        signed_id_key = "#{type}_proof_signed_id"
-        service_params[signed_id_key] = params[signed_id_key] if params[signed_id_key].present?
-
-        service_params["#{type}_proof_rejection_reason"] = params["#{type}_proof_rejection_reason"]
-        service_params["#{type}_proof_rejection_notes"] = params["#{type}_proof_rejection_notes"]
-      end
+        params[:constituent].present? && params[:constituent].is_a?(ActionController::Parameters) && params[:constituent][:first_name].present?
     end
 
     def build_constituent_params_for_notification
@@ -476,6 +493,26 @@ module Admin
 
     def build_notification_params
       params.permit(:household_size, :annual_income, :communication_preference, :additional_notes).to_h
+    end
+
+    def send_medical_certification_notification_if_needed(application)
+      has_provider_info = application.medical_provider_name.present? || 
+                          application.medical_provider_email.present? || 
+                          application.medical_provider_phone.present?
+      is_rejected = application.medical_certification_status_rejected?
+
+      # If provider info exists AND certification is rejected for reason other than not present, notify the provider
+      if has_provider_info && is_rejected && application.medical_certification_rejection_reason != 'none_provided'
+        MedicalProviderMailer.certification_revision_needed(application).deliver_later
+        return
+      end
+
+      # If nothing is attached (no provider info AND a rejected certification), notify the constituent
+      return if has_provider_info || !is_rejected
+
+      ApplicationNotificationsMailer.medical_certification_not_provided(application).deliver_later
+    rescue StandardError => e
+      Rails.logger.error("Failed to send medical certification notification for application #{application&.id}: #{e.message}")
     end
 
     # NOTE: cast_boolean_params and cast_boolean_for are provided by the ParamCasting concern

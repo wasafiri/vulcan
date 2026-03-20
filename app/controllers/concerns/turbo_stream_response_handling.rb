@@ -9,7 +9,7 @@ module TurboStreamResponseHandling
   # @param modals_to_remove [Array<String>] Array of modal IDs to remove
   def handle_turbo_stream_success(message:, updates: {}, modals_to_remove: [])
     prepare_turbo_stream_data if respond_to?(:prepare_turbo_stream_data, true)
-    flash.now[:notice] = message
+    flash.now[:success] = message
     streams = build_success_turbo_streams(updates, modals_to_remove)
     render turbo_stream: streams
   end
@@ -25,6 +25,8 @@ module TurboStreamResponseHandling
   # @param updates [Hash] Hash of element_id => partial_name for updates
   # @param modals_to_remove [Array<String>] Array of modal IDs to remove
   # @return [Array] Array of turbo stream objects
+  #
+  # NOTE: modals_to_remove is ignored if updates includes 'modals' (container replacement)
   def build_success_turbo_streams(updates = {}, modals_to_remove = [])
     streams = []
 
@@ -36,32 +38,14 @@ module TurboStreamResponseHandling
       streams << turbo_stream.update(element_id, partial: partial_name)
     end
 
-    # Remove specified modals
-    modals_to_remove.each do |modal_id|
-      streams << turbo_stream.remove(modal_id)
+    # Remove specified modals unless they were recently updated
+    unless updates.key?('modals')
+      modals_to_remove.each do |modal_id|
+        streams << turbo_stream.remove(modal_id)
+      end
     end
 
     streams
-  end
-
-  # Standard set of modals to remove for application-related operations
-  def standard_application_modals
-    %w[
-      proofRejectionModal
-      incomeProofReviewModal
-      residencyProofReviewModal
-      medicalCertificationReviewModal
-    ]
-  end
-
-  # Builds turbo streams for application proof review success
-  def build_proof_review_success_streams
-    updates = {
-      'attachments-section' => 'attachments',
-      'audit-logs' => 'audit_logs'
-    }
-
-    build_success_turbo_streams(updates, standard_application_modals)
   end
 
   # Handles both HTML and Turbo Stream responses for successful operations
@@ -69,7 +53,8 @@ module TurboStreamResponseHandling
   # @param html_message [String] Message for HTML redirect
   # @param turbo_message [String] Message for Turbo Stream response
   # @param turbo_updates [Hash] Updates for Turbo Stream response
-  # @param turbo_modals_to_remove [Array<String>] Modals to remove for Turbo Stream
+  # @param turbo_modals_to_remove [Array<String>] DEPRECATED: Modals to remove for Turbo Stream.
+  #   Use 'modals' => 'modals' in turbo_updates to replace entire modal container.
   # @param turbo_redirect_path [String] Path to redirect for Turbo Stream (optional)
   def handle_success_response(
     html_redirect_path:,
@@ -82,6 +67,7 @@ module TurboStreamResponseHandling
     turbo_message ||= html_message
 
     respond_to do |format|
+      # Keep traditional flash types for HTML redirects to avoid breaking existing tests.
       format.html { redirect_to html_redirect_path, notice: html_message }
 
       format.turbo_stream do
@@ -103,8 +89,8 @@ module TurboStreamResponseHandling
   # @param html_redirect_path [String] Path to redirect for HTML requests (optional)
   # @param html_render_action [Symbol] Action to render for HTML requests (optional)
   # @param error_message [String] Error message to display
-  # @param status [Symbol] HTTP status for render (optional, defaults to :unprocessable_entity)
-  def handle_error_response(error_message:, html_redirect_path: nil, html_render_action: nil, status: :unprocessable_entity)
+  # @param status [Symbol] HTTP status for render (optional, defaults to :unprocessable_content)
+  def handle_error_response(error_message:, html_redirect_path: nil, html_render_action: nil, status: :unprocessable_content)
     respond_to do |format|
       if html_redirect_path
         format.html { redirect_to html_redirect_path, alert: error_message }

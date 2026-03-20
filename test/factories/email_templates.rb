@@ -5,10 +5,17 @@ FactoryBot.define do
     sequence(:name) { |n| "template_#{n}" }
     subject { 'Default Subject for %<name>s' }
     body { 'Default body for %<name>s.' }
-    variables { ['%<name>s'] }
+    variables { 
+      { 
+        'required' => ['name'], 
+        'optional' => [] 
+      } 
+    }
     description { 'A default email template.' }
-    format { :html } # Default format
+    format { :html }
+    locale { 'en' }
     version { 1 }
+    enabled { true }
     updated_by factory: %i[admin]
 
     trait :html do

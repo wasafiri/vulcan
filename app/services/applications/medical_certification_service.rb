@@ -33,10 +33,10 @@ module Applications
         # Send email with notification for tracking
         send_email(notification)
 
-        success(message: 'Medical certification requested successfully.')
+        success(message: 'Disability certification requested successfully.')
       rescue StandardError => e
         log_error(e, "Application ID: #{application.id}")
-        failure(message: "Failed to request medical certification: #{e.message}")
+        failure(message: "Failed to request disability certification: #{e.message}")
       end
     end
 
@@ -76,7 +76,8 @@ module Applications
           old_status: previous_status || 'not_requested',
           new_status: 'requested',
           change_type: 'medical_certification',
-          provider_name: application.medical_provider_name
+          provider_name: application.medical_provider_name,
+          submission_method: 'email'
         }
       )
     end
@@ -118,7 +119,8 @@ module Applications
           provider: application.medical_provider_name,
           provider_email: application.medical_provider_email
         },
-        channel: :email
+        channel: :email,
+        deliver: false
       )
     rescue StandardError => e
       # Log but don't fail the process

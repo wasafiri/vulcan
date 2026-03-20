@@ -31,7 +31,7 @@ class EdgeCasesTest < ActionMailbox::TestCase
     # Set up ApplicationMailbox routing for testing
     ApplicationMailbox.instance_eval do
       routing(/proof@/i => :proof_submission)
-      routing(/medical-cert@/i => :medical_certification)
+      routing(/disability_cert@/i => :medical_certification)
       routing(/.+/ => :default)
     end
 
@@ -39,11 +39,15 @@ class EdgeCasesTest < ActionMailbox::TestCase
     # This allows tests to run without requiring templates to exist in test DB
     # Create a specific mock for the proof_submission_error template
     proof_submission_error_template = mock('EmailTemplate')
+    proof_submission_error_template.stubs(:subject).returns('Error Processing Your Proof Submission')
     proof_submission_error_template.stubs(:render).returns(['Error Processing Your Proof Submission', 'Test Email Body'])
+    proof_submission_error_template.stubs(:enabled?).returns(true)
 
     # Create a generic mock for other templates
     generic_template = mock('EmailTemplate')
+    generic_template.stubs(:subject).returns('Test Email Subject')
     generic_template.stubs(:render).returns(['Test Email Subject', 'Test Email Body'])
+    generic_template.stubs(:enabled?).returns(true)
 
     # Ensure the template lookup uses the correct template based on name
     EmailTemplate.stubs(:find_by!).with(name: 'application_notifications_proof_submission_error',
@@ -55,7 +59,7 @@ class EdgeCasesTest < ActionMailbox::TestCase
     # We need to use assert_throws to catch the bounce
     assert_throws(:bounce) do
       inbound_email = create_inbound_email_from_mail(
-        to: 'proof@example.com',
+        to: 'proof@mdmat.org',
         from: @constituent.email,
         subject: 'Income Proof Submission',
         body: 'I forgot to attach my proof.'
@@ -78,7 +82,7 @@ class EdgeCasesTest < ActionMailbox::TestCase
 
     assert_throws(:bounce) do
       inbound_email = create_inbound_email_with_attachment(
-        to: 'proof@example.com',
+        to: 'proof@mdmat.org',
         from: @constituent.email,
         subject: 'Income Proof Submission',
         body: 'Please find my income proof attached.',
@@ -109,7 +113,7 @@ class EdgeCasesTest < ActionMailbox::TestCase
 
     assert_throws(:bounce) do
       inbound_email = create_inbound_email_with_attachment(
-        to: 'proof@example.com',
+        to: 'proof@mdmat.org',
         from: @constituent.email,
         subject: 'Income Proof Submission',
         body: 'Please find my income proof attached.',
@@ -138,7 +142,7 @@ class EdgeCasesTest < ActionMailbox::TestCase
 
     # Create and process the email without expecting a bounce
     inbound_email = create_inbound_email_with_attachment(
-      to: 'proof@example.com',
+      to: 'proof@mdmat.org',
       from: @constituent.email,
       subject: 'Proof Document',
       body: 'Please find my proof attached.',
@@ -172,7 +176,7 @@ class EdgeCasesTest < ActionMailbox::TestCase
 
     mail = Mail.new do
       from current_constituent_email # Use the local variable
-      to ['proof@example.com', 'support@example.com', 'admin@example.com']
+      to ['proof@mdmat.org', 'mat.program1@maryland.gov', 'admin@example.com']
       subject 'Income Proof Submission'
 
       text_part do
@@ -222,7 +226,7 @@ class EdgeCasesTest < ActionMailbox::TestCase
       ProofSubmissionMailbox.any_instance.expects(:attach_proof).at_least_once.returns(true)
 
       inbound_email = create_inbound_email_with_attachment(
-        to: 'proof@example.com',
+        to: 'proof@mdmat.org',
         from: @constituent.email,
         subject: 'Income Proof Submission - 特殊文字 - üñîçødé',
         body: 'Please find my income proof attached. 特殊文字 üñîçødé',

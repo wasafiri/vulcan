@@ -3,58 +3,42 @@
 require 'test_helper'
 
 class ApplicationMailerTest < ActionMailer::TestCase
-  test 'host_url is set correctly in development' do
-    Rails.stub :env, ActiveSupport::StringInquirer.new('development') do
-      # Create a mailer instance and directly test the set_default_host_url method
-      mailer = ApplicationMailer.new
-      mailer.send(:set_default_host_url)
+  test 'normalize_locale normalizes explicit locale value' do
+    mailer = ApplicationMailer.new
 
-      # Verify the host URL is set to localhost:3000 in development
-      assert_equal 'localhost:3000', mailer.instance_variable_get(:@host_url)
-    end
+    resolved = mailer.send(:normalize_locale, 'es-MX')
+
+    assert_equal 'es', resolved
   end
 
-  test 'host_url is set correctly in production with missing MAILER_HOST' do
-    Rails.stub :env, ActiveSupport::StringInquirer.new('production') do
-      # Store the original MAILER_HOST value
-      original_host = ENV.fetch('MAILER_HOST', nil)
+  test 'resolve_template_locale falls back to recipient locale' do
+    recipient = Struct.new(:locale).new('es-MX')
+    mailer = ApplicationMailer.new
 
-      begin
-        # Temporarily unset MAILER_HOST
-        ENV['MAILER_HOST'] = nil
+    resolved = mailer.send(:resolve_template_locale, recipient: recipient)
 
-        # Create a mailer instance and directly test the set_default_host_url method
-        mailer = ApplicationMailer.new
-        mailer.send(:set_default_host_url)
-
-        # Verify the host URL is set to the default Heroku URL
-        assert_equal 'morning-dawn-84330-f594822dd77d.herokuapp.com', mailer.instance_variable_get(:@host_url)
-      ensure
-        # Restore the original MAILER_HOST value
-        ENV['MAILER_HOST'] = original_host
-      end
-    end
+    assert_equal 'es', resolved
   end
 
-  test 'host_url is set correctly in production with MAILER_HOST' do
-    Rails.stub :env, ActiveSupport::StringInquirer.new('production') do
-      # Store the original MAILER_HOST value
-      original_host = ENV.fetch('MAILER_HOST', nil)
-
-      begin
-        # Set a test MAILER_HOST value
-        ENV['MAILER_HOST'] = 'test-host.example.com'
-
-        # Create a mailer instance and directly test the set_default_host_url method
-        mailer = ApplicationMailer.new
-        mailer.send(:set_default_host_url)
-
-        # Verify the host URL is set to the MAILER_HOST value
-        assert_equal 'test-host.example.com', mailer.instance_variable_get(:@host_url)
-      ensure
-        # Restore the original MAILER_HOST value
-        ENV['MAILER_HOST'] = original_host
+  test 'resolve_template_locale prefers recipient effective_locale when present' do
+    recipient = Struct.new(:locale) do
+      def effective_locale
+        'es-MX'
       end
+    end.new('en')
+    mailer = ApplicationMailer.new
+
+    resolved = mailer.send(:resolve_template_locale, recipient: recipient)
+
+    assert_equal 'es', resolved
+  end
+
+  test 'resolve_template_locale falls back to default locale instead of ambient i18n locale' do
+    mailer = ApplicationMailer.new
+
+    I18n.with_locale(:es) do
+      resolved = mailer.send(:resolve_template_locale)
+      assert_equal I18n.default_locale.to_s, resolved
     end
   end
 end

@@ -1,5 +1,4 @@
 import { Controller } from "@hotwired/stimulus"
-import { applyTargetSafety } from "../../mixins/target_safety"
 import { setVisible } from "../../utils/visibility"
 
 /**
@@ -12,29 +11,52 @@ class DocumentProofHandlerController extends Controller {
   static targets = [
     "acceptRadio",
     "rejectRadio",
+    "noneButton",
     "uploadSection",
     "rejectionSection",
     "fileInput",
     "rejectionReasonSelect",
-    "rejectionNotes",
-    "reasonPreview"
+    "reasonPreview",
+    "languageNotice",
+    "customReasonSection",
+    "customReasonField"
   ]
 
   static values = {
-    proofType: String // "income_proof" or "residency_proof"
+    type: String // "income" or "residency"
   }
 
   connect() {
+    // Restore state from form data if rejection fields have values
+    this.restoreStateFromFormData();
+    
     // Set initial state based on selected radio button
     this.updateVisibility();
     
-    // Add event listener for rejection reason selection
-    this.withTarget('rejectionReasonSelect', (target) => {
-      target.addEventListener('change', () => {
-        this.previewRejectionReason();
-        this.populateRejectionNotes();
-      });
-    });
+    // Initialize rejection UI state if rejection is selected
+    if (this.hasRejectRadioTarget && this.rejectRadioTarget.checked) {
+      this.previewRejectionReason();
+      this.updateReasonInputMode();
+    }
+  }
+
+  /**
+   * Restore the UI state based on which radio button is checked
+   * This handles cases where the form is re-rendered after validation errors
+   */
+  restoreStateFromFormData() {
+    if (!this.hasAcceptRadioTarget || !this.hasRejectRadioTarget) {
+      return;
+    }
+
+    // Check which radio button is currently selected and show the correct fields
+    const isAccepted = this.acceptRadioTarget.checked;
+    const isRejected = this.rejectRadioTarget.checked;
+
+    if (isAccepted || isRejected) {
+      // Radio button state is already set, just update visibility
+      this.updateVisibility();
+    }
   }
 
   /**
@@ -47,128 +69,140 @@ class DocumentProofHandlerController extends Controller {
   }
 
   /**
+   * Handle "None Provided" button click
+   * UX shortcut that automatically selects reject + none_provided reason
+   * @param {Event} event The click event from the none button
+   */
+  handleNoneProvided(event) {
+    if (!this.hasRejectRadioTarget || !this.hasRejectionReasonSelectTarget) {
+      return;
+    }
+
+    // Programmatically select the reject radio button
+    this.rejectRadioTarget.checked = true;
+
+    // Auto-select "none_provided" from rejection reason dropdown
+    this.rejectionReasonSelectTarget.value = 'none_provided';
+
+    // Update visibility and reason mode
+    this.updateVisibility();
+    this.previewRejectionReason();
+    this.updateReasonInputMode();
+  }
+
+  /**
    * Update the visibility of upload or rejection sections
    * based on the selected radio
    */
   updateVisibility() {
-    if (!this.hasRequiredTargets('acceptRadio', 'uploadSection', 'rejectionSection')) {
+    if (!this.hasAcceptRadioTarget || !this.hasUploadSectionTarget || !this.hasRejectionSectionTarget) {
       return;
     }
 
     const isAccepted = this.acceptRadioTarget.checked;
-    
+    const isRejected = this.rejectRadioTarget.checked;
+  
     // Toggle visibility of sections using utility
+    // Note: display:none automatically removes elements from accessibility tree
     setVisible(this.uploadSectionTarget, isAccepted);
-    setVisible(this.rejectionSectionTarget, !isAccepted);
+    setVisible(this.rejectionSectionTarget, isRejected);
     
     // Toggle file input enabled state
-    this.withTarget('fileInput', (target) => {
+    // Note: We don't set 'required' attribute to allow server-side validation to handle missing files
+    if (this.hasFileInputTarget) {
+      const target = this.fileInputTarget;
       target.disabled = !isAccepted;
 
-      // Clear file when switching to reject
-      if (!isAccepted && target.value) {
-        target.value = '';
+      if (!isAccepted) {
+        // Clear file when switching to reject
+        if (target.value) {
+          target.value = '';
+        }
       }
-    });
+    }
 
     // Toggle required attributes on fields
-    this.withTarget('rejectionReasonSelect', (target) => {
+    if (this.hasRejectionReasonSelectTarget) {
+      const target = this.rejectionReasonSelectTarget;
       if (isAccepted) {
         target.removeAttribute('required');
       } else {
         target.setAttribute('required', 'required');
       }
-    });
+    }
 
-    this.withTarget('rejectionNotes', (target) => {
-      if (isAccepted) {
-        target.removeAttribute('required');
-      }
-      // If rejectionNotes should be required when rejecting, add:
-      // else { target.setAttribute('required', 'required'); }
-    });
+    if (isRejected) {
+      this.previewRejectionReason();
+      this.updateReasonInputMode();
+    } else {
+      this._hideCustomReasonAndNotice();
+    }
+  }
+
+  disconnect() {}
+
+  handleReasonSelectionChanged() {
+    this.previewRejectionReason();
+    this.updateReasonInputMode();
   }
 
   /**
-   * Preview the rejection reason text
+   * Preview the rejection reason text.
+   * Reads the human-readable body from the selected option's data-reason-text attribute,
+   * which is populated server-side from the RejectionReason DB records.
    */
   previewRejectionReason() {
-    this.withTarget('reasonPreview', (previewTarget) => {
-      this.withTarget('rejectionReasonSelect', (selectTarget) => {
-        const selectedReason = selectTarget.value;
+    if (!this.hasReasonPreviewTarget || !this.hasRejectionReasonSelectTarget) return
 
-        if (selectedReason) {
-          // In a real app, we'd use I18n or data attributes to get formatted reason text
-          previewTarget.textContent = this.formatRejectionReason(selectedReason);
-          setVisible(previewTarget, true);
-        } else {
-          setVisible(previewTarget, false);
-        }
-      });
-    });
-  }
-  
-  /**
-   * Format a rejection reason code into human-readable text
-   * @param {string} reasonCode The rejection reason code
-   * @returns {string} Formatted reason text
-   */
-  formatRejectionReason(reasonCode) {
-    // This would typically come from Rails I18n
-    const reasonMessages = {
-      'address_mismatch': 'The address on the document does not match the application address.',
-      'expired': 'The document has expired or is not within the required date range.',
-      'missing_name': 'The document does not clearly show the applicant\'s name.',
-      'wrong_document': 'This is not an acceptable document type for this proof.',
-      'missing_amount': 'The income amount is not clearly visible on the document.',
-      'exceeds_threshold': 'The income shown exceeds the program\'s threshold.',
-      'outdated_ss_award': 'The Social Security award letter is from a previous year.',
-      'other': 'There is an issue with this document. Please see notes for details.'
-    };
-    
-    return reasonMessages[reasonCode] || 'This document was rejected. Please provide a valid document.';
+    const selectTarget = this.rejectionReasonSelectTarget
+    const previewTarget = this.reasonPreviewTarget
+    const selectedOption = selectTarget.options[selectTarget.selectedIndex]
+    const reasonText = selectedOption?.dataset.reasonText
+
+    if (reasonText) {
+      previewTarget.textContent = reasonText
+      setVisible(previewTarget, true)
+    } else {
+      setVisible(previewTarget, false)
+    }
   }
 
-  /**
-   * Populate the rejection notes field with appropriate text based on selected reason
-   */
-  populateRejectionNotes() {
-    this.withTarget('rejectionNotes', (notesTarget) => {
-      this.withTarget('rejectionReasonSelect', (selectTarget) => {
-        const selectedReason = selectTarget.value;
-        
-        if (selectedReason && !notesTarget.value) {
-          // Only populate if the field is empty
-          const reasonText = this.formatRejectionReason(selectedReason);
-          const instructionalText = this.getInstructionalText(selectedReason);
-          notesTarget.value = `${reasonText} ${instructionalText}`;
-        }
-      });
-    });
+  updateReasonInputMode() {
+    if (!this.hasRejectionReasonSelectTarget) return
+
+    const isOther = this.rejectionReasonSelectTarget.value === 'other'
+
+    if (this.hasLanguageNoticeTarget) {
+      setVisible(this.languageNoticeTarget, isOther)
+    }
+
+    if (this.hasCustomReasonSectionTarget) {
+      setVisible(this.customReasonSectionTarget, isOther)
+    }
+    if (this.hasCustomReasonFieldTarget) {
+      this.customReasonFieldTarget.disabled = !isOther
+      if (isOther) {
+        this.customReasonFieldTarget.setAttribute('required', 'required')
+      } else {
+        this.customReasonFieldTarget.removeAttribute('required')
+        this.customReasonFieldTarget.value = ''
+      }
+    }
   }
 
-  /**
-   * Get instructional text for rejection reasons
-   * @param {string} reasonCode The rejection reason code
-   * @returns {string} Instructional text
-   */
-  getInstructionalText(reasonCode) {
-    const instructions = {
-      'address_mismatch': 'Please provide a document that shows your current address.',
-      'expired': 'Please provide a current document that is not expired.',
-      'missing_name': 'Please provide a document that clearly shows your name.',
-      'wrong_document': 'Please provide an acceptable document type for this proof.',
-      'missing_amount': 'Please provide a document that clearly shows the income amount.',
-      'exceeds_threshold': 'Unfortunately, your income exceeds the program eligibility threshold.',
-      'outdated_ss_award': 'Please provide your most recent Social Security award letter.',
-      'other': 'Please contact us for more information about the required documentation.'
-    };
-    
-    return instructions[reasonCode] || 'Please provide the required documentation.';
+  _hideCustomReasonAndNotice() {
+    if (this.hasLanguageNoticeTarget) {
+      setVisible(this.languageNoticeTarget, false)
+    }
+    if (this.hasCustomReasonSectionTarget) {
+      setVisible(this.customReasonSectionTarget, false)
+    }
+    if (this.hasCustomReasonFieldTarget) {
+      this.customReasonFieldTarget.removeAttribute('required')
+      this.customReasonFieldTarget.disabled = true
+      this.customReasonFieldTarget.value = ''
+    }
   }
 }
-
-// Apply target safety mixin
-applyTargetSafety(DocumentProofHandlerController)
 
 export default DocumentProofHandlerController

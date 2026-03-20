@@ -54,6 +54,12 @@ module ApplicationDataLoading
                .order(created_at: :desc)
                .load
 
+    # Load application notes with admin and assigned_to to avoid N+1
+    ApplicationNote.where(application_id: application.id)
+                   .includes(:admin, :assigned_to)
+                   .recent_first
+                   .load
+
     # Access user if needed (for caching, if necessary)
     User.find_by(id: application.user_id) if application.user_id.present?
 
@@ -131,20 +137,36 @@ module ApplicationDataLoading
   end
 
   # Build a base scope for application queries with common includes
-  # @param exclude_statuses [Array<Symbol>] Statuses to exclude (default: [:rejected, :archived])
+  # @param exclude_statuses [Array<Symbol>] Statuses to exclude (default: [:draft, :rejected, :archived])
   # @return [ActiveRecord::Relation] The base scope
-  def build_application_base_scope(exclude_statuses: %i[rejected archived])
-    scope = Application.includes(:user, :managing_guardian).distinct
+  #
+  # Usage:
+  #   # Default behavior: exclude drafts, rejected, archived
+  #   build_application_base_scope
+  #
+  #   # Include drafts by removing from exclusions
+  #   build_application_base_scope(exclude_statuses: [:rejected, :archived])
+  #
+  #   # Custom exclusion list
+  #   build_application_base_scope(exclude_statuses: [:rejected])
+  def build_application_base_scope(exclude_statuses: %i[draft rejected archived])
+    scope = Application.includes(
+      :user,
+      :managing_guardian,
+      # Preload guardian_relationships to avoid N+1 when checking relationships in views
+      user: :guardian_relationships_as_dependent
+    )
 
     scope = scope.where.not(status: exclude_statuses) if exclude_statuses.any?
 
-    scope
+    # Default ordering: most recent applications first
+    scope.order(application_date: :desc, id: :desc)
   end
 
   # Load notifications for an application with specific actions
   # @param application [Application] The application
   # @param actions [Array<String>] Notification actions to load
-  # @return [Array<NotificationDecorator>] Decorated notifications
+  # @return [ActiveRecord::Relation] Notifications
   def load_application_notifications(application, actions: nil)
     actions ||= %w[
       medical_certification_requested medical_certification_received
@@ -158,7 +180,6 @@ module ApplicationDataLoading
       .where(notifiable_type: 'Application', notifiable_id: application.id)
       .where(action: actions)
       .order(created_at: :desc)
-      .map { |n| NotificationDecorator.new(n) }
   end
 
   # Load application events with specific actions

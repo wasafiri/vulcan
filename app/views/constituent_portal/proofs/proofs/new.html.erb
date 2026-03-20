@@ -33,7 +33,7 @@
                   <% if @proof_type == 'income' %>
                     Your income proof document should clearly show your name, date, and income details. Acceptable documents include: tax returns, current year SSA award letters, recent bank statements showing SSA deposits, current unexpired SSA/SSI/SSDI documentation, current unexpired Medicaid/SNAP award letters, or current unexpired VA Benefits letters.
                   <% else %>
-                    Your residency proof document should clearly show your name and current address. Acceptable documents include: driver's license, state ID, identification card, utility bill, lease agreement, or patient photo ID.
+                    Your residency proof document should clearly show your name and current address. Acceptable documents include: driver's license, state ID, identification card, utility bill, lease agreement, or photo ID.
                   <% end %>
                 </p>
               </div>
@@ -128,7 +128,7 @@
                 <li>Is clearly legible</li>
                 <li>Shows all required information</li>
               </ul>
-              <p class="mt-3">For additional assistance, please contact our support team at <a href="mailto:support@example.com" class="text-indigo-600 hover:text-indigo-900">support@example.com</a> or call (555) 123-4567.</p>
+              <p class="mt-3">For additional assistance, please contact our team at <a href="mailto:<%= Policy.get('support_email') || 'mat.program1@maryland.gov' %>" class="text-indigo-600 hover:text-indigo-900"><%= Policy.get('support_email') || 'mat.program1@maryland.gov' %></a> or call (555) 123-4567.</p>
             </div>
           </details>
         </div>

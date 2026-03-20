@@ -5,100 +5,65 @@ require 'application_system_test_case'
 module AdminTests
   class GuardianProofReviewTest < ApplicationSystemTestCase
     setup do
-      # Force a clean browser session for each test
-      Capybara.reset_sessions!
-
       @admin = create(:admin)
       @application = create(:application, :in_progress_with_pending_proofs, :submitted_by_guardian, :old_enough_for_new_application)
-
       # Don't sign in during setup - let each test handle its own authentication
-      # This ensures each test starts with a clean authentication state
     end
 
     teardown do
-      # Ensure any open modals are closed
-      begin
-        if has_selector?('#incomeProofReviewModal', visible: true)
-          within('#incomeProofReviewModal') do
-            click_button 'Close' if has_button?('Close')
-          end
-        end
-
-        if has_selector?('#residencyProofReviewModal', visible: true)
-          within('#residencyProofReviewModal') do
-            click_button 'Close' if has_button?('Close')
-          end
-        end
-      rescue Ferrum::NodeNotFoundError, Ferrum::DeadBrowserError
-        # Browser might be in a bad state, reset it
-        Capybara.reset_sessions!
-      end
-
-      # Always ensure clean session state between tests
+      # Simple teardown: just reset sessions
+      # Don't try to interact with modals during teardown - it can cause hangs
+      # Capybara.reset_sessions! will close all dialogs automatically
       Capybara.reset_sessions!
     end
 
     test 'displays guardian alert in income proof review modal' do
       # Always sign in fresh for each test
       system_test_sign_in(@admin)
-      visit admin_application_path(@application)
-
-      # Wait for page to load completely
-      assert_selector 'html', wait: 30
-      assert_selector 'h1', text: 'Application', wait: 20
+      visit_admin_application_with_retry(@application, user: @admin)
+      # Wait for page to load with resilient assertion
+      assert_text(/Application Details|Application #/i, wait: 30)
 
       # Use intelligent waiting - assert_selector will wait automatically
       assert_selector '#attachments-section', wait: 15
       assert_selector '#attachments-section', text: 'Income Proof'
       assert_selector '#attachments-section', text: 'Residency Proof'
 
-      # Open the income proof review modal
-      within '#attachments-section' do
-        # Find the specific button for income proof with explicit wait
-        assert_selector('button[data-modal-id="incomeProofReviewModal"]', wait: 15)
-        find('button[data-modal-id="incomeProofReviewModal"]', wait: 15).click
-      end
+      # Open the income proof review modal using the stable helper method
+      click_review_proof_and_wait('income', timeout: 15)
 
-      # Verify the guardian alert is displayed - use have_content for intelligent waiting
-      within '#incomeProofReviewModal' do
-        assert_content 'Guardian Application'
-        assert_content 'This application was submitted by a Guardian User (parent) on behalf of a dependent'
-        assert_content 'Please verify this relationship when reviewing these proof documents'
+      # Verify the guardian alert is displayed using resilient checks
+      assert_selector '#incomeProofReviewModal', text: 'Guardian Application', wait: 15
+      assert_selector '#incomeProofReviewModal', text: 'This application was submitted by a Guardian User (parent) on behalf of a dependent', wait: 15
+      assert_selector '#incomeProofReviewModal', text: 'Please verify this relationship when reviewing these proof documents', wait: 15
 
-        # Close the modal to prevent interference with subsequent tests
-        click_button 'Close'
+      within('#incomeProofReviewModal') do
+        find('button', text: 'Close', visible: :all, wait: 10).trigger('click')
       end
     end
 
     test 'displays guardian alert in residency proof review modal' do
       # Always sign in fresh for each test
       system_test_sign_in(@admin)
-      visit admin_application_path(@application)
-
-      # Wait for page to load completely
-      assert_selector 'html', wait: 20
-      assert_selector 'h1', text: 'Application', wait: 15
+      visit_admin_application_with_retry(@application, user: @admin)
+      # Wait for page to load with resilient assertion
+      assert_text(/Application Details|Application #/i, wait: 30)
 
       # Use intelligent waiting - assert_selector will wait automatically
       assert_selector '#attachments-section', wait: 15
       assert_selector '#attachments-section', text: 'Income Proof'
       assert_selector '#attachments-section', text: 'Residency Proof'
 
-      # Open the residency proof review modal
-      within '#attachments-section' do
-        # Find the specific button for residency proof with explicit wait
-        assert_selector('button[data-modal-id="residencyProofReviewModal"]', wait: 15)
-        find('button[data-modal-id="residencyProofReviewModal"]', wait: 10).click
-      end
+      # Open the residency proof review modal using the stable helper method
+      click_review_proof_and_wait('residency', timeout: 15)
 
-      # Verify the guardian alert is displayed - use have_content for intelligent waiting
-      within '#residencyProofReviewModal' do
-        assert_content 'Guardian Application'
-        assert_content 'This application was submitted by a Guardian User (parent) on behalf of a dependent'
-        assert_content 'Please verify this relationship when reviewing these proof documents'
+      # Verify the guardian alert is displayed using resilient checks
+      assert_selector '#residencyProofReviewModal', text: 'Guardian Application', wait: 15
+      assert_selector '#residencyProofReviewModal', text: 'This application was submitted by a Guardian User (parent) on behalf of a dependent', wait: 15
+      assert_selector '#residencyProofReviewModal', text: 'Please verify this relationship when reviewing these proof documents', wait: 15
 
-        # Close the modal to prevent interference with subsequent tests
-        click_button 'Close'
+      within('#residencyProofReviewModal') do
+        find('button', text: 'Close', visible: :all, wait: 10).trigger('click')
       end
     end
 
@@ -135,29 +100,23 @@ module AdminTests
       # Ensure proofs are properly saved and processed
       regular_application.reload
 
-      visit admin_application_path(regular_application)
+      visit_admin_application_with_retry(regular_application, user: @admin)
+      # Wait for page to load with resilient assertion
+      assert_text(/Application Details|Application #/i, wait: 30)
 
-      # Wait for basic page structure first
-      assert_selector 'html', wait: 15
-      assert_selector 'h1', text: 'Application', wait: 15
-
-      # Use intelligent waiting - assert_selector will wait automatically
+      # Use intelligent waiting - assert_selector will wait
       assert_selector '#attachments-section', wait: 15
       assert_selector '#attachments-section', text: 'Income Proof'
       assert_selector '#attachments-section', text: 'Residency Proof'
 
       # Open the income proof review modal
-      within '#attachments-section' do
-        # Use assert_selector first to wait for element, then find fresh reference
-        assert_selector('button[data-modal-id="incomeProofReviewModal"]', wait: 10)
-        find('button[data-modal-id="incomeProofReviewModal"]', wait: 5).click
-      end
+      click_review_proof_and_wait('income', timeout: 15)
 
-      # Verify the guardian alert is not displayed - use has_no_content for intelligent waiting
+      # Verify the guardian alert is not displayed
       within '#incomeProofReviewModal' do
-        assert_no_content 'Guardian Application'
-        assert_no_content 'This application was submitted by a'
-        assert_no_content 'on behalf of a minor'
+        assert_no_text 'Guardian Application'
+        assert_no_text 'This application was submitted by a'
+        assert_no_text 'on behalf of a minor'
       end
 
       # Close the modal
@@ -166,17 +125,13 @@ module AdminTests
       end
 
       # Open the residency proof review modal
-      within '#attachments-section' do
-        # Use assert_selector first to wait for element, then find fresh reference
-        assert_selector('button[data-modal-id="residencyProofReviewModal"]', wait: 10)
-        find('button[data-modal-id="residencyProofReviewModal"]', wait: 5).click
-      end
+      click_review_proof_and_wait('residency', timeout: 15)
 
       # Verify the guardian alert is not displayed
       within '#residencyProofReviewModal' do
-        assert_no_content 'Guardian Application'
-        assert_no_content 'This application was submitted by a'
-        assert_no_content 'on behalf of a minor'
+        assert_no_text 'Guardian Application'
+        assert_no_text 'This application was submitted by a'
+        assert_no_text 'on behalf of a minor'
       end
     end
   end

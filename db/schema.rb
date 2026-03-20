@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_07_28_215349) do
+ActiveRecord::Schema[8.0].define(version: 2026_03_17_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -63,8 +63,12 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_28_215349) do
     t.boolean "internal_only", default: true
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "assigned_to_id"
+    t.datetime "completed_at"
     t.index ["admin_id"], name: "index_application_notes_on_admin_id"
     t.index ["application_id"], name: "index_application_notes_on_application_id"
+    t.index ["assigned_to_id"], name: "index_application_notes_on_assigned_to_id"
+    t.index ["completed_at"], name: "index_application_notes_on_completed_at"
   end
 
   create_table "application_status_changes", force: :cascade do |t|
@@ -116,7 +120,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_28_215349) do
     t.integer "medical_certification_status", default: 0, null: false
     t.datetime "medical_certification_verified_at"
     t.bigint "medical_certification_verified_by_id"
-    t.text "medical_certification_rejection_reason"
     t.datetime "medical_certification_requested_at"
     t.integer "medical_certification_request_count", default: 0
     t.string "last_visited_step"
@@ -126,6 +129,18 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_28_215349) do
     t.string "alternate_contact_email"
     t.integer "income_proof_status", default: 0, null: false
     t.integer "residency_proof_status", default: 0, null: false
+    t.integer "document_signing_status", default: 0, null: false
+    t.string "document_signing_service"
+    t.string "document_signing_submission_id"
+    t.string "document_signing_submitter_id"
+    t.datetime "document_signing_requested_at"
+    t.datetime "document_signing_signed_at"
+    t.integer "document_signing_request_count", default: 0, null: false
+    t.text "document_signing_audit_url"
+    t.text "document_signing_document_url"
+    t.index ["document_signing_service"], name: "index_applications_on_document_signing_service"
+    t.index ["document_signing_status"], name: "index_applications_on_document_signing_status"
+    t.index ["document_signing_submission_id"], name: "index_applications_on_document_signing_submission_id"
     t.index ["income_proof_status"], name: "idx_applications_on_income_proof_status"
     t.index ["income_verified_by_id"], name: "index_applications_on_income_verified_by_id"
     t.index ["last_proof_submitted_at"], name: "index_applications_on_last_proof_submitted_at"
@@ -153,7 +168,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_28_215349) do
     t.string "name", null: false
     t.string "subject"
     t.text "body"
-    t.text "variables", default: [], array: true
+    t.jsonb "variables", default: {}
     t.bigint "updated_by_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -162,7 +177,11 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_28_215349) do
     t.integer "version", default: 1
     t.string "previous_subject"
     t.text "previous_body"
-    t.index ["name"], name: "index_email_templates_on_name", unique: true
+    t.boolean "enabled", default: true, null: false
+    t.string "locale", default: "en", null: false
+    t.boolean "needs_sync", default: false, null: false
+    t.index ["enabled"], name: "index_email_templates_on_enabled"
+    t.index ["name", "format", "locale"], name: "index_email_templates_on_name_format_locale", unique: true
     t.index ["updated_by_id"], name: "index_email_templates_on_updated_by_id"
   end
 
@@ -204,9 +223,18 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_28_215349) do
     t.jsonb "metadata", default: {}, null: false
     t.string "auditable_type"
     t.bigint "auditable_id"
+    t.index ["action", "auditable_type", "auditable_id"], name: "index_events_on_action_and_auditable"
     t.index ["auditable_type", "auditable_id"], name: "index_events_on_auditable"
     t.index ["metadata"], name: "index_events_on_metadata", using: :gin
     t.index ["user_id"], name: "index_events_on_user_id"
+  end
+
+  create_table "feature_flags", force: :cascade do |t|
+    t.string "name", null: false
+    t.boolean "enabled", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_feature_flags_on_name", unique: true
   end
 
   create_table "guardian_relationships", force: :cascade do |t|
@@ -256,23 +284,21 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_28_215349) do
 
   create_table "notifications", force: :cascade do |t|
     t.bigint "recipient_id", null: false
-    t.bigint "actor_id", null: false
+    t.bigint "actor_id"
     t.string "action"
     t.datetime "read_at"
     t.jsonb "metadata"
     t.string "notifiable_type", null: false
-    t.bigint "notifiable_id", null: false
+    t.bigint "notifiable_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "message_id"
     t.string "delivery_status"
     t.datetime "delivered_at"
     t.datetime "opened_at"
-    t.boolean "created_by_service", default: false, null: false
     t.boolean "audited", default: false, null: false
     t.index ["actor_id"], name: "index_notifications_on_actor_id"
     t.index ["audited"], name: "index_notifications_on_audited"
-    t.index ["created_by_service"], name: "index_notifications_on_created_by_service"
     t.index ["message_id"], name: "index_notifications_on_message_id"
     t.index ["notifiable_type", "notifiable_id"], name: "index_notifications_on_notifiable"
     t.index ["recipient_id"], name: "index_notifications_on_recipient_id"
@@ -309,7 +335,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_28_215349) do
     t.index ["admin_id"], name: "index_print_queue_items_on_admin_id"
     t.index ["application_id"], name: "index_print_queue_items_on_application_id"
     t.index ["constituent_id"], name: "index_print_queue_items_on_constituent_id"
-    t.check_constraint "letter_type >= 0 AND letter_type <= 10", name: "check_print_queue_items_on_letter_type"
+    t.check_constraint "letter_type >= 0 AND letter_type <= 11", name: "check_print_queue_items_on_letter_type"
   end
 
   create_table "products", force: :cascade do |t|
@@ -346,11 +372,13 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_28_215349) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.text "notes"
+    t.string "rejection_reason_code"
     t.index ["admin_id", "created_at"], name: "index_proof_reviews_on_admin_id_and_created_at"
     t.index ["admin_id"], name: "index_proof_reviews_on_admin_id"
     t.index ["application_id", "proof_type", "created_at"], name: "idx_on_application_id_proof_type_created_at_4b8ffa7c5f"
     t.index ["application_id", "proof_type", "status"], name: "idx_on_application_id_proof_type_status_78cb268d0d"
     t.index ["application_id"], name: "index_proof_reviews_on_application_id"
+    t.index ["rejection_reason_code"], name: "index_proof_reviews_on_rejection_reason_code"
     t.index ["reviewed_at"], name: "index_proof_reviews_on_reviewed_at"
     t.index ["status"], name: "index_proof_reviews_on_status"
   end
@@ -366,6 +394,21 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_28_215349) do
     t.datetime "resolved_at"
     t.integer "resolved_by_id"
     t.index ["user_id"], name: "index_recovery_requests_on_user_id"
+  end
+
+  create_table "rejection_reasons", force: :cascade do |t|
+    t.string "code", null: false
+    t.string "proof_type", null: false
+    t.string "locale", default: "en", null: false
+    t.text "body", null: false
+    t.boolean "needs_sync", default: false, null: false
+    t.integer "version", default: 1, null: false
+    t.text "previous_body"
+    t.bigint "updated_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["code", "proof_type", "locale"], name: "index_rejection_reasons_on_code_proof_type_locale", unique: true
+    t.index ["updated_by_id"], name: "index_rejection_reasons_on_updated_by_id"
   end
 
   create_table "role_capabilities", force: :cascade do |t|
@@ -623,6 +666,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_28_215349) do
     t.string "dependent_email", comment: "Optional email for dependents; if blank, uses guardian email"
     t.string "dependent_phone", comment: "Optional phone for dependents; if blank, uses guardian phone"
     t.integer "vendor_authorization_status"
+    t.string "referral_source"
     t.index ["business_name"], name: "index_users_on_business_name"
     t.index ["business_tax_id"], name: "index_users_on_business_tax_id"
     t.index ["dependent_email"], name: "index_users_on_dependent_email"
@@ -730,6 +774,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_28_215349) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "application_notes", "applications"
   add_foreign_key "application_notes", "users", column: "admin_id"
+  add_foreign_key "application_notes", "users", column: "assigned_to_id"
   add_foreign_key "application_status_changes", "applications"
   add_foreign_key "application_status_changes", "users"
   add_foreign_key "applications", "users"

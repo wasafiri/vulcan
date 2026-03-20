@@ -28,9 +28,10 @@ class MedicalCertificationMailbox < ApplicationMailbox
   private
 
   def create_audit_record
-    Event.create!(
-      user: application.constituent,
+    AuditEventService.log(
+      actor: application.constituent,
       action: 'medical_certification_received',
+      auditable: application,
       metadata: {
         application_id: application.id,
         medical_provider_id: medical_provider.id,
@@ -73,9 +74,10 @@ class MedicalCertificationMailbox < ApplicationMailbox
 
   def notify_admin
     # Notify admin of new certification submission
-    Event.create!(
-      user: application.constituent,
+    AuditEventService.log(
+      actor: application.constituent,
       action: 'medical_certification_received',
+      auditable: application,
       metadata: {
         application_id: application.id,
         medical_provider_id: medical_provider.id,
@@ -143,10 +145,11 @@ class MedicalCertificationMailbox < ApplicationMailbox
 
   def bounce_with_notification(error_type, message)
     # Use System User if constituent isn't available (e.g., bounced before application lookup)
-    event_user = application&.constituent || User.system_user
-    Event.create!(
-      user: event_user,
+    event_user = application&.user || User.system_user
+    AuditEventService.log(
+      actor: event_user,
       action: "medical_certification_#{error_type}",
+      auditable: application,
       metadata: {
         application_id: application&.id,
         medical_provider_id: medical_provider&.id,
@@ -169,14 +172,20 @@ class MedicalCertificationMailbox < ApplicationMailbox
   end
 
   def medical_provider
-    @medical_provider ||= MedicalProvider.find_by(email: mail.from.first)
+    return @medical_provider if defined?(@medical_provider)
+
+    @medical_provider = MedicalProvider.find_by(email: mail.from.first)
   end
 
   def application
     # Extract application ID from the email subject or body
     # This assumes you include an application ID in the original request email
     application_id = extract_application_id_from_email
-    @application ||= Application.find_by(id: application_id)
+    if defined?(@application)
+      @application
+    else
+      @application = Application.find_by(id: application_id)
+    end
   end
 
   def extract_application_id_from_email

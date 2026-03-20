@@ -7,25 +7,6 @@ import { FetchRequest } from "@rails/request.js"
 export class RailsRequestService {
   constructor() {
     this.activeRequests = new Map()
-    this.setupUnhandledRejectionHandler()
-  }
-
-  /**
-   * Set up global handler to catch specific @rails/request.js errors that escape try/catch blocks
-   */
-  setupUnhandledRejectionHandler() {
-    if (typeof window !== 'undefined') {
-      window.addEventListener('unhandledrejection', (event) => {
-        const error = event.reason
-        // Check if this is the specific @rails/request.js error we want to suppress
-        if (error && error.message && error.message.includes('Expected a JSON response but got "text/html" instead')) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.debug('RailsRequestService: Suppressed unhandled @rails/request.js JSON parsing error')
-          }
-          event.preventDefault() // Prevent the error from being logged to console
-        }
-      })
-    }
   }
 
   /**
@@ -208,16 +189,12 @@ export class RailsRequestService {
    * @param {string} type - Message type (success, error, warning, info)
    */
   tryShowFlash(message, type = 'error') {
-    if (window.AppNotifications && typeof window.AppNotifications.show === 'function') {
-      window.AppNotifications.show(message, type);
-      return true;
-    } else {
-      // Fallback to console if AppNotifications is not available (e.g., during development or if not loaded)
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('AppNotifications service not available to show flash message:', message, type);
-      }
-      return false;
+    // With native Rails flash, rely on server-side flash rendering or Turbo Streams.
+    // Client-side fallback stays as a no-op except for dev logging.
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('RailsRequestService.tryShowFlash noop (server-rendered flash expected):', message, type)
     }
+    return false
   }
 
   /**
@@ -256,3 +233,15 @@ export class RequestError extends Error {
 
 // Export singleton instance
 export const railsRequest = new RailsRequestService()
+
+// Development-time guard to prevent HTML requests via railsRequest
+if (process.env.NODE_ENV !== 'production') {
+  const originalPerform = railsRequest.perform.bind(railsRequest)
+  railsRequest.perform = async (opts = {}) => {
+    const accept = (opts.headers && opts.headers.Accept) || ""
+    if (/html/.test(accept)) {
+      throw new Error("Use Turbo frames/streams for HTML, not railsRequest. This service is for JSON APIs only.")
+    }
+    return originalPerform(opts)
+  }
+}

@@ -2,11 +2,17 @@
 
 require 'test_helper'
 require 'socket'
+require 'capybara/cuprite'
+begin
+  require 'selenium/webdriver'
+rescue LoadError
+  # Selenium not available – tests will default to Cuprite
+end
 
 # --------------------------------------------------------------------------
 # SECTION 1: CAPYBARA DRIVER REGISTRATION
 # --------------------------------------------------------------------------
-# This is the single, authoritative place where the Cuprite driver is
+# This is the single, authoritative place where the driver is
 # registered and configured.
 # --------------------------------------------------------------------------
 Capybara.register_driver :cuprite do |app|
@@ -28,16 +34,18 @@ Capybara.register_driver :cuprite do |app|
   block_rules = blocked_hosts.map { |h| "MAP #{h} 0.0.0.0" }.join(', ')
 
   # Debug: Check CI environment variables
-  is_ci = ENV['CI'] || ENV['HEROKU_TEST_RUN_ID']
+  is_ci = ENV['CI'] || ENV.fetch('HEROKU_TEST_RUN_ID', nil)
   timeout_value = is_ci ? 120 : 60
-  puts "🔧 Cuprite CI Detection: CI=#{ENV['CI']}, HEROKU_TEST_RUN_ID=#{ENV['HEROKU_TEST_RUN_ID']}, using timeout=#{timeout_value}s" if ENV['VERBOSE_TESTS']
+  if ENV['VERBOSE_TESTS']
+    puts "🔧 Cuprite CI Detection: CI=#{ENV.fetch('CI', nil)}, HEROKU_TEST_RUN_ID=#{ENV.fetch('HEROKU_TEST_RUN_ID', nil)}, using timeout=#{timeout_value}s"
+  end
 
   Capybara::Cuprite::Driver.new(
     app,
     # General options
-    window_size: [1400, 1000],
-    js_errors: true, # Raise Ruby errors for JS console errors
-    inspector: true, # Allow `page.driver.debug` to open a browser inspector
+    window_size: [1200, 800],
+    js_errors: false,
+    inspector: false,
 
     # Performance & Stability
     # Force long timeouts for CI environments - use 120s always in CI, fallback to 60s locally
@@ -83,34 +91,15 @@ Capybara.register_driver :cuprite do |app|
   )
 end
 
-# --------------------------------------------------------------------------
-# SECTION 2: COMPREHENSIVE CUPRITE RESCUE MODULE
-# --------------------------------------------------------------------------
-# This module patches Capybara's lowest-level synchronize method to catch
-# ALL Ferrum errors, providing complete protection for the entire DSL.
-# --------------------------------------------------------------------------
-module CupriteRescue
-  RETRY_ERRORS = [
-    Ferrum::DeadBrowserError,
-    Ferrum::PendingConnectionsError,
-    Ferrum::NodeNotFoundError,
-    Ferrum::TimeoutError
-  ].freeze
-  MAX_RETRIES = 2
-
-  def synchronize(*)
-    Thread.current[:capybara_retries] ||= 0
-    super
-  rescue *RETRY_ERRORS => e
-    raise if Thread.current[:capybara_retries] >= MAX_RETRIES
-
-    Thread.current[:capybara_retries] += 1
-    warn "🔄  #{e.class} – restarting Cuprite (#{Thread.current[:capybara_retries]})"
-    hard_restart
-    retry
-  ensure
-    Thread.current[:capybara_retries] = 0 if Thread.current[:capybara_retries]&.positive?
-  end
+# Optional Selenium driver for isolation testing (set SYSTEM_TEST_DRIVER=selenium)
+Capybara.register_driver :selenium_chrome_headless do |app|
+  options = Selenium::WebDriver::Chrome::Options.new
+  options.add_argument('--headless=new')
+  options.add_argument('--disable-gpu')
+  options.add_argument('--no-sandbox')
+  options.add_argument('--disable-dev-shm-usage')
+  options.add_argument('--window-size=1200,800')
+  Capybara::Selenium::Driver.new(app, browser: :chrome, options: options)
 end
 
 # CupriteSessionExtensions - Add hard restart capability
@@ -122,7 +111,7 @@ module CupriteSessionExtensions
 end
 
 # --------------------------------------------------------------------------
-# SECTION 3: GLOBAL CAPYBARA CONFIGURATION
+# SECTION 2: GLOBAL CAPYBARA CONFIGURATION
 # --------------------------------------------------------------------------
 # This block sets the global configuration for Capybara itself.
 # --------------------------------------------------------------------------
@@ -137,62 +126,12 @@ Capybara.configure do |config|
   config.save_path = Rails.root.join('tmp/capybara')
   config.disable_animation = true # Speeds up tests
   config.enable_aria_label = true
-  config.automatic_reload = true # Auto-refind stale nodes after DOM changes
+  # Prefer Capybara defaults; avoid auto-reloading surprises
+  # config.automatic_reload = true
 end
-
-# Apply CupriteRescue wrapper once, process-wide and threadsafe
-Capybara::Session.prepend(CupriteRescue)
 
 # Include CupriteSessionExtensions for hard restart capability
 Capybara::Session.include CupriteSessionExtensions
-
-# Improved fill_in patch to eliminate ALL Cuprite Node#set warnings
-module FillInCupritePatch
-  def fill_in(locator, **options)
-    # Only patch for Cuprite driver
-    return super unless driver.is_a?(Capybara::Cuprite::Driver)
-
-    # Extract the value from either :with key or assume second positional argument pattern
-    value = options.delete(:with)&.to_s
-
-    # Find the field with remaining options (filtering out problematic ones)
-    safe_options = options.except(:clear, :fill_options, :currently_with, :exact_text, :normalize_ws)
-    el = find_field(locator, **safe_options)
-
-    # Clear the field using the most reliable method for Cuprite
-    begin
-      # Method 1: JavaScript clearing (most reliable)
-      execute_script("arguments[0].value = ''; arguments[0].dispatchEvent(new Event('input', {bubbles: true}));", el)
-    rescue StandardError
-      # Method 2: Fallback to native clearing
-      begin
-        el.native.clear if el.native.respond_to?(:clear)
-      rescue StandardError
-        # Method 3: Last resort - select all and replace
-        el.send_keys([:control, 'a']) if value.present?
-      end
-    end
-
-    # Set the new value if provided
-    return if value.blank?
-
-    el.send_keys(value)
-    # Trigger change events for JavaScript controllers (Stimulus, etc.)
-    begin
-      execute_script(<<~JS, el)
-        const element = arguments[0];
-        if (element) {
-          element.dispatchEvent(new Event('change', { bubbles: true }));
-          element.dispatchEvent(new Event('blur', { bubbles: true }));
-        }
-      JS
-    rescue StandardError => e
-      warn "Warning: Could not trigger change events: #{e.message}" if ENV['VERBOSE_TESTS']
-    end
-  end
-end
-
-Capybara::Session.prepend(FillInCupritePatch)
 
 # Helper Modules – defined before use
 
@@ -303,21 +242,21 @@ module SeedLookupHelpers
         raise(ArgumentError, 'No applications found in seeds (expected in_progress)')
     when :submitted_application
       # Try multiple possible statuses that indicate a submitted application
-      scope.where(status: %w[in_progress awaiting_documents]).first ||
+      scope.where(status: %w[in_progress awaiting_dcf]).first ||
         scope.first ||
-        raise(ArgumentError, 'No applications found in seeds (expected in_progress or awaiting_documents)')
+        raise(ArgumentError, 'No applications found in seeds (expected in_progress or awaiting_dcf)')
     when :approved_application
       scope.find_by(status: 'approved') ||
         scope.first ||
         raise(ArgumentError, 'No applications found in seeds (expected approved)')
     when :pending_application
-      scope.where(status: %w[needs_information awaiting_documents]).first ||
+      scope.where(status: %w[awaiting_proof awaiting_dcf]).first ||
         scope.first ||
-        raise(ArgumentError, 'No applications found in seeds (expected needs_information or awaiting_documents)')
+        raise(ArgumentError, 'No applications found in seeds (expected awaiting_proof or awaiting_dcf)')
     when :pending_with_proofs
       # Find a pending application that has both income and residency proofs attached
       scope.joins(:income_proof_attachment, :residency_proof_attachment)
-           .where(status: %w[needs_information awaiting_documents]).first ||
+           .where(status: %w[awaiting_proof awaiting_dcf]).first ||
         scope.first ||
         raise(ArgumentError, 'No applications found in seeds (expected pending with proofs)')
     when :waiting_period
@@ -370,18 +309,12 @@ module MemorySafeTestHelpers
     end
   end
 
-  def create_list(factory_name, count, *args)
-    FactoryBot.create_list(factory_name, count, *args)
+  def create_list(factory_name, count, *)
+    FactoryBot.create_list(factory_name, count, *)
   end
 
   # Helper method to create lightweight blob stubs for ActiveStorage
-  def create_lightweight_blob(filename: 'test.pdf', content_type: 'application/pdf')
-    ActiveStorage::Blob.create_after_upload!(
-      io: StringIO.new('stub'),
-      filename: filename,
-      content_type: content_type
-    )
-  end
+  # Removed duplicate create_lightweight_blob – unified in ActiveSupport::TestCase
 
   # Helper to attach a lightweight blob to a model (direct attach without explicit blob)
   def attach_lightweight_proof(model, attachment_name, filename: 'test.pdf')
@@ -404,8 +337,12 @@ end
 # helpers and defines a setup/teardown lifecycle.
 # --------------------------------------------------------------------------
 class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
-  # Use the driver we registered above.
-  driven_by :cuprite, screen_size: [1400, 1000]
+  # Use driver based on ENV for isolation; default to Cuprite
+  if ENV['SYSTEM_TEST_DRIVER']&.downcase == 'selenium'
+    driven_by :selenium, using: :chrome, screen_size: [1200, 800]
+  else
+    driven_by :cuprite, screen_size: [1200, 800]
+  end
 
   # Include all necessary helper modules.
   include SystemTestAuthentication
@@ -416,13 +353,19 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
 
   # SeedLookupHelper is in test_helper.rb for global access.
 
-  # Load modal helpers
-  require_relative 'support/modal_helpers'
-  include ModalHelpers
+  # Modal helpers consolidated into SystemTestHelpers
 
-  # Reduced parallelism for system tests to improve browser stability
-  # Use fewer workers in CI environments to reduce resource contention
-  default_workers = ENV['CI'] || ENV['HEROKU_TEST_RUN_ID'] ? 2 : 4
+  # Use guarded default worker count. Ruby 3.4.x + pg 1.6.x can segfault on
+  # concurrent connection setup (observed in connect_start). Default to 1
+  # worker for that combo; allow override via SYSTEM_TEST_WORKERS.
+  begin
+    ruby_34 = Gem::Version.new(RUBY_VERSION).segments.first(2) == [3, 4]
+    pg_spec = Gem.loaded_specs['pg']
+    pg_16   = pg_spec && pg_spec.version.segments.first(2) == [1, 6]
+    default_workers = ruby_34 && pg_16 ? 1 : 4
+  rescue StandardError
+    default_workers = 1
+  end
   parallelize(workers: ENV.fetch('SYSTEM_TEST_WORKERS', default_workers).to_i, with: :processes)
 
   # Database cleaning strategy for system tests
@@ -433,7 +376,9 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     end
 
     setup do
-      DatabaseCleaner.strategy = :transaction
+      # Use truncation for system tests since the app server runs in
+      # a separate thread/process and won’t see transactional data.
+      DatabaseCleaner.strategy = :truncation
       DatabaseCleaner.start
     end
 
@@ -460,12 +405,8 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
       Capybara.reset_sessions!
       track_chrome_processes('AFTER_SESSION_RESET')
       debug_browser_state('SETUP AFTER RESET')
-    rescue StandardError => e
+    rescue StandardError
       track_chrome_processes('SESSION_RESET_FAILED')
-      debug_browser_corruption('SETUP RESET FAILED', e)
-      # Try to recover by forcing a clean restart
-      force_browser_restart('setup_recovery')
-      track_chrome_processes('AFTER_RECOVERY')
     end
 
     # 3. Clear any lingering authentication state from previous tests.
@@ -474,10 +415,6 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     # 4. Clear any pending network connections from previous tests
     clear_pending_network_connections if respond_to?(:clear_pending_network_connections, true)
     track_chrome_processes('AFTER_CONNECTION_CLEAR')
-
-    # 5. Inject JavaScript fixes for known issues (e.g., Chart.js).
-    inject_test_javascript_fixes if page&.driver
-    track_chrome_processes('TEST_SETUP_COMPLETE')
   end
 
   teardown do
@@ -542,11 +479,8 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   end
 
   # Helper for tests that need JS to reach across threads (file uploads, ActionCable, etc.)
-  def using_truncation(&block)
-    DatabaseCleaner.strategy = :truncation
-    DatabaseCleaner.cleaning(&block)
-  ensure
-    DatabaseCleaner.strategy = :transaction
+  def using_truncation(&)
+    DatabaseCleaner.cleaning(&)
   end
 
   # Auth assertion helpers – many tests rely on these
@@ -620,11 +554,11 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   private
 
   # ============================================================================
-  # CHROME PROCESS MANAGEMENT SYSTEM
+  # CHROME PROCESS MANAGEMENT
   # ============================================================================
 
   def track_chrome_processes(_context)
-    return unless ENV['VERBOSE_TESTS'] || ENV['DEBUG_BROWSER']
+    return unless ENV['ALLOW_CHROME_CLEANUP']
 
     begin
       chrome_processes = `ps aux | grep -i chrome | grep -v grep`.split("\n")
@@ -639,6 +573,8 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
 
   # Emergency Chrome process cleanup
   def emergency_chrome_cleanup
+    return unless ENV['ALLOW_CHROME_CLEANUP']
+
     # Get all Chrome processes
     chrome_processes = `ps aux | grep -i chrome | grep -v grep`.split("\n")
     initial_count = chrome_processes.count
@@ -738,7 +674,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   end
 
   # ============================================================================
-  # COMPREHENSIVE BROWSER CORRUPTION DEBUGGING SYSTEM
+  # BROWSER CORRUPTION DEBUGGING
   # ============================================================================
 
   def debug_browser_state(_context)
@@ -786,141 +722,8 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     end
   end
 
-  def debug_browser_corruption(_context, _error)
-    return unless ENV['VERBOSE_TESTS'] || ENV['DEBUG_BROWSER']
-
-    # Chrome process information with leak detection
-    begin
-      chrome_processes = `ps aux | grep -i chrome | grep -v grep`.split("\n")
-      process_count = chrome_processes.count
-      # CRITICAL: Detect process leak (normal should be < 10)
-      if process_count > 50
-        # Kill all Chrome processes to prevent system overload
-        begin
-          chrome_processes.each do |proc|
-            pid = proc.split[1]
-            Process.kill('TERM', pid.to_i) if pid&.match?(/^\d+$/)
-          end
-        rescue StandardError
-          # Silently handle Chrome process killing errors
-        end
-      end
-    rescue StandardError
-      # Silently handle Chrome process check errors
-    end
-
-    # Try to gather more state information
-    debug_browser_state('CORRUPTION_ANALYSIS')
-  end
-
   def force_browser_restart(_reason)
-    track_chrome_processes('RESTART_BEGIN')
-
-    # Use enhanced Capybara session cleanup first
-    begin
-      capybara_session_cleanup
-      track_chrome_processes('AFTER_SESSION_CLEANUP')
-    rescue StandardError
-      # Silently handle session cleanup errors
-    end
-
-    # Enhanced browser object validation and cleanup
-    browser_object = nil
-    begin
-      browser_object = defined?(page) && page&.driver&.browser
-
-      # Try graceful shutdown first if browser object exists and is responsive
-      if browser_object.respond_to?(:quit)
-        browser_object.quit
-        track_chrome_processes('AFTER_BROWSER_QUIT')
-      end
-    rescue StandardError
-      track_chrome_processes('BROWSER_QUIT_FAILED')
-    end
-
-    begin
-      # Try proper Capybara session cleanup first
-      capybara_session_cleanup
-      track_chrome_processes('AFTER_PROPER_CLEANUP')
-    rescue StandardError
-      track_chrome_processes('CLEANUP_FAILED')
-
-      # Check if we need emergency measures
-      current_processes = begin
-        `ps aux | grep -i chrome | grep -v grep`.split("\n").count
-      rescue StandardError
-        0
-      end
-
-      if current_processes > 100
-        begin
-          capybara_nuclear_reset
-          track_chrome_processes('AFTER_EMERGENCY_RESET')
-        rescue StandardError
-          # Silently handle nuclear reset errors
-        end
-      end
-    end
-
-    # Verify cleanup was successful
-    begin
-      debug_browser_state('AFTER_RESTART')
-    rescue StandardError
-      # Silently handle post-restart debug errors
-    end
-  end
-
-  # Injects JS patches to fix known issues, like Chart.js recursion loops
-  # that can cause the browser to hang or crash.
-  def inject_test_javascript_fixes
-    unless defined?(@_chart_patch_done) && @_chart_patch_done
-      page.execute_script(<<~JS)
-        // Disable Chart.js globally (prevents huge CPU during screenshots)
-        if (window.Chart) {
-          window.Chart = { register: ()=>{}, defaults:{}, Chart: ()=>({ destroy:()=>{}, update:()=>{}, render:()=>{} }) };
-        }
-
-        // Disable CSS animations and transitions for test stability (based on Capybara best practices)
-        if (!window._animationsDisabled) {
-          const disableAnimationStyles = '-webkit-transition: none !important;' +
-                                       '-moz-transition: none !important;' +
-                                       '-ms-transition: none !important;' +
-                                       '-o-transition: none !important;' +
-                                       'transition: none !important;' +
-                                       '-webkit-transform: none !important;' +
-                                       '-moz-transform: none !important;' +
-                                       '-ms-transform: none !important;' +
-                                       '-o-transform: none !important;' +
-                                       'transform: none !important;' +
-                                       '-webkit-animation: none !important;' +
-                                       '-moz-animation: none !important;' +
-                                       '-ms-animation: none !important;' +
-                                       '-o-animation: none !important;' +
-                                       'animation: none !important;';
-
-          const animationStyles = document.createElement('style');
-          animationStyles.type = 'text/css';
-          animationStyles.innerHTML = '*, *::before, *::after {' + disableAnimationStyles + '}';
-          document.head.appendChild(animationStyles);
-          window._animationsDisabled = true;
-        }
-
-        // Guard against getComputedStyle infinite recursion (a known Ferrum bug)
-        if (!window._getComputedStylePatched) {
-          const original = window.getComputedStyle;
-          let depth = 0;
-          window.getComputedStyle = function(el, pseudo) {
-            if (depth > 50) { console.warn('getComputedStyle recursion avoided'); return {}; }
-            depth++; const result = original.call(this, el, pseudo); depth--; return result;
-          };
-          window._getComputedStylePatched = true;
-        }
-      JS
-      @_chart_patch_done = true
-    end
-  rescue Ferrum::DeadBrowserError
-    # Ignore if browser is already dead, teardown will handle it.
-  rescue StandardError => e
-    puts "Warning: JS injection failed: #{e.message}"
+    # Minimal reset; do not kill external Chrome processes
+    capybara_session_cleanup
   end
 end

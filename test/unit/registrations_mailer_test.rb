@@ -24,7 +24,9 @@ class RegistrationsMailerTest < ActiveSupport::TestCase
     mock_template = mock('EmailTemplate')
     subject = 'Welcome to the Maryland Accessible Telecommunications Program'
     body = "Dear Test,\n\nWelcome to the program.\n\nThank you,\nThe MAT Team"
+    mock_template.stubs(:subject).returns(subject)
     mock_template.stubs(:render).returns([subject, body])
+    mock_template.stubs(:enabled?).returns(true)
     EmailTemplate.stubs(:find_by!).returns(mock_template)
 
     # Clear any emails from previous tests

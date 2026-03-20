@@ -23,7 +23,7 @@ module Admin
                              .select('users.id, users.business_name, ' \
                                      'SUM(voucher_transactions.amount) as total_amount, ' \
                                      'COUNT(DISTINCT voucher_transactions.id) as transaction_count')
-                             .order('total_amount DESC')
+                             .order(total_amount: :desc)
 
       respond_to do |format|
         format.html
@@ -41,7 +41,10 @@ module Admin
     end
 
     def update
-      handle_missing_gad_reference and return if missing_gad_reference?
+      if missing_gad_reference?
+        handle_update_error("GAD reference can't be blank")
+        return
+      end
 
       if @invoice.update(invoice_params)
         log_event!('Updated invoice details', {
@@ -51,7 +54,7 @@ module Admin
                    })
         redirect_to [:admin, @invoice], notice: invoice_update_notice
       else
-        render_update_error
+        handle_update_error(@invoice.errors.full_messages.join(', '))
       end
     end
 
@@ -59,9 +62,9 @@ module Admin
       if @invoice.status_invoice_pending?
         @invoice.update!(status: :invoice_approved)
         log_event!('Approved invoice')
-        redirect_to [:admin, @invoice], notice: 'Invoice approved successfully'
+        redirect_to [:admin, @invoice], notice: t('.invoice_approved_pass')
       else
-        redirect_to [:admin, @invoice], alert: 'Invoice must be pending to approve'
+        redirect_to [:admin, @invoice], alert: t('.invoice_approved_pending')
       end
     end
 
@@ -81,18 +84,16 @@ module Admin
 
     # Helpers for update action refactoring
     def missing_gad_reference?
-      invoice_params[:status] == 'invoice_paid' && params.dig(:invoice, :gad_invoice_reference).blank?
+      # params.expect() raises ArgumentError if structure doesn't match, which would fail the guard clause
+      # The form sends status as string 'invoice_paid', so check for that
+      status = params.dig(:invoice, :status)
+      status == 'invoice_paid' && params.dig(:invoice, :gad_invoice_reference).blank?
     end
 
-    def handle_missing_gad_reference
-      flash[:alert] = "GAD reference can't be blank"
+    def handle_update_error(alert_message = nil)
+      flash[:alert] = alert_message if alert_message
       set_transactions
-      render :show, status: :unprocessable_entity
-    end
-
-    def render_update_error
-      set_transactions
-      render :show, status: :unprocessable_entity
+      render :show, status: :unprocessable_content
     end
 
     def invoice_update_notice

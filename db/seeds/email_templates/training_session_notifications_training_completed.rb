@@ -3,7 +3,7 @@
 # Seed File for "training_session_notifications_training_completed"
 # (Suggest saving as db/seeds/email_templates/training_session_notifications_training_completed.rb)
 # --------------------------------------------------
-EmailTemplate.create_or_find_by!(name: 'training_session_notifications_training_completed', format: :text) do |template|
+EmailTemplate.create_or_find_by!(name: 'training_session_notifications_training_completed', format: :text, locale: 'en') do |template|
   template.subject = 'Training Session Completed'
   template.description = 'Sent to the user after their training session has been successfully completed and marked as such by the trainer.'
   template.body = <<~TEXT
@@ -26,8 +26,11 @@ EmailTemplate.create_or_find_by!(name: 'training_session_notifications_training_
     Thank you for participating in the training session. We hope it was helpful and informative!
     %<footer_text>s
   TEXT
-  template.variables = %w[header_text constituent_full_name application_id completed_date_formatted
-                          trainer_full_name trainer_email trainer_phone_formatted footer_text]
+  template.variables = {
+    'required' => %w[header_text constituent_full_name application_id completed_date_formatted
+                     trainer_full_name trainer_email trainer_phone_formatted footer_text],
+    'optional' => []
+  }
   template.version = 1
 end
 Rails.logger.debug 'Seeded training_session_notifications_training_completed (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

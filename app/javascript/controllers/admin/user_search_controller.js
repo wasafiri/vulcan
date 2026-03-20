@@ -1,6 +1,5 @@
 import BaseFormController from "../base/form_controller"
 import { railsRequest } from "../../services/rails_request"
-import { applyTargetSafety } from "../../mixins/target_safety"
 import { setVisible } from "../../utils/visibility"
 
 class UserSearchController extends BaseFormController {
@@ -13,7 +12,7 @@ class UserSearchController extends BaseFormController {
     "clearSearchButton"
   ]
 
-  static outlets = ["guardian-picker", "flash"]
+  static outlets = ["guardian-picker"]
 
   static values = {
     searchUrl: String,
@@ -25,7 +24,7 @@ class UserSearchController extends BaseFormController {
     super.connect()
 
     // Add debounced search listener using our new pattern
-    if (this.safeTarget('searchInput')) {
+    if (this.hasSearchInputTarget) {
       this.addDebouncedListener(
         this.searchInputTarget,
         'input',
@@ -43,53 +42,42 @@ class UserSearchController extends BaseFormController {
       return
     }
 
-    await this.executeSearch(q)
+    // Use Turbo Frame navigation
+    this.navigateToSearch(q)
   }
 
-  async executeSearch(q) {
-    if (!q) return
+  navigateToSearch(q) {
+    // Find the turbo frame that should handle the search results
+    if (!this.hasSearchResultsTarget) return
+    const turboFrame = this.searchResultsTarget
 
-    try {
-      // Directly handle Turbo Stream response without cloning
-      const response = await fetch(
-        `${this.searchUrlValue}?q=${encodeURIComponent(q)}&role=${this.defaultRoleValue}`,
-        {
-          method: 'GET',
-          headers: { Accept: 'text/vnd.turbo-stream.html, text/html' }
-        }
-      )
-
-      if (response.ok) {
-        const html = await response.text()
-        this.displaySearchResults(html)
-      } else {
-        throw new Error(`Search failed: ${response.status} ${response.statusText}`)
-      }
-    } catch (error) {
-      console.error('Search error:', error)
-      this.showErrorNotification(error.message || 'Search failed')
-    }
-  }
-
-  displaySearchResults(html) {
-    this.withTarget('searchResults', (target) => {
-      target.innerHTML = html
-      setVisible(target, true)
-    })
+    // Construct the search URL
+    const searchUrl = `${this.searchUrlValue}?q=${encodeURIComponent(q)}&role=${this.defaultRoleValue}`
+    
+    // Set the turbo frame's src to trigger navigation
+    // Ensure it's visible in case it was previously hidden by clearResults()
+    setVisible(turboFrame, true)
+    turboFrame.src = searchUrl
   }
 
   clearResults() {
-    this.withTarget('searchResults', (target) => {
-      target.innerHTML = ""
+    if (this.hasSearchResultsTarget) {
+      const target = this.searchResultsTarget
+      // Clear the turbo frame by removing its src
+      target.removeAttribute('src')
+      target.innerHTML = '<p class="text-sm text-gray-500 p-3">Type a name or email to search for guardians.</p>'
       setVisible(target, false)
-    })
+    }
   }
 
+
+
   clearSearchAndShowForm() {
-    this.withTarget('searchInput', (input) => {
+    if (this.hasSearchInputTarget) {
+      const input = this.searchInputTarget
       input.value = ""
       input.focus()
-    })
+    }
 
     this.clearResults()
 
@@ -112,10 +100,11 @@ class UserSearchController extends BaseFormController {
 
   // Separate method for when we actually want to clear everything
   clearSearchAndSelection() {
-    this.withTarget('searchInput', (input) => {
+    if (this.hasSearchInputTarget) {
+      const input = this.searchInputTarget
       input.value = ""
       input.focus()
-    })
+    }
 
     this.clearResults()
 
@@ -179,7 +168,7 @@ class UserSearchController extends BaseFormController {
 
       const result = await railsRequest.perform({
         method: 'post',
-        url: '/admin/users',
+        url: this.hasCreateUserUrlValue ? this.createUserUrlValue : '/admin/users',
         body: userData,
         headers: {
           'Accept': 'application/json',
@@ -199,7 +188,6 @@ class UserSearchController extends BaseFormController {
 
     } catch (error) {
       console.error('Guardian creation error:', error)
-      this.showErrorNotification(error.message || 'Failed to create guardian')
 
       // Restore button state on error
       const button = event.target
@@ -334,7 +322,6 @@ class UserSearchController extends BaseFormController {
   async handleSuccess(data) {
     if (data.user) {
       this.handleGuardianCreationSuccess(data)
-      this.showSuccessNotification("Guardian created successfully")
     } else {
       super.handleSuccess(data)
     }
@@ -363,21 +350,7 @@ class UserSearchController extends BaseFormController {
     this.clearSearchAndShowForm()
   }
 
-  showSuccessNotification(message) {
-    if (this.hasFlashOutlet) {
-      this.flashOutlet.showSuccess(message)
-    } else {
-      super.showStatus(message, 'success')
-    }
-  }
-
-  showErrorNotification(message) {
-    if (this.hasFlashOutlet) {
-      this.flashOutlet.showError(message)
-    } else {
-      super.showStatus(message, 'error')
-    }
-  }
+  
 
   // Override disconnect to add event handler cleanup
   disconnect() {
@@ -423,6 +396,5 @@ class UserSearchController extends BaseFormController {
 }
 
 // Apply target safety mixin
-applyTargetSafety(UserSearchController)
 
 export default UserSearchController

@@ -103,6 +103,42 @@ module Admin
       assert_equal 'paper', created_application.submission_method
     end
 
+    test 'should persist locale for self-applicant' do
+      unique_email = "self.locale.#{Time.now.to_i}@example.com"
+
+      NotificationService.stubs(:create_and_deliver!).returns(true)
+
+      assert_difference ['Application.count', 'User.count'], 1 do
+        post admin_paper_applications_path, headers: default_headers, params: {
+          constituent: {
+            first_name: 'Locale',
+            last_name: 'SelfApplicant',
+            email: unique_email,
+            phone: '555-000-0091',
+            physical_address_1: '910 Locale Way',
+            city: 'Baltimore',
+            state: 'MD',
+            zip_code: '21201',
+            hearing_disability: '1',
+            locale: 'es'
+          },
+          application: {
+            household_size: 1,
+            annual_income: 12_000,
+            maryland_resident: '1',
+            self_certify_disability: '1',
+            medical_provider_name: 'Dr. Locale',
+            medical_provider_phone: '555-111-0091',
+            medical_provider_email: 'dr.locale.self@example.com'
+          }
+        }
+      end
+
+      created_user = User.find_by(email: unique_email)
+      assert_not_nil created_user
+      assert_equal 'es', created_user.locale
+    end
+
     test 'should create paper application for dependent with NEW guardian' do
       dependent_email = "dependent.newguardian.#{Time.now.to_i}@example.com"
       guardian_email = "new.guardian.#{Time.now.to_i}@example.com"
@@ -170,6 +206,59 @@ module Admin
       assert_equal new_guardian.id, created_application.managing_guardian_id, 'Application should be linked to the new guardian'
       assert_response :redirect
       assert_redirected_to admin_application_path(created_application)
+    end
+
+    test 'should persist locale separately for new guardian and dependent' do
+      dependent_email = "dependent.locale.newguardian.#{Time.now.to_i}@example.com"
+      guardian_email = "new.guardian.locale.#{Time.now.to_i}@example.com"
+
+      NotificationService.stubs(:create_and_deliver!).returns(true)
+
+      assert_difference 'User.count', 2 do
+        assert_difference 'Application.count', 1 do
+          assert_difference 'GuardianRelationship.count', 1 do
+            post admin_paper_applications_path, headers: default_headers, params: {
+              guardian_attributes: {
+                first_name: 'LocaleGuardian',
+                last_name: 'Primary',
+                email: guardian_email,
+                phone: '555-000-0092',
+                physical_address_1: '920 Guardian Rd',
+                city: 'Guardville',
+                state: 'MD',
+                zip_code: '21002',
+                locale: 'en'
+              },
+              constituent: {
+                first_name: 'LocaleDependent',
+                last_name: 'Secondary',
+                dependent_email: dependent_email,
+                date_of_birth: 11.years.ago.to_date.to_s,
+                hearing_disability: '1',
+                locale: 'es'
+              },
+              use_guardian_email: false,
+              relationship_type: 'Parent',
+              application: {
+                household_size: 2,
+                annual_income: 19_000,
+                maryland_resident: '1',
+                self_certify_disability: '1',
+                medical_provider_name: 'Dr. Locale Family',
+                medical_provider_phone: '555-333-0092',
+                medical_provider_email: 'dr.locale.family@example.com'
+              }
+            }
+          end
+        end
+      end
+
+      guardian = User.find_by(email: guardian_email)
+      dependent = User.find_by(dependent_email: dependent_email)
+      assert_not_nil guardian
+      assert_not_nil dependent
+      assert_equal 'en', guardian.locale
+      assert_equal 'es', dependent.locale
     end
 
     test 'should create paper application for dependent using guardian email' do
@@ -304,6 +393,99 @@ module Admin
       assert_redirected_to admin_application_path(created_application)
     end
 
+    test 'should update existing dependent locale without changing guardian locale' do
+      existing_guardian = create(:constituent,
+                                 email: "existing.guardian.locale.#{Time.now.to_i}@example.com",
+                                 first_name: 'Locale',
+                                 last_name: 'Guardian',
+                                 locale: 'en')
+      existing_dependent = create(:constituent,
+                                  email: "existing.dependent.locale.#{Time.now.to_i}@example.com",
+                                  first_name: 'Locale',
+                                  last_name: 'Dependent',
+                                  locale: 'en')
+      create(:guardian_relationship,
+             guardian_user: existing_guardian,
+             dependent_user: existing_dependent,
+             relationship_type: 'Parent')
+
+      NotificationService.stubs(:create_and_deliver!).returns(true)
+
+      assert_difference 'Application.count', 1 do
+        post admin_paper_applications_path, headers: default_headers, params: {
+          applicant_type: 'dependent',
+          guardian_id: existing_guardian.id,
+          dependent_id: existing_dependent.id,
+          relationship_type: 'Parent',
+          constituent: {
+            locale: 'es',
+            communication_preference: 'letter'
+          },
+          application: {
+            household_size: 2,
+            annual_income: 14_000,
+            maryland_resident: '1',
+            self_certify_disability: '1',
+            medical_provider_name: 'Dr. Existing Dependent',
+            medical_provider_phone: '555-444-0093',
+            medical_provider_email: 'dr.existing.dependent@example.com'
+          }
+        }
+      end
+
+      assert_response :redirect
+      existing_guardian.reload
+      existing_dependent.reload
+
+      assert_equal 'en', existing_guardian.locale
+      assert_equal 'es', existing_dependent.locale
+      assert_equal 'letter', existing_dependent.communication_preference
+    end
+
+    test 'should not overwrite existing dependent locale when locale selection is blank' do
+      existing_guardian = create(:constituent,
+                                 email: "existing.guardian.blanklocale.#{Time.now.to_i}@example.com",
+                                 first_name: 'Blank',
+                                 last_name: 'Guardian',
+                                 locale: 'en')
+      existing_dependent = create(:constituent,
+                                  email: "existing.dependent.blanklocale.#{Time.now.to_i}@example.com",
+                                  first_name: 'Blank',
+                                  last_name: 'Dependent',
+                                  locale: 'es')
+      create(:guardian_relationship,
+             guardian_user: existing_guardian,
+             dependent_user: existing_dependent,
+             relationship_type: 'Parent')
+
+      NotificationService.stubs(:create_and_deliver!).returns(true)
+
+      assert_difference 'Application.count', 1 do
+        post admin_paper_applications_path, headers: default_headers, params: {
+          applicant_type: 'dependent',
+          guardian_id: existing_guardian.id,
+          dependent_id: existing_dependent.id,
+          relationship_type: 'Parent',
+          constituent: {
+            locale: ''
+          },
+          application: {
+            household_size: 2,
+            annual_income: 14_000,
+            maryland_resident: '1',
+            self_certify_disability: '1',
+            medical_provider_name: 'Dr. Blank Locale',
+            medical_provider_phone: '555-444-0094',
+            medical_provider_email: 'dr.blank.locale@example.com'
+          }
+        }
+      end
+
+      assert_response :redirect
+      existing_dependent.reload
+      assert_equal 'es', existing_dependent.locale
+    end
+
     # test 'should create paper application with rejected proofs and ensure ProofReview records are created' do # Original test name
     # Refactored test based on user feedback:
     test 'creates application, approves income proof, rejects residency proof' do
@@ -337,8 +519,9 @@ module Admin
       assert_equal 'approved', app.reload.income_proof_status
 
       residency_review = app.proof_reviews.find_by!(proof_type: :residency, status: :rejected)
-      assert_equal 'address_mismatch', residency_review.rejection_reason
-      assert_equal "The address on the document doesn't match for residency.", residency_review.notes
+      assert_equal 'address_mismatch', residency_review.rejection_reason_code
+      assert_nil residency_review.notes
+      assert residency_review.rejection_reason.present?
 
       # Verify events (filter for application-related events)
       application_events = Event.where('action IN (?, ?, ?)', 'application_created', 'proof_submitted', 'proof_rejected').order(:created_at)
@@ -388,8 +571,7 @@ module Admin
         application: application_attrs,
         income_proof_action: 'accept',
         residency_proof_action: 'reject',
-        residency_proof_rejection_reason: 'address_mismatch',
-        residency_proof_rejection_notes: "The address on the document doesn't match for residency."
+        residency_proof_rejection_reason: 'address_mismatch'
       }
     end
 
@@ -414,7 +596,7 @@ module Admin
         self_certify_disability: '1',
         medical_provider_name: 'Dr. No Proof',
         medical_provider_phone: '555-888-9999',
-        medical_provider_email: 'dr.noproof@example.com'
+        medical_provider_email: 'dr.noproof@mdmat.org'
       }
     end
 
@@ -497,8 +679,7 @@ module Admin
         },
         income_proof_action: 'accept',
         residency_proof_action: 'reject',
-        residency_proof_rejection_reason: 'address_mismatch',
-        residency_proof_rejection_notes: "The address on the document doesn't match."
+        residency_proof_rejection_reason: 'address_mismatch'
       }
 
       # Restore the environment
@@ -552,7 +733,7 @@ module Admin
         }
       end
 
-      assert_response :unprocessable_entity
+      assert_response :unprocessable_content
       assert_match 'Income exceeds the maximum threshold for the household size.', flash[:alert]
     end
 
@@ -601,23 +782,29 @@ module Admin
       }
 
       # Check that the response is unprocessable entity
-      assert_response :unprocessable_entity
+      assert_response :unprocessable_content
     end
 
-    test 'should get fpl_thresholds' do
-      get fpl_thresholds_admin_paper_applications_path, headers: default_headers
+    test 'helper methods return correct FPL data' do
+      # Test that the helper methods provide correct server-rendered data
+      get new_admin_paper_application_path, headers: default_headers
       assert_response :success
 
-      json_response = response.parsed_body # Use Rails' response.parsed_body helper
-      assert_equal 15_650, json_response['thresholds']['1']
-      assert_equal 21_150, json_response['thresholds']['2']
-      assert_equal 26_650, json_response['thresholds']['3']
-      assert_equal 32_150, json_response['thresholds']['4']
-      assert_equal 37_650, json_response['thresholds']['5']
-      assert_equal 43_150, json_response['thresholds']['6']
-      assert_equal 48_650, json_response['thresholds']['7']
-      assert_equal 54_150, json_response['thresholds']['8']
-      assert_equal 400, json_response['modifier']
+      # The helper methods should be available in the controller
+      thresholds_json = @controller.fpl_thresholds_json
+      modifier = @controller.fpl_modifier_value
+
+      # Parse the JSON and verify values
+      thresholds = JSON.parse(thresholds_json)
+      assert_equal 15_650, thresholds['1']
+      assert_equal 21_150, thresholds['2']
+      assert_equal 26_650, thresholds['3']
+      assert_equal 32_150, thresholds['4']
+      assert_equal 37_650, thresholds['5']
+      assert_equal 43_150, thresholds['6']
+      assert_equal 48_650, thresholds['7']
+      assert_equal 54_150, thresholds['8']
+      assert_equal 400, modifier
     end
 
     test 'should send rejection notification' do
@@ -634,7 +821,7 @@ module Admin
         phone: '555-123-4567',
         household_size: '2',
         annual_income: '100000',
-        notification_method: 'email',
+        communication_preference: 'email',
         additional_notes: 'Income exceeds threshold'
       }
 
@@ -650,7 +837,7 @@ module Admin
         phone: '555-123-4567',
         household_size: '2',
         annual_income: '100000',
-        notification_method: 'letter',
+        communication_preference: 'letter',
         additional_notes: 'Income exceeds threshold'
       }
 
@@ -694,13 +881,12 @@ module Admin
             medical_provider_email: 'dr.smith@example.com'
           },
           income_proof_action: 'reject',
-          income_proof_rejection_reason: 'incomplete_documentation',
-          income_proof_rejection_notes: 'The income documentation is incomplete.'
+          income_proof_rejection_reason: 'incomplete_documentation'
         }
       end
 
       # Expect unprocessable entity
-      assert_response :unprocessable_entity
+      assert_response :unprocessable_content
     end
 
     test 'should handle missing constituent gracefully in notification job' do
@@ -784,8 +970,7 @@ module Admin
           medical_provider_email: 'dr.test@example.com'
         },
         income_proof_action: 'reject',
-        income_proof_rejection_reason: 'incomplete_documentation',
-        income_proof_rejection_notes: 'Missing required information'
+        income_proof_rejection_reason: 'incomplete_documentation'
       }
 
       # Restore the environment
@@ -837,7 +1022,124 @@ module Admin
         }
       end
 
-      assert_response :unprocessable_entity
+      assert_response :unprocessable_content
+    end
+
+    test 'self-application should not use guardian_attributes when constituent data is missing' do
+      # This test verifies that disability_attrs from applicant_attributes are NOT incorrectly
+      # merged with guardian_attributes when creating a self-application.
+      #
+      # Bug scenario: If constituent[:first_name] is blank but guardian_attributes is present,
+      # the old code would use guardian_attributes.deep_merge(disability_attrs) as the constituent,
+      # which incorrectly merges the applicant's disabilities into the guardian's data.
+      #
+      # Expected behavior: Self-applications should only use constituent data, not guardian_attributes.
+
+      guardian_email = "guardian.should.not.be.used.#{Time.now.to_i}@example.com"
+
+      ProofAttachmentService.stubs(:attach_proof).returns({ success: true })
+      ApplicationNotificationsMailer.stubs(:account_created).returns(stub(deliver_later: true))
+
+      # Submit a self-application with guardian_attributes but NO constituent[:first_name]
+      # This should fail validation, NOT create a user from guardian_attributes with the applicant's disabilities
+      assert_no_difference 'User.count', 'Should not create user from guardian_attributes for self-application' do
+        post admin_paper_applications_path, headers: default_headers, params: {
+          applicant_type: 'self',
+          guardian_attributes: {
+            first_name: 'GuardianFirstName',
+            last_name: 'GuardianLastName',
+            email: guardian_email,
+            phone: '555-111-2222',
+            physical_address_1: '100 Guardian Rd',
+            city: 'Guardville',
+            state: 'MD',
+            zip_code: '21001'
+          },
+          constituent: {
+            # Deliberately leaving first_name blank to trigger the bug scenario
+            email: '', # empty email
+            hearing_disability: '0'
+          },
+          applicant_attributes: {
+            self_certify_disability: '1',
+            hearing_disability: '1', # This should go to the applicant, NOT the guardian
+            vision_disability: '1'
+          },
+          application: {
+            household_size: 1,
+            annual_income: 10_000,
+            maryland_resident: '1',
+            medical_provider_name: 'Dr. Test',
+            medical_provider_phone: '555-333-4444',
+            medical_provider_email: 'dr.test@example.com'
+          }
+        }
+      end
+
+      # Verify no user was created with the guardian's email and applicant's disabilities
+      created_user = User.find_by(email: guardian_email)
+      assert_nil created_user, 'No user should be created from guardian_attributes for a self-application'
+
+      # The response should indicate failure due to missing constituent data
+      assert_response :unprocessable_content
+    end
+
+    test 'self-application disability attrs should apply to constituent not guardian' do
+      # This test verifies that when both constituent and guardian_attributes are present,
+      # the applicant's disability flags go to the constituent (applicant), not the guardian.
+
+      constituent_email = "self.applicant.disability.#{Time.now.to_i}@example.com"
+      income_proof_file = fixture_file_upload(Rails.root.join('test/fixtures/files/test_income_proof.pdf'), 'application/pdf')
+      residency_proof_file = fixture_file_upload(Rails.root.join('test/fixtures/files/test_residency_proof.pdf'), 'application/pdf')
+
+      ProofAttachmentService.stubs(:attach_proof).returns({ success: true })
+      ApplicationNotificationsMailer.stubs(:account_created).returns(stub(deliver_later: true))
+
+      assert_difference 'User.count', 1 do
+        post admin_paper_applications_path, headers: default_headers, params: {
+          applicant_type: 'self',
+          constituent: {
+            first_name: 'SelfApplicant',
+            last_name: 'WithDisability',
+            email: constituent_email,
+            phone: '555-222-3333',
+            physical_address_1: '200 Applicant Way',
+            city: 'Appville',
+            state: 'MD',
+            zip_code: '21002'
+          },
+          applicant_attributes: {
+            self_certify_disability: '1',
+            hearing_disability: '1',
+            vision_disability: '1',
+            speech_disability: '0',
+            mobility_disability: '0',
+            cognition_disability: '0'
+          },
+          application: {
+            household_size: 1,
+            annual_income: 10_000,
+            maryland_resident: '1',
+            self_certify_disability: '1',
+            medical_provider_name: 'Dr. Self',
+            medical_provider_phone: '555-444-5555',
+            medical_provider_email: 'dr.self@example.com'
+          },
+          income_proof: income_proof_file,
+          residency_proof: residency_proof_file,
+          income_proof_action: 'accept',
+          residency_proof_action: 'accept'
+        }
+      end
+
+      # Verify the applicant was created with the correct disabilities
+      applicant = User.find_by(email: constituent_email)
+      assert applicant, 'Applicant should be created'
+      assert applicant.hearing_disability, 'Applicant should have hearing disability from applicant_attributes'
+      assert applicant.vision_disability, 'Applicant should have vision disability from applicant_attributes'
+      assert_not applicant.speech_disability, 'Applicant should not have speech disability'
+      assert_not applicant.mobility_disability, 'Applicant should not have mobility disability'
+      assert_not applicant.cognition_disability, 'Applicant should not have cognition disability'
     end
   end
 end

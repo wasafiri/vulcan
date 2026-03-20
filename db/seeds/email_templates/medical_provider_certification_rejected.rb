@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # Seed File for "medical_provider_certification_rejected"
-EmailTemplate.create_or_find_by!(name: 'medical_provider_certification_rejected', format: :text) do |template|
+EmailTemplate.create_or_find_by!(name: 'medical_provider_certification_rejected', format: :text, locale: 'en') do |template|
   template.subject = 'Disability Certification Rejected'
   template.description = 'Sent to a medical provider when the submitted disability certification form is rejected.'
   template.body = <<~TEXT
@@ -9,11 +9,11 @@ EmailTemplate.create_or_find_by!(name: 'medical_provider_certification_rejected'
 
     DISABILITY CERTIFICATION FORM REJECTED
 
-    Dear Medical Provider,
+    Hello,
 
-    We have received the disability certification form for the following patient:
+    We have received the disability certification form for the following individual:
 
-    Patient Name: %<constituent_full_name>s
+    Name: %<constituent_full_name>s
     Application ID: %<application_id>s
 
     Unfortunately, the certification form has been rejected due to the following reason:
@@ -27,19 +27,20 @@ EmailTemplate.create_or_find_by!(name: 'medical_provider_certification_rejected'
     1. Email: Reply to this email with the updated certification form attached
     2. Fax: Send the updated form to 410-767-4276
 
-    Note: The patient has %<remaining_attempts>s remaining submission attempts before they must reapply.
-
-    Thank you for your assistance in helping your patient access needed telecommunications services.
+    Thank you for your assistance in helping this applicant access needed telecommunications services.
 
     Sincerely,
     Maryland Accessible Telecommunications Program
 
     ----------
 
-    For questions, please contact us at medical-cert@mdmat.org or call 410-767-6960.
+    For questions, please contact us at mat.program1@maryland.gov or call 410-767-6960.
     Maryland Accessible Telecommunications (MAT) - Improving lives through accessible communication.
   TEXT
-  template.variables = %w[constituent_full_name application_id rejection_reason remaining_attempts]
+  template.variables = {
+    'required' => %w[constituent_full_name application_id rejection_reason],
+    'optional' => []
+  }
   template.version = 1
 end
 Rails.logger.debug 'Seeded medical_provider_certification_rejected (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

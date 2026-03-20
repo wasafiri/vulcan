@@ -46,9 +46,9 @@ module ConstituentPortal
         check 'I authorize the release and sharing of my medical information as described above'
       end
 
-      # Upload documents with safe interaction
-      attach_file 'Proof of Residency', @valid_image
-      attach_file 'Income Verification', @valid_pdf
+      # Upload documents with safe interaction (using updated label names)
+      attach_file 'Upload Residency Proof Document', @valid_image
+      attach_file 'Upload Income Proof Document', @valid_pdf
 
       # Save the application with safe interaction
       click_button 'Save Application'
@@ -118,9 +118,9 @@ module ConstituentPortal
         check 'I authorize the release and sharing of my medical information as described above'
       end
 
-      # Upload required documents with safe interaction
-      attach_file 'Proof of Residency', @valid_image
-      attach_file 'Income Verification', @valid_pdf
+      # Upload required documents with safe interaction (using updated label names)
+      attach_file 'Upload Residency Proof Document', @valid_image
+      attach_file 'Upload Income Proof Document', @valid_pdf
 
       # Save as draft with safe interaction
       click_button 'Save Application'
@@ -145,8 +145,8 @@ module ConstituentPortal
 
       # Update fields with safe interaction - bypass JavaScript by setting values directly
       # Debug: Check current values before updating
-      household_field = find('#application_household_size')
-      income_field = find('#application_annual_income')
+      household_field = find_by_id('application_household_size')
+      income_field = find_by_id('application_annual_income')
 
       # Set values directly to bypass autosave interference
       household_field.set('4')
@@ -229,9 +229,9 @@ module ConstituentPortal
         check 'I authorize the release and sharing of my medical information as described above'
       end
 
-      # Upload required documents with safe interaction
-      attach_file 'Proof of Residency', @valid_image
-      attach_file 'Income Verification', @valid_pdf
+      # Upload required documents with safe interaction (using updated label names)
+      attach_file 'Upload Residency Proof Document', @valid_image
+      attach_file 'Upload Income Proof Document', @valid_pdf
 
       # Save as draft with safe interaction
       click_button 'Save Application'

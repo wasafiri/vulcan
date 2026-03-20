@@ -8,7 +8,7 @@ module Applications
 
     attr_reader :params, :admin, :application, :constituent, :errors, :guardian_user_for_app
 
-    def initialize(params:, admin:, skip_income_validation: false)
+    def initialize(params:, admin:, skip_income_validation: false, skip_proof_processing: false)
       super()
       @params = params.with_indifferent_access
       @admin = admin
@@ -18,6 +18,7 @@ module Applications
       @errors = []
       @temp_passwords = {}
       @skip_income_validation = skip_income_validation
+      @skip_proof_processing = skip_proof_processing
     end
 
     def create
@@ -27,7 +28,7 @@ module Applications
       application_created = ActiveRecord::Base.transaction do
         return failure('Constituent processing failed') unless process_constituent
         return failure('Application creation failed') unless create_application
-        return failure('Proof upload failed') unless process_proof_uploads
+        return failure('Proof upload failed') unless @skip_proof_processing || process_proof_uploads
 
         @application.persisted?
       end
@@ -35,7 +36,7 @@ module Applications
       # If application was successfully created, send notifications outside the transaction
       if application_created && @application.persisted?
         begin
-          handle_successful_application
+          handle_successful_application(:create)
         rescue StandardError => e
           # Log notification errors but don't fail the entire operation
           log_error(e, 'Failed to send notifications after successful application creation')
@@ -59,9 +60,13 @@ module Applications
         @application = application
         @constituent = application.user
 
+        # Update application attributes if provided
+        return failure('Application update failed') unless update_application_attributes
+
+        # Process proof uploads (accept/reject)
         return failure('Proof upload failed') unless process_proof_uploads
 
-        handle_successful_application if @application.persisted?
+        handle_successful_application(:update) if @application.persisted?
         return true
       end
     rescue StandardError => e
@@ -74,14 +79,19 @@ module Applications
 
     private
 
-    def failure(message) # rubocop:disable Naming/PredicateMethod
+    def failure(message)
       @errors << message
       false
     end
 
-    def handle_successful_application
+    def handle_successful_application(operation = :create)
       send_notifications
-      log_application_creation
+      case operation
+      when :create
+        log_application_creation
+      when :update
+        log_application_update
+      end
     end
 
     def log_application_creation
@@ -96,13 +106,32 @@ module Applications
       )
     end
 
+    def log_application_update
+      AuditEventService.log(
+        action: 'application_updated',
+        actor: @admin,
+        auditable: @application,
+        metadata: {
+          submission_method: 'paper',
+          updated_attributes: @application.saved_changes.keys,
+          proof_actions: {
+            income: params[:income_proof_action],
+            residency: params[:residency_proof_action]
+          }.compact
+        }
+      )
+    end
+
     def process_constituent
       guardian_id = params[:guardian_id]
       new_guardian_attrs = params[:new_guardian_attributes]
       applicant_data = params[:constituent]
       relationship_type = params[:relationship_type]
+      dependent_id = params[:dependent_id]
 
-      if guardian_scenario?(guardian_id, new_guardian_attrs, applicant_data)
+      if existing_dependent_scenario?(guardian_id, dependent_id)
+        process_existing_dependent(guardian_id, dependent_id, relationship_type)
+      elsif guardian_scenario?(guardian_id, new_guardian_attrs, applicant_data)
         process_guardian_dependent(guardian_id, new_guardian_attrs, applicant_data, relationship_type)
       elsif self_applicant_scenario?(applicant_data)
         process_self_applicant(applicant_data)
@@ -116,6 +145,63 @@ module Applications
       (guardian_id.present? || attributes_present?(new_guardian_attrs)) &&
         attributes_present?(applicant_data) &&
         params[:applicant_type] == 'dependent'
+    end
+
+    def existing_dependent_scenario?(guardian_id, dependent_id)
+      guardian_id.present? && dependent_id.present? && params[:applicant_type] == 'dependent'
+    end
+
+    def process_existing_dependent(guardian_id, dependent_id, relationship_type)
+      guardian = User.find_by(id: guardian_id)
+      dependent = User.find_by(id: dependent_id)
+
+      return add_error('Guardian not found') unless guardian
+      return add_error('Dependent not found') unless dependent
+
+      return false unless ensure_guardian_relationship(guardian, dependent, relationship_type)
+      return false unless update_dependent_and_validate_eligibility(dependent)
+
+      @guardian_user_for_app = guardian
+      @constituent = dependent
+      true
+    end
+
+    def ensure_guardian_relationship(guardian, dependent, relationship_type)
+      rel = GuardianRelationship.find_by(guardian_id: guardian.id, dependent_id: dependent.id)
+      return true if rel.present?
+
+      return add_error('Relationship type required to relate guardian and dependent') if relationship_type.blank?
+
+      begin
+        GuardianRelationship.create!(guardian_user: guardian, dependent_user: dependent, relationship_type: relationship_type)
+        true
+      rescue ActiveRecord::RecordInvalid => e
+        add_error("Failed to create relationship: #{e.record.errors.full_messages.join(', ')}")
+        false
+      end
+    end
+
+    def update_dependent_and_validate_eligibility(dependent)
+      # Update dependent information if provided (contact info may have changed)
+      return false if params[:constituent].present? && attributes_present?(params[:constituent]) && !update_dependent_contact_info(dependent)
+
+      # Validate no active application for dependent
+      return add_error('This dependent already has an active or pending application.') if Application.where(user_id: dependent.id).where.not(status: :archived).exists?
+
+      waiting_period_eligible?(dependent)
+    end
+
+    def waiting_period_eligible?(dependent)
+      # Fast-path waiting period check for better UX (model validation remains authoritative)
+      last_app = dependent.applications.order(application_date: :desc).first
+      return true if last_app.blank?
+
+      waiting_period = Policy.get('waiting_period_years') || 3
+      eligible_date = last_app.application_date + waiting_period.years
+      return true if eligible_date <= Time.current
+
+      add_error("Dependent is not yet eligible. Reapply after #{eligible_date.to_date.strftime('%B %d, %Y')}")
+      false
     end
 
     def self_applicant_scenario?(applicant_data)
@@ -160,7 +246,7 @@ module Applications
       @temp_passwords[user.id] = password
     end
 
-    def validate_no_active_application(user_type) # rubocop:disable Naming/PredicateMethod
+    def validate_no_active_application(user_type)
       return true unless @constituent.applications.where.not(status: :archived).exists?
 
       error_message = case user_type
@@ -171,6 +257,51 @@ module Applications
                       end
       add_error(error_message)
       false
+    end
+
+    def update_dependent_contact_info(dependent)
+      attrs = params[:constituent]
+      return true if attrs.blank?
+
+      updates = build_dependent_contact_updates(attrs)
+      return true if updates.empty?
+
+      if dependent.update(updates)
+        Rails.logger.info "Updated contact info for dependent #{dependent.id}: #{updates.keys.join(', ')}"
+        true
+      else
+        add_error("Failed to update dependent information: #{dependent.errors.full_messages.join(', ')}")
+        false
+      end
+    rescue ActiveRecord::RecordInvalid => e
+      add_error("Failed to update dependent information: #{e.record.errors.full_messages.join(', ')}")
+      false
+    end
+
+    def build_dependent_contact_updates(attrs) # rubocop:disable Metrics/PerceivedComplexity
+      updates = {}
+
+      # Email (may come as dependent_email)
+      updates[:email] = attrs[:dependent_email] if attrs[:dependent_email].present?
+
+      # Phone (may come as dependent_phone)
+      updates[:phone] = attrs[:dependent_phone] if attrs[:dependent_phone].present?
+
+      # Address fields
+      updates[:physical_address_1] = attrs[:physical_address_1] if attrs[:physical_address_1].present?
+      updates[:physical_address_2] = attrs[:physical_address_2] if attrs[:physical_address_2].present?
+      updates[:city] = attrs[:city] if attrs[:city].present?
+      updates[:state] = attrs[:state] if attrs[:state].present?
+      updates[:zip_code] = attrs[:zip_code] if attrs[:zip_code].present?
+
+      # Communication and localization preferences
+      updates[:locale] = attrs[:locale] if attrs[:locale].present?
+      updates[:communication_preference] = attrs[:communication_preference] if attrs[:communication_preference].present?
+      updates[:preferred_means_of_communication] = attrs[:preferred_means_of_communication] if attrs[:preferred_means_of_communication].present?
+      updates[:phone_type] = attrs[:phone_type] if attrs[:phone_type].present?
+      updates[:referral_source] = attrs[:referral_source] if attrs[:referral_source].present?
+
+      updates
     end
 
     def create_application
@@ -187,7 +318,7 @@ module Applications
       Current.paper_context = nil
     end
 
-    def validate_income_threshold(application_attrs) # rubocop:disable Naming/PredicateMethod
+    def validate_income_threshold(application_attrs)
       # Skip validation if explicitly requested (e.g., for rejection cases)
       return true if @skip_income_validation
 
@@ -206,13 +337,15 @@ module Applications
       false
     end
 
-    def build_and_save_application(application_attrs) # rubocop:disable Naming/PredicateMethod
+    def build_and_save_application(application_attrs)
       @application = Application.new(application_attrs)
       @application.user = @constituent
       @application.managing_guardian = @guardian_user_for_app
       @application.submission_method = :paper
       @application.application_date = Time.current
-      @application.status = :in_progress
+
+      # Set appropriate status based on what's missing
+      @application.status = determine_initial_status
 
       return true if @application.save
 
@@ -220,10 +353,41 @@ module Applications
       false
     end
 
+    def determine_initial_status
+      # awaiting_proof if:
+      # 1. No medical provider info provided
+      # 2. No proofs provided (income_proof_action: 'none' or residency_proof_action: 'none')
+      # 3. Proofs were rejected (income_proof_action: 'reject' or residency_proof_action: 'reject')
+
+      return :awaiting_proof if params[:no_medical_provider_information]
+
+      income_action = params[:income_proof_action]
+      residency_action = params[:residency_proof_action]
+
+      # If no proofs provided or any proofs rejected, awaiting proof
+      return :awaiting_proof if income_action.in?(%w[none reject]) || residency_action.in?(%w[none reject])
+
+      # Otherwise, in progress (has all initial documentation)
+      :in_progress
+    end
+
+    # Update application attributes within paper context
+    # only if params[:application] is present
+    def update_application_attributes
+      application_attrs = params[:application]
+      return true if application_attrs.blank?
+
+      # Update attributes - model callback automatically sets paper context
+      return true if @application.update(application_attrs)
+
+      add_error("Failed to update application: #{@application.errors.full_messages.join(', ')}")
+      false
+    end
+
     def process_proof_uploads
       Current.paper_context = true
 
-      %i[income residency].each do |proof_type|
+      %i[income residency medical_certification].each do |proof_type|
         return false unless process_proof(proof_type)
       end
 
@@ -233,66 +397,123 @@ module Applications
     end
 
     def process_proof(type)
-      action = params["#{type}_proof_action"] || params[:"#{type}_proof_action"]
+      # Handle medical_certification naming convention
+      action_key = type == :medical_certification ? "#{type}_action" : "#{type}_proof_action"
+      action = params[action_key] || params[action_key.to_sym]
 
-      return true unless %w[accept reject].include?(action)
+      return true unless %w[accept reject approved rejected not_requested].include?(action)
 
       case action
-      when 'accept'
+      when 'accept', 'approved'
         process_accept_proof(type)
-      when 'reject'
+      when 'reject', 'rejected'
         process_reject_proof(type)
+      when 'not_requested'
+        true
       end
     end
 
     def process_accept_proof(type)
-      file_present = params["#{type}_proof"].present? || params["#{type}_proof_signed_id"].present?
+      # Handle medical_certification naming convention
+      file_key = type == :medical_certification ? type.to_s : "#{type}_proof"
+      signed_id_key = type == :medical_certification ? "#{type}_signed_id" : "#{type}_proof_signed_id"
 
-      if Current.paper_context? && !file_present
-        # Paper context without file - just approve status
-        @application.update!("#{type}_proof_status" => Application.public_send("#{type}_proof_statuses")['approved'])
-        log_proof_submission(type, false)
-        true
-      elsif file_present
-        attach_and_approve_proof(type)
-      else
-        add_error("Please upload a file for #{type} proof")
-        false
-      end
+      file_param = params[file_key]
+      signed_id_param = params[signed_id_key]
+
+      # Check if we have a valid file or signed_id
+      # file_param can be:
+      # - An uploaded file (ActionDispatch::Http::UploadedFile)
+      # - A file-like object (responds to :read)
+      # - A signed blob ID string (String)
+      # signed_id_param should be a non-empty string if present
+      file_valid = file_param.present? && (
+        file_param.respond_to?(:read) ||
+        file_param.is_a?(ActionDispatch::Http::UploadedFile) ||
+        (file_param.is_a?(String) && !file_param.empty?)
+      )
+      signed_id_valid = signed_id_param.present? && signed_id_param.is_a?(String) && !signed_id_param.empty?
+
+      file_present = file_valid || signed_id_valid
+
+      # Approval requires an attachment in all contexts. Only rejections may proceed without files.
+      return add_error("Please upload a file for #{type} proof before approving") unless file_present
+
+      attach_and_approve_proof(type)
     end
 
-    def attach_and_approve_proof(type) # rubocop:disable Naming/PredicateMethod
-      blob_or_file = params["#{type}_proof"].presence || params["#{type}_proof_signed_id"].presence
+    def attach_and_approve_proof(type)
+      # Handle medical_certification naming convention
+      file_key = type == :medical_certification ? type.to_s : "#{type}_proof"
+      signed_id_key = type == :medical_certification ? "#{type}_signed_id" : "#{type}_proof_signed_id"
 
-      result = ProofAttachmentService.attach_proof(
-        application: @application,
-        proof_type: type,
-        blob_or_file: blob_or_file,
-        status: :approved,
-        admin: @admin,
-        submission_method: :paper,
-        metadata: {}
-      )
+      blob_or_file = params[file_key].presence || params[signed_id_key].presence
+
+      # Route medical certifications to the correct service
+      result = if type == :medical_certification
+                 MedicalCertificationAttachmentService.attach_certification(
+                   application: @application,
+                   blob_or_file: blob_or_file,
+                   status: :approved,
+                   admin: @admin,
+                   submission_method: :paper,
+                   metadata: {}
+                 )
+               else
+                 ProofAttachmentService.attach_proof(
+                   application: @application,
+                   proof_type: type,
+                   blob_or_file: blob_or_file,
+                   status: :approved,
+                   admin: @admin,
+                   submission_method: :paper,
+                   metadata: {}
+                 )
+               end
 
       unless result[:success]
         add_error("Error processing #{type} proof: #{result[:error]&.message}")
         return false
       end
 
-      @application.update!("#{type}_proof_status" => Application.public_send("#{type}_proof_statuses")['approved'])
       true
     end
 
-    def process_reject_proof(type) # rubocop:disable Naming/PredicateMethod
-      result = ProofAttachmentService.reject_proof_without_attachment(
-        application: @application,
-        proof_type: type,
-        admin: @admin,
-        reason: params["#{type}_proof_rejection_reason"],
-        notes: params["#{type}_proof_rejection_notes"],
-        submission_method: :paper,
-        metadata: {}
-      )
+    def process_reject_proof(type)
+      reason_key        = type == :medical_certification ? "#{type}_rejection_reason" : "#{type}_proof_rejection_reason"
+      custom_reason_key = type == :medical_certification ? "#{type}_custom_rejection_reason" : "#{type}_proof_custom_rejection_reason"
+      selected_reason   = fetch_param(reason_key).to_s
+      custom_reason     = fetch_param(custom_reason_key).to_s.strip
+
+      if type == :medical_certification
+        reason_payload = resolve_medical_rejection_reason_payload(
+          selected_reason: selected_reason,
+          custom_reason: custom_reason
+        )
+
+        result = MedicalCertificationAttachmentService.reject_certification(
+          application: @application,
+          admin: @admin,
+          reason: reason_payload[:reason],
+          reason_code: reason_payload[:reason_code],
+          submission_method: :paper,
+          metadata: {}
+        )
+      else
+        resolved_reason = resolve_rejection_reason_value(
+          selected_reason: selected_reason,
+          custom_reason: custom_reason
+        )
+
+        result = ProofAttachmentService.reject_proof_without_attachment(
+          application: @application,
+          proof_type: type,
+          admin: @admin,
+          reason: resolved_reason,
+          submission_method: :paper,
+          metadata: {}
+        )
+      end
 
       unless result[:success]
         add_error("Error rejecting #{type} proof: #{result[:error]&.message}")
@@ -300,6 +521,25 @@ module Applications
       end
 
       true
+    end
+
+    def resolve_rejection_reason_value(selected_reason:, custom_reason:)
+      return selected_reason unless selected_reason == 'other'
+      return 'Other' if custom_reason.blank?
+
+      custom_reason
+    end
+
+    def resolve_medical_rejection_reason_payload(selected_reason:, custom_reason:)
+      return { reason: selected_reason, reason_code: selected_reason } if selected_reason.present? && %w[none_provided other].exclude?(selected_reason)
+      return { reason: 'none_provided', reason_code: nil } if selected_reason == 'none_provided'
+      return { reason: 'Other', reason_code: nil } if custom_reason.blank?
+
+      { reason: custom_reason, reason_code: nil }
+    end
+
+    def fetch_param(key)
+      params[key] || params[key.to_sym]
     end
 
     def log_proof_submission(type, has_attachment)
@@ -393,7 +633,7 @@ module Applications
       attrs.present? && attrs.values.any?(&:present?)
     end
 
-    def add_error(message) # rubocop:disable Naming/PredicateMethod
+    def add_error(message)
       @errors << message
       false
     end

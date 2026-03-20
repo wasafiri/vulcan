@@ -2,7 +2,7 @@
 
 # Seed File for "evaluator_mailer_new_evaluation_assigned"
 # --------------------------------------------------
-EmailTemplate.create_or_find_by!(name: 'evaluator_mailer_new_evaluation_assigned', format: :text) do |template|
+EmailTemplate.create_or_find_by!(name: 'evaluator_mailer_new_evaluation_assigned', format: :text, locale: 'en') do |template|
   template.subject = 'New Evaluation Assigned'
   template.description = 'Sent to an evaluator when a new constituent evaluation has been assigned to them.'
   template.body = <<~TEXT
@@ -28,9 +28,12 @@ EmailTemplate.create_or_find_by!(name: 'evaluator_mailer_new_evaluation_assigned
 
     %<footer_text>s
   TEXT
-  template.variables = %w[header_text evaluator_full_name status_box_text constituent_full_name
-                          constituent_address_formatted constituent_phone_formatted constituent_email
-                          constituent_disabilities_text_list evaluators_evaluation_url footer_text]
+  template.variables = {
+    'required' => %w[header_text evaluator_full_name status_box_text constituent_full_name
+                     constituent_address_formatted constituent_phone_formatted constituent_email
+                     constituent_disabilities_text_list evaluators_evaluation_url footer_text],
+    'optional' => []
+  }
   template.version = 1
 end
 Rails.logger.debug 'Seeded evaluator_mailer_new_evaluation_assigned (text)' if ENV['VERBOSE_TESTS'] || Rails.env.development?

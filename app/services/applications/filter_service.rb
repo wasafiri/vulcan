@@ -26,6 +26,7 @@ module Applications
         .then { |result| apply_conditional_explicit_status_filter(result) }
         .then { |result| apply_conditional_date_range_filter(result) }
         .then { |result| apply_conditional_search_filter(result) }
+        .then { |result| apply_guardian_dependent_text_searches(result) }
         .then { |result| apply_guardian_relationship_filters(result) }
     end
 
@@ -57,6 +58,8 @@ module Applications
       case filter
       when 'active'
         scope.active
+      when 'draft'
+        scope.where(status: :draft)
       when 'in_progress'
         scope.where(status: :in_progress)
       when 'approved'
@@ -67,7 +70,7 @@ module Applications
         # Use Rails enum mapping to get the correct integer values
         scope.where(income_proof_status: :not_reviewed).or(scope.where(residency_proof_status: :not_reviewed))
       when 'awaiting_medical_response'
-        scope.where(status: :awaiting_documents)
+        scope.where(status: :awaiting_dcf)
       when 'medical_certs_to_review'
         # Only include applications that are in progress and have received certs
         scope.where(status: :in_progress, medical_certification_status: :received)
@@ -88,6 +91,9 @@ module Applications
       when 'dependent_applications'
         # Filter applications that are for dependents (have a managing_guardian)
         scope.where.not(managing_guardian_id: nil)
+      when 'digitally_signed_needs_review'
+        # Applications that have been digitally signed and need admin review
+        scope.digitally_signed_needs_review
       else
         scope
       end
@@ -121,6 +127,26 @@ module Applications
       )
     end
 
+    # Support text queries for guardian and dependent specific searches
+    def apply_guardian_dependent_text_searches(scope)
+      result = scope
+
+      if params[:managing_guardian_q].present?
+        q = "%#{params[:managing_guardian_q]}%"
+        # Explicit join to users as managing guardians
+        result = result.joins('INNER JOIN users mg_users ON mg_users.id = applications.managing_guardian_id')
+                       .where('mg_users.first_name ILIKE ? OR mg_users.last_name ILIKE ? OR mg_users.email ILIKE ?', q, q, q)
+      end
+
+      if params[:dependent_q].present?
+        q = "%#{params[:dependent_q]}%"
+        result = result.joins(:user)
+                       .where('users.first_name ILIKE ? OR users.last_name ILIKE ? OR users.email ILIKE ?', q, q, q)
+      end
+
+      result
+    end
+
     def apply_guardian_relationship_filters(scope)
       scope
         .then { |result| apply_managing_guardian_filter(result) }
@@ -152,7 +178,8 @@ module Applications
     end
 
     def apply_only_dependents_filter(scope)
-      return scope unless params[:only_dependent_apps] == 'true'
+      # Support both legacy only_dependent_apps=true and new for_minors checkbox
+      return scope unless params[:only_dependent_apps] == 'true' || params[:for_minors].present?
 
       scope.where.not(managing_guardian_id: nil)
     end

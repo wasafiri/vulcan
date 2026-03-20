@@ -53,7 +53,7 @@ module ConstituentPortal
         post constituent_portal_applications_path, params: @application_params.merge(submit_application: true)
       end
 
-      assert_response :unprocessable_entity
+      assert_response :unprocessable_content
       assert_match(/At least one disability must be selected/, response.body)
     end
 
@@ -153,9 +153,14 @@ module ConstituentPortal
         params = @application_params.dup
         params[:application]["#{disability_type}_disability"] = '1'
 
-        post constituent_portal_applications_path, params: params.merge(submit_application: true)
+        # Capture application count before POST to find the newly created one
+        assert_difference 'Application.count', 1 do
+          post constituent_portal_applications_path, params: params.merge(submit_application: true)
+        end
 
-        assert_redirected_to constituent_portal_application_path(Application.last)
+        # Find the application that was just created for this constituent
+        created_application = constituent.applications.order(created_at: :desc).first
+        assert_redirected_to constituent_portal_application_path(created_application)
         assert constituent.reload.send("#{disability_type}_disability"),
                "#{disability_type}_disability should be true after submission"
       end
@@ -186,7 +191,7 @@ module ConstituentPortal
         submit_application: true
       }
 
-      assert_response :unprocessable_entity
+      assert_response :unprocessable_content
       assert_match(/At least one disability must be selected/, response.body)
 
       # Now add a disability along with required fields

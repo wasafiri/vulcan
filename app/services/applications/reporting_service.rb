@@ -152,11 +152,11 @@ module Applications
       data[:previous_fy_draft_applications] =
         Application.where(status: :draft, created_at: previous_range).count
 
-      # Combined draft and needs_information applications (for production use)
+      # Combined draft and awaiting_proof applications (for production use)
       data[:current_fy_draft_and_needs_info_applications] =
-        Application.where(status: %i[draft needs_information], created_at: current_range).count
+        Application.where(status: %i[draft awaiting_proof], created_at: current_range).count
       data[:previous_fy_draft_and_needs_info_applications] =
-        Application.where(status: %i[draft needs_information], created_at: previous_range).count
+        Application.where(status: %i[draft awaiting_proof], created_at: previous_range).count
     end
 
     def add_voucher_metrics(data)
@@ -301,11 +301,10 @@ module Applications
     def add_recent_notifications(data)
       notifications = Notification.select(
         'id, recipient_id, actor_id, notifiable_id, notifiable_type, action, read_at, created_at, message_id, delivery_status, metadata'
-      ).includes(:notifiable, :actor)
-                                  .order(created_at: :desc)
+      ).order(created_at: :desc)
                                   .limit(5)
 
-      data[:recent_notifications] = notifications.map { |n| NotificationDecorator.new(n) }
+      data[:recent_notifications] = notifications
     end
 
     def fetch_application_status_counts
@@ -343,7 +342,7 @@ module Applications
 
     def add_application_pipeline_data(data, status_counts)
       draft_count = status_count_helper(status_counts, :draft)
-      needs_info_count = status_count_helper(status_counts, :needs_information)
+      needs_info_count = status_count_helper(status_counts, :awaiting_proof)
       draft_and_needs_info_count = draft_count + needs_info_count
       submitted_count = status_count_helper(status_counts, :submitted)
       in_review_count = status_count_helper(status_counts, :in_review)
@@ -370,7 +369,7 @@ module Applications
 
     def add_status_breakdown_data(data, status_counts)
       draft_count = status_count_helper(status_counts, :draft)
-      needs_info_count = status_count_helper(status_counts, :needs_information)
+      needs_info_count = status_count_helper(status_counts, :awaiting_proof)
       draft_and_needs_info_count = draft_count + needs_info_count
       submitted_count = status_count_helper(status_counts, :submitted)
       in_review_count = status_count_helper(status_counts, :in_review)
@@ -396,7 +395,7 @@ module Applications
 
     def add_individual_status_counts(data, status_counts)
       draft_count = status_count_helper(status_counts, :draft)
-      needs_info_count = status_count_helper(status_counts, :needs_information)
+      needs_info_count = status_count_helper(status_counts, :awaiting_proof)
       draft_and_needs_info_count = draft_count + needs_info_count
       submitted_count = status_count_helper(status_counts, :submitted)
       in_review_count = status_count_helper(status_counts, :in_review)

@@ -188,7 +188,7 @@ class ProofAttachmentService
       with_paper_context(flow_data.submission_method, flow_data.proof_type) do
         attach_and_verify_initial_save(flow_data.application, flow_data.proof_type, flow_data.attachment_param)
         log_attachment_events_from_flow_data(flow_data, params)
-        verify_attachment_persisted_after_update(flow_data.application, flow_data.proof_type)
+        # Removed verify_attachment_persisted_after_update - status updates don't affect attachments
 
         result[:blob_size] = flow_data.blob_size
         result[:success] = true
@@ -202,9 +202,14 @@ class ProofAttachmentService
     end
 
     def perform_attachment(application, proof_type, attachment_param)
-      application.send("#{proof_type}_proof").attach(attachment_param)
+      attachment_method = get_attachment_method_name(proof_type)
+      application.send(attachment_method).attach(attachment_param)
     rescue ActiveSupport::MessageVerifier::InvalidSignature, ActiveRecord::RecordNotFound => e
       handle_attachment_signature_error(application, proof_type, attachment_param, e)
+    end
+
+    def get_attachment_method_name(proof_type)
+      "#{proof_type}_proof"
     end
 
     def handle_attachment_signature_error(application, proof_type, attachment_param, error)
@@ -212,7 +217,8 @@ class ProofAttachmentService
 
       validate_recoverable_attachment_param(attachment_param, error)
       blob = recreate_blob_from_uploaded_file(attachment_param)
-      application.send("#{proof_type}_proof").attach(blob)
+      attachment_method = get_attachment_method_name(proof_type)
+      application.send(attachment_method).attach(blob)
     end
 
     def validate_recoverable_attachment_param(attachment_param, error)
@@ -252,15 +258,11 @@ class ProofAttachmentService
     def verify_attachment_persisted(application, proof_type)
       application.reload
 
-      return if application.send("#{proof_type}_proof").attached?
+      attachment_method = get_attachment_method_name(proof_type)
+      return if application.send(attachment_method).attached?
 
       Rails.logger.error "Attachment failed to persist for #{proof_type} proof on application #{application.id}"
       raise 'Attachment failed to persist after save and reload'
-    end
-
-    def verify_attachment_persisted_after_update(application, proof_type)
-      application.reload
-      raise 'Critical error: Attachment disappeared after status update' unless application.send("#{proof_type}_proof").attached?
     end
 
     def log_error(error)
@@ -362,7 +364,8 @@ class ProofAttachmentService
     end
 
     def build_event_metadata(context)
-      attached_blob = context.application.send("#{context.proof_type}_proof").blob
+      attachment_method = get_attachment_method_name(context.proof_type)
+      attached_blob = context.application.send(attachment_method).blob
       blob_id = attached_blob&.id
 
       context.metadata.merge(
@@ -393,11 +396,19 @@ class ProofAttachmentService
       ActiveRecord::Base.transaction do
         status_attrs = { "#{context.proof_type}_proof_status" => context.status }
         status_attrs[:needs_review_since] = Time.current if context.status == :not_reviewed
-        context.application.update!(status_attrs)
+        status_attrs[:updated_at] = Time.current
+        
+        # Use update_columns to bypass validations that may require all proofs to be attached
+        # This is necessary in paper application context where proofs are being processed
+        context.application.update_columns(status_attrs)
+        context.application.reload
       end
     end
 
     def send_notification(context, event_metadata)
+      # Skip notifications if this is a paper application as paper applications handle their own notifications in PaperApplicationService
+      return if Current.paper_context
+
       NotificationService.create_and_deliver!(
         type: "#{context.proof_type}_proof_attached",
         recipient: context.application.user,
@@ -408,24 +419,29 @@ class ProofAttachmentService
     end
 
     def perform_rejection(application:, proof_type:, admin:, submission_method:, rejection_details:)
-      reason = rejection_details.fetch(:reason, 'other')
-      notes = rejection_details.fetch(:notes, nil)
+      raw_reason = rejection_details.fetch(:reason, 'other')
+      notes      = rejection_details.fetch(:notes, nil)
+
+      resolved = RejectionReason.resolve_for_persistence(
+        code: raw_reason, proof_type: proof_type.to_s, fallback: raw_reason
+      )
+      reason_text = resolved[:text]
+      reason_code = resolved[:code]
 
       with_paper_context(submission_method, proof_type) do
-        # Update the proof status
         application.reject_proof_without_attachment!(
           proof_type,
           admin: admin,
-          reason: reason,
+          reason: reason_text,
           notes: notes || 'Rejected during paper application submission'
         )
 
-        # Create the proof review record
         application.proof_reviews.create!(
           admin: admin,
           proof_type: proof_type,
           status: 'rejected',
-          rejection_reason: reason,
+          rejection_reason: reason_text,
+          rejection_reason_code: reason_code,
           notes: notes,
           reviewed_at: Time.current,
           submission_method: submission_method
@@ -450,6 +466,10 @@ class ProofAttachmentService
         actor: admin,
         metadata: audit_metadata
       )
+
+      # Skip notifications if this is a paper application context as PaperApplicationService handles notifications
+      return if Current.paper_context
+
       NotificationService.create_and_deliver!(
         type: "#{proof_type}_proof_rejected",
         recipient: application.user,

@@ -14,10 +14,11 @@ class EvaluatorMailer < ApplicationMailer
   def new_evaluation_assigned
     evaluation = params[:evaluation]
     template_name = 'evaluator_mailer_new_evaluation_assigned'
+    locale = resolve_template_locale(recipient: evaluation&.evaluator)
 
-    text_template = load_email_template(template_name)
-    variables = build_new_evaluation_variables(evaluation)
-    send_evaluation_email(text_template, variables, evaluation.evaluator, template_name)
+    text_template = load_email_template(template_name, locale: locale)
+    variables = build_new_evaluation_variables(evaluation, template: text_template, locale: locale)
+    send_email(evaluation.evaluator.email, text_template, variables)
   rescue StandardError => e
     log_email_error(e, evaluation&.evaluator, template_name, variables)
     raise
@@ -28,12 +29,13 @@ class EvaluatorMailer < ApplicationMailer
   def evaluation_submission_confirmation
     evaluation = params[:evaluation]
     template_name = 'evaluator_mailer_evaluation_submission_confirmation'
+    locale = resolve_template_locale(recipient: evaluation&.constituent)
 
-    text_template = load_email_template(template_name)
-    variables = build_submission_confirmation_variables(evaluation)
+    text_template = load_email_template(template_name, locale: locale)
+    variables = build_submission_confirmation_variables(evaluation, template: text_template, locale: locale)
 
     queue_letter_if_needed(evaluation, template_name, variables)
-    send_constituent_email(text_template, variables, evaluation.constituent, template_name)
+    send_email(evaluation.constituent.email, text_template, variables)
   rescue StandardError => e
     log_submission_error(e, evaluation)
     raise
@@ -62,22 +64,26 @@ class EvaluatorMailer < ApplicationMailer
   private
 
   # Load email template with error handling
-  def load_email_template(template_name)
-    EmailTemplate.find_by!(name: template_name, format: :text)
+  def load_email_template(template_name, locale: nil)
+    find_text_template(template_name, locale: locale)
   rescue ActiveRecord::RecordNotFound => e
     Rails.logger.error "Missing EmailTemplate for #{template_name}: #{e.message}"
     raise "Email templates not found for #{template_name}"
   end
 
   # Build variables hash for new evaluation assignment email
-  def build_new_evaluation_variables(evaluation)
+  def build_new_evaluation_variables(evaluation, template:, locale: nil)
     evaluator = evaluation.evaluator
     constituent = evaluation.constituent
     application = evaluation.application
 
     evaluation_url = safe_evaluation_url(evaluation)
-    header_title = "New Evaluation Assigned - Application ##{application.id}"
-    header_data = build_header_footer_data(header_title)
+    header_title = header_title_from_template_subject(
+      template: template,
+      subject_variables: { application_id: application.id },
+      fallback: "New Evaluation Assigned - Application ##{application.id}"
+    )
+    header_data = build_header_footer_data(header_title, locale: locale)
 
     {
       evaluator_full_name: evaluator.full_name,
@@ -93,14 +99,18 @@ class EvaluatorMailer < ApplicationMailer
   end
 
   # Build variables hash for evaluation submission confirmation email
-  def build_submission_confirmation_variables(evaluation)
+  def build_submission_confirmation_variables(evaluation, template:, locale: nil)
     constituent = evaluation.constituent
     application = evaluation.application
     evaluator = evaluation.evaluator
     submission_date_formatted = evaluation.try(:submitted_at)&.strftime('%B %d, %Y at %I:%M %p %Z') || 'Not Provided'
 
-    header_title = "Your Evaluation has been Submitted - Application ##{application.id}"
-    header_data = build_header_footer_data(header_title)
+    header_title = header_title_from_template_subject(
+      template: template,
+      subject_variables: { application_id: application.id },
+      fallback: "Your Evaluation has been Submitted - Application ##{application.id}"
+    )
+    header_data = build_header_footer_data(header_title, locale: locale)
 
     {
       constituent_first_name: constituent.first_name,
@@ -119,23 +129,25 @@ class EvaluatorMailer < ApplicationMailer
   end
 
   # Build header and footer data for email template
-  def build_header_footer_data(title)
-    footer_contact_email = Policy.get('support_email') || 'support@example.com'
+  def build_header_footer_data(title, locale: nil)
+    footer_contact_email = Policy.get('support_email') || 'mat.program1@maryland.gov'
     footer_website_url = root_url(host: default_url_options[:host])
     footer_show_automated_message = true
     footer_organization_name = Policy.get('organization_name') || 'MAT Program'
     header_logo_url = safe_logo_url
 
     {
-      header_text: header_text(title: title, logo_url: header_logo_url),
+      header_text: header_text(title: title, logo_url: header_logo_url, locale: locale),
       footer_text: footer_text(
         contact_email: footer_contact_email,
         website_url: footer_website_url,
         show_automated_message: footer_show_automated_message,
-        organization_name: footer_organization_name
+        organization_name: footer_organization_name,
+        locale: locale
       ),
       header_logo_url: header_logo_url,
-      header_subtitle: nil
+      header_subtitle: nil,
+      support_email: footer_contact_email
     }
   end
 
@@ -169,34 +181,6 @@ class EvaluatorMailer < ApplicationMailer
     constituent.disabilities.map { |d| "- #{d}" }.join("\n")
   end
 
-  # Send email to evaluator
-  def send_evaluation_email(text_template, variables, evaluator, template_name)
-    send_email(text_template, variables, evaluator.email, template_name)
-  end
-
-  # Send email to constituent
-  def send_constituent_email(text_template, variables, constituent, template_name)
-    send_email(text_template, variables, constituent.email, template_name)
-  end
-
-  # Generic email sending method
-  def send_email(text_template, variables, recipient_email, template_name)
-    rendered_subject, rendered_text_body = text_template.render(**variables)
-    rendered_subject = format(rendered_subject, **variables)
-    rendered_text_body = format(rendered_text_body, **variables)
-
-    text_body = rendered_text_body.to_s
-    Rails.logger.debug { "DEBUG: Preparing to send #{template_name} email with content: #{text_body.inspect}" }
-
-    mail(
-      to: recipient_email,
-      subject: rendered_subject,
-      message_stream: 'notifications',
-      body: text_body,
-      content_type: 'text/plain'
-    )
-  end
-
   # Queue letter if constituent prefers print communication
   def queue_letter_if_needed(evaluation, template_name, variables)
     constituent = evaluation.constituent
@@ -218,12 +202,13 @@ class EvaluatorMailer < ApplicationMailer
 
   # Log email delivery errors
   def log_email_error(error, evaluator, template_name, variables = {})
-    Event.create!(
-      user: evaluator,
+    AuditEventService.log(
+      actor: evaluator,
       action: 'email_delivery_error',
-      user_agent: Current.user_agent,
-      ip_address: Current.ip_address,
+      auditable: evaluator,
       metadata: {
+        user_agent: Current.user_agent,
+        ip_address: Current.ip_address,
         error_message: error.message,
         error_class: error.class.name,
         template_name: template_name,

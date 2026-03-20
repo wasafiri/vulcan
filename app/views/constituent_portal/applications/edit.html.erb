@@ -1,16 +1,19 @@
 <main class="container mx-auto px-4 py-8" role="main">
  <header class="mb-6">
    <h1 class="text-3xl font-bold text-gray-900">Edit Application</h1>
+   <p class="text-l text-gray-900"><span style="color: red;">*</span> Indicates a required field</p>
  </header>
 
  <%= form_with(model: [:constituent_portal, @application], 
               local: true, 
               class: "space-y-8", 
               data: { 
-                controller: "autosave", 
+                controller: "income-validation currency-formatter autosave", 
                 autosave_target: "form",
                 autosave_url_value: autosave_field_constituent_portal_application_path(@application),
-                autosave_debounce_wait_value: 1000
+                autosave_debounce_wait_value: 1000,
+                "income-validation-fpl-thresholds-value": fpl_thresholds_json,
+                "income-validation-modifier-value": fpl_modifier_value
               }) do |f| %>
    
    <!-- Autosave status indicator -->
@@ -18,18 +21,27 @@
    <div class="bg-white shadow sm:rounded-lg" aria-labelledby="application_form_heading">
      <h2 id="application_form_heading" class="sr-only">Application Details Form</h2>
 
-     <% if @application.errors.any? %>
-       <div class="bg-red-50 p-4 rounded-t-lg" role="alert" aria-labelledby="error_messages">
-         <h3 id="error_messages" class="text-red-800 font-medium">
-           <%= pluralize(@application.errors.count, "error") %> prohibited this application from being saved:
-         </h3>
-         <ul class="mt-2 list-disc list-inside text-sm text-red-700">
-           <% @application.errors.full_messages.each do |msg| %>
-             <li><%= msg %></li>
-           <% end %>
-         </ul>
-       </div>
-     <% end %>
+    <% if @application.errors.any? %>
+      <div id="error-summary" class="bg-red-50 p-4 rounded-t-lg" role="alert" aria-live="assertive" aria-labelledby="error_messages" aria-atomic="true" tabindex="-1" autofocus>
+        <h3 id="error_messages" class="text-red-800 font-medium">
+          <%= pluralize(@application.errors.count, "error") %> prohibited this application from being saved:
+        </h3>
+        <ul class="mt-2 list-disc list-inside text-sm text-red-700">
+          <% @application.errors.full_messages.each do |msg| %>
+            <li><%= msg %></li>
+          <% end %>
+        </ul>
+      </div>
+      <script>
+        // Focus the error summary for screen reader users
+        document.addEventListener('DOMContentLoaded', function() {
+          var errorSummary = document.getElementById('error-summary');
+          if (errorSummary) {
+            errorSummary.focus();
+          }
+        });
+      </script>
+    <% end %>
 
      <div class="p-6 space-y-6">
        <!-- Application Status Display -->
@@ -47,7 +59,7 @@
 
        <!-- Residency Verification Section -->
        <div class="space-y-4 p-4 bg-gray-50 rounded">
-         <h2 class="text-lg font-medium text-gray-900">Residency Verification</h2>
+         <h2 class="text-lg font-medium text-gray-900 required-label">Residency Verification</h2>
          
          <div class="flex items-start">
            <%= f.check_box :maryland_resident,
@@ -70,9 +82,10 @@
                 min: 1,
                 class: "focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md",
                 "aria-describedby": "household_size_help",
-                required: true %>
+                required: true,
+                data: { "income-validation-target": "householdSize" } %>
           </div>
-          <p class="mt-2 text-sm text-gray-500" id="household_size_help">
+          <p class="mt-2 text-sm text-gray-500 required-label" id="household_size_help">
             Total number of people living in your household
           </p>
         </div>
@@ -87,13 +100,19 @@
                 step: "0.01",
                 class: "pl-7 focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md",
                 "aria-describedby": "annual_income_help",
-                required: true %>
+                required: true,
+                data: { "income-validation-target": "annualIncome", currency_formatter_target: "input" } %>
           </div>
-          <p class="mt-2 text-sm text-gray-500" id="annual_income_help">
-            Total yearly household income before taxes
-          </p>
+          <div class="mt-2">
+            <p class="text-sm text-gray-500 required-label" id="annual_income_help">
+              Total yearly household income before taxes
+            </p>
+          </div>
         </div>
       </fieldset>
+
+       <!-- Income Threshold Warning Container -->
+       <div id="income-threshold-warning" hidden class="hidden" data-income-validation-target="warningContainer"></div>
 
         <!-- Applicant and Guardian Display -->
         <section aria-labelledby="applicant-guardian-title" class="space-y-4 p-4 bg-gray-50 rounded">
@@ -116,7 +135,7 @@
 
        <!-- Disability Section -->
        <section aria-labelledby="disability-section-title" class="space-y-4 p-4 bg-gray-50 rounded">
-         <h2 id="disability-section-title" class="text-lg font-medium text-gray-900">Disability Information</h2>
+         <h2 id="disability-section-title" class="text-lg font-medium text-gray-900 required-label">Disability Information</h2>
          
          <div class="flex items-start">
            <%= f.check_box :self_certify_disability,
@@ -137,10 +156,12 @@
            
            <div class="grid sm:grid-cols-2 gap-4">
              <% disabilities = [:hearing, :vision, :speech, :mobility, :cognition] %>
+             <%# Use application's user for dependent applications, not current_user %>
+             <% applicant_user = @application.user || current_user %>
              <% disabilities.each do |disability| %>
                <div class="flex items-center">
                  <%= f.check_box "#{disability}_disability",
-                     checked: params.dig(:application, "#{disability}_disability") == "1" || current_user.send("#{disability}_disability"),
+                     checked: params.dig(:application, "#{disability}_disability") == "1" || applicant_user.send("#{disability}_disability"),
                      class: "h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded",
                      "aria-describedby": "#{disability}-description" %>
                  <%= f.label "#{disability}_disability", disability.to_s.titleize,
@@ -154,7 +175,7 @@
          </fieldset>
        </section>
 
-       <!-- Medical Provider Information -->
+       <!-- Certifying Professional Information -->
        <%= f.fields_for :medical_provider_attributes do |mp| %>
          <%= render "medical_provider_form", form: mp %>
        <% end %>
@@ -190,10 +211,10 @@
          <div class="space-y-4">
            <div>
              <%= f.label :residency_proof, "Proof of Residency",
-                 class: "block text-sm font-medium text-gray-700" %>
+                 class: "block text-sm font-medium text-gray-700 required-label" %>
              <p id="residency-hint" class="text-xs text-gray-500 mb-2">
                Upload one of the following acceptable documents: <strong>driver's license</strong>, <strong>state ID</strong>, 
-               <strong>identification card</strong>, <strong>utility bill</strong>, or <strong>patient photo ID</strong>
+               <strong>identification card</strong>, <strong>utility bill</strong>, or <strong> photo ID</strong>
              </p>
              <%= f.file_field :residency_proof,
                  class: "block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100",
@@ -203,7 +224,7 @@
 
            <div>
              <%= f.label :income_proof, "Income Verification",
-                 class: "block text-sm font-medium text-gray-700" %>
+                 class: "block text-sm font-medium text-gray-700 required-label" %>
              <p id="income-hint" class="text-xs text-gray-500 mb-2">
                Upload SSI/SSDI documentation, recent pay stubs, or tax forms
              </p>
@@ -220,18 +241,19 @@
      <div class="px-6 py-4 bg-gray-50 flex items-center justify-end space-x-3 rounded-b-lg">
        <%= link_to "Cancel",
            constituent_portal_application_path(@application),
-           class: "inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+           class: "px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
            role: "button" %>
            
        <%= f.submit "Save Application",
            name: "save_draft",
-           class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+           class: "px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
            "aria-label": "Save application draft" %>
 
        <%= f.submit "Submit Application", 
            name: "submit_application",
-           class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500",
-           "aria-label": "Submit final application" %>
+           class: "px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500",
+           "aria-label": "Submit final application",
+           data: { "income-validation-target": "submitButton" } %>
      </div>
    </div>
  <% end %>

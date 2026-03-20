@@ -57,7 +57,7 @@ class RegistrationsControllerTest < ActionDispatch::IntegrationTest
       } }
     end
 
-    assert_redirected_to welcome_path
+    assert_redirected_to constituent_portal_dashboard_path
     assert_equal 'Account created successfully. Welcome!', flash[:notice]
 
     # Verify user was created correctly
@@ -91,7 +91,7 @@ class RegistrationsControllerTest < ActionDispatch::IntegrationTest
     end
 
     # Should succeed and redirect
-    assert_redirected_to welcome_path
+    assert_redirected_to constituent_portal_dashboard_path
     assert_equal 'Account created successfully. Welcome!', flash[:notice]
 
     # Verify user was created correctly without disability flags set
@@ -116,7 +116,7 @@ class RegistrationsControllerTest < ActionDispatch::IntegrationTest
       } }
     end
 
-    assert_response :unprocessable_entity
+    assert_response :unprocessable_content
     # Check errors directly on the instance variable assigned by the controller
     assert_includes assigns(:user).errors[:phone], 'must be a valid 10-digit US phone number'
   end
@@ -140,7 +140,7 @@ class RegistrationsControllerTest < ActionDispatch::IntegrationTest
       } }
     end
 
-    assert_response :unprocessable_entity
+    assert_response :unprocessable_content
     # Check errors directly on the instance variable assigned by the controller
     assert_includes assigns(:user).errors[:email], 'has already been taken'
   end
@@ -167,7 +167,7 @@ class RegistrationsControllerTest < ActionDispatch::IntegrationTest
       } }
     end
 
-    assert_response :unprocessable_entity
+    assert_response :unprocessable_content
     # Check errors directly on the instance variable assigned by the controller
     assert_includes assigns(:user).errors[:phone], 'has already been taken'
   end
@@ -206,7 +206,7 @@ class RegistrationsControllerTest < ActionDispatch::IntegrationTest
     end
 
     # Should still redirect successfully
-    assert_redirected_to welcome_path
+    assert_redirected_to constituent_portal_dashboard_path
     assert_equal 'Account created successfully. Welcome!', flash[:notice]
 
     # Verify the new user was created AND flagged
@@ -231,7 +231,7 @@ class RegistrationsControllerTest < ActionDispatch::IntegrationTest
       } }
     end
 
-    assert_response :unprocessable_entity
+    assert_response :unprocessable_content
     # Check errors directly on the instance variable assigned by the controller
     assert_includes assigns(:user).errors[:password_confirmation], "doesn't match Password"
   end
@@ -273,7 +273,7 @@ class RegistrationsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 1, ActionMailer::Base.deliveries.size, 'Email should have been delivered'
 
     # Verify the registration was successful
-    assert_redirected_to welcome_path
+    assert_redirected_to constituent_portal_dashboard_path
     assert_equal 'Account created successfully. Welcome!', flash[:notice]
 
     # Verify user was created with expected attributes
@@ -300,7 +300,73 @@ class RegistrationsControllerTest < ActionDispatch::IntegrationTest
     # Test that variables were substituted with values
     assert_match(/Test/, content, 'First name should be substituted')
     assert_match(/Test User/, content, 'Full name should be substituted')
-    assert_match(%r{constituent_portal/dashboard}, content, 'Should include dashboard link')
-    assert_match(%r{constituent_portal/applications/new}, content, 'Should include new application link')
+    # Dashboard and new application links were removed from the template body
+  end
+
+  def test_registration_confirmation_uses_spanish_template_for_spanish_locale
+    ActionMailer::Base.deliveries.clear
+
+    template_name = 'application_notifications_registration_confirmation'
+    admin = create(:admin)
+
+    EmailTemplate.where(name: template_name, format: :text).delete_all
+
+    create(:email_template, :text,
+           name: template_name,
+           locale: 'en',
+           subject: 'Welcome EN',
+           body: 'EN body %<user_first_name>s %<user_full_name>s',
+           description: 'EN registration confirmation',
+           variables: {
+             'required' => %w[user_first_name user_full_name],
+             'optional' => %w[header_text footer_text dashboard_url new_application_url active_vendors_text_list support_email]
+           },
+           updated_by: admin,
+           enabled: true)
+
+    create(:email_template, :text,
+           name: template_name,
+           locale: 'es',
+           subject: 'Bienvenido ES',
+           body: 'ES body %<user_first_name>s %<user_full_name>s',
+           description: 'ES registration confirmation',
+           variables: {
+             'required' => %w[user_first_name user_full_name],
+             'optional' => %w[header_text footer_text dashboard_url new_application_url active_vendors_text_list support_email]
+           },
+           updated_by: admin,
+           enabled: true)
+
+    email = "registro-es-#{SecureRandom.hex(4)}@example.com"
+
+    assert_difference('User.count', 1) do
+      assert_enqueued_jobs 1 do
+        post sign_up_path, params: { user: {
+          email: email,
+          password: 'password123',
+          password_confirmation: 'password123',
+          first_name: 'Prueba',
+          last_name: 'Usuario',
+          date_of_birth: '1990-01-01',
+          phone: '555-555-5555',
+          timezone: 'Eastern Time (US & Canada)',
+          locale: 'es',
+          communication_preference: 'email',
+          hearing_disability: true,
+          vision_disability: false,
+          speech_disability: false,
+          mobility_disability: false,
+          cognition_disability: false
+        } }
+      end
+    end
+
+    perform_enqueued_jobs
+
+    assert_equal 1, ActionMailer::Base.deliveries.size
+    sent_email = ActionMailer::Base.deliveries.last
+    assert_equal [email], sent_email.to
+    assert_equal 'Bienvenido ES', sent_email.subject
+    assert_includes sent_email.body.to_s, 'ES body Prueba Prueba Usuario'
   end
 end

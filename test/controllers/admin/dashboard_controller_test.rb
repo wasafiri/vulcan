@@ -55,8 +55,6 @@ module Admin
       # First dashboard request: verify proofs and medical certs counts
       # Dashboard redirects to admin/applications#index, so follow the redirect
       get admin_dashboard_path
-      assert_redirected_to admin_applications_path
-      follow_redirect!
       assert_response :success
       verify_dashboard_counts
 
@@ -64,8 +62,6 @@ module Admin
 
       # Second dashboard request: verify training requests count
       get admin_dashboard_path
-      assert_redirected_to admin_applications_path
-      follow_redirect!
       assert_response :success
       verify_training_request_counts
     end
@@ -150,12 +146,13 @@ module Admin
       expected_proofs_count = Application.where(income_proof_status: :not_reviewed)
                                          .or(Application.where(residency_proof_status: :not_reviewed))
                                          .count
-      assert_equal expected_proofs_count, assigns(:proofs_needing_review_count),
+      # Access metrics hash.
+      assert_equal expected_proofs_count, assigns(:metrics)[:proofs_needing_review_count],
                    'Expected proofs needing review count to match'
 
       # Verify counts for medical certifications.
       expected_medical_certs_count = Application.where(medical_certification_status: 'received').count
-      assert_equal expected_medical_certs_count, assigns(:medical_certs_to_review_count),
+      assert_equal expected_medical_certs_count, assigns(:metrics)[:medical_certs_to_review_count],
                    'Expected medical certificates to review count to match'
     end
 
@@ -184,7 +181,7 @@ module Admin
 
       assert_equal 4, distinct_apps_count,
                    'Database should have 4 distinct applications with training requests'
-      assert_equal 4, assigns(:training_requests_count),
+      assert_equal 4, assigns(:metrics)[:training_requests_count],
                    'Controller should assign 4 training requests'
     end
   end

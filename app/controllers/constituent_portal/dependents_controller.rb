@@ -35,11 +35,24 @@ module ConstituentPortal
     # POST /constituent_portal/dependents
     def create
       # Using UserServiceIntegration concern for consistent user creation
-      # Flow: create_user_with_service(params, is_managing_adult: false) -> handles password, disability validation, etc.
-      result = create_user_with_service(dependent_user_params, is_managing_adult: false)
+      # Portal always creates NEW users for dependents (skip_user_lookup: true)
+      # Paper applications may find/reuse existing users (skip_user_lookup: false, default)
+      # Require disability validation for portal-created dependents
+      result = create_user_with_service(dependent_user_params,
+                                        is_managing_adult: false,
+                                        skip_user_lookup: true,
+                                        require_disability_validation: true)
 
       if result.success?
         @dependent_user = result.data[:user]
+
+        # Safety check: Ensure the dependent is not the same as the guardian
+        if @dependent_user.id == current_user.id
+          @dependent_user.destroy if @dependent_user.persisted?
+          log_user_service_error('to create dependent', 'Cannot add yourself as your own dependent')
+          handle_creation_failure(['You cannot add yourself as your own dependent. Please create a dependent with different contact information.'])
+          return
+        end
 
         # Using UserServiceIntegration concern for relationship creation
         # Flow: create_guardian_relationship_with_service -> handles relationship creation and validation
@@ -66,7 +79,7 @@ module ConstituentPortal
         redirect_after_successful_update
       else
         setup_edit_template_variables
-        render :edit, status: :unprocessable_entity
+        render :edit, status: :unprocessable_content
       end
     end
 
@@ -94,9 +107,12 @@ module ConstituentPortal
     private
 
     def set_dependent
-      # Ensure current_user can only manage their own dependents
-      @dependent = current_user.dependents.find_by(id: params[:id])
-      redirect_to constituent_portal_dashboard_path, alert: 'Dependent not found.' unless @dependent
+      # Use Rails-centric scope for authorization
+      @dependent = User.editable_by_guardian(current_user).find_by(id: params[:id])
+
+      return if @dependent
+
+      redirect_to constituent_portal_dashboard_path, alert: 'Dependent not found.'
     end
 
     def dependent_user_params
@@ -148,7 +164,7 @@ module ConstituentPortal
       @guardian_relationship ||= GuardianRelationship.new(guardian_relationship_params)
 
       flash.now[:alert] = "Failed to create dependent: #{error_messages.join(', ')}"
-      render :new, status: :unprocessable_entity
+      render :new, status: :unprocessable_content
     end
 
     def configure_uniqueness_validation(params_to_update)

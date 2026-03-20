@@ -50,9 +50,10 @@ class ProofSubmissionMailbox < ApplicationMailbox
     # Only create event if we have both constituent and application
     return unless constituent && application
 
-    Event.create!(
-      user: constituent,
+    AuditEventService.log(
+      actor: constituent,
       action: 'proof_submission_received',
+      auditable: application,
       metadata: {
         application_id: application.id,
         inbound_email_id: inbound_email.id,
@@ -87,7 +88,7 @@ class ProofSubmissionMailbox < ApplicationMailbox
 
     # Check for medical certification keywords
     if text.match?(/\b(medical|certification|doctor|provider|health)\b/) ||
-       mail.to.to_s.downcase.include?('medical-cert')
+       mail.to.to_s.downcase.include?('disability_cert')
       :medical_certification
     # Check for residency proof keywords
     elsif text.match?(/\b(residency|address)\b/) && !text.match?(/\bincome\b/)
@@ -150,9 +151,10 @@ class ProofSubmissionMailbox < ApplicationMailbox
 
   def notify_admin
     # Notify admin of new proof submission
-    Event.create!(
-      user: constituent,
+    AuditEventService.log(
+      actor: constituent,
       action: 'proof_submission_processed',
+      auditable: application,
       metadata: {
         application_id: application.id,
         inbound_email_id: inbound_email.id
@@ -173,9 +175,9 @@ class ProofSubmissionMailbox < ApplicationMailbox
 
   def ensure_active_application
     # An application is considered active for proof submission if its status
-    # is one of: in_progress, needs_information, reminder_sent, or awaiting_documents.
+    # is one of: in_progress, awaiting_proof, reminder_sent, or awaiting_dcf.
     # This aligns with the :active scope defined in ApplicationStatusManagement.
-    active_statuses = %i[in_progress needs_information reminder_sent awaiting_documents]
+    active_statuses = %i[in_progress awaiting_proof reminder_sent awaiting_dcf]
     return if application && active_statuses.include?(application.status&.to_sym)
 
     bounce_with_notification(
@@ -262,9 +264,11 @@ class ProofSubmissionMailbox < ApplicationMailbox
   end
 
   def create_bounce_event(event_user, error_type, message)
-    Event.create!(
-      user: event_user,
+    # Use AuditEventService with optional auditable (nil if application not found)
+    AuditEventService.log(
+      actor: event_user,
       action: "proof_submission_#{error_type}",
+      auditable: application,
       metadata: build_bounce_event_metadata(error_type, message)
     )
   end
